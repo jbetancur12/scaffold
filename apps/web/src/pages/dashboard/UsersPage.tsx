@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { userApi, CreateUserData } from '@/services/userApi';
 import { User, UserRole } from '@scaffold/types';
+import { CreateUserSchema } from '@scaffold/schemas';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -74,6 +75,9 @@ export default function UsersPage() {
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            // Client-side validation using shared schema
+            CreateUserSchema.parse(formData);
+
             await userApi.createUser(formData);
             toast({
                 title: 'Éxito',
@@ -83,9 +87,17 @@ export default function UsersPage() {
             setFormData({ email: '', password: '', role: UserRole.USER });
             loadUsers();
         } catch (error: any) {
+            let message = 'Error al crear el usuario';
+
+            if (error.name === 'ZodError') {
+                message = error.errors[0].message;
+            } else if (error.response?.data?.message) {
+                message = error.response.data.message;
+            }
+
             toast({
-                title: 'Error',
-                description: error.response?.data?.message || 'Error al crear el usuario',
+                title: 'Error de validación',
+                description: message,
                 variant: 'destructive',
             });
         }

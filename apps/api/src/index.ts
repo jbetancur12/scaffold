@@ -11,6 +11,7 @@ import { createAuthRoutes } from './modules/auth/auth.routes';
 import { createUserRoutes } from './modules/user/user.routes';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './shared/middleware/error.middleware';
+import { setupSwagger } from './config/swagger';
 
 const app = express();
 const PORT = env.PORT;
@@ -22,6 +23,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+setupSwagger(app);
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes

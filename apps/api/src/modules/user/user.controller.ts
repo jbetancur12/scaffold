@@ -3,6 +3,7 @@ import { UserService } from './user.service';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 import { asyncHandler } from '../../shared/middleware/error.middleware';
 import { AuthRequest } from '../../middleware/auth.middleware';
+import { CreateUserSchema, UpdateUserSchema } from '@scaffold/schemas';
 
 export class UserController {
     constructor(private readonly userService: UserService) { }
@@ -28,16 +29,14 @@ export class UserController {
     });
 
     create = asyncHandler(async (req: Request, res: Response) => {
-        const { email, password, role } = req.body;
-        if (!email || !password || !role) {
-            throw new AppError('Email, contraseña y rol son requeridos', 400);
-        }
-        const user = await this.userService.createUser({ email, password, role });
+        const validatedData = CreateUserSchema.parse(req.body);
+        const user = await this.userService.createUser(validatedData);
         return ApiResponse.success(res, user, 'Usuario creado', 201);
     });
 
     update = asyncHandler(async (req: Request, res: Response) => {
-        const user = await this.userService.updateUser(req.params.id, req.body);
+        const validatedData = UpdateUserSchema.parse(req.body);
+        const user = await this.userService.updateUser(req.params.id, validatedData);
         return ApiResponse.success(res, user, 'Usuario actualizado');
     });
 

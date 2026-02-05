@@ -10,6 +10,9 @@
         "paths": {
             "@scaffold/types": [
                 "../../packages/types/src/index.ts"
+            ],
+            "@scaffold/schemas": [
+                "../../packages/schemas/src/index.ts"
             ]
         }
     },
