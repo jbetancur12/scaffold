@@ -8,6 +8,8 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './src'),
+            '@scaffold/types': path.resolve(__dirname, '../../packages/types/src/index.ts'),
+            '@scaffold/schemas': path.resolve(__dirname, '../../packages/schemas/src/index.ts'),
         },
     },
     server: {
