@@ -10,6 +10,7 @@ import { UserRole } from '@scaffold/types';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { Button } from '@/components/ui/button';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 
 export default function DashboardPage() {
     const { user } = useAuth();
@@ -24,9 +25,18 @@ export default function DashboardPage() {
         <DashboardLayout>
             <div className="space-y-10">
                 {/* Welcome Section */}
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">¡Bienvenido de nuevo, {user?.email.split('@')[0]}!</h2>
-                    <p className="text-slate-500 mt-2">Esto es lo que está pasando en tu sistema hoy.</p>
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 className="text-3xl font-bold tracking-tight text-slate-900">¡Bienvenido de nuevo, {user?.email.split('@')[0]}!</h2>
+                        <p className="text-slate-500 mt-2">Esto es lo que está pasando en tu sistema hoy.</p>
+                    </div>
+
+                    {/* Example of Role-Based Action Visibility */}
+                    <RoleGuard allowedRoles={[UserRole.SUPERADMIN]}>
+                        <Button variant="outline" className="border-primary text-primary hover:bg-primary/5 rounded-xl">
+                            Acceso de Super Administrador
+                        </Button>
+                    </RoleGuard>
                 </div>
 
                 {/* Stats Grid */}

@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import { env } from './config/env';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -10,9 +10,10 @@ import { connectRedis } from './config/redis';
 import { createAuthRoutes } from './modules/auth/auth.routes';
 import { createUserRoutes } from './modules/user/user.routes';
 import { rateLimit } from 'express-rate-limit';
+import { errorHandler } from './shared/middleware/error.middleware';
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = env.PORT;
 
 app.use(helmet());
 app.use(cors({
@@ -58,6 +59,9 @@ const main = async () => {
         app.get('/', (_req, res) => {
             res.json({ message: 'API is running' });
         });
+
+        // Global Error Handler (Must be last)
+        app.use(errorHandler);
 
         app.listen(PORT, () => {
             winstonLogger.info(`Server running on port ${PORT}`);

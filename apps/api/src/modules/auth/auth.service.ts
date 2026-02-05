@@ -46,7 +46,18 @@ export class AuthService {
     }
 
     async login(user: User) {
-        const tokens = this.generateTokens(user);
-        return tokens;
+        return this.generateTokens(user);
+    }
+
+    async getUserByEmail(email: string) {
+        return this.userService.findByEmail(email);
+    }
+
+    verifyToken(token: string) {
+        try {
+            return jwt.verify(token, process.env.JWT_SECRET!) as any;
+        } catch (error) {
+            return null;
+        }
     }
 }
