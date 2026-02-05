@@ -12,6 +12,7 @@ import {
     Search,
     UserCircle
 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
 import { cn } from '@/lib/utils';
 
@@ -38,6 +39,7 @@ const SidebarItem = ({ icon: Icon, label, active, onClick }: SidebarItemProps) =
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+    const { toast } = useToast();
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -53,9 +55,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const handleLogout = async () => {
         try {
             await logout();
+            toast({
+                title: 'Logged out',
+                description: 'You have been successfully logged out.',
+            });
             navigate('/login');
         } catch (error) {
-            console.error('Logout failed', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to log out. Please try again.',
+                variant: 'destructive',
+            });
         }
     };
 

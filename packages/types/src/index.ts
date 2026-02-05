@@ -8,6 +8,6 @@ export interface User {
     id: string;
     email: string;
     role: UserRole;
-    createdAt: string;
-    updatedAt: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
 }

@@ -7,10 +7,26 @@ const api = axios.create({
     withCredentials: true, // Important for HttpOnly cookies
 });
 
+api.interceptors.request.use(
+    (config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
 api.interceptors.response.use(
     (response) => response,
     async (error) => {
-        // Handle 401, refresh token logic could go here
+        if (error.response?.status === 401) {
+            // Optional: Handle token expiration/refresh or redirect to login
+            localStorage.removeItem('token');
+        }
         return Promise.reject(error);
     }
 );

@@ -21,10 +21,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const checkAuth = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const response = await api.get('/users/me');
             setUser(response.data);
         } catch {
+            localStorage.removeItem('token');
             setUser(null);
         } finally {
             setIsLoading(false);
@@ -33,12 +40,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const login = async (email: string, password: string) => {
         const response = await api.post('/auth/login', { email, password });
-        setUser(response.data.user);
+        const { accessToken, user: userData } = response.data;
+        localStorage.setItem('token', accessToken);
+        setUser(userData);
     };
 
     const logout = async () => {
-        await api.post('/auth/logout');
-        setUser(null);
+        try {
+            await api.post('/auth/logout');
+        } finally {
+            localStorage.removeItem('token');
+            setUser(null);
+        }
     };
 
     return (

@@ -29,7 +29,7 @@ export class AuthService {
     }
 
     generateTokens(user: User) {
-        const payload = { sub: user.id, email: user.email, role: user.role };
+        const payload = { id: user.id, email: user.email, role: user.role };
         const accessOptions: SignOptions = {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             expiresIn: (process.env.JWT_ACCESS_EXPIRATION || '15m') as any,
