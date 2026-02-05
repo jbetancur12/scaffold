@@ -69,30 +69,49 @@ try {
 
 ---
 
+## 🔑 Estrategia de Tokens (Seguridad)
+
+El scaffold utiliza una estrategia de doble token para máxima seguridad:
+
+1.  **Access Token**: Se devuelve en el body de la respuesta y se guarda en `localStorage`. Se envía en el header `Authorization: Bearer <token>`. Es de vida corta (15 min).
+2.  **Refresh Token**: Se envía automáticamente en una cookie `HttpOnly` y `Secure`. El frontend **no puede** acceder a ella mediante JS, lo que previene ataques XSS. Es de vida larga (7 días) y se usa para renovar el Access Token mediante el endpoint `/auth/refresh`.
+
+---
+
 ## 🔐 Gestión de Roles (RBAC)
 
 El scaffold usa el enum `UserRole` definido en `@scaffold/types`.
 
 ### Backend: Protegiendo Rutas
-Usa el middleware `authenticateToken` seguido de `authorizeRoles`.
+Usa el middleware `authenticateToken` seguido de `requireRole`.
 
 ```typescript
 router.get('/admin-only', 
     authenticateToken, 
-    authorizeRoles(UserRole.SUPERADMIN, UserRole.ADMIN),
+    requireRole([UserRole.SUPERADMIN, UserRole.ADMIN]),
     controller.method
 );
 ```
 
-### Frontend: UI Condicional
-Usa el objeto `user` del `AuthContext`.
+### Frontend: UI Declarativa (`RoleGuard`)
+Para mostrar u ocultar componentes basados en el rol, usa el componente `RoleGuard`.
 
-```typescript
-const { user } = useAuth();
+```tsx
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { UserRole } from '@scaffold/types';
 
-{user?.role === UserRole.SUPERADMIN && (
-    <Button>Solo para Superadmin</Button>
-)}
+<RoleGuard allowedRoles={[UserRole.SUPERADMIN, UserRole.ADMIN]}>
+    <Button>Panel de Control</Button>
+</RoleGuard>
+```
+
+### Frontend: Hook de Permisos (`useHasRole`)
+Si necesitas lógica de permisos dentro de una función o para propiedades:
+
+```tsx
+const { hasRole } = useHasRole();
+
+const canEdit = hasRole([UserRole.SUPERADMIN]);
 ```
 
 ---
@@ -104,6 +123,54 @@ Para evitar inconsistencias, **toda** validación de datos de entrada (Login, Re
 1.  **Define el esquema** en `packages/schemas/src/index.ts`.
 2.  **Usa `.parse()`** en el backend (Controller) para validar el `req.body`.
 3.  **Usa `.parse()`** en el frontend antes de enviar la peticion para dar feedback inmediato al usuario.
+
+---
+
+---
+
+## 📡 Eventos Internos (`EventEmitter`)
+
+Para mantener el código desacoplado, usamos un `eventEmitter` global para efectos secundarios (logs de auditoría, emails, notificaciones).
+
+```typescript
+import { eventEmitter, APP_EVENTS } from '../../shared/services/event-emitter.service';
+
+// Emitir un evento
+eventEmitter.emitSafe(APP_EVENTS.USER_LOGGED_IN, { userId: user.id, email: user.email });
+```
+*Los eventos se manejan de forma segura para no tumbar el servidor si un listener falla.*
+
+---
+
+## 🗑️ Borrado Lógico (Soft Delete)
+
+Todas las entidades heredan de `BaseEntity`, que incluye una propiedad `deletedAt`. 
+
+- **Nunca** borres datos físicamente a menos que sea estrictamente necesario.
+- Para "borrar" un registro, simplemente marca la fecha: `entity.deletedAt = new Date();`.
+- *Nota: En futuras versiones se puede añadir un filtro global en MikroORM para ignorar registros borrados.*
+
+---
+
+## 🏥 Monitoreo y Salud (Health Checks)
+
+El sistema incluye un endpoint de salud para verificar la conectividad de la base de datos y Redis.
+
+- **Endpoint**: `GET /health`
+- **Uso**: Útil para orquestadores como Kubernetes o servicios de monitoreo externo.
+
+---
+
+## 📝 Registro de Logs (Winston)
+
+No uses `console.log`. Usa el logger configurado para asegurar que los logs se formateen correctamente y puedan ser enviados a servicios externos en el futuro.
+
+```typescript
+import { winstonLogger } from './config/logger';
+
+winstonLogger.info('Iniciando proceso X...');
+winstonLogger.error('Fallo crítico en Y', { error });
+```
 
 ---
 
