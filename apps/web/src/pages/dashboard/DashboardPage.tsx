@@ -6,12 +6,19 @@ import {
     Clock,
     ArrowRight
 } from 'lucide-react';
+import { UserRole } from '@scaffold/types';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { Button } from '@/components/ui/button';
 
 export default function DashboardPage() {
     const { user } = useAuth();
+
+    const roleLabels: Record<string, string> = {
+        [UserRole.SUPERADMIN]: 'Super Administrador',
+        [UserRole.ADMIN]: 'Administrador',
+        [UserRole.USER]: 'Usuario Estándar',
+    };
 
     return (
         <DashboardLayout>
@@ -69,7 +76,7 @@ export default function DashboardPage() {
                                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Permisos del Sistema</p>
                                     <div className="flex items-center gap-2 mt-1">
                                         <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-                                        <p className="text-sm font-semibold text-primary capitalize">{user?.role}</p>
+                                        <p className="text-sm font-semibold text-primary">{user ? roleLabels[user.role] : ''}</p>
                                     </div>
                                 </div>
                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">

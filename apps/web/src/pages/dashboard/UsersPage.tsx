@@ -45,6 +45,12 @@ export default function UsersPage() {
         role: UserRole.USER,
     });
 
+    const roleLabels: Record<string, string> = {
+        [UserRole.SUPERADMIN]: 'Super Administrador',
+        [UserRole.ADMIN]: 'Administrador',
+        [UserRole.USER]: 'Usuario Estándar',
+    };
+
     useEffect(() => {
         loadUsers();
     }, []);
@@ -162,7 +168,7 @@ export default function UsersPage() {
                                                 "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider",
                                                 user.role === UserRole.SUPERADMIN ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-600"
                                             )}>
-                                                {user.role}
+                                                {roleLabels[user.role]}
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-slate-500 font-medium">

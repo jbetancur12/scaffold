@@ -43,6 +43,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+    const roleLabels: Record<string, string> = {
+        [UserRole.SUPERADMIN]: 'Super Administrador',
+        [UserRole.ADMIN]: 'Administrador',
+        [UserRole.USER]: 'Usuario Estándar',
+    };
+
     const menuItems = [
         { icon: LayoutDashboard, label: 'Resumen', path: '/dashboard', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Users, label: 'Usuarios', path: '/dashboard/users', roles: [UserRole.SUPERADMIN] },
@@ -99,7 +105,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         </div>
                         <div className="flex flex-col overflow-hidden">
                             <span className="text-sm font-semibold truncate text-slate-900">{user?.email}</span>
-                            <span className="text-xs text-slate-500 capitalize">{user?.role}</span>
+                            <span className="text-xs text-slate-500">{user ? roleLabels[user.role] : ''}</span>
                         </div>
                     </div>
                     <Button
@@ -183,7 +189,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <div className="h-8 w-[1px] bg-slate-200 mx-2 hidden sm:block" />
                         <div className="hidden sm:flex flex-col items-end">
                             <span className="text-sm font-medium text-slate-900">{user?.email.split('@')[0]}</span>
-                            <span className="text-[10px] uppercase tracking-wider font-bold text-primary">{user?.role}</span>
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-primary">{user ? roleLabels[user.role] : ''}</span>
                         </div>
                     </div>
                 </header>
