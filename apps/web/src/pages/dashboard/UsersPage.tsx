@@ -57,7 +57,7 @@ export default function UsersPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'Failed to load users',
+                description: 'No se pudieron cargar los usuarios',
                 variant: 'destructive',
             });
         } finally {
@@ -70,8 +70,8 @@ export default function UsersPage() {
         try {
             await userApi.createUser(formData);
             toast({
-                title: 'Success',
-                description: 'User created successfully',
+                title: 'Éxito',
+                description: 'Usuario creado exitosamente',
             });
             setIsCreateModalOpen(false);
             setFormData({ email: '', password: '', role: UserRole.USER });
@@ -79,26 +79,26 @@ export default function UsersPage() {
         } catch (error: any) {
             toast({
                 title: 'Error',
-                description: error.response?.data?.message || 'Failed to create user',
+                description: error.response?.data?.message || 'Error al crear el usuario',
                 variant: 'destructive',
             });
         }
     };
 
     const handleDeleteUser = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this user?')) return;
+        if (!confirm('¿Estás seguro de que deseas eliminar este usuario?')) return;
 
         try {
             await userApi.deleteUser(id);
             toast({
-                title: 'Success',
-                description: 'User deleted successfully',
+                title: 'Éxito',
+                description: 'Usuario eliminado exitosamente',
             });
             loadUsers();
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'Failed to delete user',
+                description: 'No se pudo eliminar al usuario',
                 variant: 'destructive',
             });
         }
@@ -108,10 +108,10 @@ export default function UsersPage() {
         return (
             <div className="flex flex-col items-center justify-center py-20">
                 <Shield className="h-16 w-16 text-slate-200 mb-4" />
-                <h1 className="text-2xl font-bold text-slate-900 mb-2">Access Denied</h1>
-                <p className="text-slate-500">You don't have permission to access user management.</p>
+                <h1 className="text-2xl font-bold text-slate-900 mb-2">Acceso Denegado</h1>
+                <p className="text-slate-500">No tienes permisos para acceder a la gestión de usuarios.</p>
                 <Button variant="link" onClick={() => window.history.back()} className="mt-4">
-                    Go back
+                    Regresar
                 </Button>
             </div>
         );
@@ -122,12 +122,12 @@ export default function UsersPage() {
             <div className="space-y-8">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-slate-900">User Management</h1>
-                        <p className="text-slate-500 mt-1">Manage system accounts and permission levels.</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Gestión de Usuarios</h1>
+                        <p className="text-slate-500 mt-1">Administra las cuentas del sistema y niveles de permisos.</p>
                     </div>
                     <Button onClick={() => setIsCreateModalOpen(true)} className="shadow-lg shadow-primary/20">
                         <UserPlus className="mr-2 h-4 w-4" />
-                        Create New User
+                        Crear Nuevo Usuario
                     </Button>
                 </div>
 
@@ -140,10 +140,10 @@ export default function UsersPage() {
                         <Table>
                             <TableHeader className="bg-slate-50/50">
                                 <TableRow>
-                                    <TableHead className="font-bold text-slate-900"><Mail className="inline mr-2 h-4 w-4 text-slate-400" />Email</TableHead>
-                                    <TableHead className="font-bold text-slate-900"><Shield className="inline mr-2 h-4 w-4 text-slate-400" />Role</TableHead>
-                                    <TableHead className="font-bold text-slate-900"><Calendar className="inline mr-2 h-4 w-4 text-slate-400" />Joined On</TableHead>
-                                    <TableHead className="text-right font-bold text-slate-900">Actions</TableHead>
+                                    <TableHead className="font-bold text-slate-900"><Mail className="inline mr-2 h-4 w-4 text-slate-400" />Correo Electrónico</TableHead>
+                                    <TableHead className="font-bold text-slate-900"><Shield className="inline mr-2 h-4 w-4 text-slate-400" />Rol</TableHead>
+                                    <TableHead className="font-bold text-slate-900"><Calendar className="inline mr-2 h-4 w-4 text-slate-400" />Registrado el</TableHead>
+                                    <TableHead className="text-right font-bold text-slate-900">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -166,7 +166,7 @@ export default function UsersPage() {
                                             </span>
                                         </TableCell>
                                         <TableCell className="text-slate-500 font-medium">
-                                            {new Date(user.createdAt).toLocaleDateString('en-US', {
+                                            {new Date(user.createdAt).toLocaleDateString('es-ES', {
                                                 month: 'short',
                                                 day: 'numeric',
                                                 year: 'numeric'
@@ -193,19 +193,19 @@ export default function UsersPage() {
                 <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
                     <DialogContent className="sm:max-w-[425px] rounded-3xl p-8">
                         <DialogHeader>
-                            <DialogTitle className="text-2xl font-bold">Add New User</DialogTitle>
+                            <DialogTitle className="text-2xl font-bold">Añadir Nuevo Usuario</DialogTitle>
                             <DialogDescription className="text-slate-500">
-                                Create a new account with specific permissions.
+                                Crea una nueva cuenta con permisos específicos.
                             </DialogDescription>
                         </DialogHeader>
                         <form onSubmit={handleCreateUser} className="space-y-6 pt-4">
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="email" className="font-semibold px-1">Email Address</Label>
+                                    <Label htmlFor="email" className="font-semibold px-1">Correo Electrónico</Label>
                                     <Input
                                         id="email"
                                         type="email"
-                                        placeholder="user@example.com"
+                                        placeholder="usuario@ejemplo.com"
                                         value={formData.email}
                                         onChange={(e) =>
                                             setFormData({ ...formData, email: e.target.value })
@@ -215,11 +215,11 @@ export default function UsersPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="password" className="font-semibold px-1">Initial Password</Label>
+                                    <Label htmlFor="password" className="font-semibold px-1">Contraseña Inicial</Label>
                                     <Input
                                         id="password"
                                         type="password"
-                                        placeholder="Minimum 8 characters"
+                                        placeholder="Mínimo 8 caracteres"
                                         value={formData.password}
                                         onChange={(e) =>
                                             setFormData({ ...formData, password: e.target.value })
@@ -229,7 +229,7 @@ export default function UsersPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="role" className="font-semibold px-1">Access Level</Label>
+                                    <Label htmlFor="role" className="font-semibold px-1">Nivel de Acceso</Label>
                                     <Select
                                         value={formData.role}
                                         onValueChange={(value) =>
@@ -240,8 +240,8 @@ export default function UsersPage() {
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="rounded-xl">
-                                            <SelectItem value={UserRole.USER}>Standard User</SelectItem>
-                                            <SelectItem value={UserRole.ADMIN}>Administrator</SelectItem>
+                                            <SelectItem value={UserRole.USER}>Usuario Estándar</SelectItem>
+                                            <SelectItem value={UserRole.ADMIN}>Administrador</SelectItem>
                                             <SelectItem value={UserRole.SUPERADMIN}>Super Admin</SelectItem>
                                         </SelectContent>
                                     </Select>
@@ -254,10 +254,10 @@ export default function UsersPage() {
                                     onClick={() => setIsCreateModalOpen(false)}
                                     className="rounded-xl"
                                 >
-                                    Cancel
+                                    Cancelar
                                 </Button>
                                 <Button type="submit" className="rounded-xl shadow-lg shadow-primary/20">
-                                    Create Account
+                                    Crear Cuenta
                                 </Button>
                             </DialogFooter>
                         </form>

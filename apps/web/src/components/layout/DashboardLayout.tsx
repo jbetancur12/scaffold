@@ -44,8 +44,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const menuItems = [
-        { icon: LayoutDashboard, label: 'Overview', path: '/dashboard', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: Users, label: 'Users', path: '/dashboard/users', roles: [UserRole.SUPERADMIN] },
+        { icon: LayoutDashboard, label: 'Resumen', path: '/dashboard', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Users, label: 'Usuarios', path: '/dashboard/users', roles: [UserRole.SUPERADMIN] },
     ];
 
     const filteredItems = menuItems.filter(item =>
@@ -56,14 +56,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         try {
             await logout();
             toast({
-                title: 'Logged out',
-                description: 'You have been successfully logged out.',
+                title: 'Sesión cerrada',
+                description: 'Has cerrado sesión exitosamente.',
             });
             navigate('/login');
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'Failed to log out. Please try again.',
+                description: 'No se pudo cerrar la sesión. Inténtalo de nuevo.',
                 variant: 'destructive',
             });
         }
@@ -108,7 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         onClick={handleLogout}
                     >
                         <LogOut className="mr-3 h-5 w-5" />
-                        Logout
+                        Cerrar sesión
                     </Button>
                 </div>
             </aside>
@@ -172,7 +172,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <Search className="h-4 w-4 text-slate-400 mr-2" />
                             <input
                                 type="text"
-                                placeholder="Search..."
+                                placeholder="Buscar..."
                                 className="bg-transparent border-none outline-none text-sm w-48 text-slate-900 placeholder:text-slate-400"
                             />
                         </div>
