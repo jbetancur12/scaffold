@@ -60,7 +60,7 @@ export default function UsersPage() {
         try {
             setLoading(true);
             const response = await userApi.getUsers();
-            setUsers(response.users);
+            setUsers(response.items);
         } catch (error) {
             toast({
                 title: 'Error',
