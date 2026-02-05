@@ -9,6 +9,7 @@ import { winstonLogger } from './config/logger';
 import { connectRedis } from './config/redis';
 import { createAuthRoutes } from './modules/auth/auth.routes';
 import { createUserRoutes } from './modules/user/user.routes';
+import { createHealthRoutes } from './modules/health/health.routes';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './shared/middleware/error.middleware';
 import { setupSwagger } from './config/swagger';
@@ -56,6 +57,7 @@ const main = async () => {
 
         // Routes
         app.use('/auth', createAuthRoutes(orm));
+        app.use('/health', createHealthRoutes(orm));
         app.use('/users', createUserRoutes(orm));
 
         app.get('/', (_req, res) => {

@@ -4,6 +4,7 @@ import { LoginSchema, RegisterSchema } from './auth.dto';
 import { RedisService } from '../../shared/services/redis.service';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 import { asyncHandler } from '../../shared/middleware/error.middleware';
+import { eventEmitter, APP_EVENTS } from '../../shared/services/event-emitter.service';
 
 export class AuthController {
     constructor(
@@ -33,6 +34,8 @@ export class AuthController {
             sameSite: 'strict',
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
+
+        eventEmitter.emitSafe(APP_EVENTS.USER_LOGGED_IN, { userId: user.id, email: user.email });
 
         return ApiResponse.success(res, {
             accessToken,
