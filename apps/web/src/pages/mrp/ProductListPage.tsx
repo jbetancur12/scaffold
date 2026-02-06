@@ -67,9 +67,7 @@ export default function ProductListPage() {
                                     <TableHead className="font-bold text-slate-900">Nombre</TableHead>
                                     <TableHead className="font-bold text-slate-900">SKU</TableHead>
                                     <TableHead className="font-bold text-slate-900">Variantes</TableHead>
-                                    <TableHead className="font-bold text-slate-900">Costo Global (Peor Esc.)</TableHead>
-                                    <TableHead className="font-bold text-slate-900">Precio Base</TableHead>
-                                    <TableHead className="font-bold text-slate-900">Precio Base</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Precio de Venta</TableHead>
                                     <TableHead className="font-bold text-slate-900">Margen Crítico (Mín.)</TableHead>
                                     <TableHead className="text-right font-bold text-slate-900">Acciones</TableHead>
                                 </TableRow>
@@ -77,10 +75,20 @@ export default function ProductListPage() {
                             <TableBody>
                                 {products.map((product) => {
                                     const variants = product.variants || [];
+
+                                    // Find the variant with the highest production cost
+                                    const variantWithMaxCost = variants.length > 0
+                                        ? [...variants].sort((a, b) => (b.cost || 0) - (a.cost || 0))[0]
+                                        : null;
+
                                     const margins = variants
                                         .filter(v => (v.price || 0) > 0)
                                         .map(v => (v.price - v.cost) / v.price);
-                                    const minMargin = margins.length > 0 ? Math.min(...margins) : null;
+
+                                    // Use the margin of the most expensive variant as the baseline
+                                    const minMargin = variantWithMaxCost && (variantWithMaxCost.price || 0) > 0
+                                        ? (variantWithMaxCost.price - variantWithMaxCost.cost) / variantWithMaxCost.price
+                                        : (margins.length > 0 ? Math.min(...margins) : null);
 
                                     const avgTargetMargin = variants.length > 0
                                         ? variants.reduce((acc, v) => acc + (v.targetMargin || 0.4), 0) / variants.length
@@ -107,7 +115,7 @@ export default function ProductListPage() {
                                             <TableCell>{product.sku}</TableCell>
                                             <TableCell>{variants.length}</TableCell>
                                             <TableCell className="font-bold text-slate-900">
-                                                {variants.length > 0 ? `$${Math.max(...variants.map(v => v.price || 0)).toFixed(2)}` : '-'}
+                                                {variantWithMaxCost ? `$${variantWithMaxCost.price.toFixed(2)}` : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 {minMargin !== null ? (

@@ -251,12 +251,16 @@ export default function ProductFormPage() {
                         </div>
                         {(() => {
                             const variants = product.variants || [];
-                            const maxCost = Math.max(...variants.map(v => v.cost || 0));
-                            const validPrices = variants.filter(v => (v.price || 0) > 0).map(v => v.price);
-                            const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
 
-                            // Safety margin uses the worst combination: highest cost vs lowest valid price
-                            const criticalMargin = (minPrice > 0 && variants.length > 0) ? (minPrice - maxCost) / minPrice : 0;
+                            // Find the variant with the highest production cost
+                            const variantWithMaxCost = variants.length > 0
+                                ? [...variants].sort((a, b) => (b.cost || 0) - (a.cost || 0))[0]
+                                : null;
+
+                            const maxCost = variantWithMaxCost ? variantWithMaxCost.cost : 0;
+                            const priceRef = variantWithMaxCost ? variantWithMaxCost.price : 0;
+
+                            const criticalMargin = (priceRef > 0) ? (priceRef - maxCost) / priceRef : 0;
                             const avgTarget = variants.length > 0
                                 ? variants.reduce((acc, v) => acc + (v.targetMargin || 0.4), 0) / variants.length
                                 : 0.4;
