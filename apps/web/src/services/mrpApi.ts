@@ -48,11 +48,11 @@ export const mrpApi = {
     },
 
     // Variants
-    createVariant: async (productId: string, data: Partial<{ name: string; sku: string; price: number }>): Promise<unknown> => {
+    createVariant: async (productId: string, data: Partial<{ name: string; sku: string; price: number; targetMargin: number }>): Promise<unknown> => {
         const response = await api.post(`/mrp/products/${productId}/variants`, data);
         return response.data;
     },
-    updateVariant: async (variantId: string, data: Partial<{ name: string; sku: string; price: number }>): Promise<unknown> => {
+    updateVariant: async (variantId: string, data: Partial<{ name: string; sku: string; price: number; targetMargin: number }>): Promise<unknown> => {
         const response = await api.put(`/mrp/variants/${variantId}`, data);
         return response.data;
     },

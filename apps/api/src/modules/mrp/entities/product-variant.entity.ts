@@ -35,7 +35,7 @@ export class ProductVariant extends BaseEntity implements IProductVariant {
     @Property()
     indirectCost: number = 0;
 
-    @Property()
+    @Property({ fieldName: 'target_margin' })
     targetMargin: number = 0.4;
 
     @OneToMany(() => BOMItem, bomItem => bomItem.variant)

@@ -494,7 +494,7 @@ export default function ProductFormPage() {
                             {editingVariant && (editingVariant as any).cost > 0 && (
                                 <div className="mt-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
                                     <div className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
-                                        <Save className="h-4 w-4" /> {/* Should use a bulb icon ideally */}
+                                        <Save className="h-4 w-4" />
                                         Asistente de Precios
                                     </div>
                                     <div className="space-y-1">
@@ -505,11 +505,11 @@ export default function ProductFormPage() {
                                         <div className="flex justify-between text-xs text-slate-600">
                                             <span>Precio Recomendado:</span>
                                             <span className="font-bold text-primary">
-                                                ${((editingVariant as any).cost / (1 - variantFormData.targetMargin)).toFixed(2)}
+                                                ${(variantFormData.targetMargin < 1 ? ((editingVariant as any).cost / (1 - (variantFormData.targetMargin || 0.4))).toFixed(2) : '0.00')}
                                             </span>
                                         </div>
                                         <p className="text-[10px] text-slate-400 mt-2 italic">
-                                            * Basado en el costo real promedio y tu margen objetivo del {(variantFormData.targetMargin * 100).toFixed(0)}%.
+                                            * Basado en el costo real promedio y tu margen objetivo del {((variantFormData.targetMargin || 0.4) * 100).toFixed(0)}%.
                                         </p>
                                     </div>
                                 </div>
