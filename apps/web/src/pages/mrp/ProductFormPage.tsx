@@ -239,6 +239,49 @@ export default function ProductFormPage() {
                     </div>
                 </div>
 
+                {/* Global Product Summary */}
+                {isEditing && product && product.variants && product.variants.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-primary/5 border border-primary/10 p-6 rounded-3xl">
+                            <Label className="text-[10px] text-primary uppercase tracking-wider font-bold">Peor Escenario (Costo Máx.)</Label>
+                            <div className="text-2xl font-bold text-slate-900 mt-1">
+                                ${Math.max(...product.variants.map(v => v.cost || 0)).toFixed(2)}
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1">Costo de la variante más costosa</p>
+                        </div>
+                        <div className="bg-white border border-slate-200 p-6 rounded-3xl">
+                            <Label className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Precio Promedio</Label>
+                            <div className="text-2xl font-bold text-slate-900 mt-1">
+                                ${(product.variants.reduce((acc, v) => acc + (v.price || 0), 0) / product.variants.length).toFixed(2)}
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1">Basado en {product.variants.length} variantes</p>
+                        </div>
+                        {(() => {
+                            const maxCost = Math.max(...product.variants.map(v => v.cost || 0));
+                            const avgPrice = product.variants.reduce((acc, v) => acc + (v.price || 0), 0) / product.variants.length;
+                            const globalMargin = (avgPrice - maxCost) / avgPrice;
+                            const avgTarget = product.variants.reduce((acc, v) => acc + (v.targetMargin || 0.4), 0) / product.variants.length;
+
+                            const getGlobalColor = (margin: number, target: number) => {
+                                const deviation = margin - target;
+                                if (deviation < -0.1) return 'text-red-600 bg-red-50 border-red-200';
+                                if (deviation < 0) return 'text-amber-600 bg-amber-50 border-amber-200';
+                                return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+                            };
+
+                            return (
+                                <div className={`${getGlobalColor(globalMargin, avgTarget)} border p-6 rounded-3xl`}>
+                                    <Label className="text-[10px] uppercase tracking-wider font-bold opacity-70">Margen Global (Mín.)</Label>
+                                    <div className="text-2xl font-bold mt-1">
+                                        {(globalMargin * 100).toFixed(1)}%
+                                    </div>
+                                    <p className="text-[10px] opacity-70 mt-1">Meta promedio: {(avgTarget * 100).toFixed(0)}%</p>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="space-y-8">
                     {/* Product Basic Info */}
                     <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">

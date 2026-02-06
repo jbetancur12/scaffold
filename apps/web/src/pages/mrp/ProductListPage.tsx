@@ -67,7 +67,9 @@ export default function ProductListPage() {
                                     <TableHead className="font-bold text-slate-900">Nombre</TableHead>
                                     <TableHead className="font-bold text-slate-900">SKU</TableHead>
                                     <TableHead className="font-bold text-slate-900">Variantes</TableHead>
-                                    <TableHead className="font-bold text-slate-900">Rentabilidad (Margen Real)</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Costo Global (Peor Esc.)</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Precio Base</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Rentabilidad Global</TableHead>
                                     <TableHead className="text-right font-bold text-slate-900">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -102,10 +104,16 @@ export default function ProductListPage() {
                                             </TableCell>
                                             <TableCell>{product.sku}</TableCell>
                                             <TableCell>{variants.length}</TableCell>
+                                            <TableCell className="font-semibold text-slate-700">
+                                                {variants.length > 0 ? `$${Math.max(...variants.map(v => v.cost || 0)).toFixed(2)}` : '-'}
+                                            </TableCell>
+                                            <TableCell className="text-slate-600">
+                                                {variants.length > 0 ? `$${(variants.reduce((acc, v) => acc + (v.price || 0), 0) / variants.length).toFixed(2)}` : '-'}
+                                            </TableCell>
                                             <TableCell>
                                                 {avgMargin !== null ? (
                                                     <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getMarginColor(avgMargin, avgTargetMargin)}`}>
-                                                        {(avgMargin * 100).toFixed(1)}% Promedio
+                                                        {(avgMargin * 100).toFixed(1)}% Real
                                                     </div>
                                                 ) : (
                                                     <span className="text-slate-400 text-xs">-</span>
