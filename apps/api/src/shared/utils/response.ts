@@ -1,3 +1,5 @@
+import { Response } from 'express';
+
 export class AppError extends Error {
     constructor(
         public message: string,
@@ -11,7 +13,7 @@ export class AppError extends Error {
 }
 
 export const ApiResponse = {
-    success: <T>(res: any, data: T, message: string = 'Success', statusCode: number = 200) => {
+    success: <T>(res: Response, data: T, message: string = 'Success', statusCode: number = 200) => {
         return res.status(statusCode).json({
             success: true,
             message,
@@ -19,7 +21,7 @@ export const ApiResponse = {
         });
     },
 
-    error: (res: any, message: string = 'Error', statusCode: number = 500, errorCode?: string) => {
+    error: (res: Response, message: string = 'Error', statusCode: number = 500, errorCode?: string) => {
         return res.status(statusCode).json({
             success: false,
             message,
@@ -27,7 +29,7 @@ export const ApiResponse = {
         });
     },
 
-    pagination: <T>(res: any, items: T[], total: number, page: number, limit: number, message: string = 'Success') => {
+    pagination: <T>(res: Response, items: T[], total: number, page: number, limit: number, message: string = 'Success') => {
         return res.status(200).json({
             success: true,
             message,

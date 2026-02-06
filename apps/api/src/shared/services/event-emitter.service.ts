@@ -16,7 +16,7 @@ class AppEventEmitter extends EventEmitter {
     /**
      * Generalized emit with logging
      */
-    emitSafe(event: string, ...args: any[]): boolean {
+    emitSafe(event: string, ...args: unknown[]): boolean {
         try {
             return this.emit(event, ...args);
         } catch (error) {

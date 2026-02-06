@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { userApi, CreateUserData } from '@/services/userApi';
 import { User, UserRole } from '@scaffold/types';
@@ -14,6 +14,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { ZodError } from 'zod';
+import { isAxiosError } from 'axios';
 import {
     Dialog,
     DialogContent,
@@ -52,11 +54,7 @@ export default function UsersPage() {
         [UserRole.USER]: 'Usuario Estándar',
     };
 
-    useEffect(() => {
-        loadUsers();
-    }, []);
-
-    const loadUsers = async () => {
+    const loadUsers = useCallback(async () => {
         try {
             setLoading(true);
             const response = await userApi.getUsers();
@@ -70,7 +68,11 @@ export default function UsersPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [toast]);
+
+    useEffect(() => {
+        loadUsers();
+    }, [loadUsers]);
 
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -86,12 +88,12 @@ export default function UsersPage() {
             setIsCreateModalOpen(false);
             setFormData({ email: '', password: '', role: UserRole.USER });
             loadUsers();
-        } catch (error: any) {
+        } catch (error: unknown) {
             let message = 'Error al crear el usuario';
 
-            if (error.name === 'ZodError') {
+            if (error instanceof ZodError) {
                 message = error.errors[0].message;
-            } else if (error.response?.data?.message) {
+            } else if (isAxiosError(error) && error.response?.data?.message) {
                 message = error.response.data.message;
             }
 

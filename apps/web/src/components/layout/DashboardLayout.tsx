@@ -10,7 +10,11 @@ import {
     X,
     Bell,
     Search,
-    UserCircle
+    UserCircle,
+    Package,
+    ShoppingCart,
+    Factory,
+    Warehouse
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
@@ -52,6 +56,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const menuItems = [
         { icon: LayoutDashboard, label: 'Resumen', path: '/dashboard', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Users, label: 'Usuarios', path: '/dashboard/users', roles: [UserRole.SUPERADMIN] },
+        { icon: Package, label: 'Productos', path: '/dashboard/mrp/products', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Package, label: 'Materias Primas', path: '/dashboard/mrp/raw-materials', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: ShoppingCart, label: 'Proveedores', path: '/dashboard/mrp/suppliers', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Factory, label: 'Órdenes de Producción', path: '/dashboard/mrp/production', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Warehouse, label: 'Inventario', path: '/dashboard/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
     ];
 
     const filteredItems = menuItems.filter(item =>

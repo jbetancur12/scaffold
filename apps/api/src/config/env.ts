@@ -1,4 +1,11 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { join } from 'path';
+
+// Load .env from monorepo root
+// When running with ts-node-dev, cwd is the workspace root (apps/api)
+// So we need to go up two levels to reach the monorepo root
+config({ path: join(process.cwd(), '../../.env') });
+
 import { z } from 'zod';
 
 const envSchema = z.object({

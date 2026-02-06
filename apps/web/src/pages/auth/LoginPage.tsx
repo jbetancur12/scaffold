@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { LoginSchema } from '@scaffold/schemas';
+import { ZodError } from 'zod';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -30,10 +31,10 @@ export default function LoginPage() {
                 description: 'Has iniciado sesión correctamente.',
             });
             navigate('/dashboard');
-        } catch (error: any) {
+        } catch (error: unknown) {
             let message = 'Credenciales inválidas. Por favor, inténtalo de nuevo.';
 
-            if (error.name === 'ZodError') {
+            if (error instanceof ZodError) {
                 message = error.errors[0].message;
             }
 

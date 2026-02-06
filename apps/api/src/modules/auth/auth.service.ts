@@ -31,12 +31,10 @@ export class AuthService {
     generateTokens(user: User) {
         const payload = { id: user.id, email: user.email, role: user.role };
         const accessOptions: SignOptions = {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            expiresIn: (process.env.JWT_ACCESS_EXPIRATION || '15m') as any,
+            expiresIn: (process.env.JWT_ACCESS_EXPIRATION || '15m') as SignOptions['expiresIn'],
         };
         const refreshOptions: SignOptions = {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            expiresIn: (process.env.JWT_REFRESH_EXPIRATION || '7d') as any,
+            expiresIn: (process.env.JWT_REFRESH_EXPIRATION || '7d') as SignOptions['expiresIn'],
         };
 
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, accessOptions);
@@ -55,7 +53,7 @@ export class AuthService {
 
     verifyToken(token: string) {
         try {
-            return jwt.verify(token, process.env.JWT_SECRET!) as any;
+            return jwt.verify(token, process.env.JWT_SECRET!) as jwt.JwtPayload;
         } catch (error) {
             return null;
         }

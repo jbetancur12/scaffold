@@ -3,17 +3,19 @@ import { winstonLogger } from '../../config/logger';
 import { AppError } from '../utils/response';
 
 export const errorHandler = (
-    err: any,
+    err: unknown,
     req: Request,
     res: Response,
     _next: NextFunction
 ) => {
     const statusCode = err instanceof AppError ? err.statusCode : 500;
-    const message = err.message || 'Internal Server Error';
+    const message = (err instanceof Error) ? err.message : 'Internal Server Error';
+    const stack = (err instanceof Error) ? err.stack : undefined;
+    const errorCode = (err instanceof AppError) ? err.errorCode : undefined;
 
     // Log the error
     winstonLogger.error(`[${req.method}] ${req.path} >> ${statusCode} - ${message}`, {
-        stack: err.stack,
+        stack,
         body: req.body,
         query: req.query
     });
@@ -23,14 +25,14 @@ export const errorHandler = (
         message: statusCode === 500 && process.env.NODE_ENV === 'production'
             ? 'Something went wrong on our end'
             : message,
-        errorCode: err.errorCode,
-        ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+        errorCode,
+        ...(process.env.NODE_ENV !== 'production' && { stack })
     });
 };
 
 /**
  * Wrapper to catch async errors in controllers
  */
-export const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+export const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
 };

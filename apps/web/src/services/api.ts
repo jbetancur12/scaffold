@@ -1,17 +1,20 @@
 import axios from 'axios';
 
 const api = axios.create({
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
     withCredentials: true,
 });
 
+interface FailedRequest {
+    resolve: (value?: unknown) => void;
+    reject: (reason?: unknown) => void;
+}
+
 // Avoid circular dependency by not importing AuthContext directly
 let isRefreshing = false;
-let failedQueue: any[] = [];
+let failedQueue: FailedRequest[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: unknown, token: string | null = null) => {
     failedQueue.forEach((prom) => {
         if (error) {
             prom.reject(error);
