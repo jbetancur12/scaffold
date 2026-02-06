@@ -56,9 +56,35 @@ export const mrpApi = {
         const response = await api.put(`/mrp/variants/${variantId}`, data);
         return response.data;
     },
-    deleteVariant: async (variantId: string): Promise<void> => {
-        await api.delete(`/mrp/variants/${variantId}`);
-    },
+    deleteVariant: (variantId: string) =>
+        api.delete(`/mrp/variants/${variantId}`),
+
+    // Purchase Orders
+    createPurchaseOrder: (data: {
+        supplierId: string;
+        expectedDeliveryDate?: string;
+        notes?: string;
+        items: Array<{
+            rawMaterialId: string;
+            quantity: number;
+            unitPrice: number;
+        }>;
+    }) => api.post('/mrp/purchase-orders', data),
+
+    listPurchaseOrders: (page: number = 1, limit: number = 10, filters?: { status?: string; supplierId?: string }) =>
+        api.get('/mrp/purchase-orders', { params: { page, limit, ...filters } }),
+
+    getPurchaseOrder: (id: string) =>
+        api.get(`/mrp/purchase-orders/${id}`),
+
+    updatePurchaseOrderStatus: (id: string, status: string) =>
+        api.put(`/mrp/purchase-orders/${id}/status`, { status }),
+
+    receivePurchaseOrder: (id: string) =>
+        api.post(`/mrp/purchase-orders/${id}/receive`),
+
+    cancelPurchaseOrder: (id: string) =>
+        api.delete(`/mrp/purchase-orders/${id}`),
 
     // Suppliers
     getSuppliers: async (page = 1, limit = 10) => {
@@ -75,8 +101,16 @@ export const mrpApi = {
         const response = await api.get<{ materials: RawMaterial[], total: number }>(`/mrp/raw-materials?page=${page}&limit=${limit}`);
         return response.data;
     },
+    getRawMaterial: async (id: string) => {
+        const response = await api.get<RawMaterial>(`/mrp/raw-materials/${id}`);
+        return response.data;
+    },
     createRawMaterial: async (data: Partial<RawMaterial>): Promise<RawMaterial> => {
         const response = await api.post('/mrp/raw-materials', data);
+        return response.data;
+    },
+    updateRawMaterial: async (id: string, data: Partial<RawMaterial>): Promise<RawMaterial> => {
+        const response = await api.patch(`/mrp/raw-materials/${id}`, data);
         return response.data;
     },
 

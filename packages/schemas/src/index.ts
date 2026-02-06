@@ -63,8 +63,10 @@ export const ProductVariantSchema = z.object({
     sku: z.string().min(1, 'SKU es obligatorio'),
     price: z.number().min(0),
     cost: z.number().min(0),
+    referenceCost: z.number().min(0).optional(),
     laborCost: z.number().min(0),
     indirectCost: z.number().min(0),
+    targetMargin: z.number().min(0).max(1).default(0.4),
 });
 
 export const BOMItemSchema = z.object({

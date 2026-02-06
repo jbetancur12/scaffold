@@ -67,35 +67,64 @@ export default function ProductListPage() {
                                     <TableHead className="font-bold text-slate-900">Nombre</TableHead>
                                     <TableHead className="font-bold text-slate-900">SKU</TableHead>
                                     <TableHead className="font-bold text-slate-900">Variantes</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Rentabilidad (Margen Real)</TableHead>
                                     <TableHead className="text-right font-bold text-slate-900">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {products.map((product) => (
-                                    <TableRow key={product.id} className="group hover:bg-slate-50/50 transition-colors">
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-                                                    <Package className="h-4 w-4 text-slate-500" />
+                                {products.map((product) => {
+                                    const variants = product.variants || [];
+                                    const avgMargin = variants.length > 0
+                                        ? variants.reduce((acc, v) => acc + (v.price - v.cost) / v.price, 0) / variants.length
+                                        : null;
+
+                                    const avgTargetMargin = variants.length > 0
+                                        ? variants.reduce((acc, v) => acc + (v.targetMargin || 0.4), 0) / variants.length
+                                        : 0.4;
+
+                                    const getMarginColor = (margin: number | null, target: number) => {
+                                        if (margin === null) return 'text-slate-400';
+                                        const deviation = margin - target;
+                                        if (deviation < -0.1) return 'text-red-600 bg-red-50 border-red-100';
+                                        if (deviation < 0) return 'text-amber-600 bg-amber-50 border-amber-100';
+                                        return 'text-emerald-600 bg-emerald-50 border-emerald-100';
+                                    };
+
+                                    return (
+                                        <TableRow key={product.id} className="group hover:bg-slate-50/50 transition-colors">
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                                                        <Package className="h-4 w-4 text-slate-500" />
+                                                    </div>
+                                                    <span className="text-slate-900">{product.name}</span>
                                                 </div>
-                                                <span className="text-slate-900">{product.name}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>{product.sku}</TableCell>
-                                        <TableCell>{product.variants?.length || 0}</TableCell>
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/mrp/products/${product.id}/bom`)}>
-                                                    <Layers className="h-4 w-4 mr-2" />
-                                                    BOM
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => navigate(`/dashboard/mrp/products/${product.id}`)}>
-                                                    Editar
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                            </TableCell>
+                                            <TableCell>{product.sku}</TableCell>
+                                            <TableCell>{variants.length}</TableCell>
+                                            <TableCell>
+                                                {avgMargin !== null ? (
+                                                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getMarginColor(avgMargin, avgTargetMargin)}`}>
+                                                        {(avgMargin * 100).toFixed(1)}% Promedio
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs">-</span>
+                                                )}
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/mrp/products/${product.id}/bom`)}>
+                                                        <Layers className="h-4 w-4 mr-2" />
+                                                        BOM
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => navigate(`/dashboard/mrp/products/${product.id}`)}>
+                                                        Editar
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
                                 {products.length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={4} className="text-center py-10 text-slate-500">

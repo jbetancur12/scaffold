@@ -37,6 +37,7 @@ const variantSchema = z.object({
     name: z.string().min(1, 'El nombre es requerido'),
     sku: z.string().min(1, 'El SKU es requerido'),
     price: z.number().min(0, 'El precio debe ser mayor o igual a 0'),
+    targetMargin: z.number().min(0).max(1, 'El margen debe estar entre 0 y 100%'),
 });
 
 interface VariantFormData {
@@ -44,6 +45,7 @@ interface VariantFormData {
     name: string;
     sku: string;
     price: number;
+    targetMargin: number;
 }
 
 export default function ProductFormPage() {
@@ -67,6 +69,7 @@ export default function ProductFormPage() {
         name: '',
         sku: '',
         price: 0,
+        targetMargin: 0.4,
     });
 
     const loadProduct = useCallback(async () => {
@@ -138,13 +141,16 @@ export default function ProductFormPage() {
 
     const handleAddVariant = () => {
         setEditingVariant(null);
-        setVariantFormData({ name: '', sku: '', price: 0 });
+        setVariantFormData({ name: '', sku: '', price: 0, targetMargin: 0.4 });
         setShowVariantDialog(true);
     };
 
-    const handleEditVariant = (variant: VariantFormData) => {
+    const handleEditVariant = (variant: any) => {
         setEditingVariant(variant);
-        setVariantFormData(variant);
+        setVariantFormData({
+            ...variant,
+            targetMargin: variant.targetMargin ?? 0.4
+        });
         setShowVariantDialog(true);
     };
 
@@ -290,40 +296,70 @@ export default function ProductFormPage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Nombre</TableHead>
-                                            <TableHead>SKU</TableHead>
-                                            <TableHead>Precio</TableHead>
+                                            <TableHead>Nombre / SKU</TableHead>
+                                            <TableHead>Precio de Venta</TableHead>
+                                            <TableHead>Costo Planeado (Ref.)</TableHead>
+                                            <TableHead>Margen Planeado</TableHead>
+                                            <TableHead>Costo Real (Prom.)</TableHead>
+                                            <TableHead>Margen Real</TableHead>
                                             <TableHead className="text-right">Acciones</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {product.variants.map((variant) => (
-                                            <TableRow key={variant.id}>
-                                                <TableCell className="font-medium">{variant.name}</TableCell>
-                                                <TableCell>{variant.sku}</TableCell>
-                                                <TableCell>${variant.price?.toFixed(2) || '0.00'}</TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleEditVariant(variant as VariantFormData)}
-                                                        >
-                                                            <Edit2 className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDeleteVariant(variant.id)}
-                                                        >
-                                                            <Trash2 className="h-4 w-4 text-red-500" />
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {product.variants.map((variant) => {
+                                            const plannedMargin = (variant.price - variant.referenceCost) / variant.price;
+                                            const realMargin = (variant.price - variant.cost) / variant.price;
+
+                                            const getMarginColor = (margin: number, target: number) => {
+                                                const deviation = margin - target;
+                                                if (deviation < -0.1) return 'text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100';
+                                                if (deviation < 0) return 'text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-100';
+                                                return 'text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100';
+                                            };
+
+                                            return (
+                                                <TableRow key={variant.id} className="hover:bg-slate-50/50">
+                                                    <TableCell>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold text-slate-900">{variant.name}</span>
+                                                            <span className="text-xs text-slate-500 font-mono">{variant.sku}</span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="font-medium text-slate-900">${variant.price?.toFixed(2)}</TableCell>
+                                                    <TableCell className="text-slate-600">${variant.referenceCost?.toFixed(2) || '0.00'}</TableCell>
+                                                    <TableCell className="text-slate-500 text-xs">{(plannedMargin * 100).toFixed(1)}%</TableCell>
+                                                    <TableCell className="font-semibold text-primary">${variant.cost?.toFixed(2) || '0.00'}</TableCell>
+                                                    <TableCell>
+                                                        <span className={getMarginColor(realMargin, variant.targetMargin || 0.4)}>
+                                                            {(realMargin * 100).toFixed(1)}%
+                                                        </span>
+                                                        <div className="text-[10px] text-slate-400 mt-0.5">Meta: {((variant.targetMargin || 0.4) * 100).toFixed(0)}%</div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-1">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleEditVariant(variant as any)}
+                                                                className="h-8 w-8 p-0"
+                                                            >
+                                                                <Edit2 className="h-4 w-4 text-slate-400 group-hover:text-primary" />
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleDeleteVariant(variant.id)}
+                                                                className="h-8 w-8 p-0"
+                                                            >
+                                                                <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-500" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
                                     </TableBody>
                                 </Table>
                             ) : (
@@ -383,17 +419,55 @@ export default function ProductFormPage() {
                                     placeholder="Ej. CAM-BAS-R-M"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="variant-price">Precio</Label>
-                                <Input
-                                    id="variant-price"
-                                    type="number"
-                                    step="0.01"
-                                    value={variantFormData.price}
-                                    onChange={(e) => setVariantFormData({ ...variantFormData, price: parseFloat(e.target.value) || 0 })}
-                                    placeholder="0.00"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="variant-price">Precio Actual</Label>
+                                    <Input
+                                        id="variant-price"
+                                        type="number"
+                                        step="0.01"
+                                        value={variantFormData.price}
+                                        onChange={(e) => setVariantFormData({ ...variantFormData, price: parseFloat(e.target.value) || 0 })}
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="variant-target">Margen Objetivo (%)</Label>
+                                    <Input
+                                        id="variant-target"
+                                        type="number"
+                                        step="1"
+                                        value={(variantFormData.targetMargin * 100)}
+                                        onChange={(e) => setVariantFormData({ ...variantFormData, targetMargin: (parseFloat(e.target.value) || 0) / 100 })}
+                                        placeholder="40"
+                                    />
+                                </div>
                             </div>
+
+                            {/* Assistant Logic */}
+                            {editingVariant && (editingVariant as any).cost > 0 && (
+                                <div className="mt-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                                    <div className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
+                                        <Save className="h-4 w-4" /> {/* Should use a bulb icon ideally */}
+                                        Asistente de Precios
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between text-xs text-slate-600">
+                                            <span>Costo Actual:</span>
+                                            <span className="font-medium">${(editingVariant as any).cost.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-600">
+                                            <span>Precio Recomendado:</span>
+                                            <span className="font-bold text-primary">
+                                                ${((editingVariant as any).cost / (1 - variantFormData.targetMargin)).toFixed(2)}
+                                            </span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 mt-2 italic">
+                                            * Basado en el costo real promedio y tu margen objetivo del {(variantFormData.targetMargin * 100).toFixed(0)}%.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                         <DialogFooter>
                             <Button type="button" variant="ghost" onClick={() => setShowVariantDialog(false)}>

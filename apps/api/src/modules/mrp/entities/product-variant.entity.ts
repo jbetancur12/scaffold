@@ -24,13 +24,19 @@ export class ProductVariant extends BaseEntity implements IProductVariant {
     price!: number;
 
     @Property()
-    cost: number = 0;
+    cost: number = 0; // Actual Cost (Avg)
+
+    @Property()
+    referenceCost: number = 0; // Standard Cost (Reference)
 
     @Property()
     laborCost: number = 0;
 
     @Property()
     indirectCost: number = 0;
+
+    @Property()
+    targetMargin: number = 0.4;
 
     @OneToMany(() => BOMItem, bomItem => bomItem.variant)
     bomItems = new Collection<BOMItem>(this);

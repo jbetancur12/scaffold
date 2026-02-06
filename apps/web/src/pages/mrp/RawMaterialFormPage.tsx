@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { mrpApi } from '@/services/mrpApi';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -25,8 +25,11 @@ const rawMaterialSchema = z.object({
 });
 
 export default function RawMaterialFormPage() {
+    const { id } = useParams();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const isEditing = !!id;
+
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
@@ -35,22 +38,60 @@ export default function RawMaterialFormPage() {
         cost: 0,
     });
 
+    const loadMaterial = useCallback(async () => {
+        if (!id) return;
+        try {
+            setLoading(true);
+            const material = await mrpApi.getRawMaterial(id);
+            setFormData({
+                name: material.name,
+                sku: material.sku,
+                unit: material.unit as UnitType,
+                cost: material.cost,
+            });
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'No se pudo cargar el material',
+                variant: 'destructive',
+            });
+            navigate('/dashboard/mrp/raw-materials');
+        } finally {
+            setLoading(false);
+        }
+    }, [id, navigate, toast]);
+
+    useEffect(() => {
+        if (isEditing) {
+            loadMaterial();
+        }
+    }, [isEditing, loadMaterial]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             setLoading(true);
             rawMaterialSchema.parse(formData);
 
-            await mrpApi.createRawMaterial({
-                ...formData,
-                unit: formData.unit,
-                cost: Number(formData.cost)
-            });
-
-            toast({
-                title: 'Éxito',
-                description: 'Material creado exitosamente',
-            });
+            if (isEditing) {
+                await mrpApi.updateRawMaterial(id!, {
+                    ...formData,
+                    cost: Number(formData.cost)
+                });
+                toast({
+                    title: 'Éxito',
+                    description: 'Material actualizado exitosamente',
+                });
+            } else {
+                await mrpApi.createRawMaterial({
+                    ...formData,
+                    cost: Number(formData.cost)
+                });
+                toast({
+                    title: 'Éxito',
+                    description: 'Material creado exitosamente',
+                });
+            }
             navigate('/dashboard/mrp/raw-materials');
         } catch (error: unknown) {
             let message = 'Error al guardar';
@@ -76,10 +117,10 @@ export default function RawMaterialFormPage() {
                     </Button>
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                            Nuevo Material
+                            {isEditing ? 'Editar Material' : 'Nuevo Material'}
                         </h1>
                         <p className="text-slate-500">
-                            Registra nueva materia prima o insumo.
+                            {isEditing ? 'Modifica los detalles del material.' : 'Registra nueva materia prima o insumo.'}
                         </p>
                     </div>
                 </div>
@@ -154,7 +195,7 @@ export default function RawMaterialFormPage() {
                             {loading ? 'Guardando...' : (
                                 <>
                                     <Save className="mr-2 h-4 w-4" />
-                                    Crear Material
+                                    {isEditing ? 'Actualizar Material' : 'Crear Material'}
                                 </>
                             )}
                         </Button>

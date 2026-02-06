@@ -109,7 +109,10 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
 
     // Helper to find material name by ID for display if relation not populated deep enough or just for safety
     const getMaterialUnit = (id: string) => materials.find(m => m.id === id)?.unit || '-';
-    const getMaterialCost = (id: string) => materials.find(m => m.id === id)?.cost || 0;
+    const getMaterialCost = (id: string) => {
+        const m = materials.find(m => m.id === id);
+        return (m?.averageCost && m.averageCost > 0) ? m.averageCost : (m?.cost || 0);
+    };
 
     return (
         <div className="space-y-4">
@@ -136,7 +139,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                             // ... (retaining prior context if needed, but here simple replace)
                             // @ts-expect-error rawMaterial might not be in the type definition yet
                             const material = item.rawMaterial || materials.find(m => m.id === item.rawMaterialId);
-                            const unitCost = material?.cost || 0;
+                            const unitCost = (material?.averageCost && material.averageCost > 0) ? material.averageCost : (material?.cost || 0);
                             const subtotal = item.quantity * unitCost;
 
                             return (
@@ -167,7 +170,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                     <SelectContent>
                                         {materials.map(m => (
                                             <SelectItem key={m.id} value={m.id}>
-                                                {m.name} ({m.sku}) - ${m.cost}
+                                                {m.name} ({m.sku}) - ${(m.averageCost && m.averageCost > 0 ? m.averageCost : m.cost).toFixed(2)}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

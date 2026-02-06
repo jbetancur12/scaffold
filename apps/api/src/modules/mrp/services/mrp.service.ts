@@ -24,6 +24,26 @@ export class MrpService {
         return material;
     }
 
+    async getRawMaterial(id: string): Promise<RawMaterial> {
+        return this.rawMaterialRepo.findOneOrFail({ id }, { populate: ['supplier'] });
+    }
+
+    async updateRawMaterial(id: string, data: Partial<z.infer<typeof RawMaterialSchema>>): Promise<RawMaterial> {
+        const material = await this.getRawMaterial(id);
+        const oldCost = material.cost;
+
+        Object.assign(material, data);
+
+        await this.em.persistAndFlush(material);
+
+        // If cost changed, recalculate affected variants
+        if (data.cost !== undefined && data.cost !== oldCost) {
+            await this.recalculateVariantsByMaterial(id);
+        }
+
+        return material;
+    }
+
     async listRawMaterials(page = 1, limit = 10): Promise<{ materials: RawMaterial[]; total: number }> {
         const [materials, total] = await this.rawMaterialRepo.findAndCount(
             {},
@@ -77,12 +97,40 @@ export class MrpService {
     async calculateVariantCost(variantId: string): Promise<void> {
         const variant = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['bomItems', 'bomItems.rawMaterial'] });
 
-        let materialCost = 0;
+        let actualMaterialCost = 0;
+        let referenceMaterialCost = 0;
+
         for (const item of variant.bomItems) {
-            materialCost += item.quantity * item.rawMaterial.cost;
+            // Actual cost uses averageCost if available
+            const actualUnitCost = (item.rawMaterial.averageCost && item.rawMaterial.averageCost > 0)
+                ? item.rawMaterial.averageCost
+                : item.rawMaterial.cost;
+            actualMaterialCost += item.quantity * actualUnitCost;
+
+            // Reference cost always uses the standard cost
+            const referenceUnitCost = item.rawMaterial.cost;
+            referenceMaterialCost += item.quantity * referenceUnitCost;
         }
 
-        variant.cost = materialCost + variant.laborCost + variant.indirectCost;
+        const labor = variant.laborCost || 0;
+        const indirect = variant.indirectCost || 0;
+
+        variant.cost = actualMaterialCost + labor + indirect;
+        variant.referenceCost = referenceMaterialCost + labor + indirect;
+
         await this.em.persistAndFlush(variant);
+    }
+
+    async recalculateVariantsByMaterial(materialId: string): Promise<void> {
+        // Find all BOM items that use this material
+        const bomItems = await this.bomItemRepo.find({ rawMaterial: { id: materialId } });
+
+        // Get unique variant IDs
+        const variantIds = [...new Set(bomItems.map(item => item.variant.id))];
+
+        // Recalculate each variant
+        for (const variantId of variantIds) {
+            await this.calculateVariantCost(variantId);
+        }
     }
 }

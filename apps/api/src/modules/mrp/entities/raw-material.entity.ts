@@ -17,6 +17,15 @@ export class RawMaterial extends BaseEntity implements IRawMaterial {
     @Property()
     cost!: number;
 
+    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+    averageCost: number = 0;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    lastPurchasePrice?: number;
+
+    @Property({ nullable: true })
+    lastPurchaseDate?: Date;
+
     @Property()
     minStockLevel?: number;
 

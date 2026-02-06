@@ -52,10 +52,23 @@ export interface RawMaterial {
     name: string;
     sku: string;
     unit: UnitType;
-    cost: number; // Current average cost
+    cost: number; // Initial standard cost / Reference cost
+    averageCost?: number; // Current average cost calculated from purchases
+    lastPurchasePrice?: number; // Price of the very last purchase
+    lastPurchaseDate?: string | Date; // Date of the very last purchase
     stock?: number; // Virtual field for total stock
     minStockLevel?: number;
     supplierId?: string; // Preferred supplier
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface SupplierMaterial {
+    id: string;
+    supplierId: string;
+    rawMaterialId: string;
+    lastPurchasePrice: number;
+    lastPurchaseDate: string | Date;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -87,9 +100,11 @@ export interface ProductVariant {
     name: string; // e.g., "L", "XL", "Red"
     sku: string;
     price: number; // Sale price
-    cost: number; // Calculated cost
+    cost: number; // Calculated Actual Cost (Avg)
+    referenceCost: number; // Calculated Standard Cost
     laborCost: number;
     indirectCost: number;
+    targetMargin: number;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

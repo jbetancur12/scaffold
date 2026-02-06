@@ -5,6 +5,7 @@ import { SupplierService } from './services/supplier.service';
 import { MrpService } from './services/mrp.service';
 import { InventoryService } from './services/inventory.service';
 import { ProductionService } from './services/production.service';
+import { PurchaseOrderService } from './services/purchase-order.service';
 import { ProductSchema, SupplierSchema, RawMaterialSchema, BOMItemSchema, ProductionOrderSchema, ProductionOrderItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 
@@ -14,6 +15,7 @@ export class MrpController {
     private mrpService: MrpService;
     private inventoryService: InventoryService;
     private productionService: ProductionService;
+    private purchaseOrderService: PurchaseOrderService;
 
     constructor(orm: MikroORM) {
         const em = orm.em.fork();
@@ -22,6 +24,7 @@ export class MrpController {
         this.mrpService = new MrpService(em);
         this.inventoryService = new InventoryService(em);
         this.productionService = new ProductionService(em);
+        this.purchaseOrderService = new PurchaseOrderService(em, this.mrpService);
     }
 
     // --- Products ---
@@ -155,6 +158,27 @@ export class MrpController {
         }
     }
 
+    async getRawMaterial(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const material = await this.mrpService.getRawMaterial(id);
+            res.json(material);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateRawMaterial(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const data = RawMaterialSchema.partial().parse(req.body);
+            const material = await this.mrpService.updateRawMaterial(id, data);
+            res.json(material);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async addBOMItem(req: Request, res: Response, next: NextFunction) {
         try {
             const data = BOMItemSchema.parse(req.body);
@@ -217,6 +241,76 @@ export class MrpController {
             const { page, limit } = req.query;
             const result = await this.inventoryService.getInventoryItems(Number(page) || 1, Number(limit) || 10);
             res.json(result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // --- Purchase Orders ---
+    async createPurchaseOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const data = req.body;
+            const purchaseOrder = await this.purchaseOrderService.createPurchaseOrder(data);
+            res.status(201).json(purchaseOrder);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getPurchaseOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const purchaseOrder = await this.purchaseOrderService.getPurchaseOrder(id);
+            if (!purchaseOrder) {
+                res.status(404).json({ message: 'Purchase order not found' });
+                return;
+            }
+            res.json(purchaseOrder);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listPurchaseOrders(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { page, limit, status, supplierId } = req.query;
+            const result = await this.purchaseOrderService.listPurchaseOrders(
+                Number(page) || 1,
+                Number(limit) || 10,
+                { status: status as any, supplierId: supplierId as string }
+            );
+            res.json(result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updatePurchaseOrderStatus(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+            const purchaseOrder = await this.purchaseOrderService.updateStatus(id, status);
+            res.json(purchaseOrder);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async receivePurchaseOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const purchaseOrder = await this.purchaseOrderService.receivePurchaseOrder(id);
+            res.json(purchaseOrder);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async cancelPurchaseOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            await this.purchaseOrderService.cancelPurchaseOrder(id);
+            res.status(204).send();
         } catch (error) {
             next(error);
         }

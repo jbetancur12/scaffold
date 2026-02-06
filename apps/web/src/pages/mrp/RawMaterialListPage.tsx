@@ -11,7 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Database, Plus } from 'lucide-react';
+import { Database, Plus, Edit2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -67,7 +67,9 @@ export default function RawMaterialListPage() {
                                     <TableHead className="font-bold text-slate-900">Nombre</TableHead>
                                     <TableHead className="font-bold text-slate-900">SKU</TableHead>
                                     <TableHead className="font-bold text-slate-900">Unidad</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Costo Ref. (Anual)</TableHead>
                                     <TableHead className="font-bold text-slate-900">Costo Promedio</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Última Compra</TableHead>
                                     <TableHead className="text-right font-bold text-slate-900">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -84,9 +86,27 @@ export default function RawMaterialListPage() {
                                         </TableCell>
                                         <TableCell>{material.sku}</TableCell>
                                         <TableCell>{material.unit}</TableCell>
-                                        <TableCell>${material.cost?.toFixed(2) || '0.00'}</TableCell>
+                                        <TableCell className="font-semibold text-slate-600">${material.cost?.toFixed(2) || '0.00'}</TableCell>
+                                        <TableCell className="font-bold text-primary">${material.averageCost && material.averageCost > 0 ? material.averageCost.toFixed(2) : '0.00'}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col text-xs">
+                                                <span className="font-medium text-slate-900">${material.lastPurchasePrice?.toFixed(2) || '-'}</span>
+                                                <span className="text-slate-500">
+                                                    {material.lastPurchaseDate ? new Date(material.lastPurchaseDate).toLocaleDateString() : 'N/A'}
+                                                </span>
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-right">
-                                            {/* Action buttons */}
+                                            <div className="flex justify-end gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => navigate(`/dashboard/mrp/raw-materials/${material.id}`)}
+                                                    className="h-8 w-8 p-0"
+                                                >
+                                                    <Edit2 className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}

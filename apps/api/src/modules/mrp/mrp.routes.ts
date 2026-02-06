@@ -25,6 +25,8 @@ export const createMrpRoutes = (orm: MikroORM) => {
     // Raw Materials & BOM
     router.post('/raw-materials', (req, res, next) => mrpController.createRawMaterial(req, res, next));
     router.get('/raw-materials', (req, res, next) => mrpController.listRawMaterials(req, res, next));
+    router.get('/raw-materials/:id', (req, res, next) => mrpController.getRawMaterial(req, res, next));
+    router.patch('/raw-materials/:id', (req, res, next) => mrpController.updateRawMaterial(req, res, next));
 
     // BOM
     router.get('/variants/:variantId/bom', (req, res, next) => mrpController.getBOM(req, res, next));
@@ -34,6 +36,14 @@ export const createMrpRoutes = (orm: MikroORM) => {
     // Production Orders
     router.post('/production-orders', (req, res, next) => mrpController.createProductionOrder(req, res, next));
     router.get('/production-orders/:id/requirements', (req, res, next) => mrpController.calculateMaterialRequirements(req, res, next));
+
+    // Purchase Orders
+    router.post('/purchase-orders', (req, res, next) => mrpController.createPurchaseOrder(req, res, next));
+    router.get('/purchase-orders', (req, res, next) => mrpController.listPurchaseOrders(req, res, next));
+    router.get('/purchase-orders/:id', (req, res, next) => mrpController.getPurchaseOrder(req, res, next));
+    router.put('/purchase-orders/:id/status', (req, res, next) => mrpController.updatePurchaseOrderStatus(req, res, next));
+    router.post('/purchase-orders/:id/receive', (req, res, next) => mrpController.receivePurchaseOrder(req, res, next));
+    router.delete('/purchase-orders/:id', (req, res, next) => mrpController.cancelPurchaseOrder(req, res, next));
 
     // Inventory
     router.get('/inventory', (req, res, next) => mrpController.listInventory(req, res, next));
