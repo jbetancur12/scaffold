@@ -241,20 +241,13 @@ export default function ProductFormPage() {
 
                 {/* Global Product Summary */}
                 {isEditing && product && product.variants && product.variants.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-primary/5 border border-primary/10 p-6 rounded-3xl">
-                            <Label className="text-[10px] text-primary uppercase tracking-wider font-bold">Peor Escenario (Costo Máx.)</Label>
-                            <div className="text-2xl font-bold text-slate-900 mt-1">
-                                ${Math.max(...product.variants.map(v => v.cost || 0)).toFixed(2)}
-                            </div>
-                            <p className="text-[10px] text-slate-400 mt-1">Costo de la variante más costosa</p>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="bg-white border border-slate-200 p-6 rounded-3xl">
-                            <Label className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Precio Promedio</Label>
+                            <Label className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Precio de Venta (Ref.)</Label>
                             <div className="text-2xl font-bold text-slate-900 mt-1">
-                                ${(product.variants.reduce((acc, v) => acc + (v.price || 0), 0) / product.variants.length).toFixed(2)}
+                                ${Math.max(...product.variants.map(v => v.price || 0)).toFixed(2)}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-1">Basado en {product.variants.length} variantes</p>
+                            <p className="text-[10px] text-slate-400 mt-1">Precio de la variante más costosa</p>
                         </div>
                         {(() => {
                             const variants = product.variants || [];

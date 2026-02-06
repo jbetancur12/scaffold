@@ -76,8 +76,9 @@ export default function ProductListPage() {
                             </TableHeader>
                             <TableBody>
                                 {products.map((product) => {
-                                    const variants = product.variants || [];
-                                    const margins = variants.map(v => (v.price - v.cost) / v.price);
+                                    const margins = variants
+                                        .filter(v => (v.price || 0) > 0)
+                                        .map(v => (v.price - v.cost) / v.price);
                                     const minMargin = margins.length > 0 ? Math.min(...margins) : null;
 
                                     const avgTargetMargin = variants.length > 0
@@ -104,11 +105,8 @@ export default function ProductListPage() {
                                             </TableCell>
                                             <TableCell>{product.sku}</TableCell>
                                             <TableCell>{variants.length}</TableCell>
-                                            <TableCell className="font-semibold text-slate-700">
-                                                {variants.length > 0 ? `$${Math.max(...variants.map(v => v.cost || 0)).toFixed(2)}` : '-'}
-                                            </TableCell>
-                                            <TableCell className="text-slate-600">
-                                                {variants.length > 0 ? `$${(variants.reduce((acc, v) => acc + (v.price || 0), 0) / variants.length).toFixed(2)}` : '-'}
+                                            <TableCell className="font-bold text-slate-900">
+                                                {variants.length > 0 ? `$${Math.max(...variants.map(v => v.price || 0)).toFixed(2)}` : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 {minMargin !== null ? (
