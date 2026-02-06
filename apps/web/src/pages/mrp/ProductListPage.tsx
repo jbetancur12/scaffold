@@ -69,16 +69,16 @@ export default function ProductListPage() {
                                     <TableHead className="font-bold text-slate-900">Variantes</TableHead>
                                     <TableHead className="font-bold text-slate-900">Costo Global (Peor Esc.)</TableHead>
                                     <TableHead className="font-bold text-slate-900">Precio Base</TableHead>
-                                    <TableHead className="font-bold text-slate-900">Rentabilidad Global</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Precio Base</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Margen Crítico (Mín.)</TableHead>
                                     <TableHead className="text-right font-bold text-slate-900">Acciones</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {products.map((product) => {
                                     const variants = product.variants || [];
-                                    const avgMargin = variants.length > 0
-                                        ? variants.reduce((acc, v) => acc + (v.price - v.cost) / v.price, 0) / variants.length
-                                        : null;
+                                    const margins = variants.map(v => (v.price - v.cost) / v.price);
+                                    const minMargin = margins.length > 0 ? Math.min(...margins) : null;
 
                                     const avgTargetMargin = variants.length > 0
                                         ? variants.reduce((acc, v) => acc + (v.targetMargin || 0.4), 0) / variants.length
@@ -111,9 +111,9 @@ export default function ProductListPage() {
                                                 {variants.length > 0 ? `$${(variants.reduce((acc, v) => acc + (v.price || 0), 0) / variants.length).toFixed(2)}` : '-'}
                                             </TableCell>
                                             <TableCell>
-                                                {avgMargin !== null ? (
-                                                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getMarginColor(avgMargin, avgTargetMargin)}`}>
-                                                        {(avgMargin * 100).toFixed(1)}% Real
+                                                {minMargin !== null ? (
+                                                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getMarginColor(minMargin, avgTargetMargin)}`}>
+                                                        {(minMargin * 100).toFixed(1)}% Crítico
                                                     </div>
                                                 ) : (
                                                     <span className="text-slate-400 text-xs">-</span>

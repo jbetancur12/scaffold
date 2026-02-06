@@ -257,10 +257,16 @@ export default function ProductFormPage() {
                             <p className="text-[10px] text-slate-400 mt-1">Basado en {product.variants.length} variantes</p>
                         </div>
                         {(() => {
-                            const maxCost = Math.max(...product.variants.map(v => v.cost || 0));
-                            const avgPrice = product.variants.reduce((acc, v) => acc + (v.price || 0), 0) / product.variants.length;
-                            const globalMargin = (avgPrice - maxCost) / avgPrice;
-                            const avgTarget = product.variants.reduce((acc, v) => acc + (v.targetMargin || 0.4), 0) / product.variants.length;
+                            const variants = product.variants || [];
+                            const maxCost = Math.max(...variants.map(v => v.cost || 0));
+                            const prices = variants.map(v => v.price || 0);
+                            const minPrice = Math.min(...prices);
+
+                            // Critical margin uses the worst combination: highest cost vs lowest price
+                            const criticalMargin = variants.length > 0 ? (minPrice - maxCost) / minPrice : 0;
+                            const avgTarget = variants.length > 0
+                                ? variants.reduce((acc, v) => acc + (v.targetMargin || 0.4), 0) / variants.length
+                                : 0.4;
 
                             const getGlobalColor = (margin: number, target: number) => {
                                 const deviation = margin - target;
@@ -270,12 +276,12 @@ export default function ProductFormPage() {
                             };
 
                             return (
-                                <div className={`${getGlobalColor(globalMargin, avgTarget)} border p-6 rounded-3xl`}>
-                                    <Label className="text-[10px] uppercase tracking-wider font-bold opacity-70">Margen Global (Mín.)</Label>
+                                <div className={`${getGlobalColor(criticalMargin, avgTarget)} border p-6 rounded-3xl`}>
+                                    <Label className="text-[10px] uppercase tracking-wider font-bold opacity-70">Margen de Seguridad (Mín.)</Label>
                                     <div className="text-2xl font-bold mt-1">
-                                        {(globalMargin * 100).toFixed(1)}%
+                                        {(criticalMargin * 100).toFixed(1)}%
                                     </div>
-                                    <p className="text-[10px] opacity-70 mt-1">Meta promedio: {(avgTarget * 100).toFixed(0)}%</p>
+                                    <p className="text-[10px] opacity-70 mt-1">Garantizado en todas las variantes</p>
                                 </div>
                             );
                         })()}
