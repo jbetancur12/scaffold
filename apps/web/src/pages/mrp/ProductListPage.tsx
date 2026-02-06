@@ -76,6 +76,7 @@ export default function ProductListPage() {
                             </TableHeader>
                             <TableBody>
                                 {products.map((product) => {
+                                    const variants = product.variants || [];
                                     const margins = variants
                                         .filter(v => (v.price || 0) > 0)
                                         .map(v => (v.price - v.cost) / v.price);
