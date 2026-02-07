@@ -9,11 +9,20 @@ import {
 } from '@scaffold/types';
 
 export interface MaterialRequirement {
-    materialName: string;
-    requiredQuantity: number;
-    availableStock: number;
-    unit: string;
-    missingQuantity: number;
+    material: {
+        id: string;
+        name: string;
+        sku: string;
+        unit: string;
+    };
+    required: number;
+    available: number;
+    potentialSuppliers: {
+        supplier: { id: string; name: string; email?: string; phone?: string };
+        lastPrice: number;
+        lastDate: string;
+        isCheapest: boolean;
+    }[];
 }
 
 export type CreateProductionOrderDTO = Omit<Partial<ProductionOrder>, 'items'> & {

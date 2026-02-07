@@ -6,6 +6,7 @@ import { ProductionOrderItem } from '../entities/production-order-item.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
+import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { ProductionOrderSchema, ProductionOrderItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 
@@ -81,10 +82,20 @@ export class ProductionService {
     }
 
 
-    async calculateMaterialRequirements(orderId: string): Promise<{ material: RawMaterial, required: number, available: number }[]> {
+    async calculateMaterialRequirements(orderId: string): Promise<{
+        material: RawMaterial,
+        required: number,
+        available: number,
+        potentialSuppliers: { supplier: any, lastPrice: number, lastDate: Date, isCheapest: boolean }[]
+    }[]> {
         const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] });
 
-        const requirements = new Map<string, { material: RawMaterial, required: number, available: number }>();
+        const requirements = new Map<string, {
+            material: RawMaterial,
+            required: number,
+            available: number,
+            potentialSuppliers: { supplier: any, lastPrice: number, lastDate: Date, isCheapest: boolean }[]
+        }>();
 
         // 1. Calculate Required
         for (const item of order.items) {
@@ -101,20 +112,55 @@ export class ProductionService {
                     requirements.set(rawMaterialId, {
                         material: bomItem.rawMaterial,
                         required: requiredQty,
-                        available: 0 // Will populate next
+                        available: 0, // Will populate next
+                        potentialSuppliers: [] // Will populate next
                     });
                 }
             }
         }
 
-        // 2. Check Available Stock (Sum across all warehouses for now, or specific RawMaterial warehouse)
-        // Optimization: Fetch all needed inventory items in one query if possible
+        // 2. Check Available Stock
         const materialIds = Array.from(requirements.keys());
-        const inventoryItems = await this.inventoryRepo.find({ rawMaterial: { $in: materialIds } });
+        if (materialIds.length > 0) {
+            const inventoryItems = await this.inventoryRepo.find({ rawMaterial: { $in: materialIds } });
 
-        for (const invItem of inventoryItems) {
-            if (invItem.rawMaterial && requirements.has(invItem.rawMaterial.id)) {
-                requirements.get(invItem.rawMaterial.id)!.available += invItem.quantity;
+            for (const invItem of inventoryItems) {
+                if (invItem.rawMaterial && requirements.has(invItem.rawMaterial.id)) {
+                    requirements.get(invItem.rawMaterial.id)!.available += Number(invItem.quantity);
+                }
+            }
+
+            // 3. Check Potential Suppliers (SupplierMaterial)
+            const supplierMaterials = await this.em.find(SupplierMaterial, { rawMaterial: { $in: materialIds } }, { populate: ['supplier'], orderBy: { lastPurchasePrice: 'ASC', lastPurchaseDate: 'DESC' } });
+
+            for (const sm of supplierMaterials as any[]) {
+                if (requirements.has(sm.rawMaterial.id)) {
+                    const req = requirements.get(sm.rawMaterial.id)!;
+
+                    // Check if this is the cheapest (since list is sorted by ASC price, first one per material is cheapest)
+                    // But we might have multiple suppliers for same material.
+                    // We can mark the first encountered as cheapest or handle logic in frontend.
+                    // Since it's sorted by price ASC, the first one added to the array will be the cheapest.
+                    const isCheapest = req.potentialSuppliers.length === 0 || sm.lastPurchasePrice < req.potentialSuppliers[0].lastPrice;
+                    // Actually, if we just push all, the frontend can highlight. 
+                    // Let's rely on the sort from DB: cheapest checks across all supplier records.
+
+                    req.potentialSuppliers.push({
+                        supplier: sm.supplier,
+                        lastPrice: Number(sm.lastPurchasePrice),
+                        lastDate: sm.lastPurchaseDate,
+                        isCheapest: false // Will calculate after population
+                    });
+                }
+            }
+
+            // Post-process to mark cheapest
+            for (const req of requirements.values()) {
+                if (req.potentialSuppliers.length > 0) {
+                    // Sort again just to be sure
+                    req.potentialSuppliers.sort((a, b) => a.lastPrice - b.lastPrice);
+                    req.potentialSuppliers[0].isCheapest = true;
+                }
             }
         }
 
