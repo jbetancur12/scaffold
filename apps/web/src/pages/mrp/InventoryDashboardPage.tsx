@@ -11,8 +11,27 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Package } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Loader2, Package, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/components/ui/use-toast';
 
 interface PopulatedInventoryItem extends InventoryItem {
     variant?: ProductVariant & { product?: Product };
@@ -21,13 +40,22 @@ interface PopulatedInventoryItem extends InventoryItem {
 }
 
 export default function InventoryDashboardPage() {
-    // const navigate = useNavigate();
+    const { toast } = useToast();
     const [inventory, setInventory] = useState<PopulatedInventoryItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    // Manual Add State
+    const [isManualAddOpen, setIsManualAddOpen] = useState(false);
+    const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+    const [selectedMaterialId, setSelectedMaterialId] = useState('');
+    const [manualQuantity, setManualQuantity] = useState('');
+    const [manualCost, setManualCost] = useState('');
+    const [submittingManual, setSubmittingManual] = useState(false);
+
     useEffect(() => {
         loadInventory();
+        loadRawMaterials();
     }, []);
 
     const loadInventory = async () => {
@@ -40,6 +68,56 @@ export default function InventoryDashboardPage() {
             setError('Error al cargar el inventario');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadRawMaterials = async () => {
+        try {
+            const data = await mrpApi.getRawMaterials(1, 100);
+            // @ts-ignore
+            setRawMaterials(data.materials || []);
+        } catch (err) {
+            console.error('Error loading raw materials', err);
+        }
+    };
+
+    const handleManualAdd = async () => {
+        if (!selectedMaterialId || !manualQuantity || !manualCost) {
+            toast({
+                title: 'Error',
+                description: 'Por favor complete todos los campos',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        try {
+            setSubmittingManual(true);
+            await mrpApi.addManualStock({
+                rawMaterialId: selectedMaterialId,
+                quantity: Number(manualQuantity),
+                unitCost: Number(manualCost),
+            });
+
+            toast({
+                title: 'Stock agregado',
+                description: 'El inventario y costo promedio han sido actualizados.',
+            });
+
+            setIsManualAddOpen(false);
+            setSelectedMaterialId('');
+            setManualQuantity('');
+            setManualCost('');
+            loadInventory(); // Reload to see changes
+        } catch (err) {
+            console.error(err);
+            toast({
+                title: 'Error',
+                description: 'No se pudo agregar el stock manual.',
+                variant: 'destructive',
+            });
+        } finally {
+            setSubmittingManual(false);
         }
     };
 
@@ -70,6 +148,73 @@ export default function InventoryDashboardPage() {
                         Gestión de Stock: Materias Primas y Productos Terminados por Almacén.
                     </p>
                 </div>
+                <Dialog open={isManualAddOpen} onOpenChange={setIsManualAddOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Ajuste Manual
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Agregar Stock Manualmente</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="material">Materia Prima</Label>
+                                <Select value={selectedMaterialId} onValueChange={setSelectedMaterialId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar materia prima" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {rawMaterials.map((material) => (
+                                            <SelectItem key={material.id} value={material.id}>
+                                                {material.name} ({material.sku})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="quantity">Cantidad a Agregar</Label>
+                                <Input
+                                    id="quantity"
+                                    type="number"
+                                    step="0.01"
+                                    value={manualQuantity}
+                                    onChange={(e) => setManualQuantity(e.target.value)}
+                                    placeholder="Ej. 10.5"
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="cost">Costo Unitario (para promedio)</Label>
+                                <Input
+                                    id="cost"
+                                    type="number"
+                                    step="0.01"
+                                    value={manualCost}
+                                    onChange={(e) => setManualCost(e.target.value)}
+                                    placeholder="Ej. 1500"
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsManualAddOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleManualAdd} disabled={submittingManual}>
+                                {submittingManual ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Guardando...
+                                    </>
+                                ) : (
+                                    'Guardar Ajuste'
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
 
             {loading ? (

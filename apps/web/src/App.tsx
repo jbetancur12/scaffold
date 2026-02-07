@@ -93,6 +93,7 @@ export default function App() {
 
                         <Route path="/dashboard/mrp/raw-materials" element={<RawMaterialListPage />} />
                         <Route path="/dashboard/mrp/raw-materials/new" element={<RawMaterialFormPage />} />
+                        <Route path="/dashboard/mrp/raw-materials/:id" element={<RawMaterialFormPage />} />
 
                         <Route path="/dashboard/mrp/production-orders" element={<ProductionOrderListPage />} />
                         <Route path="/dashboard/mrp/production-orders/new" element={<ProductionOrderFormPage />} />

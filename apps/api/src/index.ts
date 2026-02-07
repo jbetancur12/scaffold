@@ -27,13 +27,17 @@ app.use(express.json());
 app.use(cookieParser());
 setupSwagger(app);
 
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    limit: 100, // Limit each IP to 100 requests per windowMs
-    standardHeaders: 'draft-7',
-    legacyHeaders: false,
-});
-app.use(limiter);
+// Rate limiting - only in production
+if (process.env.NODE_ENV === 'production') {
+    const limiter = rateLimit({
+        windowMs: 15 * 60 * 1000, // 15 minutes
+        limit: 100, // Limit each IP to 100 requests per windowMs
+        standardHeaders: 'draft-7',
+        legacyHeaders: false,
+    });
+    app.use(limiter);
+}
+
 
 const main = async () => {
     try {

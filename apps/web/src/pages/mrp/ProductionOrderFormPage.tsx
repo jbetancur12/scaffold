@@ -231,14 +231,22 @@ export default function ProductionOrderFormPage() {
                         )}
                     </div>
 
-                    {/* If in view mode and items loaded from API (implementation pending for full mapping) */}
+                    {/* If in view mode and items loaded from API */}
                     {isEditing && order?.items && items.length === 0 ? (
                         <div className="space-y-2">
                             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                             {order.items.map((item: any) => (
-                                <div key={item.id} className="p-4 bg-slate-50 rounded-lg flex justify-between">
-                                    <span>Variante ID: {item.variantId} (Falta nombre)</span>
-                                    <span className="font-bold">{item.quantity} un.</span>
+                                <div key={item.id} className="p-4 bg-slate-50 rounded-lg flex justify-between items-center">
+                                    <div>
+                                        <span className="font-semibold text-slate-900">
+                                            {item.variant?.product?.name || 'Producto sin nombre'}
+                                        </span>
+                                        <span className="text-slate-600"> - </span>
+                                        <span className="text-slate-700">
+                                            {item.variant?.name || 'Variante sin nombre'}
+                                        </span>
+                                    </div>
+                                    <span className="font-bold text-slate-900">{item.quantity} un.</span>
                                 </div>
                             ))}
                         </div>
@@ -322,20 +330,28 @@ export default function ProductionOrderFormPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {requirements.map((req, idx) => (
-                                        <TableRow key={idx}>
-                                            <TableCell className="font-medium">{req.materialName}</TableCell>
-                                            <TableCell>{req.requiredQuantity} {req.unit}</TableCell>
-                                            <TableCell>{req.availableStock} {req.unit}</TableCell>
-                                            <TableCell>
-                                                {req.missingQuantity > 0 ? (
-                                                    <span className="text-red-600 font-bold">Falta {req.missingQuantity}</span>
-                                                ) : (
-                                                    <span className="text-green-600">Cubierto</span>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {requirements.map((req, idx) => {
+                                        // API returns: { material: { name, unit, ... }, required, available }
+                                        const material = (req as any).material;
+                                        const required = (req as any).required;
+                                        const available = (req as any).available;
+                                        const missing = Math.max(0, required - available);
+
+                                        return (
+                                            <TableRow key={idx}>
+                                                <TableCell className="font-medium">{material?.name || req.materialName || 'N/A'}</TableCell>
+                                                <TableCell>{required || req.requiredQuantity || 0} {material?.unit || req.unit || ''}</TableCell>
+                                                <TableCell>{available || req.availableStock || 0} {material?.unit || req.unit || ''}</TableCell>
+                                                <TableCell>
+                                                    {missing > 0 ? (
+                                                        <span className="text-red-600 font-bold">Falta {missing.toFixed(2)}</span>
+                                                    ) : (
+                                                        <span className="text-green-600">Cubierto</span>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         )}

@@ -99,7 +99,7 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                     setLinearResult({
                         pieces,
                         waste: rollWidth - (pieces * pieceLength),
-                        consumption: (1 / pieces) * quantityPerUnit // Adjusted for quantity per unit
+                        consumption: (rollWidth / 100 / pieces) * quantityPerUnit // Material length in meters / pieces per bar * quantity
                     });
                 } else {
                     setLinearResult(null);

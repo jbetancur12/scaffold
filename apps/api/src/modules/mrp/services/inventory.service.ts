@@ -40,6 +40,60 @@ export class InventoryService {
         return inventoryItem;
     }
 
+    async addManualStock(data: { rawMaterialId: string; quantity: number; unitCost: number }): Promise<InventoryItem> {
+        // 1. Get or create default warehouse
+        let warehouse = await this.warehouseRepo.findOne({ name: 'Main Warehouse' });
+        if (!warehouse) {
+            warehouse = this.warehouseRepo.create({
+                name: 'Main Warehouse',
+                location: 'Default Location',
+                type: 'RAW_MATERIALS' as any,
+            } as any);
+            await this.em.persist(warehouse);
+        }
+
+        // 2. Get Raw Material
+        const rawMaterialRepo = this.em.getRepository('RawMaterial');
+        const rawMaterial = await rawMaterialRepo.findOneOrFail({ id: data.rawMaterialId });
+
+        // 3. Get or Create Inventory Item
+        let inventory = await this.inventoryRepo.findOne({
+            rawMaterial: { id: data.rawMaterialId },
+            warehouse: { id: warehouse.id },
+        });
+
+        if (!inventory) {
+            inventory = this.inventoryRepo.create({
+                warehouse,
+                rawMaterial,
+                quantity: 0,
+            } as any); // Cast to any to avoid strict type checks on relation creation if needed, or define proper partial
+        }
+
+        // 4. Calculate Weighted Average Cost
+        const currentStock = inventory.quantity;
+        // @ts-ignore
+        const currentAvgCost = Number(rawMaterial.averageCost || 0);
+        const addedQty = data.quantity;
+        const addedCost = data.unitCost;
+
+        let newAvgCost = addedCost;
+        if (currentStock + addedQty > 0) {
+            const currentTotalValue = currentStock * currentAvgCost;
+            const addedTotalValue = addedQty * addedCost;
+            newAvgCost = (currentTotalValue + addedTotalValue) / (currentStock + addedQty);
+        }
+
+        // 5. Update values
+        inventory.quantity += addedQty;
+        // @ts-ignore
+        rawMaterial.averageCost = newAvgCost;
+
+        // 6. Save
+        await this.em.persistAndFlush([inventory, rawMaterial]);
+        return inventory;
+    }
+
     async getInventoryItems(page: number, limit: number) {
         const [items, total] = await this.inventoryRepo.findAndCount(
             {},

@@ -32,6 +32,27 @@ export class ProductionService {
         return order;
     }
 
+    async listOrders(page: number = 1, limit: number = 10): Promise<{ orders: ProductionOrder[], total: number }> {
+        const [orders, total] = await this.productionOrderRepo.findAndCount(
+            {},
+            {
+                populate: ['items', 'items.variant', 'items.variant.product'],
+                limit,
+                offset: (page - 1) * limit,
+                orderBy: { createdAt: 'DESC' }
+            }
+        );
+        return { orders, total };
+    }
+
+    async getOrder(id: string): Promise<ProductionOrder> {
+        return await this.productionOrderRepo.findOneOrFail(
+            { id },
+            { populate: ['items', 'items.variant', 'items.variant.product', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] }
+        );
+    }
+
+
     async calculateMaterialRequirements(orderId: string): Promise<{ material: RawMaterial, required: number, available: number }[]> {
         const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] });
 

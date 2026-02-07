@@ -6,7 +6,7 @@ import { MrpService } from './services/mrp.service';
 import { InventoryService } from './services/inventory.service';
 import { ProductionService } from './services/production.service';
 import { PurchaseOrderService } from './services/purchase-order.service';
-import { ProductSchema, SupplierSchema, RawMaterialSchema, BOMItemSchema, ProductionOrderSchema, ProductionOrderItemSchema } from '@scaffold/schemas';
+import { ProductSchema, ProductionOrderSchema, RawMaterialSchema, BOMItemSchema, SupplierSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 
 export class MrpController {
@@ -210,21 +210,62 @@ export class MrpController {
     }
 
     // --- Production & Inventory ---
+    async listProductionOrders(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { page = 1, limit = 10 } = req.query;
+            const orders = await this.productionService.listOrders(
+                Number(page),
+                Number(limit)
+            );
+            res.json(orders);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const order = await this.productionService.getOrder(id);
+            res.json(order);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async createProductionOrder(req: Request, res: Response, next: NextFunction) {
         try {
             // Expect body to have { order: ..., items: [...] } logic or modify schema to include items
             // For now assuming: { ...orderData, items: [{variantId, quantity}] }
             const { items, ...orderData } = req.body;
 
-            const validatedOrder = ProductionOrderSchema.parse(orderData);
-            const validatedItems = z.array(ProductionOrderItemSchema).parse(items);
+            // Auto-generate code if not provided
+            if (!orderData.code) {
+                const timestamp = Date.now().toString(36).toUpperCase();
+                orderData.code = `PO-${timestamp}`;
+            }
 
-            const order = await this.productionService.createOrder(validatedOrder, validatedItems);
+            // Set default status if not provided
+            if (!orderData.status) {
+                orderData.status = 'draft';
+            }
+
+            const validatedOrder = ProductionOrderSchema.parse(orderData);
+
+            // Validate items without productionOrderId (it doesn't exist yet)
+            const itemCreationSchema = z.array(z.object({
+                variantId: z.string().uuid(),
+                quantity: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
+            }));
+            const validatedItems = itemCreationSchema.parse(items);
+
+            const order = await this.productionService.createOrder(validatedOrder, validatedItems as any);
             res.status(201).json(order);
         } catch (error) {
             next(error);
         }
     }
+
 
     async calculateMaterialRequirements(req: Request, res: Response, next: NextFunction) {
         try {
@@ -236,11 +277,27 @@ export class MrpController {
         }
     }
 
-    async listInventory(req: Request, res: Response, next: NextFunction) {
+    // --- Inventory ---
+    async getInventory(req: Request, res: Response, next: NextFunction) {
         try {
             const { page, limit } = req.query;
-            const result = await this.inventoryService.getInventoryItems(Number(page) || 1, Number(limit) || 10);
+            const result = await this.inventoryService.getInventoryItems(Number(page) || 1, Number(limit) || 100);
             res.json(result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async addManualStock(req: Request, res: Response, next: NextFunction) {
+        try {
+            const schema = z.object({
+                rawMaterialId: z.string(),
+                quantity: z.number().min(0.01),
+                unitCost: z.number().min(0),
+            });
+            const data = schema.parse(req.body);
+            const result = await this.inventoryService.addManualStock(data);
+            res.status(200).json(result);
         } catch (error) {
             next(error);
         }

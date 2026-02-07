@@ -34,8 +34,11 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.delete('/bom-items/:id', (req, res, next) => mrpController.deleteBOMItem(req, res, next));
 
     // Production Orders
+    router.get('/production-orders', (req, res, next) => mrpController.listProductionOrders(req, res, next));
+    router.get('/production-orders/:id', (req, res, next) => mrpController.getProductionOrder(req, res, next));
     router.post('/production-orders', (req, res, next) => mrpController.createProductionOrder(req, res, next));
     router.get('/production-orders/:id/requirements', (req, res, next) => mrpController.calculateMaterialRequirements(req, res, next));
+
 
     // Purchase Orders
     router.post('/purchase-orders', (req, res, next) => mrpController.createPurchaseOrder(req, res, next));
@@ -46,7 +49,8 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.delete('/purchase-orders/:id', (req, res, next) => mrpController.cancelPurchaseOrder(req, res, next));
 
     // Inventory
-    router.get('/inventory', (req, res, next) => mrpController.listInventory(req, res, next));
+    router.get('/inventory', (req, res, next) => mrpController.getInventory(req, res, next));
+    router.post('/inventory/manual-add', (req, res, next) => mrpController.addManualStock(req, res, next));
 
     return router;
 };

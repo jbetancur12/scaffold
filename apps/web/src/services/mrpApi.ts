@@ -149,5 +149,9 @@ export const mrpApi = {
     getInventory: async (page = 1, limit = 10) => {
         const response = await api.get<{ items: InventoryItem[], total: number }>(`/mrp/inventory?page=${page}&limit=${limit}`);
         return response.data;
-    }
+    },
+    addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number }) => {
+        const response = await api.post('/mrp/inventory/manual-add', data);
+        return response.data;
+    },
 };
