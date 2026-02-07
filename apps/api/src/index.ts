@@ -4,7 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { MikroORM, RequestContext } from '@mikro-orm/core';
-import mikroConfig from './config/mikro-orm.config';
+import mikroConfig from '../mikro-orm.config';
 import { winstonLogger } from './config/logger';
 import { connectRedis } from './config/redis';
 import { createAuthRoutes } from './modules/auth/auth.routes';

@@ -21,6 +21,7 @@ import {
 import { Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { z } from 'zod';
+import FabricationCalculator from './FabricationCalculator';
 
 interface BOMEditorProps {
     variant: ProductVariant;
@@ -126,7 +127,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Material</TableHead>
-                            <TableHead className="w-[100px]">Cantidad</TableHead>
+                            <TableHead className="w-[160px]">Cantidad</TableHead>
                             <TableHead className="w-[80px]">Unidad</TableHead>
                             <TableHead className="w-[100px] text-right">Costo Unit</TableHead>
                             <TableHead className="w-[100px] text-right">Subtotal</TableHead>
@@ -177,24 +178,31 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                 </Select>
                             </TableCell>
                             <TableCell>
-                                <Input
-                                    type="number"
-                                    value={newItem.quantity}
-                                    onChange={e => setNewItem({ ...newItem, quantity: e.target.value })}
-                                    placeholder="0.00"
-                                    min="0"
-                                    step="0.01"
-                                    className="h-9"
-                                />
+                                <div className="flex gap-2 items-center">
+                                    <Input
+                                        type="number"
+                                        value={newItem.quantity}
+                                        onChange={e => setNewItem({ ...newItem, quantity: e.target.value })}
+                                        placeholder="0.00"
+                                        min="0"
+                                        step="0.0001"
+                                        className="h-9"
+                                    />
+                                    <FabricationCalculator
+                                        onCalculate={(qty) => setNewItem({ ...newItem, quantity: qty.toString() })}
+                                    />
+                                </div>
                             </TableCell>
                             <TableCell className="text-xs text-slate-500">
                                 {newItem.materialId ? getMaterialUnit(newItem.materialId) : '-'}
                             </TableCell>
                             <TableCell className="text-right text-xs text-slate-500">
-                                {newItem.materialId ? `$${getMaterialCost(newItem.materialId)}` : '-'}
+                                {newItem.materialId ? `$${getMaterialCost(newItem.materialId).toFixed(2)}` : '-'}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                                -
+                                {newItem.materialId && newItem.quantity
+                                    ? `$${(getMaterialCost(newItem.materialId) * (parseFloat(newItem.quantity) || 0)).toFixed(2)}`
+                                    : '-'}
                             </TableCell>
                             <TableCell>
                                 <Button

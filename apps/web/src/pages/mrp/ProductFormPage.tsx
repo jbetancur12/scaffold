@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { mrpApi } from '@/services/mrpApi';
+import { generateProductSku, generateVariantSku } from '@/utils/skuGenerator';
 import { Product } from '@scaffold/types';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save, Plus, Trash2, Edit2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
 import {
     Table,
@@ -62,6 +63,17 @@ export default function ProductFormPage() {
         description: '',
     });
 
+    const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
+
+    // Initial SKU generation listener
+    useEffect(() => {
+        if (!isEditing && !skuManuallyEdited && formData.name) {
+            const autoSku = generateProductSku(formData.name);
+            setFormData(prev => ({ ...prev, sku: autoSku }));
+        }
+    }, [formData.name, isEditing, skuManuallyEdited]);
+
+
     // Variant management
     const [showVariantDialog, setShowVariantDialog] = useState(false);
     const [editingVariant, setEditingVariant] = useState<VariantFormData | null>(null);
@@ -71,6 +83,14 @@ export default function ProductFormPage() {
         price: 0,
         targetMargin: 0.4,
     });
+
+    // Variant SKU generation listener
+    useEffect(() => {
+        if (showVariantDialog && formData.sku && variantFormData.name) {
+            const autoVariantSku = generateVariantSku(formData.sku, variantFormData.name);
+            setVariantFormData(prev => ({ ...prev, sku: autoVariantSku }));
+        }
+    }, [variantFormData.name, formData.sku, showVariantDialog]);
 
     const loadProduct = useCallback(async () => {
         try {
@@ -82,6 +102,8 @@ export default function ProductFormPage() {
                 sku: productData.sku,
                 description: productData.description || '',
             });
+            // Reset manual edit flag when loading new product
+            setSkuManuallyEdited(true);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -302,13 +324,34 @@ export default function ProductFormPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="sku">SKU Base</Label>
-                                <Input
-                                    id="sku"
-                                    value={formData.sku}
-                                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                                    placeholder="Ej. CAM-BAS"
-                                    required
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        id="sku"
+                                        value={formData.sku}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, sku: e.target.value });
+                                            setSkuManuallyEdited(true);
+                                        }}
+                                        placeholder="Ej. CAM-BAS"
+                                        required
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        title="Generar SKU automáticamente"
+                                        onClick={() => {
+                                            if (formData.name) {
+                                                const autoSku = generateProductSku(formData.name);
+                                                setFormData({ ...formData, sku: autoSku });
+                                                setSkuManuallyEdited(false); // Reset so it continues to track if user keeps typing? Actually set to false means "auto mode". 
+                                                // But if we click this, maybe we want it to be "auto".
+                                            }
+                                        }}
+                                    >
+                                        <RefreshCw className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </div>
                         </div>
 
@@ -458,12 +501,36 @@ export default function ProductFormPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="variant-sku">SKU</Label>
-                                <Input
-                                    id="variant-sku"
-                                    value={variantFormData.sku}
-                                    onChange={(e) => setVariantFormData({ ...variantFormData, sku: e.target.value })}
-                                    placeholder="Ej. CAM-BAS-R-M"
-                                />
+                                <div className="flex gap-2">
+                                    <Input
+                                        id="variant-sku"
+                                        value={variantFormData.sku}
+                                        onChange={(e) => setVariantFormData({ ...variantFormData, sku: e.target.value })}
+                                        onFocus={() => {
+                                            if (!variantFormData.sku && formData.sku && variantFormData.name) {
+                                                setVariantFormData(prev => ({
+                                                    ...prev,
+                                                    sku: generateVariantSku(formData.sku, variantFormData.name)
+                                                }));
+                                            }
+                                        }}
+                                        placeholder="Ej. CAM-BAS-R-M"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        title="Generar SKU automáticamente"
+                                        onClick={() => {
+                                            if (formData.sku && variantFormData.name) {
+                                                const autoSku = generateVariantSku(formData.sku, variantFormData.name);
+                                                setVariantFormData({ ...variantFormData, sku: autoSku });
+                                            }
+                                        }}
+                                    >
+                                        <RefreshCw className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">

@@ -50,5 +50,11 @@
         "@types/uuid": "^9.0.8",
         "ts-node-dev": "^2.0.0",
         "typescript": "^5.3.3"
+    },
+    "mikro-orm": {
+        "useTsNode": true,
+        "configPaths": [
+            "./mikro-orm.config.ts"
+        ]
     }
 }
