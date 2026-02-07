@@ -43,6 +43,11 @@ export interface Supplier {
     email?: string;
     phone?: string;
     address?: string;
+    city?: string;
+    department?: string;
+    bankDetails?: string;
+    paymentConditions?: string;
+    notes?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

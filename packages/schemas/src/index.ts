@@ -32,6 +32,11 @@ export const SupplierSchema = z.object({
     email: z.string().email('Email inválido').optional().or(z.literal('')),
     phone: z.string().optional(),
     address: z.string().optional(),
+    city: z.string().optional(),
+    department: z.string().optional(),
+    bankDetails: z.string().optional(),
+    paymentConditions: z.string().optional(),
+    notes: z.string().optional(),
 });
 
 export const RawMaterialSchema = z.object({

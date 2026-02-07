@@ -10,6 +10,7 @@ import ProductFormPage from '@/pages/mrp/ProductFormPage';
 import ProductBOMPage from '@/pages/mrp/ProductBOMPage';
 import SupplierListPage from '@/pages/mrp/SupplierListPage';
 import SupplierFormPage from '@/pages/mrp/SupplierFormPage';
+import SupplierDetailPage from '@/pages/mrp/SupplierDetailPage';
 import RawMaterialListPage from '@/pages/mrp/RawMaterialListPage';
 import RawMaterialFormPage from '@/pages/mrp/RawMaterialFormPage';
 import RawMaterialDetailPage from '@/pages/mrp/RawMaterialDetailPage';
@@ -92,6 +93,8 @@ export default function App() {
 
                         <Route path="/dashboard/mrp/suppliers" element={<SupplierListPage />} />
                         <Route path="/dashboard/mrp/suppliers/new" element={<SupplierFormPage />} />
+                        <Route path="/dashboard/mrp/suppliers/:id" element={<SupplierDetailPage />} />
+                        <Route path="/dashboard/mrp/suppliers/:id/edit" element={<SupplierFormPage />} />
 
                         <Route path="/dashboard/mrp/raw-materials" element={<RawMaterialListPage />} />
                         <Route path="/dashboard/mrp/raw-materials/new" element={<RawMaterialFormPage />} />

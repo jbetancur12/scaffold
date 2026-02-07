@@ -106,6 +106,10 @@ export const mrpApi = {
         const response = await api.get<{ suppliers: Supplier[], total: number }>(`/mrp/suppliers?page=${page}&limit=${limit}`);
         return response.data;
     },
+    getSupplier: async (id: string) => {
+        const response = await api.get<Supplier>(`/mrp/suppliers/${id}`);
+        return response.data;
+    },
     createSupplier: async (data: Partial<Supplier>): Promise<Supplier> => {
         const response = await api.post('/mrp/suppliers', data);
         return response.data;

@@ -4,6 +4,7 @@ import { mrpApi } from '@/services/mrpApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save } from 'lucide-react';
 import { z } from 'zod';
@@ -14,6 +15,11 @@ const supplierSchema = z.object({
     contactName: z.string().optional(),
     phoneNumber: z.string().optional(),
     address: z.string().optional(),
+    city: z.string().optional(),
+    department: z.string().optional(),
+    bankDetails: z.string().optional(),
+    paymentConditions: z.string().optional(),
+    notes: z.string().optional(),
 });
 
 export default function SupplierFormPage() {
@@ -29,6 +35,11 @@ export default function SupplierFormPage() {
         contactName: '',
         phoneNumber: '',
         address: '',
+        city: '',
+        department: '',
+        bankDetails: '',
+        paymentConditions: '',
+        notes: '',
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -112,6 +123,9 @@ export default function SupplierFormPage() {
                                 onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                             />
                         </div>
+                    </div>
+
+                    <div className="grid gap-6 md:grid-cols-3">
                         <div className="space-y-2">
                             <Label htmlFor="address">Dirección</Label>
                             <Input
@@ -120,6 +134,55 @@ export default function SupplierFormPage() {
                                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                             />
                         </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="city">Ciudad</Label>
+                            <Input
+                                id="city"
+                                value={formData.city}
+                                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="department">Departamento/Estado</Label>
+                            <Input
+                                id="department"
+                                value={formData.department}
+                                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="bankDetails">Datos Bancarios</Label>
+                        <Textarea
+                            id="bankDetails"
+                            placeholder="Banco, Tipo de Cuenta, Número, Titular..."
+                            value={formData.bankDetails}
+                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, bankDetails: e.target.value })}
+                            className="min-h-[80px]"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="paymentConditions">Condiciones de Pago / Comerciales</Label>
+                        <Textarea
+                            id="paymentConditions"
+                            placeholder="Plazo de pago, descuentos, incoterms, fletes..."
+                            value={formData.paymentConditions}
+                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, paymentConditions: e.target.value })}
+                            className="min-h-[80px]"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="notes">Notas Adicionales</Label>
+                        <Textarea
+                            id="notes"
+                            placeholder="Mínimos de compra, tiempos de entrega, observaciones..."
+                            value={formData.notes}
+                            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, notes: e.target.value })}
+                            className="min-h-[80px]"
+                        />
                     </div>
                 </div>
 

@@ -19,6 +19,10 @@ export class SupplierService {
         return supplier;
     }
 
+    async getSupplier(id: string): Promise<Supplier | null> {
+        return this.supplierRepo.findOne({ id });
+    }
+
     async listSuppliers(page = 1, limit = 10): Promise<{ suppliers: Supplier[]; total: number }> {
         const [suppliers, total] = await this.supplierRepo.findAndCount(
             {},

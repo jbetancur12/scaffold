@@ -18,4 +18,19 @@ export class Supplier extends BaseEntity implements ISupplier {
 
     @Property({ nullable: true })
     address?: string;
+
+    @Property({ nullable: true })
+    city?: string;
+
+    @Property({ nullable: true })
+    department?: string;
+
+    @Property({ nullable: true, type: 'text' })
+    bankDetails?: string;
+
+    @Property({ nullable: true, type: 'text' })
+    paymentConditions?: string;
+
+    @Property({ nullable: true, type: 'text' })
+    notes?: string;
 }

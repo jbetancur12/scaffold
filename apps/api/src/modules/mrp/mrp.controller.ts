@@ -137,6 +137,20 @@ export class MrpController {
         }
     }
 
+    async getSupplier(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const supplier = await this.supplierService.getSupplier(id);
+            if (!supplier) {
+                res.status(404).json({ message: 'Supplier not found' });
+                return;
+            }
+            res.json(supplier);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     // --- Raw Materials ---
     async getRawMaterialSuppliers(req: Request, res: Response, next: NextFunction) {
         try {
