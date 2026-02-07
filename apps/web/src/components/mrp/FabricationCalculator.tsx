@@ -85,6 +85,49 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
         }
     };
 
+    const renderDiagram = (rWidth: number, pWidth: number, pLength: number, res: { piecesPerWidth: number, rowsPerMeter: number } | null) => {
+        if (!res || rWidth <= 0) return null;
+
+        // ViewBox matches the physical dimensions: 0 0 RollWidth 100cm (1 meter representative sample)
+        const viewHeight = Math.max(100, pLength * 1.1);
+
+        return (
+            <div className="w-full mt-2 bg-slate-100 border border-slate-300 rounded overflow-hidden">
+                <svg viewBox={`0 0 ${rWidth} ${viewHeight}`} className="w-full h-auto block" preserveAspectRatio="xMidYMin slice">
+                    {/* Background / Fabric */}
+                    <rect x="0" y="0" width={rWidth} height={viewHeight} fill="#e2e8f0" />
+
+                    {/* Pieces */}
+                    {Array.from({ length: res.rowsPerMeter }).map((_, rowIndex) => (
+                        Array.from({ length: res.piecesPerWidth }).map((_, colIndex) => (
+                            <rect
+                                key={`${rowIndex}-${colIndex}`}
+                                x={colIndex * pWidth}
+                                y={rowIndex * pLength}
+                                width={pWidth}
+                                height={pLength}
+                                fill="#818cf8" // Indigo-400
+                                stroke="#fff"
+                                strokeWidth="1"
+                                fillOpacity="0.8"
+                            />
+                        ))
+                    ))}
+
+                    {/* Waste highlighting (right side) */}
+                    <rect
+                        x={res.piecesPerWidth * pWidth}
+                        y="0"
+                        width={rWidth - (res.piecesPerWidth * pWidth)}
+                        height={viewHeight}
+                        fill="#fecaca" // Red-200
+                        fillOpacity="0.5"
+                    />
+                </svg>
+            </div>
+        );
+    };
+
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -92,7 +135,7 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                     <Calculator className="h-4 w-4" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle>Calculadora de Trazada (Textil)</DialogTitle>
                     <DialogDescription>
@@ -164,6 +207,7 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                                     <div className="text-center font-bold text-lg text-slate-700 mt-2">
                                         {normalResult.consumptionPerUnit.toFixed(4)} m
                                     </div>
+                                    {renderDiagram(rollWidth, pieceWidth, pieceLength, normalResult)}
                                 </div>
                             ) : <div className="text-center text-xs text-slate-400">-</div>}
                         </div>
@@ -194,6 +238,7 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                                     <div className="text-center font-bold text-lg text-slate-700 mt-2">
                                         {rotatedResult.consumptionPerUnit.toFixed(4)} m
                                     </div>
+                                    {renderDiagram(rollWidth, pieceLength, pieceWidth, rotatedResult)}
                                 </div>
                             ) : <div className="text-center text-xs text-slate-400">-</div>}
                         </div>
