@@ -182,9 +182,10 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
         } else if (calcType === 'area') {
             const target = bestOption === 'rotated' ? rotatedResult : normalResult;
             if (target && bestOption) {
-                // User requirement: Apply the Standard Unit Consumption (which accounts for efficiency/waste)
-                // not the total batch consumption.
-                onCalculate(Number(target.unitAnalysis.standardConsumptionPerPiece.toFixed(4)), {
+                // User requirement: Apply the Standard Unit Consumption * Quantity Per Unit
+                // If the product takes 10 pieces, the BOM quantity should be the total for 10 pieces.
+                const totalStandardConsumption = target.unitAnalysis.standardConsumptionPerPiece * quantityPerUnit;
+                onCalculate(Number(totalStandardConsumption.toFixed(4)), {
                     calculationType: 'area',
                     quantityPerUnit,
                     rollWidth,
