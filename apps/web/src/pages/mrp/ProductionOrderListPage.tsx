@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mrpApi } from '@/services/mrpApi';
 import { ProductionOrder, ProductionOrderStatus } from '@scaffold/types';
-import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -59,74 +58,72 @@ export default function ProductionOrderListPage() {
     };
 
     return (
-        <DashboardLayout>
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                            Órdenes de Producción
-                        </h1>
-                        <p className="text-slate-500">
-                            Gestiona y monitorea las órdenes de producción.
-                        </p>
-                    </div>
-                    <Button onClick={() => navigate('/dashboard/mrp/production-orders/new')}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Nueva Orden
-                    </Button>
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                        Órdenes de Producción
+                    </h1>
+                    <p className="text-slate-500">
+                        Gestiona y monitorea las órdenes de producción.
+                    </p>
                 </div>
-
-                <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Código</TableHead>
-                                <TableHead>Estado</TableHead>
-                                <TableHead>Fecha Inicio</TableHead>
-                                <TableHead>Fecha Fin</TableHead>
-                                <TableHead>Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {loading ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8">
-                                        Cargando...
-                                    </TableCell>
-                                </TableRow>
-                            ) : orders.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
-                                        No hay órdenes de producción registradas.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                orders.map((order) => (
-                                    <TableRow key={order.id}>
-                                        <TableCell className="font-medium">{order.code}</TableCell>
-                                        <TableCell>
-                                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                                                {getStatusLabel(order.status)}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            {order.startDate ? format(new Date(order.startDate), 'dd/MM/yyyy') : '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {order.endDate ? format(new Date(order.endDate), 'dd/MM/yyyy') : '-'}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/mrp/production-orders/${order.id}`)}>
-                                                <Eye className="h-4 w-4" />
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
+                <Button onClick={() => navigate('/dashboard/mrp/production-orders/new')}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nueva Orden
+                </Button>
             </div>
-        </DashboardLayout>
+
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Código</TableHead>
+                            <TableHead>Estado</TableHead>
+                            <TableHead>Fecha Inicio</TableHead>
+                            <TableHead>Fecha Fin</TableHead>
+                            <TableHead>Acciones</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8">
+                                    Cargando...
+                                </TableCell>
+                            </TableRow>
+                        ) : orders.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                                    No hay órdenes de producción registradas.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            orders.map((order) => (
+                                <TableRow key={order.id}>
+                                    <TableCell className="font-medium">{order.code}</TableCell>
+                                    <TableCell>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                                            {getStatusLabel(order.status)}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell>
+                                        {order.startDate ? format(new Date(order.startDate), 'dd/MM/yyyy') : '-'}
+                                    </TableCell>
+                                    <TableCell>
+                                        {order.endDate ? format(new Date(order.endDate), 'dd/MM/yyyy') : '-'}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/mrp/production-orders/${order.id}`)}>
+                                            <Eye className="h-4 w-4" />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+        </div>
     );
 }

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mrpApi } from '@/services/mrpApi';
 import { Product, RawMaterial } from '@scaffold/types';
-import DashboardLayout from '@/components/layout/DashboardLayout';
 import BOMEditor from '@/components/mrp/BOMEditor';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -45,51 +44,49 @@ export default function ProductBOMPage() {
         }
     }, [id, loadData]);
 
-    if (loading) return <DashboardLayout><div>Cargando...</div></DashboardLayout>;
-    if (!product) return <DashboardLayout><div>Producto no encontrado</div></DashboardLayout>;
+    if (loading) return <div>Cargando...</div>;
+    if (!product) return <div>Producto no encontrado</div>;
 
     const variants = product.variants || [];
 
     return (
-        <DashboardLayout>
-            <div className="space-y-6">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/products')}>
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                            Configuración BOM: {product.name}
-                        </h1>
-                        <p className="text-slate-500">
-                            Gestiona la lista de materiales para cada variante.
-                        </p>
-                    </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                    {variants.length === 0 ? (
-                        <div className="text-center py-10 text-slate-500">
-                            Este producto no tiene variantes configuradas. Agrega variantes primero.
-                        </div>
-                    ) : (
-                        <Tabs defaultValue={variants[0].id} className="w-full">
-                            <TabsList className="mb-4 flex flex-wrap h-auto">
-                                {variants.map(variant => (
-                                    <TabsTrigger key={variant.id} value={variant.id} className="min-w-[100px]">
-                                        {variant.name}
-                                    </TabsTrigger>
-                                ))}
-                            </TabsList>
-                            {variants.map(variant => (
-                                <TabsContent key={variant.id} value={variant.id} className="space-y-4">
-                                    <BOMEditor variant={variant} materials={rawMaterials} />
-                                </TabsContent>
-                            ))}
-                        </Tabs>
-                    )}
+        <div className="space-y-6">
+            <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/products')}>
+                    <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                        Configuración BOM: {product.name}
+                    </h1>
+                    <p className="text-slate-500">
+                        Gestiona la lista de materiales para cada variante.
+                    </p>
                 </div>
             </div>
-        </DashboardLayout>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                {variants.length === 0 ? (
+                    <div className="text-center py-10 text-slate-500">
+                        Este producto no tiene variantes configuradas. Agrega variantes primero.
+                    </div>
+                ) : (
+                    <Tabs defaultValue={variants[0].id} className="w-full">
+                        <TabsList className="mb-4 flex flex-wrap h-auto">
+                            {variants.map(variant => (
+                                <TabsTrigger key={variant.id} value={variant.id} className="min-w-[100px]">
+                                    {variant.name}
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                        {variants.map(variant => (
+                            <TabsContent key={variant.id} value={variant.id} className="space-y-4">
+                                <BOMEditor variant={variant} materials={rawMaterials} />
+                            </TabsContent>
+                        ))}
+                    </Tabs>
+                )}
+            </div>
+        </div>
     );
 }

@@ -27,6 +27,8 @@ interface OrderItem {
     unitPrice: number;
 }
 
+
+
 export default function PurchaseOrderFormPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
@@ -125,6 +127,7 @@ export default function PurchaseOrderFormPage() {
             toast({
                 title: 'Éxito',
                 description: 'Orden de compra creada exitosamente',
+                variant: 'default',
             });
             navigate('/dashboard/mrp/purchase-orders');
         } catch (error) {
@@ -311,5 +314,6 @@ export default function PurchaseOrderFormPage() {
                 </div>
             </form>
         </div>
+
     );
 }

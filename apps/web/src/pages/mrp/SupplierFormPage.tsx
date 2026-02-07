@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mrpApi } from '@/services/mrpApi';
-import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -61,89 +60,87 @@ export default function SupplierFormPage() {
     };
 
     return (
-        <DashboardLayout>
-            <div className="space-y-8 max-w-4xl mx-auto">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/suppliers')}>
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                            Nuevo Proveedor
-                        </h1>
-                        <p className="text-slate-500">
-                            Ingresa la información del proveedor.
-                        </p>
+        <div className="space-y-8 max-w-4xl mx-auto">
+            <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/suppliers')}>
+                    <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                        Nuevo Proveedor
+                    </h1>
+                    <p className="text-slate-500">
+                        Ingresa la información del proveedor.
+                    </p>
+                </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-8">
+                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+                    <div className="space-y-2">
+                        <Label htmlFor="name">Nombre de la Empresa</Label>
+                        <Input
+                            id="name"
+                            value={formData.name}
+                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                            required
+                        />
+                    </div>
+                    <div className="grid gap-6 md:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="contactName">Nombre de Contacto</Label>
+                            <Input
+                                id="contactName"
+                                value={formData.contactName}
+                                onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="phoneNumber">Teléfono</Label>
+                            <Input
+                                id="phoneNumber"
+                                value={formData.phoneNumber}
+                                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="address">Dirección</Label>
+                            <Input
+                                id="address"
+                                value={formData.address}
+                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                            />
+                        </div>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-8">
-                    <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Nombre de la Empresa</Label>
-                            <Input
-                                id="name"
-                                value={formData.name}
-                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                required
-                            />
-                        </div>
-                        <div className="grid gap-6 md:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="contactName">Nombre de Contacto</Label>
-                                <Input
-                                    id="contactName"
-                                    value={formData.contactName}
-                                    onChange={(e) => setFormData({ ...formData, contactName: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="email">Email</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="phoneNumber">Teléfono</Label>
-                                <Input
-                                    id="phoneNumber"
-                                    value={formData.phoneNumber}
-                                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="address">Dirección</Label>
-                                <Input
-                                    id="address"
-                                    value={formData.address}
-                                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-4">
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => navigate('/dashboard/mrp/suppliers')}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button type="submit" disabled={loading} className="min-w-[150px]">
-                            {loading ? 'Guardando...' : (
-                                <>
-                                    <Save className="mr-2 h-4 w-4" />
-                                    Crear Proveedor
-                                </>
-                            )}
-                        </Button>
-                    </div>
-                </form>
-            </div>
-        </DashboardLayout>
+                <div className="flex justify-end gap-4">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => navigate('/dashboard/mrp/suppliers')}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button type="submit" disabled={loading} className="min-w-[150px]">
+                        {loading ? 'Guardando...' : (
+                            <>
+                                <Save className="mr-2 h-4 w-4" />
+                                Crear Proveedor
+                            </>
+                        )}
+                    </Button>
+                </div>
+            </form>
+        </div>
     );
 }

@@ -99,7 +99,9 @@ export default function PurchaseOrderListPage() {
     };
 
     if (loading) {
-        return <div className="p-6">Cargando...</div>;
+        return (
+            <div className="p-6">Cargando...</div>
+        );
     }
 
     return (

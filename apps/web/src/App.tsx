@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 import LoginPage from '@/pages/auth/LoginPage';
 import DashboardPage from '@/pages/dashboard/DashboardPage';
 import UsersPage from '@/pages/dashboard/UsersPage';
@@ -67,142 +68,43 @@ export default function App() {
                             </PublicRoute>
                         }
                     />
+
+                    {/* Dashboard Layout Route - wraps all protected pages */}
                     <Route
-                        path="/dashboard"
                         element={
                             <ProtectedRoute>
-                                <DashboardPage />
+                                <DashboardLayout>
+                                    <Outlet />
+                                </DashboardLayout>
                             </ProtectedRoute>
                         }
-                    />
-                    <Route
-                        path="/dashboard/users"
-                        element={
-                            <ProtectedRoute>
-                                <UsersPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/products"
-                        element={
-                            <ProtectedRoute>
-                                <ProductListPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/products/new"
-                        element={
-                            <ProtectedRoute>
-                                <ProductFormPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/products/:id/bom"
-                        element={
-                            <ProtectedRoute>
-                                <ProductBOMPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/products/:id"
-                        element={
-                            <ProtectedRoute>
-                                <ProductFormPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/suppliers"
-                        element={
-                            <ProtectedRoute>
-                                <SupplierListPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/suppliers/new"
-                        element={
-                            <ProtectedRoute>
-                                <SupplierFormPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/raw-materials"
-                        element={
-                            <ProtectedRoute>
-                                <RawMaterialListPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/raw-materials/new"
-                        element={
-                            <ProtectedRoute>
-                                <RawMaterialFormPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/production-orders"
-                        element={
-                            <ProtectedRoute>
-                                <ProductionOrderListPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/production-orders/new"
-                        element={
-                            <ProtectedRoute>
-                                <ProductionOrderFormPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/production-orders/:id"
-                        element={
-                            <ProtectedRoute>
-                                <ProductionOrderFormPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/purchase-orders"
-                        element={
-                            <ProtectedRoute>
-                                <PurchaseOrderListPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/purchase-orders/new"
-                        element={
-                            <ProtectedRoute>
-                                <PurchaseOrderFormPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/purchase-orders/:id"
-                        element={
-                            <ProtectedRoute>
-                                <PurchaseOrderDetailPage />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/dashboard/mrp/inventory"
-                        element={
-                            <ProtectedRoute>
-                                <InventoryDashboardPage />
-                            </ProtectedRoute>
-                        }
-                    />
+                    >
+                        <Route path="/dashboard" element={<DashboardPage />} />
+                        <Route path="/dashboard/users" element={<UsersPage />} />
+
+                        {/* MRP Routes */}
+                        <Route path="/dashboard/mrp/products" element={<ProductListPage />} />
+                        <Route path="/dashboard/mrp/products/new" element={<ProductFormPage />} />
+                        <Route path="/dashboard/mrp/products/:id/bom" element={<ProductBOMPage />} />
+                        <Route path="/dashboard/mrp/products/:id" element={<ProductFormPage />} />
+
+                        <Route path="/dashboard/mrp/suppliers" element={<SupplierListPage />} />
+                        <Route path="/dashboard/mrp/suppliers/new" element={<SupplierFormPage />} />
+
+                        <Route path="/dashboard/mrp/raw-materials" element={<RawMaterialListPage />} />
+                        <Route path="/dashboard/mrp/raw-materials/new" element={<RawMaterialFormPage />} />
+
+                        <Route path="/dashboard/mrp/production-orders" element={<ProductionOrderListPage />} />
+                        <Route path="/dashboard/mrp/production-orders/new" element={<ProductionOrderFormPage />} />
+                        <Route path="/dashboard/mrp/production-orders/:id" element={<ProductionOrderFormPage />} />
+
+                        <Route path="/dashboard/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
+                        <Route path="/dashboard/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />
+                        <Route path="/dashboard/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+
+                        <Route path="/dashboard/mrp/inventory" element={<InventoryDashboardPage />} />
+                    </Route>
+
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
                 <Toaster />

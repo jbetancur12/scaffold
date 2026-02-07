@@ -113,11 +113,15 @@ export default function PurchaseOrderDetailPage() {
     };
 
     if (loading) {
-        return <div className="p-6">Cargando...</div>;
+        return (
+            <div className="p-6">Cargando...</div>
+        );
     }
 
     if (!order) {
-        return <div className="p-6">Orden no encontrada</div>;
+        return (
+            <div className="p-6">Orden no encontrada</div>
+        );
     }
 
     return (
