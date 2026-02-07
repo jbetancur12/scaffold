@@ -44,12 +44,26 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
         rowsPerMeter: number;
         totalPiecesPerMeter: number;
         consumptionPerUnit: number;
+        efficiency: number;
+        unitAnalysis: {
+            wasteWidthPerRow: number;
+            distributedWasteX: number;
+            effectiveWidth: number;
+            standardConsumptionPerPiece: number;
+        };
     } | null>(null);
     const [rotatedResult, setRotatedResult] = useState<{
         piecesPerWidth: number;
         rowsPerMeter: number;
         totalPiecesPerMeter: number;
         consumptionPerUnit: number;
+        efficiency: number;
+        unitAnalysis: {
+            wasteWidthPerRow: number;
+            distributedWasteX: number;
+            effectiveWidth: number;
+            standardConsumptionPerPiece: number;
+        };
     } | null>(null);
 
     // Linear Results
@@ -61,15 +75,54 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
 
     const calculateArea = (rWidth: number, pWidth: number, pLength: number, qty: number) => {
         if (rWidth <= 0 || pWidth <= 0 || pLength <= 0) return null;
-        const piecesPerWidth = Math.floor(rWidth / pWidth);
+
+        const piecesPerWidth = Math.floor(rWidth / pWidth); // Pieces per row
+        if (piecesPerWidth <= 0) return null;
+
+        const totalRows = Math.ceil(qty / piecesPerWidth); // Total rows needed
+        const totalConsumption = (totalRows * pLength) / 100; // cm -> meters
+
+        // For density visualization (preview)
         const rowsPerMeter = Math.floor(100 / pLength);
         const totalPiecesPerMeter = piecesPerWidth * rowsPerMeter;
-        if (totalPiecesPerMeter <= 0) return null;
+
+        // Legacy Efficiency calculation (Batch Efficiency - penalized by empty slots in last row)
+        // const usedArea = qty * pWidth * pLength;
+        // const totalArea = (totalConsumption * 100) * rWidth;
+        // const efficiency = totalArea > 0 ? (usedArea / totalArea) * 100 : 0;
+
+        // New Efficiency Calculation (Layout/Width Efficiency)
+        // This reflects how well the pieces fit across the roll width, regardless of batch quantity (vertical rows).
+        // This aligns with "Standard Cost" logic where remnants are considered usable inventory, not waste.
+        const usedWidthPerRow = piecesPerWidth * pWidth;
+        const efficiency = rWidth > 0 ? (usedWidthPerRow / rWidth) * 100 : 0;
+
+
+        // Unit Analysis (Standard/Theoretical)
+        // User logic: Distributed Waste = (RollWidth - (PiecesPerRow * PieceWidth)) / PiecesPerRow
+        // Effective Width = PieceWidth + DistributedWaste
+        // This is mathematically equivalent to RollWidth / PiecesPerRow
+
+        const wasteWidthPerRow = rWidth - (piecesPerWidth * pWidth);
+        const distributedWasteX = Number((wasteWidthPerRow / piecesPerWidth).toFixed(2));
+        const effectiveWidth = pWidth + distributedWasteX;
+
+        // Standard Consumption per Piece (assuming full rows)
+        // Length / PiecesPerRow
+        const standardConsumptionPerPiece = pLength / piecesPerWidth / 100;
+
         return {
             piecesPerWidth,
             rowsPerMeter,
             totalPiecesPerMeter,
-            consumptionPerUnit: (1 / totalPiecesPerMeter) * qty
+            consumptionPerUnit: totalConsumption,
+            efficiency,
+            unitAnalysis: {
+                wasteWidthPerRow,
+                distributedWasteX,
+                effectiveWidth,
+                standardConsumptionPerPiece
+            }
         };
     };
 
@@ -81,7 +134,12 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
             setRotatedResult(rotated);
 
             if (normal && rotated) {
-                setBestOption(rotated.totalPiecesPerMeter > normal.totalPiecesPerMeter ? 'rotated' : 'normal');
+                // Prefer better efficiency, then lower consumption
+                if (rotated.consumptionPerUnit < normal.consumptionPerUnit) {
+                    setBestOption('rotated');
+                } else {
+                    setBestOption('normal');
+                }
             } else if (normal) {
                 setBestOption('normal');
             } else if (rotated) {
@@ -124,7 +182,9 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
         } else if (calcType === 'area') {
             const target = bestOption === 'rotated' ? rotatedResult : normalResult;
             if (target && bestOption) {
-                onCalculate(Number(target.consumptionPerUnit.toFixed(4)), {
+                // User requirement: Apply the Standard Unit Consumption (which accounts for efficiency/waste)
+                // not the total batch consumption.
+                onCalculate(Number(target.unitAnalysis.standardConsumptionPerPiece.toFixed(4)), {
                     calculationType: 'area',
                     quantityPerUnit,
                     rollWidth,
@@ -234,15 +294,47 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                                     }`}
                                 onClick={() => setBestOption('normal')}
                             >
-                                <div className="font-semibold text-sm mb-2 text-center">Posición Normal</div>
+                                <div className="font-semibold text-sm mb-2 text-center flex justify-between items-center">
+                                    <span>Posición Normal</span>
+                                    {normalResult && (
+                                        <span className={`text-xs px-1.5 py-0.5 rounded ${normalResult.efficiency === 100 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                            {normalResult.efficiency.toFixed(0)}% Efic.
+                                        </span>
+                                    )}
+                                </div>
                                 {normalResult ? (
                                     <div className="space-y-1 text-xs">
                                         <div className="text-center font-bold text-lg text-slate-700 mt-2">
                                             {normalResult.consumptionPerUnit.toFixed(4)} m
                                         </div>
-                                        <div className="text-center text-[10px] text-slate-500">
+                                        <div className="text-center text-[10px] text-slate-500 mb-2">
                                             Total para {quantityPerUnit} piezas
+                                            {normalResult.efficiency < 100 && (
+                                                <span className="block text-red-400 font-medium">
+                                                    {(100 - normalResult.efficiency).toFixed(1)}% Desperdicio
+                                                </span>
+                                            )}
                                         </div>
+
+                                        <div className="bg-white p-2 rounded border border-slate-100 mb-2 text-[10px] text-slate-600">
+                                            <div className="flex justify-between">
+                                                <span>Piezas por fila:</span>
+                                                <span className="font-semibold">{normalResult.piecesPerWidth}</span>
+                                            </div>
+                                            <div className="flex justify-between text-amber-600">
+                                                <span>Desperdicio fila:</span>
+                                                <span>{normalResult.unitAnalysis.wasteWidthPerRow} cm</span>
+                                            </div>
+                                            <div className="flex justify-between border-t pt-1 mt-1">
+                                                <span>Distribuido/pieza:</span>
+                                                <span>+{normalResult.unitAnalysis.distributedWasteX} cm</span>
+                                            </div>
+                                            <div className="flex justify-between font-medium text-emerald-700">
+                                                <span>Consumo/pieza (Std):</span>
+                                                <span>{normalResult.unitAnalysis.standardConsumptionPerPiece.toFixed(4)} m</span>
+                                            </div>
+                                        </div>
+
                                         <FabricationLayoutPreview
                                             rollWidth={rollWidth}
                                             pieceWidth={pieceWidth}
@@ -261,15 +353,47 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                                     }`}
                                 onClick={() => setBestOption('rotated')}
                             >
-                                <div className="font-semibold text-sm mb-2 text-center">Posición Rotada (90°)</div>
+                                <div className="font-semibold text-sm mb-2 text-center flex justify-between items-center">
+                                    <span>Posición Rotada (90°)</span>
+                                    {rotatedResult && (
+                                        <span className={`text-xs px-1.5 py-0.5 rounded ${rotatedResult.efficiency === 100 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                            {rotatedResult.efficiency.toFixed(0)}% Efic.
+                                        </span>
+                                    )}
+                                </div>
                                 {rotatedResult ? (
                                     <div className="space-y-1 text-xs">
                                         <div className="text-center font-bold text-lg text-slate-700 mt-2">
                                             {rotatedResult.consumptionPerUnit.toFixed(4)} m
                                         </div>
-                                        <div className="text-center text-[10px] text-slate-500">
+                                        <div className="text-center text-[10px] text-slate-500 mb-2">
                                             Total para {quantityPerUnit} piezas
+                                            {rotatedResult.efficiency < 100 && (
+                                                <span className="block text-red-400 font-medium">
+                                                    {(100 - rotatedResult.efficiency).toFixed(1)}% Desperdicio
+                                                </span>
+                                            )}
                                         </div>
+
+                                        <div className="bg-white p-2 rounded border border-slate-100 mb-2 text-[10px] text-slate-600">
+                                            <div className="flex justify-between">
+                                                <span>Piezas por fila:</span>
+                                                <span className="font-semibold">{rotatedResult.piecesPerWidth}</span>
+                                            </div>
+                                            <div className="flex justify-between text-amber-600">
+                                                <span>Desperdicio fila:</span>
+                                                <span>{rotatedResult.unitAnalysis.wasteWidthPerRow} cm</span>
+                                            </div>
+                                            <div className="flex justify-between border-t pt-1 mt-1">
+                                                <span>Distribuido/pieza:</span>
+                                                <span>+{rotatedResult.unitAnalysis.distributedWasteX} cm</span>
+                                            </div>
+                                            <div className="flex justify-between font-medium text-emerald-700">
+                                                <span>Consumo/pieza (Std):</span>
+                                                <span>{rotatedResult.unitAnalysis.standardConsumptionPerPiece.toFixed(4)} m</span>
+                                            </div>
+                                        </div>
+
                                         <FabricationLayoutPreview
                                             rollWidth={rollWidth}
                                             pieceWidth={pieceLength}
