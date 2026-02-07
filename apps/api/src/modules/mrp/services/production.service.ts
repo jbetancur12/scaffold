@@ -1,6 +1,6 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { ProductionOrderStatus } from '@scaffold/types';
-import { ProductionOrder, ProductionOrderStatus } from '../entities/production-order.entity';
+import { ProductionOrder } from '../entities/production-order.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { ProductionOrderItem } from '../entities/production-order-item.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
@@ -23,7 +23,31 @@ export class ProductionService {
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemSchema>[]): Promise<ProductionOrder> {
-        const order = this.productionOrderRepo.create(data as unknown as ProductionOrder);
+        // Ensure dates are properly instantiated as Date objects and handle potential string inputs
+        const orderData = { ...data };
+
+        if (orderData.startDate && typeof orderData.startDate === 'string') {
+            const date = new Date(orderData.startDate);
+            // Validate date
+            if (!isNaN(date.getTime())) {
+                orderData.startDate = date;
+            } else {
+                // Should throw or handle error, but let's try to default or leave as is (which will fail later)
+                // Actually throwing a specific error is better
+                throw new Error(`Invalid startDate: ${orderData.startDate}`);
+            }
+        }
+
+        if (orderData.endDate && typeof orderData.endDate === 'string') {
+            const date = new Date(orderData.endDate);
+            if (!isNaN(date.getTime())) {
+                orderData.endDate = date;
+            } else {
+                throw new Error(`Invalid endDate: ${orderData.endDate}`);
+            }
+        }
+
+        const order = this.productionOrderRepo.create(orderData as unknown as ProductionOrder);
 
         for (const itemData of itemsData) {
             const item = new ProductionOrderItem();
