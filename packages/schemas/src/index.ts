@@ -73,6 +73,14 @@ export const BOMItemSchema = z.object({
     variantId: z.string().uuid(),
     rawMaterialId: z.string().uuid(),
     quantity: z.number().min(0),
+    fabricationParams: z.object({
+        calculationType: z.enum(['area', 'linear']).default('area'),
+        quantityPerUnit: z.number().default(1),
+        rollWidth: z.number(), // Used as "Material Length" in linear mode if needed, or specific field
+        pieceWidth: z.number(),
+        pieceLength: z.number(),
+        orientation: z.enum(['normal', 'rotated'])
+    }).optional(),
 });
 
 export const WarehouseSchema = z.object({

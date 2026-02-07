@@ -22,6 +22,15 @@ import { Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { z } from 'zod';
 import FabricationCalculator from './FabricationCalculator';
+import FabricationLayoutPreview from './FabricationLayoutPreview';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 
 interface BOMEditorProps {
     variant: ProductVariant;
@@ -32,6 +41,14 @@ const bomItemSchema = z.object({
     variantId: z.string(),
     rawMaterialId: z.string().min(1, 'Selecciona un material'),
     quantity: z.number().min(0.0001, 'Cantidad requerida'),
+    fabricationParams: z.object({
+        calculationType: z.enum(['area', 'linear']).optional(),
+        quantityPerUnit: z.number().optional(),
+        rollWidth: z.number(),
+        pieceWidth: z.number(),
+        pieceLength: z.number(),
+        orientation: z.enum(['normal', 'rotated'])
+    }).optional()
 });
 
 export default function BOMEditor({ variant, materials }: BOMEditorProps) {
@@ -40,7 +57,16 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
     const [loading, setLoading] = useState(false);
 
     // New item form state
-    const [newItem, setNewItem] = useState({
+    const [newItem, setNewItem] = useState<{
+        materialId: string;
+        quantity: string;
+        fabricationParams?: {
+            rollWidth: number;
+            pieceWidth: number;
+            pieceLength: number;
+            orientation: 'normal' | 'rotated';
+        };
+    }>({
         materialId: '',
         quantity: '',
     });
@@ -67,7 +93,8 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
             const payload = {
                 variantId: variant.id,
                 rawMaterialId: newItem.materialId,
-                quantity: quantity
+                quantity: quantity,
+                fabricationParams: newItem.fabricationParams
             };
 
             // Validate
@@ -145,7 +172,52 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
 
                             return (
                                 <TableRow key={item.id}>
-                                    <TableCell>{material?.name || item.rawMaterialId}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col">
+                                            <span>{material?.name || item.rawMaterialId}</span>
+                                            {item.fabricationParams && (
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs text-slate-500">
+                                                        {item.fabricationParams.orientation === 'rotated' ? 'Rotada' : 'Normal'}
+                                                        ({item.fabricationParams.pieceWidth}x{item.fabricationParams.pieceLength}cm)
+                                                        {item.fabricationParams.quantityPerUnit && item.fabricationParams.quantityPerUnit > 1
+                                                            ? ` x ${item.fabricationParams.quantityPerUnit} pz`
+                                                            : ''}
+                                                    </span>
+                                                    <Dialog>
+                                                        <DialogTrigger asChild>
+                                                            <Button size="sm" variant="outline" className="h-5 text-[10px] px-2">
+                                                                Ver Trazada
+                                                            </Button>
+                                                        </DialogTrigger>
+                                                        <DialogContent>
+                                                            <DialogHeader>
+                                                                <DialogTitle>Trazada de Fabricación</DialogTitle>
+                                                                <DialogDescription>
+                                                                    Visualización de cómo se cortan las piezas en el rollo.
+                                                                </DialogDescription>
+                                                            </DialogHeader>
+                                                            <FabricationLayoutPreview
+                                                                calculationType={item.fabricationParams.calculationType}
+                                                                rollWidth={item.fabricationParams.rollWidth}
+                                                                pieceWidth={item.fabricationParams.pieceWidth}
+                                                                pieceLength={item.fabricationParams.pieceLength}
+                                                                orientation={item.fabricationParams.orientation}
+                                                            />
+                                                            <div className="text-xs text-slate-500 mt-2 text-center">
+                                                                Ancho del Rollo: {item.fabricationParams.rollWidth}cm
+                                                                {item.fabricationParams.quantityPerUnit && item.fabricationParams.quantityPerUnit > 1 && (
+                                                                    <div className="font-semibold text-emerald-600">
+                                                                        Calculado para {item.fabricationParams.quantityPerUnit} piezas por unidad.
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </TableCell>
                                     <TableCell>{item.quantity}</TableCell>
                                     <TableCell>{material?.unit || '-'}</TableCell>
                                     <TableCell className="text-right">${unitCost.toFixed(2)}</TableCell>
@@ -189,7 +261,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                         className="h-9"
                                     />
                                     <FabricationCalculator
-                                        onCalculate={(qty) => setNewItem({ ...newItem, quantity: qty.toString() })}
+                                        onCalculate={(qty, params) => setNewItem({ ...newItem, quantity: qty.toString(), fabricationParams: params })}
                                     />
                                 </div>
                             </TableCell>

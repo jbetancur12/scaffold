@@ -31,7 +31,7 @@ export class InventoryItem extends BaseEntity implements IInventoryItem {
         return this.variant?.id;
     }
 
-    @Property()
+    @Property({ type: 'decimal', precision: 10, scale: 4 })
     quantity!: number;
 
     @Property({ onUpdate: () => new Date() })

@@ -22,6 +22,14 @@ export class BOMItem extends BaseEntity implements IBOMItem {
         return this.rawMaterial.id;
     }
 
-    @Property()
+    @Property({ type: 'decimal', precision: 10, scale: 4 })
     quantity!: number;
+
+    @Property({ type: 'json', nullable: true })
+    fabricationParams?: {
+        rollWidth: number;
+        pieceWidth: number;
+        pieceLength: number;
+        orientation: 'normal' | 'rotated';
+    };
 }

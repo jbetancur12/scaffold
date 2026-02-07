@@ -349,6 +349,16 @@
           "nullable": false,
           "default": "0",
           "mappedType": "integer"
+        },
+        "target_margin": {
+          "name": "target_margin",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "default": "0.4",
+          "mappedType": "integer"
         }
       },
       "name": "product_variant",
@@ -844,12 +854,23 @@
         },
         "quantity": {
           "name": "quantity",
-          "type": "int",
+          "type": "numeric(10,4)",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "mappedType": "integer"
+          "precision": 10,
+          "scale": 4,
+          "mappedType": "decimal"
+        },
+        "fabrication_params": {
+          "name": "fabrication_params",
+          "type": "jsonb",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "mappedType": "json"
         }
       },
       "name": "bomitem",
@@ -1681,12 +1702,14 @@
         },
         "quantity": {
           "name": "quantity",
-          "type": "int",
+          "type": "numeric(10,4)",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
-          "mappedType": "integer"
+          "precision": 10,
+          "scale": 4,
+          "mappedType": "decimal"
         },
         "last_updated": {
           "name": "last_updated",

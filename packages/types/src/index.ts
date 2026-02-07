@@ -114,6 +114,14 @@ export interface BOMItem {
     variantId: string;
     rawMaterialId: string;
     quantity: number;
+    fabricationParams?: {
+        calculationType?: 'area' | 'linear';
+        quantityPerUnit?: number;
+        rollWidth: number;
+        pieceWidth: number;
+        pieceLength: number;
+        orientation: 'normal' | 'rotated';
+    };
     createdAt: string | Date;
     updatedAt: string | Date;
 }

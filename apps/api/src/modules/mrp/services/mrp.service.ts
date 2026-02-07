@@ -67,6 +67,7 @@ export class MrpService {
             variant,
             rawMaterial,
             quantity: data.quantity,
+            fabricationParams: data.fabricationParams,
         } as unknown as BOMItem);
 
         await this.em.persistAndFlush(bomItem);

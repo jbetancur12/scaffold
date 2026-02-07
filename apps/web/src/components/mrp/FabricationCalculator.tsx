@@ -12,17 +12,32 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Calculator } from 'lucide-react';
+import FabricationLayoutPreview from './FabricationLayoutPreview';
+
+interface FabricationParams {
+    calculationType?: 'area' | 'linear';
+    quantityPerUnit?: number;
+    rollWidth: number;
+    pieceWidth: number;
+    pieceLength: number;
+    orientation: 'normal' | 'rotated';
+}
 
 interface FabricationCalculatorProps {
-    onCalculate: (quantity: number) => void;
+    onCalculate: (quantity: number, params: FabricationParams) => void;
 }
 
 export default function FabricationCalculator({ onCalculate }: FabricationCalculatorProps) {
     const [open, setOpen] = useState(false);
-    const [rollWidth, setRollWidth] = useState<number>(150); // cm
-    const [pieceWidth, setPieceWidth] = useState<number>(0); // cm
-    const [pieceLength, setPieceLength] = useState<number>(0); // cm
+    const [calcType, setCalcType] = useState<'area' | 'linear'>('area');
 
+    // Inputs
+    const [quantityPerUnit, setQuantityPerUnit] = useState<number>(1); // Pieces per unit of product
+    const [rollWidth, setRollWidth] = useState<number>(150); // cm (Roll Width OR Material Length)
+    const [pieceWidth, setPieceWidth] = useState<number>(0); // cm
+    const [pieceLength, setPieceLength] = useState<number>(0); // cm (Piece Length OR Cut Length)
+
+    // Area Results
     const [bestOption, setBestOption] = useState<'normal' | 'rotated' | null>(null);
     const [normalResult, setNormalResult] = useState<{
         piecesPerWidth: number;
@@ -37,95 +52,89 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
         consumptionPerUnit: number;
     } | null>(null);
 
-    const calculate = (rWidth: number, pWidth: number, pLength: number) => {
-        if (rWidth <= 0 || pWidth <= 0 || pLength <= 0) return null;
+    // Linear Results
+    const [linearResult, setLinearResult] = useState<{
+        pieces: number;
+        waste: number;
+        consumption: number;
+    } | null>(null);
 
+    const calculateArea = (rWidth: number, pWidth: number, pLength: number, qty: number) => {
+        if (rWidth <= 0 || pWidth <= 0 || pLength <= 0) return null;
         const piecesPerWidth = Math.floor(rWidth / pWidth);
         const rowsPerMeter = Math.floor(100 / pLength);
         const totalPiecesPerMeter = piecesPerWidth * rowsPerMeter;
-
         if (totalPiecesPerMeter <= 0) return null;
-
         return {
             piecesPerWidth,
             rowsPerMeter,
             totalPiecesPerMeter,
-            consumptionPerUnit: 1 / totalPiecesPerMeter
+            consumptionPerUnit: (1 / totalPiecesPerMeter) * qty
         };
     };
 
     useEffect(() => {
-        const normal = calculate(rollWidth, pieceWidth, pieceLength);
-        const rotated = calculate(rollWidth, pieceLength, pieceWidth);
+        if (calcType === 'area') {
+            const normal = calculateArea(rollWidth, pieceWidth, pieceLength, quantityPerUnit);
+            const rotated = calculateArea(rollWidth, pieceLength, pieceWidth, quantityPerUnit);
+            setNormalResult(normal);
+            setRotatedResult(rotated);
 
-        setNormalResult(normal);
-        setRotatedResult(rotated);
-
-        if (normal && rotated) {
-            if (rotated.totalPiecesPerMeter > normal.totalPiecesPerMeter) {
+            if (normal && rotated) {
+                setBestOption(rotated.totalPiecesPerMeter > normal.totalPiecesPerMeter ? 'rotated' : 'normal');
+            } else if (normal) {
+                setBestOption('normal');
+            } else if (rotated) {
                 setBestOption('rotated');
             } else {
-                setBestOption('normal');
+                setBestOption(null);
             }
-        } else if (normal) {
-            setBestOption('normal');
-        } else if (rotated) {
-            setBestOption('rotated');
         } else {
-            setBestOption(null);
+            // Linear Logic
+            // rollWidth = Material Total Length
+            // pieceLength = Cut Length
+            if (rollWidth > 0 && pieceLength > 0 && pieceLength <= rollWidth) {
+                const pieces = Math.floor(rollWidth / pieceLength);
+                if (pieces > 0) {
+                    setLinearResult({
+                        pieces,
+                        waste: rollWidth - (pieces * pieceLength),
+                        consumption: (1 / pieces) * quantityPerUnit // Adjusted for quantity per unit
+                    });
+                } else {
+                    setLinearResult(null);
+                }
+            } else {
+                setLinearResult(null);
+            }
         }
-
-    }, [rollWidth, pieceWidth, pieceLength]);
+    }, [calcType, rollWidth, pieceWidth, pieceLength, quantityPerUnit]);
 
     const handleApply = () => {
-        const target = bestOption === 'rotated' ? rotatedResult : normalResult;
-        if (target) {
-            onCalculate(Number(target.consumptionPerUnit.toFixed(4)));
+        if (calcType === 'linear' && linearResult) {
+            onCalculate(Number(linearResult.consumption.toFixed(4)), {
+                calculationType: 'linear',
+                quantityPerUnit,
+                rollWidth, // Material Total Length
+                pieceWidth: 0,
+                pieceLength, // Cut Length
+                orientation: 'normal'
+            });
             setOpen(false);
+        } else if (calcType === 'area') {
+            const target = bestOption === 'rotated' ? rotatedResult : normalResult;
+            if (target && bestOption) {
+                onCalculate(Number(target.consumptionPerUnit.toFixed(4)), {
+                    calculationType: 'area',
+                    quantityPerUnit,
+                    rollWidth,
+                    pieceWidth,
+                    pieceLength,
+                    orientation: bestOption
+                });
+                setOpen(false);
+            }
         }
-    };
-
-    const renderDiagram = (rWidth: number, pWidth: number, pLength: number, res: { piecesPerWidth: number, rowsPerMeter: number } | null) => {
-        if (!res || rWidth <= 0) return null;
-
-        // ViewBox matches the physical dimensions: 0 0 RollWidth 100cm (1 meter representative sample)
-        const viewHeight = Math.max(100, pLength * 1.1);
-
-        return (
-            <div className="w-full mt-2 bg-slate-100 border border-slate-300 rounded overflow-hidden">
-                <svg viewBox={`0 0 ${rWidth} ${viewHeight}`} className="w-full h-auto block" preserveAspectRatio="xMidYMin slice">
-                    {/* Background / Fabric */}
-                    <rect x="0" y="0" width={rWidth} height={viewHeight} fill="#e2e8f0" />
-
-                    {/* Pieces */}
-                    {Array.from({ length: res.rowsPerMeter }).map((_, rowIndex) => (
-                        Array.from({ length: res.piecesPerWidth }).map((_, colIndex) => (
-                            <rect
-                                key={`${rowIndex}-${colIndex}`}
-                                x={colIndex * pWidth}
-                                y={rowIndex * pLength}
-                                width={pWidth}
-                                height={pLength}
-                                fill="#818cf8" // Indigo-400
-                                stroke="#fff"
-                                strokeWidth="1"
-                                fillOpacity="0.8"
-                            />
-                        ))
-                    ))}
-
-                    {/* Waste highlighting (right side) */}
-                    <rect
-                        x={res.piecesPerWidth * pWidth}
-                        y="0"
-                        width={rWidth - (res.piecesPerWidth * pWidth)}
-                        height={viewHeight}
-                        fill="#fecaca" // Red-200
-                        fillOpacity="0.5"
-                    />
-                </svg>
-            </div>
-        );
     };
 
     return (
@@ -137,15 +146,47 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
             </DialogTrigger>
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
-                    <DialogTitle>Calculadora de Trazada (Textil)</DialogTitle>
+                    <DialogTitle>Calculadora de Material</DialogTitle>
                     <DialogDescription>
-                        Compara la eficiencia rotando la pieza para encontrar el menor consumo.
+                        Calcula consumo para Telas (Área) o Varillas/Perfiles (Lineal).
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
+
+                <div className="flex gap-2 mb-4 border-b pb-2">
+                    <Button
+                        variant={calcType === 'area' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setCalcType('area')}
+                    >
+                        Área / Tela
+                    </Button>
+                    <Button
+                        variant={calcType === 'linear' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setCalcType('linear')}
+                    >
+                        Lineal / Varilla
+                    </Button>
+                </div>
+
+                <div className="grid gap-4 py-2">
+                    <div className="grid grid-cols-4 items-center gap-4 bg-amber-50 p-2 rounded border border-amber-200">
+                        <Label htmlFor="quantityPerUnit" className="text-right col-span-2 font-bold text-amber-800">
+                            Piezas por Unidad de Producto
+                        </Label>
+                        <Input
+                            id="quantityPerUnit"
+                            type="number"
+                            min="1"
+                            value={quantityPerUnit}
+                            onChange={(e) => setQuantityPerUnit(Math.max(1, Number(e.target.value)))}
+                            className="col-span-2 border-amber-300 ring-offset-amber-50 focus-visible:ring-amber-500"
+                        />
+                    </div>
+
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="rollWidth" className="text-right col-span-2">
-                            Ancho del Rollo (cm)
+                            {calcType === 'area' ? 'Ancho del Rollo (cm)' : 'Largo de Barra/Material (cm)'}
                         </Label>
                         <Input
                             id="rollWidth"
@@ -155,21 +196,25 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                             className="col-span-2"
                         />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="pieceWidth" className="text-right col-span-2">
-                            Ancho de la Pieza (cm)
-                        </Label>
-                        <Input
-                            id="pieceWidth"
-                            type="number"
-                            value={pieceWidth}
-                            onChange={(e) => setPieceWidth(Number(e.target.value))}
-                            className="col-span-2"
-                        />
-                    </div>
+
+                    {calcType === 'area' && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="pieceWidth" className="text-right col-span-2">
+                                Ancho de la Pieza (cm)
+                            </Label>
+                            <Input
+                                id="pieceWidth"
+                                type="number"
+                                value={pieceWidth}
+                                onChange={(e) => setPieceWidth(Number(e.target.value))}
+                                className="col-span-2"
+                            />
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="pieceLength" className="text-right col-span-2">
-                            Largo de la Pieza (cm)
+                            {calcType === 'area' ? 'Largo de la Pieza (cm)' : 'Largo de Corte (cm)'}
                         </Label>
                         <Input
                             id="pieceLength"
@@ -180,73 +225,99 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                        {/* Normal Option */}
-                        <div
-                            className={`p-3 rounded-lg border cursor-pointer transition-all ${bestOption === 'normal'
+                    {calcType === 'area' ? (
+                        <div className="grid grid-cols-2 gap-4 mt-2">
+                            <div
+                                className={`p-3 rounded-lg border cursor-pointer transition-all ${bestOption === 'normal'
                                     ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500'
                                     : 'bg-slate-50 border-slate-200 opacity-70 hover:opacity-100'
-                                }`}
-                            onClick={() => setBestOption('normal')}
-                        >
-                            <div className="font-semibold text-sm mb-2 text-center">Posición Normal</div>
-                            {normalResult ? (
-                                <div className="space-y-1 text-xs">
-                                    <div className="flex justify-between">
-                                        <span>A lo ancho:</span>
-                                        <strong>{normalResult.piecesPerWidth}</strong>
+                                    }`}
+                                onClick={() => setBestOption('normal')}
+                            >
+                                <div className="font-semibold text-sm mb-2 text-center">Posición Normal</div>
+                                {normalResult ? (
+                                    <div className="space-y-1 text-xs">
+                                        <div className="text-center font-bold text-lg text-slate-700 mt-2">
+                                            {normalResult.consumptionPerUnit.toFixed(4)} m
+                                        </div>
+                                        <div className="text-center text-[10px] text-slate-500">
+                                            Total para {quantityPerUnit} piezas
+                                        </div>
+                                        <FabricationLayoutPreview
+                                            rollWidth={rollWidth}
+                                            pieceWidth={pieceWidth}
+                                            pieceLength={pieceLength}
+                                            orientation="normal"
+                                            result={normalResult}
+                                        />
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span>Filas/metro:</span>
-                                        <strong>{normalResult.rowsPerMeter}</strong>
-                                    </div>
-                                    <div className="flex justify-between border-t pt-1 mt-1">
-                                        <span>Total/m:</span>
-                                        <strong>{normalResult.totalPiecesPerMeter}</strong>
-                                    </div>
-                                    <div className="text-center font-bold text-lg text-slate-700 mt-2">
-                                        {normalResult.consumptionPerUnit.toFixed(4)} m
-                                    </div>
-                                    {renderDiagram(rollWidth, pieceWidth, pieceLength, normalResult)}
-                                </div>
-                            ) : <div className="text-center text-xs text-slate-400">-</div>}
-                        </div>
+                                ) : <div className="text-center text-xs text-slate-400">-</div>}
+                            </div>
 
-                        {/* Rotated Option */}
-                        <div
-                            className={`p-3 rounded-lg border cursor-pointer transition-all ${bestOption === 'rotated'
+                            <div
+                                className={`p-3 rounded-lg border cursor-pointer transition-all ${bestOption === 'rotated'
                                     ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500'
                                     : 'bg-slate-50 border-slate-200 opacity-70 hover:opacity-100'
-                                }`}
-                            onClick={() => setBestOption('rotated')}
-                        >
-                            <div className="font-semibold text-sm mb-2 text-center">Posición Rotada (90°)</div>
-                            {rotatedResult ? (
-                                <div className="space-y-1 text-xs">
-                                    <div className="flex justify-between">
-                                        <span>A lo ancho:</span>
-                                        <strong>{rotatedResult.piecesPerWidth}</strong>
+                                    }`}
+                                onClick={() => setBestOption('rotated')}
+                            >
+                                <div className="font-semibold text-sm mb-2 text-center">Posición Rotada (90°)</div>
+                                {rotatedResult ? (
+                                    <div className="space-y-1 text-xs">
+                                        <div className="text-center font-bold text-lg text-slate-700 mt-2">
+                                            {rotatedResult.consumptionPerUnit.toFixed(4)} m
+                                        </div>
+                                        <div className="text-center text-[10px] text-slate-500">
+                                            Total para {quantityPerUnit} piezas
+                                        </div>
+                                        <FabricationLayoutPreview
+                                            rollWidth={rollWidth}
+                                            pieceWidth={pieceLength}
+                                            pieceLength={pieceWidth}
+                                            orientation="rotated"
+                                            result={rotatedResult}
+                                        />
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span>Filas/metro:</span>
-                                        <strong>{rotatedResult.rowsPerMeter}</strong>
-                                    </div>
-                                    <div className="flex justify-between border-t pt-1 mt-1">
-                                        <span>Total/m:</span>
-                                        <strong>{rotatedResult.totalPiecesPerMeter}</strong>
-                                    </div>
-                                    <div className="text-center font-bold text-lg text-slate-700 mt-2">
-                                        {rotatedResult.consumptionPerUnit.toFixed(4)} m
-                                    </div>
-                                    {renderDiagram(rollWidth, pieceLength, pieceWidth, rotatedResult)}
-                                </div>
-                            ) : <div className="text-center text-xs text-slate-400">-</div>}
+                                ) : <div className="text-center text-xs text-slate-400">-</div>}
+                            </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="mt-2 p-4 bg-slate-50 rounded border">
+                            {linearResult ? (
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center bg-white p-2 rounded shadow-sm">
+                                        <span className="text-sm font-medium">Piezas por Barra:</span>
+                                        <span className="text-xl font-bold text-indigo-600">{linearResult.pieces}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm text-slate-600">
+                                        <span>Desperdicio:</span>
+                                        <span>{linearResult.waste.toFixed(2)} cm</span>
+                                    </div>
+                                    <div className="text-center pt-2 border-t">
+                                        <div className="text-xs text-slate-500 mb-1">Consumo Total ({quantityPerUnit} piezas)</div>
+                                        <div className="text-2xl font-bold text-emerald-600">
+                                            {linearResult.consumption.toFixed(4)}
+                                        </div>
+                                    </div>
+                                    <FabricationLayoutPreview
+                                        calculationType="linear"
+                                        rollWidth={rollWidth}
+                                        pieceWidth={0}
+                                        pieceLength={pieceLength}
+                                        orientation="normal"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="text-center text-slate-400 py-8">
+                                    Ingrese dimensiones válidas.
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <DialogFooter>
-                    <Button type="button" onClick={handleApply} disabled={!bestOption}>
-                        Aplicar {bestOption === 'rotated' ? 'Rotada' : 'Normal'}
+                    <Button type="button" onClick={handleApply} disabled={calcType === 'area' ? !bestOption : !linearResult}>
+                        Aplicar
                     </Button>
                 </DialogFooter>
             </DialogContent>
