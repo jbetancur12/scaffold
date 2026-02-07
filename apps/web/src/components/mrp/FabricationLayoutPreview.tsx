@@ -98,8 +98,8 @@ export default function FabricationLayoutPreview({
         return { piecesPerWidth, rowsPerMeter };
     })();
 
-    const renderWidth = orientation === 'rotated' ? pieceLength : pieceWidth;
-    const renderLength = orientation === 'rotated' ? pieceWidth : pieceLength;
+    const renderWidth = pieceWidth;
+    const renderLength = pieceLength;
 
     // ViewBox matches the physical dimensions: 0 0 RollWidth 100cm (1 meter representative sample)
     const viewHeight = Math.max(100, renderLength * 1.1);
