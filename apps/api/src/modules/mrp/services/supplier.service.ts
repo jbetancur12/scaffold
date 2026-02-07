@@ -1,5 +1,6 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { Supplier } from '../entities/supplier.entity';
+import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { SupplierSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 
@@ -30,5 +31,15 @@ export class SupplierService {
         return { suppliers, total };
     }
 
-    // Additional methods for purchase history...
+    async getSuppliersForMaterial(materialId: string) {
+        // We need to access SupplierMaterial repo. Best to do it via EM to avoid circular deps or just simple usage.
+        const supplierMaterialRepo = this.em.getRepository(SupplierMaterial);
+        return supplierMaterialRepo.find(
+            { rawMaterial: materialId },
+            {
+                populate: ['supplier'],
+                orderBy: { lastPurchaseDate: 'DESC' }
+            }
+        );
+    }
 }

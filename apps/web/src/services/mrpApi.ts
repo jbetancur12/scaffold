@@ -25,6 +25,12 @@ export interface MaterialRequirement {
     }[];
 }
 
+export interface RawMaterialSupplier {
+    supplier: Supplier;
+    lastPurchasePrice: number;
+    lastPurchaseDate: string;
+}
+
 export type CreateProductionOrderDTO = Omit<Partial<ProductionOrder>, 'items'> & {
     items: { variantId: string; quantity: number }[];
 };
@@ -120,6 +126,10 @@ export const mrpApi = {
     },
     updateRawMaterial: async (id: string, data: Partial<RawMaterial>): Promise<RawMaterial> => {
         const response = await api.patch(`/mrp/raw-materials/${id}`, data);
+        return response.data;
+    },
+    getRawMaterialSuppliers: async (id: string) => {
+        const response = await api.get<RawMaterialSupplier[]>(`/mrp/raw-materials/${id}/suppliers`);
         return response.data;
     },
 

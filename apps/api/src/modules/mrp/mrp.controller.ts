@@ -138,6 +138,16 @@ export class MrpController {
     }
 
     // --- Raw Materials ---
+    async getRawMaterialSuppliers(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const suppliers = await this.supplierService.getSuppliersForMaterial(id);
+            res.json(suppliers);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async createRawMaterial(req: Request, res: Response, next: NextFunction) {
         try {
             const data = RawMaterialSchema.parse(req.body);

@@ -12,6 +12,7 @@ import SupplierListPage from '@/pages/mrp/SupplierListPage';
 import SupplierFormPage from '@/pages/mrp/SupplierFormPage';
 import RawMaterialListPage from '@/pages/mrp/RawMaterialListPage';
 import RawMaterialFormPage from '@/pages/mrp/RawMaterialFormPage';
+import RawMaterialDetailPage from '@/pages/mrp/RawMaterialDetailPage';
 import ProductionOrderListPage from '@/pages/mrp/ProductionOrderListPage';
 import ProductionOrderFormPage from '@/pages/mrp/ProductionOrderFormPage';
 import InventoryDashboardPage from '@/pages/mrp/InventoryDashboardPage';
@@ -94,7 +95,8 @@ export default function App() {
 
                         <Route path="/dashboard/mrp/raw-materials" element={<RawMaterialListPage />} />
                         <Route path="/dashboard/mrp/raw-materials/new" element={<RawMaterialFormPage />} />
-                        <Route path="/dashboard/mrp/raw-materials/:id" element={<RawMaterialFormPage />} />
+                        <Route path="/dashboard/mrp/raw-materials/:id" element={<RawMaterialDetailPage />} />
+                        <Route path="/dashboard/mrp/raw-materials/:id/edit" element={<RawMaterialFormPage />} />
 
                         <Route path="/dashboard/mrp/production-orders" element={<ProductionOrderListPage />} />
                         <Route path="/dashboard/mrp/production-orders/new" element={<ProductionOrderFormPage />} />

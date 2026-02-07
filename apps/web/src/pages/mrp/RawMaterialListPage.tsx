@@ -73,7 +73,11 @@ export default function RawMaterialListPage() {
                         </TableHeader>
                         <TableBody>
                             {materials.map((material) => (
-                                <TableRow key={material.id} className="group hover:bg-slate-50/50 transition-colors">
+                                <TableRow
+                                    key={material.id}
+                                    className="group hover:bg-slate-50/50 transition-colors cursor-pointer"
+                                    onClick={() => navigate(`/dashboard/mrp/raw-materials/${material.id}`)}
+                                >
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-3">
                                             <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
@@ -99,7 +103,10 @@ export default function RawMaterialListPage() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => navigate(`/dashboard/mrp/raw-materials/${material.id}`)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate(`/dashboard/mrp/raw-materials/${material.id}/edit`);
+                                                }}
                                                 className="h-8 w-8 p-0"
                                             >
                                                 <Edit2 className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
