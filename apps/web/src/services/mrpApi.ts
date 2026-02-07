@@ -144,6 +144,10 @@ export const mrpApi = {
         const response = await api.get<MaterialRequirement[]>(`/mrp/production-orders/${orderId}/requirements`);
         return response.data;
     },
+    updateProductionOrderStatus: async (id: string, status: string): Promise<ProductionOrder> => {
+        const response = await api.patch(`/mrp/production-orders/${id}/status`, { status });
+        return response.data;
+    },
 
     // Inventory
     getInventory: async (page = 1, limit = 10) => {

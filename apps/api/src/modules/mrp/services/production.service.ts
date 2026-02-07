@@ -1,5 +1,7 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
-import { ProductionOrder } from '../entities/production-order.entity';
+import { ProductionOrderStatus } from '@scaffold/types';
+import { ProductionOrder, ProductionOrderStatus } from '../entities/production-order.entity';
+import { Warehouse } from '../entities/warehouse.entity';
 import { ProductionOrderItem } from '../entities/production-order-item.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
@@ -11,11 +13,13 @@ export class ProductionService {
     private readonly em: EntityManager;
     private readonly productionOrderRepo: EntityRepository<ProductionOrder>;
     private readonly inventoryRepo: EntityRepository<InventoryItem>;
+    private readonly warehouseRepo: EntityRepository<Warehouse>;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.productionOrderRepo = em.getRepository(ProductionOrder);
         this.inventoryRepo = em.getRepository(InventoryItem);
+        this.warehouseRepo = em.getRepository(Warehouse);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemSchema>[]): Promise<ProductionOrder> {
@@ -91,5 +95,53 @@ export class ProductionService {
         }
 
         return Array.from(requirements.values());
+    }
+
+    async updateStatus(id: string, status: ProductionOrderStatus): Promise<ProductionOrder> {
+        const order = await this.productionOrderRepo.findOneOrFail({ id }, { populate: ['items', 'items.variant'] });
+
+        // Basic transition validation
+        if (order.status === ProductionOrderStatus.COMPLETED || order.status === ProductionOrderStatus.CANCELLED) {
+            throw new Error(`Cannot change status of an order that is already ${order.status}`);
+        }
+
+        order.status = status;
+
+        // If status is changed to COMPLETED, update finished goods inventory
+        if (status === ProductionOrderStatus.COMPLETED) {
+            // Get or create default warehouse for finished goods
+            let warehouse = await this.warehouseRepo.findOne({ name: 'Main Warehouse' });
+            if (!warehouse) {
+                // If not exists (unlikely if setup correctly, but handle it), create one
+                warehouse = this.warehouseRepo.create({
+                    name: 'Main Warehouse',
+                    location: 'Default',
+                    type: 'FINISHED_GOODS'
+                } as any);
+                this.em.persist(warehouse);
+            }
+
+            for (const item of order.items) {
+                let inventoryItem = await this.inventoryRepo.findOne({
+                    variant: item.variant,
+                    warehouse
+                });
+
+                if (inventoryItem) {
+                    inventoryItem.quantity = Number(inventoryItem.quantity) + Number(item.quantity);
+                } else {
+                    inventoryItem = this.inventoryRepo.create({
+                        variant: item.variant,
+                        warehouse,
+                        quantity: item.quantity,
+                        lastUpdated: new Date()
+                    } as any);
+                }
+                this.em.persist(inventoryItem);
+            }
+        }
+
+        await this.em.flush();
+        return order;
     }
 }

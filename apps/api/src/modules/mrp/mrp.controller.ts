@@ -267,6 +267,18 @@ export class MrpController {
     }
 
 
+
+    async updateProductionOrderStatus(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+            const order = await this.productionService.updateStatus(id, status);
+            res.json(order);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async calculateMaterialRequirements(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;

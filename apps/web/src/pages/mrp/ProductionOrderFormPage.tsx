@@ -169,22 +169,68 @@ export default function ProductionOrderFormPage() {
         }
     };
 
+    const handleStatusChange = async (newStatus: ProductionOrderStatus) => {
+        if (!order) return;
+        try {
+            setLoading(true);
+            const updatedOrder = await mrpApi.updateProductionOrderStatus(order.id, newStatus);
+            setOrder(updatedOrder);
+            toast({ title: 'Estado actualizado', description: `La orden ahora está en estado: ${newStatus}` });
+
+            if (newStatus === ProductionOrderStatus.COMPLETED) {
+                toast({ title: 'Inventario Actualizado', description: 'Se han agregado los productos terminados al inventario.', className: 'bg-green-50 border-green-200 text-green-800' });
+            }
+        } catch (error) {
+            console.error(error);
+            toast({ title: 'Error', description: 'No se pudo actualizar el estado', variant: 'destructive' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const isReadOnly = isEditing && order?.status !== ProductionOrderStatus.DRAFT;
 
     return (
         <div className="space-y-8 max-w-5xl mx-auto">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/production-orders')}>
-                    <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                        {isEditing ? `Orden: ${order?.code || '...'}` : 'Nueva Orden de Producción'}
-                    </h1>
-                    <p className="text-slate-500">
-                        {isEditing ? `Estado: ${order?.status}` : 'Define los productos a fabricar.'}
-                    </p>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/production-orders')}>
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                            {isEditing ? `Orden: ${order?.code || '...'}` : 'Nueva Orden de Producción'}
+                        </h1>
+                        <p className="text-slate-500">
+                            {isEditing ? `Estado: ${order?.status}` : 'Define los productos a fabricar.'}
+                        </p>
+                    </div>
                 </div>
+
+                {isEditing && order && (
+                    <div className="flex gap-2">
+                        {order.status === ProductionOrderStatus.DRAFT && (
+                            <Button onClick={() => handleStatusChange(ProductionOrderStatus.PLANNED)} className="bg-blue-600 hover:bg-blue-700">
+                                Planificar Orden
+                            </Button>
+                        )}
+                        {order.status === ProductionOrderStatus.PLANNED && (
+                            <Button onClick={() => handleStatusChange(ProductionOrderStatus.IN_PROGRESS)} className="bg-amber-600 hover:bg-amber-700">
+                                Iniciar Producción
+                            </Button>
+                        )}
+                        {order.status === ProductionOrderStatus.IN_PROGRESS && (
+                            <Button onClick={() => handleStatusChange(ProductionOrderStatus.COMPLETED)} className="bg-green-600 hover:bg-green-700">
+                                Finalizar Orden
+                            </Button>
+                        )}
+                        {order.status !== ProductionOrderStatus.COMPLETED && order.status !== ProductionOrderStatus.CANCELLED && (
+                            <Button variant="destructive" size="icon" title="Cancelar Orden" onClick={() => handleStatusChange(ProductionOrderStatus.CANCELLED)}>
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                )}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-8">
