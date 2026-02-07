@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { MikroORM } from '@mikro-orm/core';
+import { MikroORM, RequestContext } from '@mikro-orm/core';
 import { ProductService } from './services/product.service';
 import { SupplierService } from './services/supplier.service';
 import { MrpService } from './services/mrp.service';
@@ -10,22 +10,23 @@ import { ProductSchema, ProductionOrderSchema, RawMaterialSchema, BOMItemSchema,
 import { z } from 'zod';
 
 export class MrpController {
-    private productService: ProductService;
-    private supplierService: SupplierService;
-    private mrpService: MrpService;
-    private inventoryService: InventoryService;
-    private productionService: ProductionService;
-    private purchaseOrderService: PurchaseOrderService;
+    constructor(private readonly orm: MikroORM) { }
 
-    constructor(orm: MikroORM) {
-        const em = orm.em.fork();
-        this.productService = new ProductService(em);
-        this.supplierService = new SupplierService(em);
-        this.mrpService = new MrpService(em);
-        this.inventoryService = new InventoryService(em);
-        this.productionService = new ProductionService(em);
-        this.purchaseOrderService = new PurchaseOrderService(em, this.mrpService);
+    private get em() {
+        const em = RequestContext.getEntityManager();
+        if (!em) {
+            // Fallback for non-request contexts (like tests) or if middleware fails
+            return this.orm.em.fork();
+        }
+        return em;
     }
+
+    private get productService() { return new ProductService(this.em); }
+    private get supplierService() { return new SupplierService(this.em); }
+    private get mrpService() { return new MrpService(this.em); }
+    private get inventoryService() { return new InventoryService(this.em); }
+    private get productionService() { return new ProductionService(this.em); }
+    private get purchaseOrderService() { return new PurchaseOrderService(this.em, this.mrpService); }
 
     // --- Products ---
     async createProduct(req: Request, res: Response, next: NextFunction) {

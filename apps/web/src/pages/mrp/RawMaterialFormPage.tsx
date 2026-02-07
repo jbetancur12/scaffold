@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
+import { generateRawMaterialSku } from '@/utils/skuGenerator';
 import {
     Select,
     SelectContent,
@@ -38,6 +39,16 @@ export default function RawMaterialFormPage() {
         unit: UnitType.UNIT,
         cost: 0,
     });
+
+    const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
+
+    // Auto-generate SKU
+    useEffect(() => {
+        if (!isEditing && !skuManuallyEdited && formData.name) {
+            const autoSku = generateRawMaterialSku(formData.name);
+            setFormData(prev => ({ ...prev, sku: autoSku }));
+        }
+    }, [formData.name, isEditing, skuManuallyEdited]);
 
     const loadMaterial = useCallback(async () => {
         if (!id) return;
@@ -140,13 +151,33 @@ export default function RawMaterialFormPage() {
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="sku">SKU / Código</Label>
-                            <Input
-                                id="sku"
-                                value={formData.sku}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, sku: e.target.value })}
-                                required
-                                placeholder="Ej. MAT-TEL-001"
-                            />
+                            <div className="flex gap-2">
+                                <Input
+                                    id="sku"
+                                    value={formData.sku}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                        setFormData({ ...formData, sku: e.target.value });
+                                        setSkuManuallyEdited(true);
+                                    }}
+                                    required
+                                    placeholder="Ej. MAT-TEL-001"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    title="Generar SKU automáticamente"
+                                    onClick={() => {
+                                        if (formData.name) {
+                                            const autoSku = generateRawMaterialSku(formData.name);
+                                            setFormData({ ...formData, sku: autoSku });
+                                            setSkuManuallyEdited(false);
+                                        }
+                                    }}
+                                >
+                                    <RefreshCw className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="unit">Unidad de Medida</Label>

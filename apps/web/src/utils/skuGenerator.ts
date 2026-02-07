@@ -56,3 +56,9 @@ export const generateVariantSku = (productSku: string, variantName: string): str
 
     return `${productSku}-${suffix}`;
 };
+
+export const generateRawMaterialSku = (materialName: string): string => {
+    if (!materialName) return '';
+    const baseSku = generateProductSku(materialName);
+    return `MAT-${baseSku}`;
+};
