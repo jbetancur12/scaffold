@@ -8,7 +8,7 @@ echo "🚀 Starting Deployment Process..."
 # Load environment variables
 if [ -f .env.production ]; then
   echo "📄 Loading .env.production..."
-  export $(cat .env.production | xargs)
+  export $(grep -v '^#' .env.production | xargs)
 else
   echo "⚠️  Warning: .env.production file not found. Ensuring vars are set in environment."
 fi
