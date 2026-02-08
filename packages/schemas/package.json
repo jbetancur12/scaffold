@@ -8,7 +8,8 @@
     "dev": "tsc -w"
   },
   "dependencies": {
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "@scaffold/types": "*"
   },
   "devDependencies": {
     "typescript": "^5.0.0"
