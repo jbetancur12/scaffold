@@ -46,4 +46,4 @@ WORKDIR /app
 EXPOSE 5050
 
 # Start command (adjust path to main.js)
-CMD ["node", "apps/api/dist/index.js"]
+CMD ["node", "apps/api/dist/apps/api/src/index.js"]
