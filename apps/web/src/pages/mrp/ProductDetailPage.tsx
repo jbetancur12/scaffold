@@ -63,6 +63,13 @@ export default function ProductDetailPage() {
         targetMargin: 0.4,
     });
 
+    // Global Config for Real-time Estimation
+    const [operationalConfig, setOperationalConfig] = useState<any | null>(null);
+
+    useEffect(() => {
+        mrpApi.getOperationalConfig().then(config => setOperationalConfig(config)).catch(err => console.error("Failed to load operational config", err));
+    }, []);
+
     const loadProduct = useCallback(async () => {
         try {
             setLoading(true);
@@ -475,14 +482,90 @@ export default function ProductDetailPage() {
                                     Asistente de Precios
                                 </div>
                                 <div className="space-y-1">
+                                    <div className="flex justify-between text-xs text-slate-500">
+                                        <span>Materia Prima (Est.):</span>
+                                        <span className="font-medium">
+                                            ${(() => {
+                                                const currentMinutes = variantFormData.productionMinutes || 0;
+                                                const oldMinutes = editingVariant.productionMinutes || 0;
+                                                const costPerMinute = operationalConfig?.costPerMinute || 0;
+
+                                                // If we have config, we can try to back out the old Op Cost
+                                                let baseCost = editingVariant.cost || 0;
+
+                                                if (operationalConfig) {
+                                                    const oldOpCost = oldMinutes * costPerMinute;
+                                                    baseCost = Math.max(0, (editingVariant.cost || 0) - oldOpCost);
+                                                }
+
+                                                return baseCost.toFixed(2);
+                                            })()}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-slate-500">
+                                        <span>Mano de Obra (Operario):</span>
+                                        <span className="font-medium">
+                                            ${(() => {
+                                                const activeMinutes = variantFormData.productionMinutes || 0;
+                                                return (activeMinutes * (operationalConfig?.modCostPerMinute || 0)).toFixed(2);
+                                            })()}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-slate-500">
+                                        <span>Costos Indirectos (Admin):</span>
+                                        <span className="font-medium">
+                                            ${(() => {
+                                                const activeMinutes = variantFormData.productionMinutes || 0;
+                                                return (activeMinutes * (operationalConfig?.cifCostPerMinute || 0)).toFixed(2);
+                                            })()}
+                                        </span>
+                                    </div>
+
+                                    <div className="border-t border-dashed my-2 border-primary/20"></div>
+
                                     <div className="flex justify-between text-xs text-slate-600">
-                                        <span>Costo Actual:</span>
-                                        <span className="font-medium">${(editingVariant.cost || 0).toFixed(2)}</span>
+                                        <span>Costo Total Estimado:</span>
+                                        <span className="font-medium">
+                                            ${(() => {
+                                                const currentMinutes = variantFormData.productionMinutes || 0;
+                                                const oldMinutes = editingVariant.productionMinutes || 0;
+                                                // Assuming operationalConfig is available in scope (I will add it in next step)
+                                                // If config is not loaded, fallback to existing logic
+                                                if (operationalConfig) {
+                                                    const costPerMinute = operationalConfig.costPerMinute || 0;
+                                                    // Estimate base cost (Material + Labor + Indirect) by removing old operational cost
+                                                    // This assumes the stored cost was calculated with the CURRENT rate. 
+                                                    // If rates changed, this is an approximation.
+                                                    const oldOpCost = oldMinutes * costPerMinute;
+                                                    const baseCost = Math.max(0, (editingVariant.cost || 0) - oldOpCost);
+
+                                                    const newOpCost = currentMinutes * costPerMinute;
+                                                    return (baseCost + newOpCost).toFixed(2);
+                                                }
+                                                return (editingVariant.cost || 0).toFixed(2);
+                                            })()}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between text-xs text-slate-600">
                                         <span>Precio Recomendado:</span>
                                         <span className="font-bold text-primary">
-                                            ${(variantFormData.targetMargin < 1 ? ((editingVariant.cost || 0) / (1 - (variantFormData.targetMargin || 0.4))).toFixed(2) : '0.00')}
+                                            ${(() => {
+                                                const currentMinutes = variantFormData.productionMinutes || 0;
+                                                const oldMinutes = editingVariant.productionMinutes || 0;
+                                                let estimatedCost = editingVariant.cost || 0;
+
+                                                if (operationalConfig) {
+                                                    const costPerMinute = operationalConfig.costPerMinute || 0;
+                                                    const oldOpCost = oldMinutes * costPerMinute;
+                                                    const baseCost = Math.max(0, (editingVariant.cost || 0) - oldOpCost);
+                                                    const newOpCost = currentMinutes * costPerMinute;
+                                                    estimatedCost = baseCost + newOpCost;
+                                                }
+
+                                                const margin = variantFormData.targetMargin || 0.4;
+                                                if (margin >= 1) return 'Err'; // Avoid division by zero or negative
+                                                return (estimatedCost / (1 - margin)).toFixed(2);
+                                            })()}
                                         </span>
                                     </div>
                                 </div>
