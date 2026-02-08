@@ -10,7 +10,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Package, Plus, Layers } from 'lucide-react';
+import { Package, Plus, Layers, Trash2, Edit2, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -24,7 +24,7 @@ export default function ProductListPage() {
         try {
             setLoading(true);
             const response = await mrpApi.getProducts();
-            setProducts(response.products); // Adjusted to match API response structure
+            setProducts(response.products);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -39,6 +39,24 @@ export default function ProductListPage() {
     useEffect(() => {
         loadProducts();
     }, [loadProducts]);
+
+    const handleDeleteProduct = async (id: string) => {
+        if (!confirm('¿Estás seguro de eliminar este producto? Esta acción no se puede deshacer.')) return;
+        try {
+            await mrpApi.deleteProduct(id);
+            toast({
+                title: 'Éxito',
+                description: 'Producto eliminado correctamente',
+            });
+            loadProducts();
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: 'No se pudo eliminar el producto',
+                variant: 'destructive',
+            });
+        }
+    };
 
     return (
         <div className="space-y-8">
@@ -125,13 +143,18 @@ export default function ProductListPage() {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex justify-end gap-2">
-                                                <Button variant="outline" size="sm" onClick={() => navigate(`/dashboard/mrp/products/${product.id}/bom`)}>
-                                                    <Layers className="h-4 w-4 mr-2" />
-                                                    BOM
+                                            <div className="flex justify-end gap-1">
+                                                <Button size="sm" variant="ghost" onClick={() => navigate(`/dashboard/mrp/products/${product.id}/bom`)} title="BOM">
+                                                    <Layers className="h-4 w-4 text-slate-400 hover:text-primary" />
                                                 </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => navigate(`/dashboard/mrp/products/${product.id}`)}>
-                                                    Editar
+                                                <Button size="sm" variant="ghost" onClick={() => navigate(`/dashboard/mrp/products/${product.id}`)} title="Ver Detalle">
+                                                    <Eye className="h-4 w-4 text-slate-400 hover:text-primary" />
+                                                </Button>
+                                                <Button size="sm" variant="ghost" onClick={() => navigate(`/dashboard/mrp/products/${product.id}/edit`)} title="Editar">
+                                                    <Edit2 className="h-4 w-4 text-slate-400 hover:text-primary" />
+                                                </Button>
+                                                <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(product.id)} title="Eliminar">
+                                                    <Trash2 className="h-4 w-4 text-slate-400 hover:text-red-500" />
                                                 </Button>
                                             </div>
                                         </TableCell>

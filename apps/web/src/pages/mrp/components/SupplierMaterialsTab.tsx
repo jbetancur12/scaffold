@@ -149,7 +149,14 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
                                 </Select>
                             </div>
                             <div className="grid gap-2">
-                                <Label>Precio de Compra (Último/Acordado)</Label>
+                                <Label>
+                                    Precio de Compra (Último/Acordado)
+                                    {selectedMaterial && allMaterials.find(m => m.id === selectedMaterial)?.unit &&
+                                        <span className="text-muted-foreground font-normal ml-1">
+                                            (por {allMaterials.find(m => m.id === selectedMaterial)?.unit})
+                                        </span>
+                                    }
+                                </Label>
                                 <Input
                                     type="number"
                                     min="0"

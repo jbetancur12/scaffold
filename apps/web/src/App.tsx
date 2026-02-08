@@ -7,6 +7,7 @@ import DashboardPage from '@/pages/dashboard/DashboardPage';
 import UsersPage from '@/pages/dashboard/UsersPage';
 import ProductListPage from '@/pages/mrp/ProductListPage';
 import ProductFormPage from '@/pages/mrp/ProductFormPage';
+import ProductDetailPage from '@/pages/mrp/ProductDetailPage';
 import ProductBOMPage from '@/pages/mrp/ProductBOMPage';
 import SupplierListPage from '@/pages/mrp/SupplierListPage';
 import SupplierFormPage from '@/pages/mrp/SupplierFormPage';
@@ -89,7 +90,8 @@ export default function App() {
                         <Route path="/dashboard/mrp/products" element={<ProductListPage />} />
                         <Route path="/dashboard/mrp/products/new" element={<ProductFormPage />} />
                         <Route path="/dashboard/mrp/products/:id/bom" element={<ProductBOMPage />} />
-                        <Route path="/dashboard/mrp/products/:id" element={<ProductFormPage />} />
+                        <Route path="/dashboard/mrp/products/:id" element={<ProductDetailPage />} />
+                        <Route path="/dashboard/mrp/products/:id/edit" element={<ProductFormPage />} />
 
                         <Route path="/dashboard/mrp/suppliers" element={<SupplierListPage />} />
                         <Route path="/dashboard/mrp/suppliers/new" element={<SupplierFormPage />} />
