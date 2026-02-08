@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { mrpApi } from '@/services/mrpApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ const rawMaterialSchema = z.object({
 export default function RawMaterialFormPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const { toast } = useToast();
     const isEditing = !!id;
 
@@ -76,8 +77,22 @@ export default function RawMaterialFormPage() {
     useEffect(() => {
         if (isEditing) {
             loadMaterial();
+        } else {
+            // Check for initial data from navigation state (Duplicate)
+            const state = (location as any).state as { initialData?: any };
+            if (state?.initialData) {
+                setFormData({
+                    name: state.initialData.name,
+                    sku: state.initialData.sku || '',
+                    unit: state.initialData.unit as UnitType,
+                    cost: state.initialData.cost,
+                });
+                if (state.initialData.sku) {
+                    setSkuManuallyEdited(true); // Treat as manually edited if we passed a SKU (though list page clears it usually)
+                }
+            }
         }
-    }, [isEditing, loadMaterial]);
+    }, [isEditing, loadMaterial, location.state]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

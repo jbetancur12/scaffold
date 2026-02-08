@@ -11,7 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Database, Plus, Edit2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Database, Plus, Edit2, Search, ChevronLeft, ChevronRight, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -130,8 +130,32 @@ export default function RawMaterialListPage() {
                                                     size="sm"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        navigate('/dashboard/mrp/raw-materials/new', {
+                                                            state: {
+                                                                initialData: {
+                                                                    ...material,
+                                                                    name: `${material.name} (Copia)`,
+                                                                    sku: '', // Reset SKU to force regeneration or manual entry
+                                                                    id: undefined, // Ensure it's treated as new
+                                                                    createdAt: undefined,
+                                                                    updatedAt: undefined
+                                                                }
+                                                            }
+                                                        });
+                                                    }}
+                                                    title="Duplicar Material"
+                                                    className="h-8 w-8 p-0"
+                                                >
+                                                    <Copy className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         navigate(`/dashboard/mrp/raw-materials/${material.id}/edit`);
                                                     }}
+                                                    title="Editar Material"
                                                     className="h-8 w-8 p-0"
                                                 >
                                                     <Edit2 className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
