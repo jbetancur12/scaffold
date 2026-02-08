@@ -23,7 +23,7 @@ docker compose -f docker-compose.prod.yml up -d --build
 
 # Run migrations
 echo "🐘 Running Database Migrations..."
-docker compose -f docker-compose.prod.yml exec api npm run migration:up
+docker compose -f docker-compose.prod.yml exec api npm run migration:up --workspace=api
 
 # Check status
 echo "✅ Deployment Complete! Status:"
