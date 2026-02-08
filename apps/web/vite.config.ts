@@ -5,7 +5,7 @@ import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [react(), tsconfigPaths()],
+    plugins: [react()],
     resolve: {
         alias: {
             '@scaffold/types': path.resolve(__dirname, '../../packages/types/src/index.ts'),
