@@ -486,7 +486,7 @@ export default function ProductDetailPage() {
                                         <span>Materia Prima (Est.):</span>
                                         <span className="font-medium">
                                             ${(() => {
-                                                const currentMinutes = variantFormData.productionMinutes || 0;
+
                                                 const oldMinutes = editingVariant.productionMinutes || 0;
                                                 const costPerMinute = operationalConfig?.costPerMinute || 0;
 

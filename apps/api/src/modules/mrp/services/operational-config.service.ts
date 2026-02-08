@@ -1,7 +1,7 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { OperationalConfig } from '../entities/operational-config.entity';
-import { OperationalConfigSchema } from '@scaffold/schemas';
-import { z } from 'zod';
+
+
 
 export class OperationalConfigService {
     private readonly em: EntityManager;
