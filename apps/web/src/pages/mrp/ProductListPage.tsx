@@ -90,31 +90,32 @@ export default function ProductListPage() {
                         </TableHeader>
                         <TableBody>
                             {products.map((product) => {
-                                const variants = product.variants || [];
+                                // Logic:
+                                // 1. General Price = Highest Selling Price among all variants.
+                                // 2. Safety Margin = (General Price - Highest Cost) / General Price.
 
-                                // Find the variant with the highest production cost
-                                const variantWithMaxCost = variants.length > 0
+                                const variants = product.variants || [];
+                                const hasVariants = variants.length > 0;
+
+                                // Standard logic: Find variant with MAX PRICE
+                                const maxPriceVariant = hasVariants
+                                    ? [...variants].sort((a, b) => (b.price || 0) - (a.price || 0))[0]
+                                    : null;
+                                const generalPrice = maxPriceVariant ? maxPriceVariant.price : 0;
+
+                                // Safety Logic: Find variant with MAX COST to calculate worst-case margin
+                                const maxCostVariant = hasVariants
                                     ? [...variants].sort((a, b) => (b.cost || 0) - (a.cost || 0))[0]
                                     : null;
+                                const maxCost = maxCostVariant ? maxCostVariant.cost : 0;
 
-                                const margins = variants
-                                    .filter(v => (v.price || 0) > 0)
-                                    .map(v => (v.price - v.cost) / v.price);
+                                // Calculate safety margin
+                                const safetyMargin = generalPrice > 0 ? (generalPrice - maxCost) / generalPrice : null;
 
-                                // Use the margin of the most expensive variant as the baseline
-                                const minMargin = variantWithMaxCost && (variantWithMaxCost.price || 0) > 0
-                                    ? (variantWithMaxCost.price - variantWithMaxCost.cost) / variantWithMaxCost.price
-                                    : (margins.length > 0 ? Math.min(...margins) : null);
-
-                                const avgTargetMargin = variants.length > 0
-                                    ? variants.reduce((acc, v) => acc + (v.targetMargin || 0.4), 0) / variants.length
-                                    : 0.4;
-
-                                const getMarginColor = (margin: number | null, target: number) => {
+                                const getMarginColor = (margin: number | null) => {
                                     if (margin === null) return 'text-slate-400';
-                                    const deviation = margin - target;
-                                    if (deviation < -0.1) return 'text-red-600 bg-red-50 border-red-100';
-                                    if (deviation < 0) return 'text-amber-600 bg-amber-50 border-amber-100';
+                                    if (margin < 0.3) return 'text-red-600 bg-red-50 border-red-100';
+                                    if (margin < 0.4) return 'text-amber-600 bg-amber-50 border-amber-100';
                                     return 'text-emerald-600 bg-emerald-50 border-emerald-100';
                                 };
 
@@ -131,12 +132,12 @@ export default function ProductListPage() {
                                         <TableCell>{product.sku}</TableCell>
                                         <TableCell>{variants.length}</TableCell>
                                         <TableCell className="font-bold text-slate-900">
-                                            {variantWithMaxCost ? `$${variantWithMaxCost.price.toFixed(2)}` : '-'}
+                                            {hasVariants ? `$${generalPrice.toFixed(2)}` : '-'}
                                         </TableCell>
                                         <TableCell>
-                                            {minMargin !== null ? (
-                                                <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getMarginColor(minMargin, avgTargetMargin)}`}>
-                                                    {(minMargin * 100).toFixed(1)}% Crítico
+                                            {safetyMargin !== null ? (
+                                                <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${getMarginColor(safetyMargin)}`}>
+                                                    {(safetyMargin * 100).toFixed(1)}% (Mín.)
                                                 </div>
                                             ) : (
                                                 <span className="text-slate-400 text-xs">-</span>

@@ -198,6 +198,60 @@ export default function ProductDetailPage() {
                 </div>
             </div>
 
+            {/* Global Pricing Reference - Visual Only */}
+            {product && product.variants && product.variants.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    {/* Card 1: Max Selling Price (Reference) */}
+                    {(() => {
+                        const maxPriceVariant = [...product.variants].sort((a, b) => (b.price || 0) - (a.price || 0))[0];
+                        const maxPrice = maxPriceVariant ? maxPriceVariant.price : 0;
+
+                        return (
+                            <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
+                                <Label className="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Precio General (Ref.)</Label>
+                                <div className="text-3xl font-bold text-slate-900 mt-1">
+                                    ${maxPrice.toFixed(2)}
+                                </div>
+                                <p className="text-xs text-slate-400 mt-2">
+                                    Basado en tu variante más cara ({maxPriceVariant?.name}).
+                                </p>
+                            </div>
+                        );
+                    })()}
+
+                    {/* Card 2: Minimal Safety Margin */}
+                    {(() => {
+                        const maxCostVariant = [...product.variants].sort((a, b) => (b.cost || 0) - (a.cost || 0))[0];
+                        const maxPriceVariant = [...product.variants].sort((a, b) => (b.price || 0) - (a.price || 0))[0];
+
+                        // Safety Margin: (General Price - Max Cost) / General Price
+
+                        const maxCost = maxCostVariant ? maxCostVariant.cost : 0;
+                        const generalPrice = maxPriceVariant ? maxPriceVariant.price : 0;
+
+                        const safetyMargin = generalPrice > 0 ? (generalPrice - maxCost) / generalPrice : 0;
+
+                        const getMarginColor = (margin: number) => {
+                            if (margin < 0.3) return 'bg-red-50 border-red-100 text-red-600';
+                            if (margin < 0.4) return 'bg-amber-50 border-amber-100 text-amber-600';
+                            return 'bg-emerald-50 border-emerald-100 text-emerald-600';
+                        };
+
+                        return (
+                            <div className={`border p-6 rounded-2xl shadow-sm ${getMarginColor(safetyMargin)}`}>
+                                <Label className="text-[10px] uppercase tracking-wider font-bold opacity-70">Margen de Seguridad (Mín.)</Label>
+                                <div className="text-3xl font-bold mt-1">
+                                    {(safetyMargin * 100).toFixed(1)}%
+                                </div>
+                                <p className="text-xs opacity-70 mt-2">
+                                    Si vendes todo a ${generalPrice.toFixed(2)}, este es el margen que obtienes en el peor caso ({maxCostVariant?.name}).
+                                </p>
+                            </div>
+                        );
+                    })()}
+                </div>
+            )}
+
             <Tabs defaultValue="variants" className="w-full">
                 <TabsList className="mb-4">
                     <TabsTrigger value="variants">Variantes</TabsTrigger>
