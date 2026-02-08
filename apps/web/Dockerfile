@@ -24,6 +24,8 @@ RUN npm run build --workspace=@scaffold/types
 RUN npm run build --workspace=@scaffold/schemas
 
 # Build Web
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build --workspace=web
 
 # Production stage - pure static file serving

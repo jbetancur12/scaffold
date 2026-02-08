@@ -54,6 +54,8 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
     restart: always
     ports:
       # Expose on a specific port (default 8080), main Nginx will proxy to this
