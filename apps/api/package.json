@@ -14,7 +14,8 @@
         "migration:down": "mikro-orm migration:down",
         "schema:update": "mikro-orm schema:update --run",
         "schema:drop": "mikro-orm schema:drop --run",
-        "seed": "tsx src/scripts/seed.ts"
+        "seed": "tsx src/scripts/seed.ts",
+        "seed:prod": "node dist/apps/api/src/scripts/seed.js"
     },
     "dependencies": {
         "@mikro-orm/core": "^6.1.4",
