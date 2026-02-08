@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { mrpApi } from '@/services/mrpApi';
 import { RawMaterial } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
     Table,
     TableBody,
@@ -10,7 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Database, Plus, Edit2 } from 'lucide-react';
+import { Database, Plus, Edit2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -19,12 +20,17 @@ export default function RawMaterialListPage() {
     const { toast } = useToast();
     const [materials, setMaterials] = useState<RawMaterial[]>([]);
     const [loading, setLoading] = useState(true);
+    const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
+    const limit = 10;
 
     const loadMaterials = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await mrpApi.getRawMaterials();
+            const response = await mrpApi.getRawMaterials(page, limit, search);
             setMaterials(response.materials);
+            setTotal(response.total);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -34,10 +40,14 @@ export default function RawMaterialListPage() {
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    }, [page, search, toast]);
 
     useEffect(() => {
-        loadMaterials();
+        const timer = setTimeout(() => {
+            loadMaterials();
+        }, 300); // 300ms debounce
+
+        return () => clearTimeout(timer);
     }, [loadMaterials]);
 
     return (
@@ -47,10 +57,24 @@ export default function RawMaterialListPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Materia Prima</h1>
                     <p className="text-slate-500 mt-1">Gestiona el inventario de materiales e insumos.</p>
                 </div>
-                <Button onClick={() => navigate('/dashboard/mrp/raw-materials/new')} className="shadow-lg shadow-primary/20">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Nuevo Material
-                </Button>
+                <div className="flex gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
+                        <Input
+                            placeholder="Buscar material..."
+                            value={search}
+                            onChange={(e) => {
+                                setSearch(e.target.value);
+                                setPage(1); // Reset to page 1 on search
+                            }}
+                            className="pl-8 w-[200px] lg:w-[300px]"
+                        />
+                    </div>
+                    <Button onClick={() => navigate('/dashboard/mrp/raw-materials/new')} className="shadow-lg shadow-primary/20">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Nuevo Material
+                    </Button>
+                </div>
             </div>
 
             <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
@@ -59,71 +83,98 @@ export default function RawMaterialListPage() {
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
                     </div>
                 ) : (
-                    <Table>
-                        <TableHeader className="bg-slate-50/50">
-                            <TableRow>
-                                <TableHead className="font-bold text-slate-900">Nombre</TableHead>
-                                <TableHead className="font-bold text-slate-900">SKU</TableHead>
-                                <TableHead className="font-bold text-slate-900">Unidad</TableHead>
-                                <TableHead className="font-bold text-slate-900">Costo Ref. (Anual)</TableHead>
-                                <TableHead className="font-bold text-slate-900">Costo Promedio</TableHead>
-                                <TableHead className="font-bold text-slate-900">Última Compra</TableHead>
-                                <TableHead className="text-right font-bold text-slate-900">Acciones</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {materials.map((material) => (
-                                <TableRow
-                                    key={material.id}
-                                    className="group hover:bg-slate-50/50 transition-colors cursor-pointer"
-                                    onClick={() => navigate(`/dashboard/mrp/raw-materials/${material.id}`)}
-                                >
-                                    <TableCell className="font-medium">
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-                                                <Database className="h-4 w-4 text-slate-500" />
-                                            </div>
-                                            <span className="text-slate-900">{material.name}</span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>{material.sku}</TableCell>
-                                    <TableCell>{material.unit}</TableCell>
-                                    <TableCell className="font-semibold text-slate-600">${material.cost?.toFixed(2) || '0.00'}</TableCell>
-                                    <TableCell className="font-bold text-primary">${material.averageCost && material.averageCost > 0 ? material.averageCost.toFixed(2) : '0.00'}</TableCell>
-                                    <TableCell>
-                                        <div className="flex flex-col text-xs">
-                                            <span className="font-medium text-slate-900">${material.lastPurchasePrice?.toFixed(2) || '-'}</span>
-                                            <span className="text-slate-500">
-                                                {material.lastPurchaseDate ? new Date(material.lastPurchaseDate).toLocaleDateString() : 'N/A'}
-                                            </span>
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    navigate(`/dashboard/mrp/raw-materials/${material.id}/edit`);
-                                                }}
-                                                className="h-8 w-8 p-0"
-                                            >
-                                                <Edit2 className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {materials.length === 0 && (
+                    <>
+                        <Table>
+                            <TableHeader className="bg-slate-50/50">
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-10 text-slate-500">
-                                        No hay materiales registrados.
-                                    </TableCell>
+                                    <TableHead className="font-bold text-slate-900">Nombre</TableHead>
+                                    <TableHead className="font-bold text-slate-900">SKU</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Unidad</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Costo Ref. (Anual)</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Costo Promedio</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Última Compra</TableHead>
+                                    <TableHead className="text-right font-bold text-slate-900">Acciones</TableHead>
                                 </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {materials.map((material) => (
+                                    <TableRow
+                                        key={material.id}
+                                        className="group hover:bg-slate-50/50 transition-colors cursor-pointer"
+                                        onClick={() => navigate(`/dashboard/mrp/raw-materials/${material.id}`)}
+                                    >
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
+                                                    <Database className="h-4 w-4 text-slate-500" />
+                                                </div>
+                                                <span className="text-slate-900">{material.name}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>{material.sku}</TableCell>
+                                        <TableCell>{material.unit}</TableCell>
+                                        <TableCell className="font-semibold text-slate-600">${material.cost?.toFixed(2) || '0.00'}</TableCell>
+                                        <TableCell className="font-bold text-primary">${material.averageCost && material.averageCost > 0 ? material.averageCost.toFixed(2) : '0.00'}</TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-col text-xs">
+                                                <span className="font-medium text-slate-900">${material.lastPurchasePrice?.toFixed(2) || '-'}</span>
+                                                <span className="text-slate-500">
+                                                    {material.lastPurchaseDate ? new Date(material.lastPurchaseDate).toLocaleDateString() : 'N/A'}
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        navigate(`/dashboard/mrp/raw-materials/${material.id}/edit`);
+                                                    }}
+                                                    className="h-8 w-8 p-0"
+                                                >
+                                                    <Edit2 className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {materials.length === 0 && (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center py-10 text-slate-500">
+                                            No hay materiales registrados.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                        <div className="flex items-center justify-end space-x-2 p-4 border-t border-slate-100">
+                            <div className="flex-1 text-sm text-muted-foreground">
+                                Página {page} de {Math.max(1, Math.ceil(total / limit))} ({total} registros)
+                            </div>
+                            <div className="space-x-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    disabled={page === 1}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                    Anterior
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage((p) => p + 1)}
+                                    disabled={page >= Math.ceil(total / limit)}
+                                >
+                                    Siguiente
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    </>
                 )}
             </div>
         </div>

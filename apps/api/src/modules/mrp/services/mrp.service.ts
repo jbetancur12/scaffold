@@ -59,9 +59,17 @@ export class MrpService {
         return material;
     }
 
-    async listRawMaterials(page = 1, limit = 10): Promise<{ materials: RawMaterial[]; total: number }> {
+    async listRawMaterials(page = 1, limit = 10, search?: string): Promise<{ materials: RawMaterial[]; total: number }> {
+        const filters: any = {};
+        if (search) {
+            filters.$or = [
+                { name: { $ilike: `%${search}%` } },
+                { sku: { $ilike: `%${search}%` } }
+            ];
+        }
+
         const [materials, total] = await this.rawMaterialRepo.findAndCount(
-            {},
+            filters,
             {
                 limit,
                 offset: (page - 1) * limit,

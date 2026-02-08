@@ -124,8 +124,8 @@ export const mrpApi = {
     },
 
     // Raw Materials
-    getRawMaterials: async (page = 1, limit = 10) => {
-        const response = await api.get<{ materials: RawMaterial[], total: number }>(`/mrp/raw-materials?page=${page}&limit=${limit}`);
+    getRawMaterials: async (page = 1, limit = 10, search = '') => {
+        const response = await api.get<{ materials: RawMaterial[], total: number }>(`/mrp/raw-materials?page=${page}&limit=${limit}&search=${search}`);
         return response.data;
     },
     getRawMaterial: async (id: string) => {

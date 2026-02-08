@@ -210,8 +210,8 @@ export class MrpController {
 
     async listRawMaterials(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit } = req.query;
-            const result = await this.mrpService.listRawMaterials(Number(page) || 1, Number(limit) || 10);
+            const { page, limit, search } = req.query;
+            const result = await this.mrpService.listRawMaterials(Number(page) || 1, Number(limit) || 10, search as string);
             res.json(result);
         } catch (error) {
             next(error);
