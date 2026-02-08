@@ -22,6 +22,8 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/suppliers', (req, res, next) => mrpController.createSupplier(req, res, next));
     router.get('/suppliers', (req, res, next) => mrpController.listSuppliers(req, res, next));
     router.get('/suppliers/:id', (req, res, next) => mrpController.getSupplier(req, res, next));
+    router.get('/suppliers/:id/materials', (req, res, next) => mrpController.getSupplierMaterials(req, res, next));
+    router.post('/suppliers/:id/materials', (req, res, next) => mrpController.addSupplierMaterial(req, res, next));
 
     // Raw Materials & BOM
     router.post('/raw-materials', (req, res, next) => mrpController.createRawMaterial(req, res, next));

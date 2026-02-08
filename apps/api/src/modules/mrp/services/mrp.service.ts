@@ -2,6 +2,7 @@ import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { BOMItem } from '../entities/bom-item.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
+import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { RawMaterialSchema, BOMItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 
@@ -21,6 +22,19 @@ export class MrpService {
     async createRawMaterial(data: z.infer<typeof RawMaterialSchema>): Promise<RawMaterial> {
         const material = this.rawMaterialRepo.create(data as unknown as RawMaterial);
         await this.em.persistAndFlush(material);
+
+        if (material.supplier) {
+            // Create SupplierMaterial link
+            const supplierMaterialRepo = this.em.getRepository(SupplierMaterial);
+            const link = supplierMaterialRepo.create({
+                supplier: material.supplier,
+                rawMaterial: material,
+                lastPurchasePrice: material.cost,
+                lastPurchaseDate: new Date()
+            } as any);
+            await this.em.persistAndFlush(link);
+        }
+
         return material;
     }
 

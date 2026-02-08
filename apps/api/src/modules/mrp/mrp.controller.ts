@@ -152,6 +152,27 @@ export class MrpController {
         }
     }
 
+    async getSupplierMaterials(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const materials = await this.supplierService.getSupplierMaterials(id);
+            res.json(materials);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async addSupplierMaterial(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { rawMaterialId, price } = req.body;
+            const link = await this.supplierService.addSupplierMaterial(id, rawMaterialId, price);
+            res.status(201).json(link);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     // --- Raw Materials ---
     async getRawMaterialSuppliers(req: Request, res: Response, next: NextFunction) {
         try {

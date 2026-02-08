@@ -1,6 +1,7 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { Supplier } from '../entities/supplier.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
+import { RawMaterial } from '../entities/raw-material.entity';
 import { SupplierSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 
@@ -45,5 +46,41 @@ export class SupplierService {
                 orderBy: { lastPurchaseDate: 'DESC' }
             }
         );
+    }
+
+    async getSupplierMaterials(supplierId: string) {
+        const supplierMaterialRepo = this.em.getRepository(SupplierMaterial);
+        return supplierMaterialRepo.find(
+            { supplier: supplierId },
+            {
+                populate: ['rawMaterial'],
+                orderBy: { lastPurchaseDate: 'DESC' }
+            }
+        );
+    }
+
+    async addSupplierMaterial(supplierId: string, materialId: string, price: number = 0) {
+        const supplierMaterialRepo = this.em.getRepository(SupplierMaterial);
+
+        let link = await supplierMaterialRepo.findOne({
+            supplier: supplierId,
+            rawMaterial: materialId
+        });
+
+        if (!link) {
+            // Check entities exist
+            const supplier = await this.supplierRepo.findOneOrFail({ id: supplierId });
+            const rawMaterial = await this.em.findOneOrFail(RawMaterial, { id: materialId });
+
+            link = supplierMaterialRepo.create({
+                supplier,
+                rawMaterial,
+                lastPurchasePrice: price,
+                lastPurchaseDate: new Date()
+            });
+            await this.em.persistAndFlush(link);
+        }
+
+        return link;
     }
 }

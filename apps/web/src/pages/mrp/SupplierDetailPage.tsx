@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Edit2, Factory, MapPin, Phone, Mail, Building, CreditCard, FileText } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { SupplierMaterialsTab } from './components/SupplierMaterialsTab';
 
 export default function SupplierDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -78,6 +79,7 @@ export default function SupplierDetailPage() {
             <Tabs defaultValue="overview" className="w-full">
                 <TabsList className="mb-4">
                     <TabsTrigger value="overview">Información General</TabsTrigger>
+                    <TabsTrigger value="materials">Materiales</TabsTrigger>
                     {/* Future: Add 'Purchase History' or 'Supplied Materials' tabs here */}
                 </TabsList>
 
@@ -155,6 +157,10 @@ export default function SupplierDetailPage() {
                             {supplier.notes || 'Sin notas adicionales.'}
                         </p>
                     </div>
+                </TabsContent>
+
+                <TabsContent value="materials" className="space-y-6">
+                    <SupplierMaterialsTab supplierId={id!} />
                 </TabsContent>
             </Tabs>
         </div>

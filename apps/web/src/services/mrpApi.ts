@@ -114,6 +114,14 @@ export const mrpApi = {
         const response = await api.post('/mrp/suppliers', data);
         return response.data;
     },
+    getSupplierMaterials: async (id: string) => {
+        const response = await api.get<{ rawMaterial: RawMaterial; lastPurchasePrice: number; lastPurchaseDate: string }[]>(`/mrp/suppliers/${id}/materials`);
+        return response.data;
+    },
+    addSupplierMaterial: async (id: string, data: { rawMaterialId: string; price: number }) => {
+        const response = await api.post(`/mrp/suppliers/${id}/materials`, data);
+        return response.data;
+    },
 
     // Raw Materials
     getRawMaterials: async (page = 1, limit = 10) => {
