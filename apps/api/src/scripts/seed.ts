@@ -1,13 +1,13 @@
 import 'dotenv/config';
 import { MikroORM } from '@mikro-orm/core';
 import * as argon2 from 'argon2';
-import mikroConfig from '../config/mikro-orm.config';
+import config from '../../mikro-orm.config';
 import { User } from '../modules/user/user.entity';
 import { UserRole } from '@scaffold/types';
 import { winstonLogger } from '../config/logger';
 
 async function seed() {
-    const orm = await MikroORM.init(mikroConfig);
+    const orm = await MikroORM.init(config);
     const em = orm.em.fork();
 
     try {

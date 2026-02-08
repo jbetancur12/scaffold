@@ -77,7 +77,8 @@ export class SupplierService {
                 rawMaterial,
                 lastPurchasePrice: price,
                 lastPurchaseDate: new Date()
-            });
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any);
             await this.em.persistAndFlush(link);
         }
 

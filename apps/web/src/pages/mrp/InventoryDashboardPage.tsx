@@ -74,7 +74,7 @@ export default function InventoryDashboardPage() {
     const loadRawMaterials = async () => {
         try {
             const data = await mrpApi.getRawMaterials(1, 100);
-            // @ts-ignore
+
             setRawMaterials(data.materials || []);
         } catch (err) {
             console.error('Error loading raw materials', err);

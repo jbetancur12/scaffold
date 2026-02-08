@@ -1,0 +1,8 @@
+
+> api@1.0.0 build
+> tsc
+
+src/modules/mrp/services/production.service.ts(144,27): error TS6133: 'isCheapest' is declared but its value is never read.
+src/modules/mrp/services/supplier.service.ts(75,48): error TS2345: Argument of type '{ supplier: Loaded<Supplier, never, "*", never>; rawMaterial: Loaded<RawMaterial, never, "*", never>; lastPurchasePrice: number; lastPurchaseDate: Date; }' is not assignable to parameter of type 'RequiredEntityData<SupplierMaterial, never, false>'.
+  Type '{ supplier: Loaded<Supplier, never, "*", never>; rawMaterial: Loaded<RawMaterial, never, "*", never>; lastPurchasePrice: number; lastPurchaseDate: Date; }' is missing the following properties from type '{ supplier: RequiredEntityData<Supplier, SupplierMaterial, false> | EntityDataPropValue<Supplier> | ExpandRequiredEntityPropObject<...>; ... 6 more ...; updatedAt: string | Date; }': supplierId, rawMaterialId, createdAt, updatedAt
+src/scripts/seed.ts(4,25): error TS2307: Cannot find module '../config/mikro-orm.config' or its corresponding type declarations.

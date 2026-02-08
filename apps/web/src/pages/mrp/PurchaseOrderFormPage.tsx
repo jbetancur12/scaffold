@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mrpApi } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
@@ -46,11 +46,7 @@ export default function PurchaseOrderFormPage() {
         { rawMaterialId: '', quantity: 0, unitPrice: 0 }
     ]);
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             const [suppliersRes, materialsRes] = await Promise.all([
                 mrpApi.getSuppliers(1, 100),
@@ -61,11 +57,15 @@ export default function PurchaseOrderFormPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudieron cargar los datos',
+                description: 'No se pudo cargar la información inicial',
                 variant: 'destructive',
             });
         }
-    };
+    }, [toast]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
     const addItem = () => {
         setItems([...items, { rawMaterialId: '', quantity: 0, unitPrice: 0 }]);

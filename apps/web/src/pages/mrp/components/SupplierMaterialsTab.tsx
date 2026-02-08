@@ -48,7 +48,7 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
         try {
             setLoading(true);
             const data = await mrpApi.getSupplierMaterials(supplierId);
-            setMaterials(data as any); // Type cast for now due to interface mismatch on frontend type
+            setMaterials(data);
         } catch (error) {
             console.error('Failed to load supplier materials', error);
         } finally {

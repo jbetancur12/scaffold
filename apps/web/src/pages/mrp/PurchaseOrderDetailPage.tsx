@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mrpApi } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
@@ -51,13 +51,7 @@ export default function PurchaseOrderDetailPage() {
     const [order, setOrder] = useState<PurchaseOrder | null>(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (id) {
-            loadOrder();
-        }
-    }, [id]);
-
-    const loadOrder = async () => {
+    const loadOrder = useCallback(async () => {
         try {
             setLoading(true);
             const response = await mrpApi.getPurchaseOrder(id!);
@@ -72,7 +66,13 @@ export default function PurchaseOrderDetailPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [id, toast, navigate]);
+
+    useEffect(() => {
+        if (id) {
+            loadOrder();
+        }
+    }, [id, loadOrder]);
 
     const handleReceive = async () => {
         if (!confirm('¿Estás seguro de recibir esta orden? Esto actualizará el inventario.')) return;

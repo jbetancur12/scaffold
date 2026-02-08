@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mrpApi, MaterialRequirement } from '@/services/mrpApi';
-import { ProductionOrder, ProductionOrderStatus } from '@scaffold/types';
+import { ProductionOrder, ProductionOrderStatus, ProductionOrderItem, ProductVariant, Product } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { ArrowLeft, Printer, Play, CheckCircle, Ban, Truck } from 'lucide-react';
+import { ArrowLeft, Printer, Play, CheckCircle, Truck } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ProductionRequirementsTable } from '@/components/mrp/ProductionRequirementsTable';
 
@@ -166,17 +166,20 @@ export default function ProductionOrderDetailPage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-4">
-                                    {order.items?.map((item: any) => (
-                                        <div key={item.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
-                                            <div>
-                                                <div className="font-medium">{item.variant?.product?.name} - {item.variant?.name}</div>
-                                                <div className="text-xs text-slate-500">{item.variant?.sku}</div>
+                                    {order.items?.map((item) => {
+                                        const populatedItem = item as ProductionOrderItem & { variant?: ProductVariant & { product?: Product } };
+                                        return (
+                                            <div key={item.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
+                                                <div>
+                                                    <div className="font-medium">{populatedItem.variant?.product?.name} - {populatedItem.variant?.name}</div>
+                                                    <div className="text-xs text-slate-500">{populatedItem.variant?.sku}</div>
+                                                </div>
+                                                <div className="font-bold text-lg">
+                                                    {item.quantity} unds
+                                                </div>
                                             </div>
-                                            <div className="font-bold text-lg">
-                                                {item.quantity} unds
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </CardContent>
                         </Card>

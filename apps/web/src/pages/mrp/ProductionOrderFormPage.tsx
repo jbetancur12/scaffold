@@ -378,16 +378,14 @@ export default function ProductionOrderFormPage() {
                                 <TableBody>
                                     {requirements.map((req, idx) => {
                                         // API returns: { material: { name, unit, ... }, required, available }
-                                        const material = (req as any).material;
-                                        const required = (req as any).required;
-                                        const available = (req as any).available;
+                                        const { material, required, available } = req;
                                         const missing = Math.max(0, required - available);
 
                                         return (
                                             <TableRow key={idx}>
-                                                <TableCell className="font-medium">{material?.name || req.materialName || 'N/A'}</TableCell>
-                                                <TableCell>{required || req.requiredQuantity || 0} {material?.unit || req.unit || ''}</TableCell>
-                                                <TableCell>{available || req.availableStock || 0} {material?.unit || req.unit || ''}</TableCell>
+                                                <TableCell className="font-medium">{material?.name || 'N/A'}</TableCell>
+                                                <TableCell>{required || 0} {material?.unit || ''}</TableCell>
+                                                <TableCell>{available || 0} {material?.unit || ''}</TableCell>
                                                 <TableCell>
                                                     {missing > 0 ? (
                                                         <span className="text-red-600 font-bold">Falta {missing.toFixed(2)}</span>

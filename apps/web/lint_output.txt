@@ -1,0 +1,45 @@
+
+> web@1.0.0 lint
+> eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+
+
+D:\MRP\apps\web\src\pages\mrp\InventoryDashboardPage.tsx
+  77:13  error  Use "@ts-expect-error" instead of "@ts-ignore", as "@ts-ignore" will do nothing if the following line is error-free  @typescript-eslint/ban-ts-comment
+
+D:\MRP\apps\web\src\pages\mrp\ProductDetailPage.tsx
+  101:41   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  338:135  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  445:63   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  454:92   error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  459:103  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\MRP\apps\web\src\pages\mrp\ProductionOrderDetailPage.tsx
+   10:49  warning  'Ban' is defined but never used           @typescript-eslint/no-unused-vars
+  169:62  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\MRP\apps\web\src\pages\mrp\ProductionOrderFormPage.tsx
+  381:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  382:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  383:67  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\MRP\apps\web\src\pages\mrp\PurchaseOrderDetailPage.tsx
+  58:8  warning  React Hook useEffect has a missing dependency: 'loadOrder'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\MRP\apps\web\src\pages\mrp\PurchaseOrderFormPage.tsx
+  51:8  warning  React Hook useEffect has a missing dependency: 'loadData'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\MRP\apps\web\src\pages\mrp\PurchaseOrderListPage.tsx
+  44:8  warning  React Hook useEffect has a missing dependency: 'loadOrders'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\MRP\apps\web\src\pages\mrp\components\SupplierMaterialsTab.tsx
+  51:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+Ô£û 15 problems (11 errors, 4 warnings)
+npm error Lifecycle script `lint` failed with error:
+npm error code 1
+npm error path D:\MRP\apps\web
+npm error workspace web@1.0.0
+npm error location D:\MRP\apps\web
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+

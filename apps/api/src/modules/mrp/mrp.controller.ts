@@ -7,9 +7,23 @@ import { InventoryService } from './services/inventory.service';
 import { ProductionService } from './services/production.service';
 import { PurchaseOrderService } from './services/purchase-order.service';
 import { ProductSchema, ProductionOrderSchema, RawMaterialSchema, BOMItemSchema, SupplierSchema } from '@scaffold/schemas';
+import { PurchaseOrderStatus } from './entities/purchase-order.entity';
 import { z } from 'zod';
 
+const CreatePurchaseOrderSchema = z.object({
+    supplierId: z.string().uuid(),
+    expectedDeliveryDate: z.coerce.date().optional(),
+    notes: z.string().optional(),
+    items: z.array(z.object({
+        rawMaterialId: z.string().uuid(),
+        quantity: z.number().min(0.01),
+        unitPrice: z.number().min(0),
+    })),
+});
+
 export class MrpController {
+    // ...
+
     constructor(private readonly orm: MikroORM) { }
 
     private get em() {
@@ -316,6 +330,7 @@ export class MrpController {
             }));
             const validatedItems = itemCreationSchema.parse(items);
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const order = await this.productionService.createOrder(validatedOrder, validatedItems as any);
             res.status(201).json(order);
         } catch (error) {
@@ -366,6 +381,7 @@ export class MrpController {
             });
             const data = schema.parse(req.body);
             const result = await this.inventoryService.addManualStock(data);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             res.status(200).json(result);
         } catch (error) {
             next(error);
@@ -375,8 +391,9 @@ export class MrpController {
     // --- Purchase Orders ---
     async createPurchaseOrder(req: Request, res: Response, next: NextFunction) {
         try {
-            const data = req.body;
+            const data = CreatePurchaseOrderSchema.parse(req.body);
             const purchaseOrder = await this.purchaseOrderService.createPurchaseOrder(data);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             res.status(201).json(purchaseOrder);
         } catch (error) {
             next(error);
@@ -403,7 +420,7 @@ export class MrpController {
             const result = await this.purchaseOrderService.listPurchaseOrders(
                 Number(page) || 1,
                 Number(limit) || 10,
-                { status: status as any, supplierId: supplierId as string }
+                { status: status as PurchaseOrderStatus, supplierId: supplierId as string }
             );
             res.json(result);
         } catch (error) {

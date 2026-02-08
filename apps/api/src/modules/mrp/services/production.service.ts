@@ -7,6 +7,7 @@ import { ProductVariant } from '../entities/product-variant.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
+import { Supplier } from '../entities/supplier.entity';
 import { ProductionOrderSchema, ProductionOrderItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 
@@ -86,7 +87,7 @@ export class ProductionService {
         material: RawMaterial,
         required: number,
         available: number,
-        potentialSuppliers: { supplier: any, lastPrice: number, lastDate: Date, isCheapest: boolean }[]
+        potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[]
     }[]> {
         const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] });
 
@@ -94,7 +95,7 @@ export class ProductionService {
             material: RawMaterial,
             required: number,
             available: number,
-            potentialSuppliers: { supplier: any, lastPrice: number, lastDate: Date, isCheapest: boolean }[]
+            potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[]
         }>();
 
         // 1. Calculate Required
@@ -133,7 +134,7 @@ export class ProductionService {
             // 3. Check Potential Suppliers (SupplierMaterial)
             const supplierMaterials = await this.em.find(SupplierMaterial, { rawMaterial: { $in: materialIds } }, { populate: ['supplier'], orderBy: { lastPurchasePrice: 'ASC', lastPurchaseDate: 'DESC' } });
 
-            for (const sm of supplierMaterials as any[]) {
+            for (const sm of supplierMaterials) {
                 if (requirements.has(sm.rawMaterial.id)) {
                     const req = requirements.get(sm.rawMaterial.id)!;
 
@@ -141,7 +142,7 @@ export class ProductionService {
                     // But we might have multiple suppliers for same material.
                     // We can mark the first encountered as cheapest or handle logic in frontend.
                     // Since it's sorted by price ASC, the first one added to the array will be the cheapest.
-                    const isCheapest = req.potentialSuppliers.length === 0 || sm.lastPurchasePrice < req.potentialSuppliers[0].lastPrice;
+
                     // Actually, if we just push all, the frontend can highlight. 
                     // Let's rely on the sort from DB: cheapest checks across all supplier records.
 
@@ -187,6 +188,7 @@ export class ProductionService {
                     name: 'Main Warehouse',
                     location: 'Default',
                     type: 'FINISHED_GOODS'
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 } as any);
                 this.em.persist(warehouse);
             }
@@ -205,6 +207,7 @@ export class ProductionService {
                         warehouse,
                         quantity: item.quantity,
                         lastUpdated: new Date()
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     } as any);
                 }
                 this.em.persist(inventoryItem);

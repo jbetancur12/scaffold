@@ -31,6 +31,7 @@ export class MrpService {
                 rawMaterial: material,
                 lastPurchasePrice: material.cost,
                 lastPurchaseDate: new Date()
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
             } as any);
             await this.em.persistAndFlush(link);
         }

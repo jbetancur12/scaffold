@@ -40,6 +40,7 @@ interface VariantFormData {
     sku: string;
     price: number;
     targetMargin: number;
+    cost?: number;
 }
 
 export default function ProductDetailPage() {
@@ -98,6 +99,7 @@ export default function ProductDetailPage() {
         setShowVariantDialog(true);
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const handleEditVariant = (variant: any) => {
         setEditingVariant(variant);
         setVariantFormData({
@@ -335,7 +337,7 @@ export default function ProductDetailPage() {
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-1">
-                                                        <Button variant="ghost" size="sm" onClick={() => handleEditVariant(variant as any)}>
+                                                        <Button variant="ghost" size="sm" onClick={() => handleEditVariant(variant)}>
                                                             <Edit2 className="h-4 w-4 text-slate-400 hover:text-primary" />
                                                         </Button>
                                                         <Button variant="ghost" size="sm" onClick={() => handleDeleteVariant(variant.id)}>
@@ -442,7 +444,7 @@ export default function ProductDetailPage() {
                         </div>
 
                         {/* Assistant Logic */}
-                        {editingVariant && (editingVariant as any).cost > 0 && (
+                        {editingVariant && (editingVariant.cost || 0) > 0 && (
                             <div className="mt-4 p-4 bg-primary/5 rounded-2xl border border-primary/10">
                                 <div className="text-sm font-semibold text-primary mb-2 flex items-center gap-2">
                                     <Save className="h-4 w-4" />
@@ -451,12 +453,12 @@ export default function ProductDetailPage() {
                                 <div className="space-y-1">
                                     <div className="flex justify-between text-xs text-slate-600">
                                         <span>Costo Actual:</span>
-                                        <span className="font-medium">${(editingVariant as any).cost.toFixed(2)}</span>
+                                        <span className="font-medium">${(editingVariant.cost || 0).toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between text-xs text-slate-600">
                                         <span>Precio Recomendado:</span>
                                         <span className="font-bold text-primary">
-                                            ${(variantFormData.targetMargin < 1 ? ((editingVariant as any).cost / (1 - (variantFormData.targetMargin || 0.4))).toFixed(2) : '0.00')}
+                                            ${(variantFormData.targetMargin < 1 ? ((editingVariant.cost || 0) / (1 - (variantFormData.targetMargin || 0.4))).toFixed(2) : '0.00')}
                                         </span>
                                     </div>
                                 </div>
