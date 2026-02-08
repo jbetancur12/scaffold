@@ -1,16 +1,19 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import tsconfigPaths from 'vite-tsconfig-paths';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // https://vitejs.dev/config/
 export default defineConfig({
     plugins: [react()],
     resolve: {
         alias: {
-            '@scaffold/types': '../../packages/types/src/index.ts',
-            '@scaffold/schemas': '../../packages/schemas/src/index.ts',
-            '@': './src',
+            '@scaffold/types': path.resolve(__dirname, '../../packages/types/src/index.ts'),
+            '@scaffold/schemas': path.resolve(__dirname, '../../packages/schemas/src/index.ts'),
+            '@': path.resolve(__dirname, './src'),
         },
     },
     server: {
