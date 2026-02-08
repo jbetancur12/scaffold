@@ -18,7 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Edit2, Save } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { z } from 'zod';
 import FabricationCalculator from './FabricationCalculator';
@@ -55,6 +55,9 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
     const { toast } = useToast();
     const [bomItems, setBomItems] = useState<BOMItem[]>([]);
     const [loading, setLoading] = useState(false);
+
+    // Edit state
+    const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
     // New item form state
     const [newItem, setNewItem] = useState<{
@@ -94,20 +97,27 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                 variantId: variant.id,
                 rawMaterialId: newItem.materialId,
                 quantity: quantity,
-                fabricationParams: newItem.fabricationParams
+                fabricationParams: newItem.fabricationParams || undefined
             };
 
             // Validate
             bomItemSchema.parse(payload);
 
             setLoading(true);
-            await mrpApi.addBOMItem(payload);
 
-            toast({ title: 'Material agregado' });
+            if (editingItemId) {
+                await mrpApi.updateBOMItem(editingItemId, payload);
+                toast({ title: 'Material actualizado' });
+            } else {
+                await mrpApi.addBOMItem(payload);
+                toast({ title: 'Material agregado' });
+            }
+
             setNewItem({ materialId: '', quantity: '' });
+            setEditingItemId(null);
             loadBOM(); // Reload to refresh list and costs if backend updates them
         } catch (error: unknown) {
-            let message = 'Error al agregar material';
+            let message = 'Error al guardar material';
             if (error instanceof z.ZodError) {
                 message = error.errors[0].message;
             }
@@ -121,12 +131,27 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
         }
     };
 
+    const handleEditItem = (item: BOMItem) => {
+        setEditingItemId(item.id);
+        setNewItem({
+            materialId: item.rawMaterialId,
+            quantity: item.quantity.toString(),
+            fabricationParams: item.fabricationParams
+        });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingItemId(null);
+        setNewItem({ materialId: '', quantity: '' });
+    };
+
     const handleDeleteItem = async (id: string) => {
         try {
             if (!confirm('¿Estás seguro de eliminar este material?')) return;
             setLoading(true);
             await mrpApi.deleteBOMItem(id);
             toast({ title: 'Material eliminado' });
+            if (editingItemId === id) handleCancelEdit();
             loadBOM();
         } catch (error) {
             toast({ title: 'Error', description: 'No se pudo eliminar', variant: 'destructive' });
@@ -158,7 +183,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                             <TableHead className="w-[80px]">Unidad</TableHead>
                             <TableHead className="w-[100px] text-right">Costo Unit</TableHead>
                             <TableHead className="w-[100px] text-right">Subtotal</TableHead>
-                            <TableHead className="w-[50px]"></TableHead>
+                            <TableHead className="w-[80px] text-right">Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -170,8 +195,10 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                             const unitCost = (material?.averageCost && material.averageCost > 0) ? material.averageCost : (material?.cost || 0);
                             const subtotal = item.quantity * unitCost;
 
+                            const isEditing = editingItemId === item.id;
+
                             return (
-                                <TableRow key={item.id}>
+                                <TableRow key={item.id} className={isEditing ? 'bg-blue-50/50' : ''}>
                                     <TableCell>
                                         <div className="flex flex-col">
                                             <span>{material?.name || item.rawMaterialId}</span>
@@ -222,22 +249,28 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                     <TableCell>{material?.unit || '-'}</TableCell>
                                     <TableCell className="text-right">${unitCost.toFixed(2)}</TableCell>
                                     <TableCell className="text-right font-medium">${subtotal.toFixed(2)}</TableCell>
-                                    <TableCell>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteItem(item.id)} className="text-red-500 hover:text-red-700 h-8 w-8 p-0">
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-1">
+                                            <Button variant="ghost" size="sm" onClick={() => handleEditItem(item)} className="text-slate-400 hover:text-primary h-8 w-8 p-0">
+                                                <Edit2 className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="sm" onClick={() => handleDeleteItem(item.id)} className="text-slate-400 hover:text-red-700 h-8 w-8 p-0">
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             );
                         })}
-                        {/* New Item Row */}
-                        <TableRow className="bg-slate-50">
+                        {/* New/Edit Item Row */}
+                        <TableRow className="bg-slate-50 border-t-2 border-slate-100">
                             <TableCell>
                                 <Select
                                     value={newItem.materialId}
                                     onValueChange={(val) => setNewItem({ ...newItem, materialId: val })}
+                                    disabled={!!editingItemId} // Disable material change during edit for simplicity, or allow if desired
                                 >
-                                    <SelectTrigger className="w-full">
+                                    <SelectTrigger className="w-full h-9">
                                         <SelectValue placeholder="Seleccionar Material" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -276,15 +309,29 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                     ? `$${(getMaterialCost(newItem.materialId) * (parseFloat(newItem.quantity) || 0)).toFixed(2)}`
                                     : '-'}
                             </TableCell>
-                            <TableCell>
-                                <Button
-                                    size="sm"
-                                    onClick={handleAddItem}
-                                    disabled={loading || !newItem.materialId || !newItem.quantity}
-                                    className="h-8 w-8 p-0"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                </Button>
+                            <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                    {editingItemId && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={handleCancelEdit}
+                                            className="h-8 w-8 p-0 text-slate-400"
+                                            title="Cancelar"
+                                        >
+                                            <Trash2 className="h-4 w-4 rotate-45" /> {/* Use X icon ideally, reusing Trash for now as 'cancel' visual implies stop */}
+                                        </Button>
+                                    )}
+                                    <Button
+                                        size="sm"
+                                        onClick={handleAddItem}
+                                        disabled={loading || !newItem.materialId || !newItem.quantity}
+                                        className="h-8 w-8 p-0 bg-primary hover:bg-primary/90"
+                                        title={editingItemId ? 'Actualizar' : 'Agregar'}
+                                    >
+                                        {editingItemId ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                                    </Button>
+                                </div>
                             </TableCell>
                         </TableRow>
                     </TableBody>

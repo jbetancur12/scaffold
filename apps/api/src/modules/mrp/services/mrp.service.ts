@@ -99,6 +99,25 @@ export class MrpService {
         );
     }
 
+    async updateBOMItem(id: string, data: Partial<z.infer<typeof BOMItemSchema>>): Promise<BOMItem> {
+        const item = await this.bomItemRepo.findOneOrFail({ id });
+
+        // Update fields
+        if (data.quantity !== undefined) item.quantity = data.quantity;
+        if (data.fabricationParams !== undefined) item.fabricationParams = data.fabricationParams;
+        if (data.rawMaterialId !== undefined) {
+            const rawMaterial = await this.rawMaterialRepo.findOneOrFail({ id: data.rawMaterialId });
+            item.rawMaterial = rawMaterial;
+        }
+
+        await this.em.persistAndFlush(item);
+
+        // Recalculate variant cost
+        await this.calculateVariantCost(item.variantId);
+
+        return item;
+    }
+
     async deleteBOMItem(id: string): Promise<void> {
         const item = await this.bomItemRepo.findOneOrFail({ id });
         const variantId = item.variantId;

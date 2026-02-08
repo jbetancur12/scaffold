@@ -35,6 +35,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     // BOM
     router.get('/variants/:variantId/bom', (req, res, next) => mrpController.getBOM(req, res, next));
     router.post('/bom-items', (req, res, next) => mrpController.addBOMItem(req, res, next));
+    router.put('/bom-items/:id', (req, res, next) => mrpController.updateBOMItem(req, res, next));
     router.delete('/bom-items/:id', (req, res, next) => mrpController.deleteBOMItem(req, res, next));
 
     // Production Orders

@@ -49,6 +49,41 @@ export default function ProductBOMPage() {
 
     const variants = product.variants || [];
 
+    const handleCopyBOM = async (targetVariantId: string, sourceVariantId: string) => {
+        if (!sourceVariantId) return;
+        if (!confirm('¿Estás seguro de copiar la lista de materiales? Esto agregará los materiales de la variante origen a la actual.')) return;
+
+        try {
+            setLoading(true);
+            const sourceBOM = await mrpApi.getBOM(sourceVariantId);
+
+            if (sourceBOM.length === 0) {
+                toast({ title: 'Aviso', description: 'La variante origen no tiene materiales.' });
+                setLoading(false);
+                return;
+            }
+
+            // Copy each item
+            const promises = sourceBOM.map(item => mrpApi.addBOMItem({
+                variantId: targetVariantId,
+                rawMaterialId: item.rawMaterialId,
+                quantity: item.quantity,
+                fabricationParams: item.fabricationParams || undefined
+            }));
+
+            await Promise.all(promises);
+            toast({ title: 'Éxito', description: 'Materiales copiados correctamente' });
+
+            // Trigger refresh by reloading data (though BOMEditor manages its own state, we might need a key change or context refresh)
+            // Ideally BOMEditor would expose a refresh, but simple reload works 
+            window.location.reload();
+        } catch (error) {
+            toast({ title: 'Error', description: 'No se pudieron copiar los materiales', variant: 'destructive' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
@@ -72,7 +107,7 @@ export default function ProductBOMPage() {
                     </div>
                 ) : (
                     <Tabs defaultValue={variants[0].id} className="w-full">
-                        <TabsList className="mb-4 flex flex-wrap h-auto">
+                        <TabsList className="mb-4 flex flex-wrap h-auto items-center gap-2">
                             {variants.map(variant => (
                                 <TabsTrigger key={variant.id} value={variant.id} className="min-w-[100px]">
                                     {variant.name}
@@ -81,6 +116,23 @@ export default function ProductBOMPage() {
                         </TabsList>
                         {variants.map(variant => (
                             <TabsContent key={variant.id} value={variant.id} className="space-y-4">
+                                <div className="flex justify-end mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-slate-500">Copiar desde:</span>
+                                        <select
+                                            className="h-9 rounded-md border border-slate-300 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                            onChange={(e) => {
+                                                if (e.target.value) handleCopyBOM(variant.id, e.target.value);
+                                                e.target.value = ''; // Reset
+                                            }}
+                                        >
+                                            <option value="">Seleccionar variante...</option>
+                                            {variants.filter(v => v.id !== variant.id).map(v => (
+                                                <option key={v.id} value={v.id}>{v.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
                                 <BOMEditor variant={variant} materials={rawMaterials} />
                             </TabsContent>
                         ))}

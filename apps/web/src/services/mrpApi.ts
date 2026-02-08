@@ -150,6 +150,10 @@ export const mrpApi = {
         const response = await api.post('/mrp/bom-items', data);
         return response.data;
     },
+    updateBOMItem: async (id: string, data: Partial<BOMItem>): Promise<BOMItem> => {
+        const response = await api.put(`/mrp/bom-items/${id}`, data);
+        return response.data;
+    },
     getBOM: async (variantId: string): Promise<BOMItem[]> => {
         const response = await api.get<BOMItem[]>(`/mrp/variants/${variantId}/bom`);
         return response.data;

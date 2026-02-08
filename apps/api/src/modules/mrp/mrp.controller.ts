@@ -235,6 +235,17 @@ export class MrpController {
         }
     }
 
+    async updateBOMItem(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const data = BOMItemSchema.partial().parse(req.body);
+            const bomItem = await this.mrpService.updateBOMItem(id, data);
+            res.json(bomItem);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async getBOM(req: Request, res: Response, next: NextFunction) {
         try {
             const { variantId } = req.params;
