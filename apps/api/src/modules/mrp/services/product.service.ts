@@ -29,7 +29,7 @@ export class ProductService {
     }
 
     async deleteProduct(id: string): Promise<void> {
-        const product = await this.productRepo.findOneOrFail({ id });
+        const product = await this.productRepo.findOneOrFail({ id }, { populate: ['variants', 'variants.bomItems'] });
         await this.em.removeAndFlush(product);
     }
 
@@ -48,7 +48,7 @@ export class ProductService {
     }
 
     async deleteVariant(variantId: string): Promise<void> {
-        const variant = await this.variantRepo.findOneOrFail({ id: variantId });
+        const variant = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['bomItems'] });
         await this.em.removeAndFlush(variant);
     }
 

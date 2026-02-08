@@ -1,4 +1,4 @@
-import { Entity, Property, ManyToOne, OneToMany, Collection } from '@mikro-orm/core';
+import { Entity, Property, ManyToOne, OneToMany, Collection, Cascade } from '@mikro-orm/core';
 import { BaseEntity } from '../../../shared/entities/base.entity';
 import { ProductVariant as IProductVariant } from '@scaffold/types';
 import { Product } from './product.entity';
@@ -38,6 +38,6 @@ export class ProductVariant extends BaseEntity implements IProductVariant {
     @Property({ fieldName: 'target_margin' })
     targetMargin: number = 0.4;
 
-    @OneToMany(() => BOMItem, bomItem => bomItem.variant)
+    @OneToMany(() => BOMItem, bomItem => bomItem.variant, { cascade: [Cascade.ALL], orphanRemoval: true })
     bomItems = new Collection<BOMItem>(this);
 }
