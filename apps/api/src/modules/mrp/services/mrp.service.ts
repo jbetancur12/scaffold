@@ -163,7 +163,7 @@ export class MrpService {
         let operationalCost = 0;
         if (variant.productionMinutes) {
             const configRepo = this.em.getRepository(OperationalConfig);
-            const config = await configRepo.findOne({}, { orderBy: { createdAt: 'DESC' } }); // Get latest
+            const [config] = await configRepo.find({}, { orderBy: { createdAt: 'DESC' }, limit: 1 }); // Get latest
             if (config) {
                 operationalCost = variant.productionMinutes * config.costPerMinute;
             }
