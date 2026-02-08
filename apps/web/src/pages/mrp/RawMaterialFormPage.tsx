@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw, Calculator } from 'lucide-react';
 import { z } from 'zod';
 import { generateRawMaterialSku } from '@/utils/skuGenerator';
 import {
@@ -79,6 +79,7 @@ export default function RawMaterialFormPage() {
             loadMaterial();
         } else {
             // Check for initial data from navigation state (Duplicate)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const state = (location as any).state as { initialData?: any };
             if (state?.initialData) {
                 setFormData({
@@ -92,7 +93,7 @@ export default function RawMaterialFormPage() {
                 }
             }
         }
-    }, [isEditing, loadMaterial, location.state]);
+    }, [isEditing, loadMaterial, location]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -212,19 +213,67 @@ export default function RawMaterialFormPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="cost">Costo Estándar</Label>
-                            <Input
-                                id="cost"
-                                type="number"
-                                step="0.01"
-                                value={formData.cost}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, cost: Number(e.target.value) })}
-                                required
-                            />
-                            <p className="text-xs text-slate-500">
-                                Costo promedio inicial. Se actualizará con las compras.
-                            </p>
+
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="cost">Costo Estándar (Por Unidad)</Label>
+                                <Input
+                                    id="cost"
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.cost}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, cost: Number(e.target.value) })}
+                                    required
+                                />
+                                <p className="text-xs text-slate-500">
+                                    Costo promedio inicial. Se actualizará con las compras.
+                                </p>
+                            </div>
+
+                            {/* Calculator Helper */}
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <Calculator className="h-4 w-4" />
+                                    Calculadora de Costo Unitario
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <Label htmlFor="calc-price" className="text-xs text-slate-500">Precio Total Compra</Label>
+                                        <Input
+                                            id="calc-price"
+                                            type="number"
+                                            placeholder="ej. 40000"
+                                            className="h-8 text-sm"
+                                            onChange={(e) => {
+                                                const price = Number(e.target.value);
+                                                const qty = Number((document.getElementById('calc-qty') as HTMLInputElement)?.value || 0);
+                                                if (price > 0 && qty > 0) {
+                                                    setFormData(prev => ({ ...prev, cost: Number((price / qty).toFixed(2)) }));
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="calc-qty" className="text-xs text-slate-500">Cantidad Total ({formData.unit})</Label>
+                                        <Input
+                                            id="calc-qty"
+                                            type="number"
+                                            placeholder="ej. 30"
+                                            className="h-8 text-sm"
+                                            onChange={(e) => {
+                                                const qty = Number(e.target.value);
+                                                const price = Number((document.getElementById('calc-price') as HTMLInputElement)?.value || 0);
+                                                if (price > 0 && qty > 0) {
+                                                    setFormData(prev => ({ ...prev, cost: Number((price / qty).toFixed(2)) }));
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-400">
+                                    Ingresa el precio total y la cantidad comprada para calcular automáticamente el costo unitario.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -246,7 +295,7 @@ export default function RawMaterialFormPage() {
                         )}
                     </Button>
                 </div>
-            </form>
-        </div>
+            </form >
+        </div >
     );
 }

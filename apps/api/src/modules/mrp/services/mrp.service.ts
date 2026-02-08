@@ -1,4 +1,4 @@
-import { EntityManager, EntityRepository } from '@mikro-orm/core';
+import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { BOMItem } from '../entities/bom-item.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
@@ -60,7 +60,7 @@ export class MrpService {
     }
 
     async listRawMaterials(page = 1, limit = 10, search?: string): Promise<{ materials: RawMaterial[]; total: number }> {
-        const filters: any = {};
+        const filters: FilterQuery<RawMaterial> = {};
         if (search) {
             filters.$or = [
                 { name: { $ilike: `%${search}%` } },
