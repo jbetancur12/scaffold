@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { MikroORM } from '@mikro-orm/core';
 import { MrpController } from './mrp.controller';
+import { OperationalConfigService } from './services/operational-config.service';
+import { OperationalConfigController } from './operational-config.controller';
 
 export const createMrpRoutes = (orm: MikroORM) => {
     const router = Router();
@@ -57,6 +59,13 @@ export const createMrpRoutes = (orm: MikroORM) => {
     // Inventory
     router.get('/inventory', (req, res, next) => mrpController.getInventory(req, res, next));
     router.post('/inventory/manual-add', (req, res, next) => mrpController.addManualStock(req, res, next));
+
+    // Operational Config
+    const configService = new OperationalConfigService(orm.em);
+    const configController = new OperationalConfigController(configService);
+
+    router.get('/operational-config', (req, res, next) => configController.getConfig(req, res, next));
+    router.put('/operational-config', (req, res, next) => configController.updateConfig(req, res, next));
 
     return router;
 };

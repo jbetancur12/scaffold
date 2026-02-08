@@ -14,7 +14,8 @@ import {
     Package,
     ShoppingCart,
     Factory,
-    Warehouse
+    Warehouse,
+    Settings
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
@@ -62,6 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: ShoppingCart, label: 'Órdenes de Compra', path: '/dashboard/mrp/purchase-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Factory, label: 'Órdenes de Producción', path: '/dashboard/mrp/production-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Inventario', path: '/dashboard/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Settings, label: 'Configuración Operativa', path: '/dashboard/mrp/operational-settings', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
     ];
 
     const filteredItems = menuItems.filter(item =>

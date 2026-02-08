@@ -5,7 +5,8 @@ import {
     RawMaterial,
     BOMItem,
     ProductionOrder,
-    InventoryItem
+    InventoryItem,
+    OperationalConfig
 } from '@scaffold/types';
 
 export interface MaterialRequirement {
@@ -63,11 +64,11 @@ export const mrpApi = {
     },
 
     // Variants
-    createVariant: async (productId: string, data: Partial<{ name: string; sku: string; price: number; targetMargin: number }>): Promise<unknown> => {
+    createVariant: async (productId: string, data: Partial<{ name: string; sku: string; price: number; targetMargin: number; productionMinutes: number }>): Promise<unknown> => {
         const response = await api.post(`/mrp/products/${productId}/variants`, data);
         return response.data;
     },
-    updateVariant: async (variantId: string, data: Partial<{ name: string; sku: string; price: number; targetMargin: number }>): Promise<unknown> => {
+    updateVariant: async (variantId: string, data: Partial<{ name: string; sku: string; price: number; targetMargin: number; productionMinutes: number }>): Promise<unknown> => {
         const response = await api.put(`/mrp/variants/${variantId}`, data);
         return response.data;
     },
@@ -191,6 +192,16 @@ export const mrpApi = {
     },
     addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number }) => {
         const response = await api.post('/mrp/inventory/manual-add', data);
+        return response.data;
+    },
+
+    // Operational Config
+    getOperationalConfig: async (): Promise<OperationalConfig> => {
+        const response = await api.get<OperationalConfig>('/mrp/operational-config');
+        return response.data;
+    },
+    updateOperationalConfig: async (data: Partial<OperationalConfig>): Promise<OperationalConfig> => {
+        const response = await api.put('/mrp/operational-config', data);
         return response.data;
     },
 };

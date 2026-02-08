@@ -35,8 +35,12 @@ export class ProductVariant extends BaseEntity implements IProductVariant {
     @Property()
     indirectCost: number = 0;
 
-    @Property({ fieldName: 'target_margin' })
+    @Property({ fieldName: 'target_margin', type: 'decimal', precision: 10, scale: 2 })
     targetMargin: number = 0.4;
+
+    @Property({ nullable: true, type: 'decimal', precision: 10, scale: 2 })
+    productionMinutes?: number;
+
 
     @OneToMany(() => BOMItem, bomItem => bomItem.variant, { cascade: [Cascade.ALL], orphanRemoval: true })
     bomItems = new Collection<BOMItem>(this);

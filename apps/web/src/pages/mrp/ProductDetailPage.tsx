@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw, Package, Layers } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw, Package, Layers, Clock } from 'lucide-react';
 import { z } from 'zod';
 import {
     Table,
@@ -32,6 +32,7 @@ const variantSchema = z.object({
     sku: z.string().min(1, 'El SKU es requerido'),
     price: z.number().min(0, 'El precio debe ser mayor o igual a 0'),
     targetMargin: z.number().min(0).max(1, 'El margen debe estar entre 0 y 100%'),
+    productionMinutes: z.number().min(0, 'El tiempo debe ser mayor o igual a 0').optional(),
 });
 
 interface VariantFormData {
@@ -40,6 +41,7 @@ interface VariantFormData {
     sku: string;
     price: number;
     targetMargin: number;
+    productionMinutes?: number;
     cost?: number;
 }
 
@@ -95,7 +97,7 @@ export default function ProductDetailPage() {
 
     const handleAddVariant = () => {
         setEditingVariant(null);
-        setVariantFormData({ name: '', sku: '', price: 0, targetMargin: 0.4 });
+        setVariantFormData({ name: '', sku: '', price: 0, targetMargin: 0.4, productionMinutes: 0 });
         setShowVariantDialog(true);
     };
 
@@ -103,8 +105,11 @@ export default function ProductDetailPage() {
     const handleEditVariant = (variant: any) => {
         setEditingVariant(variant);
         setVariantFormData({
-            ...variant,
-            targetMargin: variant.targetMargin ?? 0.4
+            name: variant.name,
+            sku: variant.sku,
+            price: variant.price,
+            targetMargin: variant.targetMargin ?? 0.4,
+            productionMinutes: variant.productionMinutes ?? 0
         });
         setShowVariantDialog(true);
     };
@@ -441,6 +446,25 @@ export default function ProductDetailPage() {
                                     placeholder="40"
                                 />
                             </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="variant-minutes">Tiempo de Producción (Minutos)</Label>
+                            <div className="relative">
+                                <Clock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="variant-minutes"
+                                    type="number"
+                                    min="0"
+                                    className="pl-8"
+                                    value={variantFormData.productionMinutes || ''}
+                                    onChange={(e) => setVariantFormData({ ...variantFormData, productionMinutes: parseFloat(e.target.value) || 0 })}
+                                    placeholder="0"
+                                />
+                            </div>
+                            <p className="text-xs text-slate-500">
+                                Se usará para calcular el costo operativo basado en la configuración global.
+                            </p>
                         </div>
 
                         {/* Assistant Logic */}

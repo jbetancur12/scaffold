@@ -22,6 +22,7 @@ import PurchaseOrderListPage from '@/pages/mrp/PurchaseOrderListPage';
 import PurchaseOrderFormPage from '@/pages/mrp/PurchaseOrderFormPage';
 import PurchaseOrderDetailPage from '@/pages/mrp/PurchaseOrderDetailPage';
 import ProductionOrderDetailPage from '@/pages/mrp/ProductionOrderDetailPage';
+import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, isLoading } = useAuth();
@@ -111,6 +112,8 @@ export default function App() {
                         <Route path="/dashboard/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
                         <Route path="/dashboard/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />
                         <Route path="/dashboard/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+
+                        <Route path="/dashboard/mrp/operational-settings" element={<OperationalSettingsPage />} />
 
                         <Route path="/dashboard/mrp/inventory" element={<InventoryDashboardPage />} />
                     </Route>

@@ -3,6 +3,7 @@ import { RawMaterial } from '../entities/raw-material.entity';
 import { BOMItem } from '../entities/bom-item.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
+import { OperationalConfig } from '../entities/operational-config.entity';
 import { RawMaterialSchema, BOMItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 
@@ -155,11 +156,21 @@ export class MrpService {
             referenceMaterialCost += item.quantity * referenceUnitCost;
         }
 
-        const labor = variant.laborCost || 0;
-        const indirect = variant.indirectCost || 0;
+        const labor = variant.laborCost || 0; // Manual override if needed
+        const indirect = variant.indirectCost || 0; // Manual override if needed
 
-        variant.cost = actualMaterialCost + labor + indirect;
-        variant.referenceCost = referenceMaterialCost + labor + indirect;
+        // Calculate Operational Cost based on time
+        let operationalCost = 0;
+        if (variant.productionMinutes) {
+            const configRepo = this.em.getRepository(OperationalConfig);
+            const config = await configRepo.findOne({}, { orderBy: { createdAt: 'DESC' } }); // Get latest
+            if (config) {
+                operationalCost = variant.productionMinutes * config.costPerMinute;
+            }
+        }
+
+        variant.cost = actualMaterialCost + labor + indirect + operationalCost;
+        variant.referenceCost = referenceMaterialCost + labor + indirect + operationalCost;
 
         await this.em.persistAndFlush(variant);
     }

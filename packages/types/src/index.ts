@@ -110,6 +110,7 @@ export interface ProductVariant {
     laborCost: number;
     indirectCost: number;
     targetMargin: number;
+    productionMinutes?: number;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -171,6 +172,28 @@ export interface ProductionOrderItem {
     productionOrderId: string;
     variantId: string;
     quantity: number;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface OperationalConfig {
+    id: string;
+    // MOD (Mano de Obra Directa)
+    operatorSalary: number; // Salario base del operario
+    operatorLoadFactor: number; // Factor prestacional (e.g., 1.38 para 38%)
+    operatorRealMonthlyMinutes: number; // Minutos productivos reales al mes
+    // CIF (Costos Indirectos de Fabricación)
+    rent: number;
+    utilities: number;
+    adminSalaries: number;
+    otherExpenses: number;
+
+    numberOfOperators: number; // Número de Operarios
+
+    // Computed Values
+    modCostPerMinute: number; // (Salary * Load) / RealMinutes
+    cifCostPerMinute: number; // (Rent + Utils + Admin + Other) / (RealMinutes * Ops)
+    costPerMinute: number; // MO Cost + CIF Cost
     createdAt: string | Date;
     updatedAt: string | Date;
 }

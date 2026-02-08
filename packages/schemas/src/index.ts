@@ -72,6 +72,7 @@ export const ProductVariantSchema = z.object({
     laborCost: z.number().min(0),
     indirectCost: z.number().min(0),
     targetMargin: z.number().min(0).max(1).default(0.4),
+    productionMinutes: z.number().min(0).optional(),
 });
 
 export const BOMItemSchema = z.object({
@@ -117,3 +118,19 @@ export const ProductionOrderItemSchema = z.object({
     variantId: z.string().uuid(),
     quantity: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
 });
+
+export const OperationalConfigSchema = z.object({
+    // MOD
+    operatorSalary: z.number().min(0, 'Salario debe ser mayor o igual a 0'),
+    operatorLoadFactor: z.number().min(1, 'El factor prestacional debe incluir el salario (min 1.0)'),
+    operatorRealMonthlyMinutes: z.number().min(1, 'Minutos reales deben ser mayor a 0'),
+
+    // CIF
+    rent: z.number().min(0, 'El arriendo debe ser mayor o igual a 0'),
+    utilities: z.number().min(0, 'Servicios deben ser mayor o igual a 0'),
+    adminSalaries: z.number().min(0, 'Nómina administrativa debe ser mayor o igual a 0'),
+    otherExpenses: z.number().min(0, 'Otros gastos deben ser mayor o igual a 0'),
+
+    numberOfOperators: z.number().min(1, 'Debe haber al menos 1 operario'),
+});
+
