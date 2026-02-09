@@ -36,7 +36,7 @@ const config: Options = {
 
     // Use ReflectMetadataProvider in production to avoid reliance on source files
     metadataProvider: isProduction ? ReflectMetadataProvider : TsMorphMetadataProvider,
-    debug: !isProduction,
+    debug: true,
 
     migrations: {
         path: path.join(baseDir, 'migrations'),
