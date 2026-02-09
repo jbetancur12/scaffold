@@ -23,12 +23,9 @@ console.error(`[MikroORM Config] CWD: ${process.cwd()}`);
 const relativeBaseDir = path.relative(process.cwd(), baseDir);
 const entitiesPathJS = path.join(baseDir, '**/*.entity.js');
 const entitiesPathTS = path.join(baseDir, '**/*.entity.ts');
-const relativeEntitiesPathJS = path.join(relativeBaseDir, '**/*.entity.js');
-const relativeEntitiesPathTS = path.join(relativeBaseDir, '**/*.entity.ts');
 
 console.error(`[MikroORM Config] Relative BaseDir: ${relativeBaseDir}`);
 console.error(`[MikroORM Config] Entities Path JS (Absolute): ${entitiesPathJS}`);
-console.error(`[MikroORM Config] Entities Path JS (Relative): ${relativeEntitiesPathJS}`);
 
 // Check if a known entity file exists to verify baseDir is correct
 const sampleEntity = path.join(baseDir, 'modules/user/user.entity.js');
