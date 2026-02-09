@@ -34,6 +34,9 @@ FROM nginx:alpine
 # Copy built assets
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
+# Copy Nginx config
+COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+
 # Expose port 80
 EXPOSE 80
 
