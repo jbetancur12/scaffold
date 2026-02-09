@@ -65,10 +65,16 @@ const main = async () => {
         });
 
         // Routes
-        app.use('/auth', createAuthRoutes(orm));
-        app.use('/health', createHealthRoutes(orm));
-        app.use('/users', createUserRoutes(orm));
-        app.use('/mrp', createMrpRoutes(orm));
+        // Create a main router
+        const apiRouter = express.Router();
+        apiRouter.use('/auth', createAuthRoutes(orm));
+        apiRouter.use('/health', createHealthRoutes(orm));
+        apiRouter.use('/users', createUserRoutes(orm));
+        apiRouter.use('/mrp', createMrpRoutes(orm));
+
+        // Mount router at root AND /api to handle both cases (Nginx stripping or not)
+        app.use('/', apiRouter);
+        app.use('/api', apiRouter);
 
         app.get('/', (_req, res) => {
             res.json({ message: 'API is running' });
