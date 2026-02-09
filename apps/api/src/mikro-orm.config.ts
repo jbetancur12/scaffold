@@ -40,13 +40,8 @@ const config: Options = {
     clientUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5433/scaffold_db',
 
     // Use both absolute and relative paths to cover all execution contexts (root vs workspace)
-    entities: [
-        entitiesPathJS,
-        entitiesPathTS,
-        relativeEntitiesPathJS,
-        relativeEntitiesPathTS
-    ],
-    entitiesTs: [entitiesPathTS, relativeEntitiesPathTS],
+    entities: [entitiesPathJS, entitiesPathTS],
+    entitiesTs: [entitiesPathTS],
 
     // Use ReflectMetadataProvider in production to avoid reliance on source files
     metadataProvider: isProduction ? ReflectMetadataProvider : TsMorphMetadataProvider,
