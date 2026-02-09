@@ -4,7 +4,6 @@ import { ReflectMetadataProvider } from '@mikro-orm/core';
 import 'reflect-metadata';
 import 'dotenv/config';
 import path from 'path';
-import fs from 'fs';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -15,15 +14,6 @@ const baseDir = __dirname;
 
 const entitiesPathJS = path.join(baseDir, '**/*.entity.js');
 const entitiesPathTS = path.join(baseDir, '**/*.entity.ts');
-
-console.log(`[MikroORM Config] Environment: ${process.env.NODE_ENV}`);
-console.log(`[MikroORM Config] BaseDir: ${baseDir}`);
-console.log(`[MikroORM Config] Entities Path JS: ${entitiesPathJS}`);
-console.log(`[MikroORM Config] Entities Path TS: ${entitiesPathTS}`);
-
-// Check if a known entity file exists to verify baseDir is correct
-const sampleEntity = path.join(baseDir, 'modules/user/user.entity.js');
-console.log(`[MikroORM Config] Checking for sample entity at ${sampleEntity}: ${fs.existsSync(sampleEntity) ? 'FOUND' : 'NOT FOUND'}`);
 
 const config: Options = {
     driver: PostgreSqlDriver,
@@ -36,7 +26,7 @@ const config: Options = {
 
     // Use ReflectMetadataProvider in production to avoid reliance on source files
     metadataProvider: isProduction ? ReflectMetadataProvider : TsMorphMetadataProvider,
-    debug: true,
+    debug: !isProduction,
 
     migrations: {
         path: path.join(baseDir, 'migrations'),
