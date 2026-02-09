@@ -1,8 +1,10 @@
 import { Options, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { ReflectMetadataProvider } from '@mikro-orm/core';
+import 'reflect-metadata';
 import 'dotenv/config';
 import path from 'path';
+import fs from 'fs';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -11,17 +13,26 @@ const isProduction = process.env.NODE_ENV === 'production';
 // In local dev: /path/to/project/apps/api/src
 const baseDir = __dirname;
 
+const entitiesPathJS = path.join(baseDir, '**/*.entity.js');
+const entitiesPathTS = path.join(baseDir, '**/*.entity.ts');
+
+console.log(`[MikroORM Config] Environment: ${process.env.NODE_ENV}`);
+console.log(`[MikroORM Config] BaseDir: ${baseDir}`);
+console.log(`[MikroORM Config] Entities Path JS: ${entitiesPathJS}`);
+console.log(`[MikroORM Config] Entities Path TS: ${entitiesPathTS}`);
+
+// Check if a known entity file exists to verify baseDir is correct
+const sampleEntity = path.join(baseDir, 'modules/user/user.entity.js');
+console.log(`[MikroORM Config] Checking for sample entity at ${sampleEntity}: ${fs.existsSync(sampleEntity) ? 'FOUND' : 'NOT FOUND'}`);
+
 const config: Options = {
     driver: PostgreSqlDriver,
     // Use DATABASE_URL from environment or fallback to local dev defaults
     clientUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5433/scaffold_db',
 
     // Relative to this config file's location
-    entities: [
-        path.join(baseDir, '**/*.entity.js'),
-        path.join(baseDir, '**/*.entity.ts')
-    ],
-    entitiesTs: [path.join(baseDir, '**/*.entity.ts')],
+    entities: [entitiesPathJS, entitiesPathTS],
+    entitiesTs: [entitiesPathTS],
 
     // Use ReflectMetadataProvider in production to avoid reliance on source files
     metadataProvider: isProduction ? ReflectMetadataProvider : TsMorphMetadataProvider,
