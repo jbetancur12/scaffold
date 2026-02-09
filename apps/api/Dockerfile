@@ -37,6 +37,7 @@ COPY --from=builder /app/package-lock.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/apps/api/package.json ./apps/api/
+COPY --from=builder /app/apps/api/tsconfig.json ./apps/api/
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 
 # Set working directory to api for execution context if needed, or run from root
