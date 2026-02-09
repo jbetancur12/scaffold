@@ -1,5 +1,6 @@
 import { Options, PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
+import { ReflectMetadataProvider } from '@mikro-orm/core';
 import 'dotenv/config';
 import path from 'path';
 
@@ -22,7 +23,8 @@ const config: Options = {
     ],
     entitiesTs: [path.join(baseDir, '**/*.entity.ts')],
 
-    metadataProvider: TsMorphMetadataProvider,
+    // Use ReflectMetadataProvider in production to avoid reliance on source files
+    metadataProvider: isProduction ? ReflectMetadataProvider : TsMorphMetadataProvider,
     debug: !isProduction,
 
     migrations: {
