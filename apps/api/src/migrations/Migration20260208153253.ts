@@ -3,16 +3,32 @@ import { Migration } from '@mikro-orm/migrations';
 export class Migration20260208153253 extends Migration {
 
   override async up(): Promise<void> {
-    this.addSql('delete from "operational_config";');
-    this.addSql(`alter table "operational_config" drop column "monthly_expenses", drop column "working_days_per_month", drop column "working_hours_per_day";`);
+    // Previous migration (20260208151417) failed to create the table because the SQL was commented out.
+    // This migration enforces the correct state by dropping (if exists) and creating the final table schema.
+    this.addSql('DROP TABLE IF EXISTS "operational_config";');
 
-    this.addSql(`alter table "operational_config" add column "operator_salary" int not null, add column "operator_load_factor" numeric(10,2) not null, add column "operator_real_monthly_minutes" int not null, add column "rent" int not null, add column "utilities" int not null, add column "admin_salaries" int not null, add column "other_expenses" int not null, add column "mod_cost_per_minute" int not null, add column "cif_cost_per_minute" int not null;`);
+    this.addSql(`create table "operational_config" (
+      "id" uuid not null,
+      "created_at" timestamptz not null,
+      "updated_at" timestamptz not null,
+      "deleted_at" timestamptz null,
+      "operator_salary" int not null,
+      "operator_load_factor" numeric(10,2) not null,
+      "operator_real_monthly_minutes" int not null,
+      "rent" int not null,
+      "utilities" int not null,
+      "admin_salaries" int not null,
+      "other_expenses" int not null,
+      "number_of_operators" int not null,
+      "mod_cost_per_minute" int not null,
+      "cif_cost_per_minute" int not null,
+      "cost_per_minute" int not null,
+      constraint "operational_config_pkey" primary key ("id")
+    );`);
   }
 
   override async down(): Promise<void> {
-    this.addSql(`alter table "operational_config" drop column "operator_salary", drop column "operator_load_factor", drop column "operator_real_monthly_minutes", drop column "rent", drop column "utilities", drop column "admin_salaries", drop column "other_expenses", drop column "mod_cost_per_minute", drop column "cif_cost_per_minute";`);
-
-    this.addSql(`alter table "operational_config" add column "monthly_expenses" int not null, add column "working_days_per_month" int not null, add column "working_hours_per_day" int not null;`);
+    this.addSql('drop table if exists "operational_config";');
   }
 
 }
