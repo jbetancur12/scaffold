@@ -15,6 +15,11 @@ const baseDir = __dirname;
 const entitiesPathJS = path.join(baseDir, '**/*.entity.js');
 const entitiesPathTS = path.join(baseDir, '**/*.entity.ts');
 
+console.error(`[MikroORM Config] Environment: ${process.env.NODE_ENV}`);
+console.error(`[MikroORM Config] BaseDir: ${baseDir}`);
+console.error(`[MikroORM Config] Entities Path JS: ${entitiesPathJS}`);
+console.error(`[MikroORM Config] CWD: ${process.cwd()}`);
+
 const config: Options = {
     driver: PostgreSqlDriver,
     // Use DATABASE_URL from environment or fallback to local dev defaults
@@ -26,7 +31,7 @@ const config: Options = {
 
     // Use ReflectMetadataProvider in production to avoid reliance on source files
     metadataProvider: isProduction ? ReflectMetadataProvider : TsMorphMetadataProvider,
-    debug: !isProduction,
+    debug: true,
 
     migrations: {
         path: path.join(baseDir, 'migrations'),
