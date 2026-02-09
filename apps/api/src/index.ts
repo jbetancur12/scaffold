@@ -20,8 +20,11 @@ const app = express();
 const PORT = env.PORT;
 
 app.use(helmet());
+const corsOrigin = process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000';
+console.log(`🔒 Configured CORS Origin: ${corsOrigin}`);
+
 app.use(cors({
-    origin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: corsOrigin,
     credentials: true,
 }));
 app.use(express.json());
