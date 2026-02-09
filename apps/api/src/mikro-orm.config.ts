@@ -4,6 +4,7 @@ import { ReflectMetadataProvider } from '@mikro-orm/core';
 import 'reflect-metadata';
 import 'dotenv/config';
 import path from 'path';
+import fs from 'fs';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
