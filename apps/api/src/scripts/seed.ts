@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { MikroORM } from '@mikro-orm/core';
 import * as argon2 from 'argon2';
-import config from '../../mikro-orm.config';
+import config from '../mikro-orm.config';
 import { User } from '../modules/user/user.entity';
 import { UserRole } from '@scaffold/types';
 import { winstonLogger } from '../config/logger';
