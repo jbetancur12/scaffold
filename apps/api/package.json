@@ -11,7 +11,7 @@
         "ts-check": "tsc --noEmit",
         "migration:create": "mikro-orm migration:create",
         "migration:up": "mikro-orm migration:up",
-        "migration:prod": "cross-env MIKRO_ORM_USE_TS_NODE=false mikro-orm migration:up",
+        "migration:prod": "MIKRO_ORM_USE_TS_NODE=false mikro-orm migration:up",
         "migration:down": "mikro-orm migration:down",
         "schema:update": "mikro-orm schema:update --run",
         "schema:drop": "mikro-orm schema:drop --run",
