@@ -39,6 +39,7 @@ export default function RawMaterialFormPage() {
         sku: '',
         unit: UnitType.UNIT,
         cost: 0,
+        minStockLevel: 0,
     });
 
     const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
@@ -61,6 +62,7 @@ export default function RawMaterialFormPage() {
                 sku: material.sku,
                 unit: material.unit as UnitType,
                 cost: material.cost,
+                minStockLevel: material.minStockLevel || 0,
             });
         } catch (error) {
             toast({
@@ -87,6 +89,7 @@ export default function RawMaterialFormPage() {
                     sku: state.initialData.sku || '',
                     unit: state.initialData.unit as UnitType,
                     cost: state.initialData.cost,
+                    minStockLevel: state.initialData.minStockLevel || 0,
                 });
                 if (state.initialData.sku) {
                     setSkuManuallyEdited(true); // Treat as manually edited if we passed a SKU (though list page clears it usually)
@@ -104,7 +107,8 @@ export default function RawMaterialFormPage() {
             if (isEditing) {
                 await mrpApi.updateRawMaterial(id!, {
                     ...formData,
-                    cost: Number(formData.cost)
+                    cost: Number(formData.cost),
+                    minStockLevel: Number(formData.minStockLevel || 0)
                 });
                 toast({
                     title: 'Éxito',
@@ -113,7 +117,8 @@ export default function RawMaterialFormPage() {
             } else {
                 await mrpApi.createRawMaterial({
                     ...formData,
-                    cost: Number(formData.cost)
+                    cost: Number(formData.cost),
+                    minStockLevel: Number(formData.minStockLevel || 0)
                 });
                 toast({
                     title: 'Éxito',
@@ -227,6 +232,21 @@ export default function RawMaterialFormPage() {
                                 />
                                 <p className="text-xs text-slate-500">
                                     Costo promedio inicial. Se actualizará con las compras.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="minStockLevel">Stock Mínimo</Label>
+                                <Input
+                                    id="minStockLevel"
+                                    type="number"
+                                    min="0"
+                                    value={formData.minStockLevel}
+                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, minStockLevel: Number(e.target.value) })}
+                                    placeholder="0"
+                                />
+                                <p className="text-xs text-slate-500">
+                                    Nivel de alerta para reabastecimiento.
                                 </p>
                             </div>
 

@@ -959,7 +959,8 @@
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
-          "nullable": true,
+          "nullable": false,
+          "default": "0",
           "mappedType": "integer"
         },
         "supplier_id": {

@@ -26,8 +26,8 @@ export class RawMaterial extends BaseEntity implements IRawMaterial {
     @Property({ nullable: true })
     lastPurchaseDate?: Date;
 
-    @Property()
-    minStockLevel?: number;
+    @Property({ default: 0 })
+    minStockLevel: number = 0;
 
     @ManyToOne(() => Supplier, { nullable: true })
     supplier?: Supplier;
