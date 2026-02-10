@@ -1,15 +1,21 @@
 {
     "extends": "../config/tsconfig.base.json",
     "compilerOptions": {
-        "outDir": "./dist",
-        "rootDir": "./src",
+        "outDir": "dist",
+        "rootDir": "src",
         "noEmit": false,
         "declaration": true,
         "allowImportingTsExtensions": false,
-        "module": "CommonJS",
-        "moduleResolution": "node"
+        "module": "ESNext", // ← Cambiar de CommonJS
+        "moduleResolution": "bundler", // ← Cambiar de node
+        "baseUrl": ".",
+        "paths": {
+            "@scaffold/schemas": [
+                "./src/index.ts"
+            ]
+        }
     },
     "include": [
-        "src/**/*.ts"
+        "src"
     ]
 }

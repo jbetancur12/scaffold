@@ -10,13 +10,18 @@ import { z } from 'zod';
 
 const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-    PORT: z.string().transform(Number).default('5000'),
+    PORT: z.preprocess(
+        () => process.env.API_PORT || process.env.PORT || '5050',
+        z.string().transform(Number)
+    ),
     DATABASE_URL: z.string().url(),
     REDIS_URL: z.string().url(),
     JWT_SECRET: z.string().min(32),
     JWT_ACCESS_EXPIRATION: z.string().default('15m'),
     JWT_REFRESH_EXPIRATION: z.string().default('7d'),
     FRONTEND_URL: z.string().url().default('http://localhost:3000'),
+    CORS_ORIGIN: z.string().optional(),
+
 });
 
 const validateEnv = () => {

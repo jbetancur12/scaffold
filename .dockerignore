@@ -1,0 +1,80 @@
+# .dockerignore
+
+# Node modules (se instalarán en el build)
+node_modules
+**/node_modules
+
+# Build outputs (se generarán en el build)
+dist
+**/dist
+build
+**/build
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Testing
+coverage
+.nyc_output
+*.test.ts
+*.spec.ts
+**/__tests__
+**/__mocks__
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# CI/CD (si aplica)
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Temp files
+*.tmp
+.cache
+.parcel-cache
+.next
+.nuxt
+
+# Package manager
+.npm
+.yarn
+.pnpm-store
+
+# Specific to your monorepo
+# Si tienes apps/web y NO la necesitas para el build de API:
+# apps/web/src
+# apps/web/public
