@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Stop script on error
 set -e
 
 echo "🚀 Starting Deployment Process..."
@@ -10,21 +9,20 @@ if [ -f .env.production ]; then
   echo "📄 Loading .env.production..."
   export $(grep -v '^#' .env.production | xargs)
 else
-  echo "⚠️  Warning: .env.production file not found. Ensuring vars are set in environment."
+  echo "⚠️  .env.production not found. Make sure env vars are set."
 fi
 
-# Pull latest code
 echo "⬇️  Pulling latest code..."
 git pull origin main
 
-# Build and start containers
-echo "Building and starting containers..."
+echo "🛑 Stopping old containers..."
+docker compose -f docker-compose.prod.yml down
+
+echo "🏗️  Building and starting containers..."
 docker compose -f docker-compose.prod.yml up -d --build
 
-# Run migrations
-echo "🐘 Running Database Migrations..."
-docker compose -f docker-compose.prod.yml exec api npm run migration:prod --workspace=api
+echo "⏳ Waiting for containers to be healthy..."
+sleep 10
 
-# Check status
-echo "✅ Deployment Complete! Status:"
+echo "✅ Deployment Complete! Current status:"
 docker compose -f docker-compose.prod.yml ps
