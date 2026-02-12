@@ -12,7 +12,7 @@ import { z } from 'zod';
 
 const CreatePurchaseOrderSchema = z.object({
     supplierId: z.string().uuid(),
-    expectedDeliveryDate: z.coerce.date().optional(),
+    expectedDeliveryDate: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
     notes: z.string().optional(),
     warehouseId: z.string().uuid().optional(),
     items: z.array(z.object({

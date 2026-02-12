@@ -120,10 +120,12 @@ export default function PurchaseOrderFormPage() {
 
         try {
             setLoading(true);
-            await mrpApi.createPurchaseOrder({
+            const submitData = {
                 ...formData,
+                expectedDeliveryDate: formData.expectedDeliveryDate || undefined,
                 items,
-            });
+            };
+            await mrpApi.createPurchaseOrder(submitData);
             toast({
                 title: 'Éxito',
                 description: 'Orden de compra creada exitosamente',
