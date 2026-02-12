@@ -21,10 +21,14 @@ const PORT = env.PORT;
 
 app.use(helmet());
 const corsOrigin = env.CORS_ORIGIN || env.FRONTEND_URL || 'http://localhost:3000';
-console.log(`🔒 Configured CORS Origin: ${corsOrigin}`);
+const origins = corsOrigin.includes(',')
+    ? corsOrigin.split(',').map(o => o.trim())
+    : corsOrigin;
+
+console.log(`🔒 Configured CORS Origins:`, origins);
 
 app.use(cors({
-    origin: corsOrigin,
+    origin: origins,
     credentials: true,
 }));
 app.use(express.json());

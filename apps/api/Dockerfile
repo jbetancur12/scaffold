@@ -67,6 +67,9 @@ RUN echo "=== Final dist structure ===" && \
     echo "=== Modules check ===" && \
     ls -la ./apps/api/dist/apps/api/src/modules/ || true
 
+RUN echo "=== BUSCANDO SCRIPT DE MIGRACION ===" && \
+    find ./apps/api/dist -name "run-migration.js"
+
 # Set environment
 ENV NODE_ENV=production
 
