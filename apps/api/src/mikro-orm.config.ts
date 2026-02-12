@@ -25,7 +25,7 @@ let migrationsPath: string;
 
 if (isProduction) {
     entitiesPath = [join(baseDir, 'modules/**/*.entity.js')];
-    migrationsPath = join(baseDir, '../migrations');
+    migrationsPath = join(baseDir, 'migrations');
 
     console.error(`[MikroORM Config] Production entities path: ${entitiesPath[0]}`);
     console.error(`[MikroORM Config] Production migrations path: ${migrationsPath}`);
@@ -72,12 +72,12 @@ const mikroOrmConfig: Options = {
     debug: process.env.MIKRO_ORM_DEBUG === 'true' || !isProduction,
     migrations: {
         path: migrationsPath,
-        pathTs: migrationsPath,
-        glob: '!(*.d).{js,ts}',
+        pathTs: isProduction ? undefined : migrationsPath,
+        glob: isProduction ? '!(*.d).js' : '!(*.d).{js,ts}',
         transactional: true,
-        disableForeignKeys: false,
+        // disableForeignKeys: false,
         allOrNothing: true,
-        emit: 'ts',
+        // emit: 'ts',
     },
     pool: {
         min: 2,
