@@ -42,18 +42,22 @@ RUN echo "=== Checking web dist ===" && \
 # Production stage - pure static file serving
 FROM nginx:alpine
 
+COPY apps/web/nginx.conf /etc/nginx/nginx.conf
+
 # ⭐ Copiar archivos estáticos
 COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
 
 # ⭐ Copiar configuración de Nginx
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
+#COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 
 # ⭐ Verificar que los archivos se copiaron
 RUN echo "=== Nginx html directory ===" && \
     ls -la /usr/share/nginx/html/
 
 # ⭐ Crear usuario nginx si no existe (mejora de seguridad)
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
+RUN touch /tmp/nginx.pid && \
+    chown -R nginx:nginx /tmp/nginx.pid && \
+    chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
     chown -R nginx:nginx /etc/nginx/conf.d
