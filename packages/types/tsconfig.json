@@ -6,8 +6,9 @@
         "noEmit": false,
         "declaration": true,
         "allowImportingTsExtensions": false,
-        "module": "ESNext",
-        "moduleResolution": "bundler",
+        "module": "commonjs",
+        "target": "es2019",
+        "moduleResolution": "node",
         "baseUrl": ".",
         "paths": {
             "@scaffold/types": [

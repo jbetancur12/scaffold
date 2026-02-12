@@ -6,8 +6,9 @@
         "noEmit": false,
         "declaration": true,
         "allowImportingTsExtensions": false,
-        "module": "ESNext", // ← Cambiar de CommonJS
-        "moduleResolution": "bundler", // ← Cambiar de node
+        "module": "commonjs",
+        "target": "es2019",
+        "moduleResolution": "node",
         "baseUrl": ".",
         "paths": {
             "@scaffold/schemas": [
