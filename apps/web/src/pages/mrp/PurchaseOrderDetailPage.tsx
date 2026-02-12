@@ -2,8 +2,24 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mrpApi } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
-import { ArrowLeft, Check, X } from 'lucide-react';
+import { ArrowLeft, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Warehouse } from '@scaffold/types';
 
 interface PurchaseOrderItem {
     id: string;
@@ -50,6 +66,10 @@ export default function PurchaseOrderDetailPage() {
     const { toast } = useToast();
     const [order, setOrder] = useState<PurchaseOrder | null>(null);
     const [loading, setLoading] = useState(true);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+    const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const loadOrder = useCallback(async () => {
         try {
@@ -68,21 +88,31 @@ export default function PurchaseOrderDetailPage() {
         }
     }, [id, toast, navigate]);
 
+    const loadWarehouses = useCallback(async () => {
+        try {
+            const data = await mrpApi.getWarehouses();
+            setWarehouses(data);
+        } catch (error) {
+            console.error('Error loading warehouses', error);
+        }
+    }, []);
+
     useEffect(() => {
         if (id) {
             loadOrder();
+            loadWarehouses();
         }
-    }, [id, loadOrder]);
+    }, [id, loadOrder, loadWarehouses]);
 
     const handleReceive = async () => {
-        if (!confirm('¿Estás seguro de recibir esta orden? Esto actualizará el inventario.')) return;
-
         try {
-            await mrpApi.receivePurchaseOrder(id!);
+            setSubmitting(true);
+            await mrpApi.receivePurchaseOrder(id!, selectedWarehouseId || undefined);
             toast({
                 title: 'Éxito',
                 description: 'Orden recibida e inventario actualizado',
             });
+            setIsReceiveDialogOpen(false);
             loadOrder();
         } catch (error) {
             toast({
@@ -90,6 +120,8 @@ export default function PurchaseOrderDetailPage() {
                 description: 'No se pudo recibir la orden',
                 variant: 'destructive',
             });
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -143,7 +175,7 @@ export default function PurchaseOrderDetailPage() {
                     <div className="flex gap-2">
                         {(order.status === 'PENDING' || order.status === 'CONFIRMED') && (
                             <>
-                                <Button onClick={handleReceive} variant="default">
+                                <Button onClick={() => setIsReceiveDialogOpen(true)} variant="default">
                                     <Check className="mr-2 h-4 w-4" />
                                     Recibir Orden
                                 </Button>
@@ -272,6 +304,52 @@ export default function PurchaseOrderDetailPage() {
                     </div>
                 </div>
             </div>
+
+            <Dialog open={isReceiveDialogOpen} onOpenChange={setIsReceiveDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Recibir Orden de Compra</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <p className="text-sm text-slate-500">
+                            ¿Estás seguro de recibir esta orden? Los artículos se agregarán al inventario.
+                        </p>
+                        <div className="grid gap-2">
+                            <Label htmlFor="warehouse">Almacén de Destino</Label>
+                            <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar almacén (Opcional)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {warehouses.map((w) => (
+                                        <SelectItem key={w.id} value={w.id}>
+                                            {w.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-slate-400">
+                                Si no selecciona uno, se usará el Almacén Principal.
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsReceiveDialogOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleReceive} disabled={submitting}>
+                            {submitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Recibiendo...
+                                </>
+                            ) : (
+                                'Confirmar Recepción'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

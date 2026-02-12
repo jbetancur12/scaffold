@@ -23,6 +23,26 @@ export class InventoryService {
         return warehouse;
     }
 
+    async listWarehouses(): Promise<Warehouse[]> {
+        return this.warehouseRepo.findAll();
+    }
+
+    async getWarehouse(id: string): Promise<Warehouse> {
+        return this.warehouseRepo.findOneOrFail({ id });
+    }
+
+    async updateWarehouse(id: string, data: Partial<z.infer<typeof WarehouseSchema>>): Promise<Warehouse> {
+        const warehouse = await this.getWarehouse(id);
+        Object.assign(warehouse, data);
+        await this.em.persistAndFlush(warehouse);
+        return warehouse;
+    }
+
+    async deleteWarehouse(id: string): Promise<void> {
+        const warehouse = await this.getWarehouse(id);
+        await this.em.removeAndFlush(warehouse);
+    }
+
     async updateStock(data: z.infer<typeof InventoryItemSchema>): Promise<InventoryItem> {
         // Build query based on whether it's raw material or variant
         const query: FilterQuery<InventoryItem> = { warehouse: data.warehouseId };
@@ -41,9 +61,17 @@ export class InventoryService {
         return inventoryItem;
     }
 
-    async addManualStock(data: { rawMaterialId: string; quantity: number; unitCost: number }): Promise<InventoryItem> {
-        // 1. Get or create default warehouse
-        let warehouse = await this.warehouseRepo.findOne({ name: 'Main Warehouse' });
+    async addManualStock(data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }): Promise<InventoryItem> {
+        // 1. Get or create warehouse
+        let warehouse: Warehouse | null = null;
+        if (data.warehouseId) {
+            warehouse = await this.warehouseRepo.findOne({ id: data.warehouseId });
+        }
+
+        if (!warehouse) {
+            warehouse = await this.warehouseRepo.findOne({ name: 'Main Warehouse' });
+        }
+
         if (!warehouse) {
             warehouse = this.warehouseRepo.create({
                 name: 'Main Warehouse',
@@ -97,9 +125,14 @@ export class InventoryService {
         return inventory;
     }
 
-    async getInventoryItems(page: number, limit: number) {
+    async getInventoryItems(page: number, limit: number, warehouseId?: string) {
+        const query: FilterQuery<InventoryItem> = {};
+        if (warehouseId) {
+            query.warehouse = warehouseId;
+        }
+
         const [items, total] = await this.inventoryRepo.findAndCount(
-            {},
+            query,
             {
                 limit,
                 offset: (page - 1) * limit,

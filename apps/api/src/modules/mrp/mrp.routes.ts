@@ -60,6 +60,13 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/inventory', (req, res, next) => mrpController.getInventory(req, res, next));
     router.post('/inventory/manual-add', (req, res, next) => mrpController.addManualStock(req, res, next));
 
+    // Warehouses
+    router.get('/warehouses', (req, res, next) => mrpController.listWarehouses(req, res, next));
+    router.post('/warehouses', (req, res, next) => mrpController.createWarehouse(req, res, next));
+    router.get('/warehouses/:id', (req, res, next) => mrpController.getWarehouse(req, res, next));
+    router.put('/warehouses/:id', (req, res, next) => mrpController.updateWarehouse(req, res, next));
+    router.delete('/warehouses/:id', (req, res, next) => mrpController.deleteWarehouse(req, res, next));
+
     // Operational Config
     const configService = new OperationalConfigService(orm.em);
     const configController = new OperationalConfigController(configService);

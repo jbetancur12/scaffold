@@ -1,15 +1,30 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mrpApi, MaterialRequirement } from '@/services/mrpApi';
-import { ProductionOrder, ProductionOrderStatus, ProductionOrderItem, ProductVariant, Product } from '@scaffold/types';
+import { ProductionOrder, ProductionOrderStatus, ProductionOrderItem, ProductVariant, Product, Warehouse } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { ArrowLeft, Printer, Play, CheckCircle, Truck } from 'lucide-react';
+import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ProductionRequirementsTable } from '@/components/mrp/ProductionRequirementsTable';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 export default function ProductionOrderDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -20,6 +35,12 @@ export default function ProductionOrderDetailPage() {
     const [requirements, setRequirements] = useState<MaterialRequirement[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingReqs, setLoadingReqs] = useState(false);
+
+    // Warehouse selection for completion
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+    const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
 
     const loadOrder = useCallback(async () => {
         if (!id) return;
@@ -57,18 +78,32 @@ export default function ProductionOrderDetailPage() {
         }
     }, [id, toast]);
 
+    const loadWarehouses = useCallback(async () => {
+        try {
+            const data = await mrpApi.getWarehouses();
+            setWarehouses(data);
+        } catch (error) {
+            console.error('Error loading warehouses', error);
+        }
+    }, []);
+
     useEffect(() => {
         loadOrder();
-    }, [loadOrder]);
+        loadWarehouses();
+    }, [loadOrder, loadWarehouses]);
 
-    // Load requirements when entering the tab, or just load them initially? 
-    // Let's load them when tab is active or just eagerly for now since it's key info.
     useEffect(() => {
         if (order) loadRequirements();
     }, [order, loadRequirements]);
 
     const handleStatusChange = async (newStatus: ProductionOrderStatus) => {
         if (!order) return;
+
+        if (newStatus === ProductionOrderStatus.COMPLETED) {
+            setIsCompleteDialogOpen(true);
+            return;
+        }
+
         try {
             await mrpApi.updateProductionOrderStatus(order.id, newStatus);
             toast({ title: "Estado actualizado", description: `La orden ahora está: ${newStatus}` });
@@ -79,6 +114,25 @@ export default function ProductionOrderDetailPage() {
                 description: "No se pudo cambiar el estado",
                 variant: "destructive"
             });
+        }
+    };
+
+    const handleComplete = async () => {
+        if (!order) return;
+        try {
+            setSubmitting(true);
+            await mrpApi.updateProductionOrderStatus(order.id, ProductionOrderStatus.COMPLETED, selectedWarehouseId || undefined);
+            toast({ title: "Orden completada", description: "El producto terminado ha sido agregado al inventario." });
+            setIsCompleteDialogOpen(false);
+            loadOrder();
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "No se pudo completar la orden",
+                variant: "destructive"
+            });
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -204,6 +258,52 @@ export default function ProductionOrderDetailPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Finalizar Orden de Producción</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <p className="text-sm text-slate-500">
+                            ¿Estás seguro de finalizar esta orden? Los productos terminados se agregarán al inventario.
+                        </p>
+                        <div className="grid gap-2">
+                            <Label htmlFor="warehouse">Almacén de Destino</Label>
+                            <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Seleccionar almacén (Opcional)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {warehouses.map((w) => (
+                                        <SelectItem key={w.id} value={w.id}>
+                                            {w.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-slate-400">
+                                Si no selecciona uno, se usará el Almacén Principal.
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsCompleteDialogOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleComplete} disabled={submitting}>
+                            {submitting ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Finalizando...
+                                </>
+                            ) : (
+                                'Confirmar y Finalizar'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -121,7 +121,7 @@ export class PurchaseOrderService {
         return purchaseOrder;
     }
 
-    async receivePurchaseOrder(id: string): Promise<PurchaseOrder> {
+    async receivePurchaseOrder(id: string, warehouseId?: string): Promise<PurchaseOrder> {
         const purchaseOrder = await this.purchaseOrderRepo.findOneOrFail(
             { id },
             { populate: ['items', 'items.rawMaterial'] }
@@ -137,7 +137,7 @@ export class PurchaseOrderService {
 
         // Update inventory for each item
         for (const item of purchaseOrder.items) {
-            await this.updateInventory(item);
+            await this.updateInventory(item, warehouseId);
             await this.updateLastPurchaseInfo(purchaseOrder.supplier, item);
         }
 
@@ -175,10 +175,18 @@ export class PurchaseOrderService {
         await this.em.persistAndFlush([item.rawMaterial, supplierMaterial]);
     }
 
-    private async updateInventory(item: PurchaseOrderItem): Promise<void> {
-        // Get or create default warehouse
+    private async updateInventory(item: PurchaseOrderItem, warehouseId?: string): Promise<void> {
+        // Get or create warehouse
         const warehouseRepo = this.em.getRepository(Warehouse);
-        let warehouse = await warehouseRepo.findOne({ name: 'Main Warehouse' });
+        let warehouse: Warehouse | null = null;
+
+        if (warehouseId) {
+            warehouse = await warehouseRepo.findOne({ id: warehouseId });
+        }
+
+        if (!warehouse) {
+            warehouse = await warehouseRepo.findOne({ name: 'Main Warehouse' });
+        }
 
         if (!warehouse) {
             // Create default warehouse if it doesn't exist

@@ -6,7 +6,8 @@ import {
     BOMItem,
     ProductionOrder,
     InventoryItem,
-    OperationalConfig
+    OperationalConfig,
+    Warehouse
 } from '@scaffold/types';
 
 export interface MaterialRequirement {
@@ -96,11 +97,32 @@ export const mrpApi = {
     updatePurchaseOrderStatus: (id: string, status: string) =>
         api.put(`/mrp/purchase-orders/${id}/status`, { status }),
 
-    receivePurchaseOrder: (id: string) =>
-        api.post(`/mrp/purchase-orders/${id}/receive`),
+    receivePurchaseOrder: (id: string, warehouseId?: string) =>
+        api.post(`/mrp/purchase-orders/${id}/receive`, { warehouseId }),
 
     cancelPurchaseOrder: (id: string) =>
         api.delete(`/mrp/purchase-orders/${id}`),
+
+    // Warehouses
+    getWarehouses: async () => {
+        const response = await api.get<Warehouse[]>('/mrp/warehouses');
+        return response.data;
+    },
+    getWarehouse: async (id: string) => {
+        const response = await api.get<Warehouse>(`/mrp/warehouses/${id}`);
+        return response.data;
+    },
+    createWarehouse: async (data: Partial<Warehouse>): Promise<Warehouse> => {
+        const response = await api.post('/mrp/warehouses', data);
+        return response.data;
+    },
+    updateWarehouse: async (id: string, data: Partial<Warehouse>): Promise<Warehouse> => {
+        const response = await api.put(`/mrp/warehouses/${id}`, data);
+        return response.data;
+    },
+    deleteWarehouse: async (id: string): Promise<void> => {
+        await api.delete(`/mrp/warehouses/${id}`);
+    },
 
     // Suppliers
     getSuppliers: async (page = 1, limit = 10) => {
@@ -180,17 +202,17 @@ export const mrpApi = {
         const response = await api.get<MaterialRequirement[]>(`/mrp/production-orders/${orderId}/requirements`);
         return response.data;
     },
-    updateProductionOrderStatus: async (id: string, status: string): Promise<ProductionOrder> => {
-        const response = await api.patch(`/mrp/production-orders/${id}/status`, { status });
+    updateProductionOrderStatus: async (id: string, status: string, warehouseId?: string): Promise<ProductionOrder> => {
+        const response = await api.patch(`/mrp/production-orders/${id}/status`, { status, warehouseId });
         return response.data;
     },
 
     // Inventory
-    getInventory: async (page = 1, limit = 10) => {
-        const response = await api.get<{ items: InventoryItem[], total: number }>(`/mrp/inventory?page=${page}&limit=${limit}`);
+    getInventory: async (page = 1, limit = 10, warehouseId?: string) => {
+        const response = await api.get<{ items: InventoryItem[], total: number }>(`/mrp/inventory`, { params: { page, limit, warehouseId } });
         return response.data;
     },
-    addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number }) => {
+    addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }) => {
         const response = await api.post('/mrp/inventory/manual-add', data);
         return response.data;
     },

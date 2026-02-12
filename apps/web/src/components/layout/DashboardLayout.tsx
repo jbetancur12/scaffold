@@ -63,6 +63,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: ShoppingCart, label: 'Órdenes de Compra', path: '/dashboard/mrp/purchase-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Factory, label: 'Órdenes de Producción', path: '/dashboard/mrp/production-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Inventario', path: '/dashboard/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Warehouse, label: 'Almacenes', path: '/dashboard/mrp/warehouses', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Settings, label: 'Configuración Operativa', path: '/dashboard/mrp/operational-settings', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
     ];
 

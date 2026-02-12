@@ -23,6 +23,8 @@ import PurchaseOrderFormPage from '@/pages/mrp/PurchaseOrderFormPage';
 import PurchaseOrderDetailPage from '@/pages/mrp/PurchaseOrderDetailPage';
 import ProductionOrderDetailPage from '@/pages/mrp/ProductionOrderDetailPage';
 import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
+import WarehouseListPage from '@/pages/mrp/WarehouseListPage';
+import WarehouseFormPage from '@/pages/mrp/WarehouseFormPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, isLoading } = useAuth();
@@ -116,6 +118,9 @@ export default function App() {
                         <Route path="/dashboard/mrp/operational-settings" element={<OperationalSettingsPage />} />
 
                         <Route path="/dashboard/mrp/inventory" element={<InventoryDashboardPage />} />
+                        <Route path="/dashboard/mrp/warehouses" element={<WarehouseListPage />} />
+                        <Route path="/dashboard/mrp/warehouses/new" element={<WarehouseFormPage />} />
+                        <Route path="/dashboard/mrp/warehouses/:id/edit" element={<WarehouseFormPage />} />
                     </Route>
 
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />

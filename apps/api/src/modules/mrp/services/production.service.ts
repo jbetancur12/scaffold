@@ -168,7 +168,7 @@ export class ProductionService {
         return Array.from(requirements.values());
     }
 
-    async updateStatus(id: string, status: ProductionOrderStatus): Promise<ProductionOrder> {
+    async updateStatus(id: string, status: ProductionOrderStatus, warehouseId?: string): Promise<ProductionOrder> {
         const order = await this.productionOrderRepo.findOneOrFail({ id }, { populate: ['items', 'items.variant'] });
 
         // Basic transition validation
@@ -180,8 +180,16 @@ export class ProductionService {
 
         // If status is changed to COMPLETED, update finished goods inventory
         if (status === ProductionOrderStatus.COMPLETED) {
-            // Get or create default warehouse for finished goods
-            let warehouse = await this.warehouseRepo.findOne({ name: 'Main Warehouse' });
+            // Get or create warehouse for finished goods
+            let warehouse: Warehouse | null = null;
+            if (warehouseId) {
+                warehouse = await this.warehouseRepo.findOne({ id: warehouseId });
+            }
+
+            if (!warehouse) {
+                warehouse = await this.warehouseRepo.findOne({ name: 'Main Warehouse' });
+            }
+
             if (!warehouse) {
                 // If not exists (unlikely if setup correctly, but handle it), create one
                 warehouse = this.warehouseRepo.create({

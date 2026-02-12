@@ -48,6 +48,9 @@ export default function InventoryDashboardPage() {
     // Manual Add State
     const [isManualAddOpen, setIsManualAddOpen] = useState(false);
     const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+    const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
+    const [selectedFilterWarehouseId, setSelectedFilterWarehouseId] = useState<string>('all');
     const [selectedMaterialId, setSelectedMaterialId] = useState('');
     const [manualQuantity, setManualQuantity] = useState('');
     const [manualCost, setManualCost] = useState('');
@@ -56,18 +59,29 @@ export default function InventoryDashboardPage() {
     useEffect(() => {
         loadInventory();
         loadRawMaterials();
-    }, []);
+        loadWarehouses();
+    }, [selectedFilterWarehouseId]);
 
     const loadInventory = async () => {
         try {
             setLoading(true);
-            const data = await mrpApi.getInventory(1, 100); // Fetch mostly all for now
+            const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
+            const data = await mrpApi.getInventory(1, 100, warehouseId); // Fetch mostly all for now
             setInventory(data.items as PopulatedInventoryItem[]);
         } catch (err) {
             console.error(err);
             setError('Error al cargar el inventario');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadWarehouses = async () => {
+        try {
+            const data = await mrpApi.getWarehouses();
+            setWarehouses(data);
+        } catch (err) {
+            console.error('Error loading warehouses', err);
         }
     };
 
@@ -97,6 +111,7 @@ export default function InventoryDashboardPage() {
                 rawMaterialId: selectedMaterialId,
                 quantity: Number(manualQuantity),
                 unitCost: Number(manualCost),
+                warehouseId: selectedWarehouseId || undefined,
             });
 
             toast({
@@ -148,73 +163,101 @@ export default function InventoryDashboardPage() {
                         Gestión de Stock: Materias Primas y Productos Terminados por Almacén.
                     </p>
                 </div>
-                <Dialog open={isManualAddOpen} onOpenChange={setIsManualAddOpen}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Ajuste Manual
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Agregar Stock Manualmente</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="material">Materia Prima</Label>
-                                <Select value={selectedMaterialId} onValueChange={setSelectedMaterialId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleccionar materia prima" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {rawMaterials.map((material) => (
-                                            <SelectItem key={material.id} value={material.id}>
-                                                {material.name} ({material.sku})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="quantity">Cantidad a Agregar</Label>
-                                <Input
-                                    id="quantity"
-                                    type="number"
-                                    step="0.01"
-                                    value={manualQuantity}
-                                    onChange={(e) => setManualQuantity(e.target.value)}
-                                    placeholder="Ej. 10.5"
-                                />
-                            </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="cost">Costo Unitario (para promedio)</Label>
-                                <Input
-                                    id="cost"
-                                    type="number"
-                                    step="0.01"
-                                    value={manualCost}
-                                    onChange={(e) => setManualCost(e.target.value)}
-                                    placeholder="Ej. 1500"
-                                />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsManualAddOpen(false)}>
-                                Cancelar
+                <div className="flex gap-2">
+                    <Select value={selectedFilterWarehouseId} onValueChange={setSelectedFilterWarehouseId}>
+                        <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="Filtrar por Almacén" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos los Almacenes</SelectItem>
+                            {warehouses.map((w) => (
+                                <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Dialog open={isManualAddOpen} onOpenChange={setIsManualAddOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Plus className="mr-2 h-4 w-4" />
+                                Ajuste Manual
                             </Button>
-                            <Button onClick={handleManualAdd} disabled={submittingManual}>
-                                {submittingManual ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        Guardando...
-                                    </>
-                                ) : (
-                                    'Guardar Ajuste'
-                                )}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Agregar Stock Manualmente</DialogTitle>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="material">Materia Prima</Label>
+                                    <Select value={selectedMaterialId} onValueChange={setSelectedMaterialId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar materia prima" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {rawMaterials.map((material) => (
+                                                <SelectItem key={material.id} value={material.id}>
+                                                    {material.name} ({material.sku})
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="warehouse">Almacén</Label>
+                                    <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Seleccionar almacén (Opcional)" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {warehouses.map((warehouse) => (
+                                                <SelectItem key={warehouse.id} value={warehouse.id}>
+                                                    {warehouse.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="quantity">Cantidad a Agregar</Label>
+                                    <Input
+                                        id="quantity"
+                                        type="number"
+                                        step="0.01"
+                                        value={manualQuantity}
+                                        onChange={(e) => setManualQuantity(e.target.value)}
+                                        placeholder="Ej. 10.5"
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="cost">Costo Unitario (para promedio)</Label>
+                                    <Input
+                                        id="cost"
+                                        type="number"
+                                        step="0.01"
+                                        value={manualCost}
+                                        onChange={(e) => setManualCost(e.target.value)}
+                                        placeholder="Ej. 1500"
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="outline" onClick={() => setIsManualAddOpen(false)}>
+                                    Cancelar
+                                </Button>
+                                <Button onClick={handleManualAdd} disabled={submittingManual}>
+                                    {submittingManual ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Guardando...
+                                        </>
+                                    ) : (
+                                        'Guardar Ajuste'
+                                    )}
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </div>
             </div>
 
             {loading ? (

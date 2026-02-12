@@ -14,12 +14,15 @@ const CreatePurchaseOrderSchema = z.object({
     supplierId: z.string().uuid(),
     expectedDeliveryDate: z.coerce.date().optional(),
     notes: z.string().optional(),
+    warehouseId: z.string().uuid().optional(),
     items: z.array(z.object({
         rawMaterialId: z.string().uuid(),
         quantity: z.number().min(0.01),
         unitPrice: z.number().min(0),
     })),
 });
+
+import { WarehouseSchema } from '@scaffold/schemas';
 
 export class MrpController {
     // ...
@@ -343,8 +346,8 @@ export class MrpController {
     async updateProductionOrderStatus(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { status } = req.body;
-            const order = await this.productionService.updateStatus(id, status);
+            const { status, warehouseId } = req.body;
+            const order = await this.productionService.updateStatus(id, status, warehouseId);
             res.json(order);
         } catch (error) {
             next(error);
@@ -364,8 +367,8 @@ export class MrpController {
     // --- Inventory ---
     async getInventory(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit } = req.query;
-            const result = await this.inventoryService.getInventoryItems(Number(page) || 1, Number(limit) || 100);
+            const { page, limit, warehouseId } = req.query;
+            const result = await this.inventoryService.getInventoryItems(Number(page) || 1, Number(limit) || 100, warehouseId as string);
             res.json(result);
         } catch (error) {
             next(error);
@@ -378,6 +381,7 @@ export class MrpController {
                 rawMaterialId: z.string(),
                 quantity: z.number().min(0.01),
                 unitCost: z.number().min(0),
+                warehouseId: z.string().optional(),
             });
             const data = schema.parse(req.body);
             const result = await this.inventoryService.addManualStock(data);
@@ -442,8 +446,60 @@ export class MrpController {
     async receivePurchaseOrder(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const purchaseOrder = await this.purchaseOrderService.receivePurchaseOrder(id);
+            const { warehouseId } = req.body;
+            const purchaseOrder = await this.purchaseOrderService.receivePurchaseOrder(id, warehouseId);
             res.json(purchaseOrder);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // --- Warehouses ---
+    async createWarehouse(req: Request, res: Response, next: NextFunction) {
+        try {
+            const data = WarehouseSchema.parse(req.body);
+            const warehouse = await this.inventoryService.createWarehouse(data);
+            res.status(201).json(warehouse);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listWarehouses(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const warehouses = await this.inventoryService.listWarehouses();
+            res.json(warehouses);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getWarehouse(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const warehouse = await this.inventoryService.getWarehouse(id);
+            res.json(warehouse);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateWarehouse(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const data = WarehouseSchema.partial().parse(req.body);
+            const warehouse = await this.inventoryService.updateWarehouse(id, data);
+            res.json(warehouse);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteWarehouse(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            await this.inventoryService.deleteWarehouse(id);
+            res.status(204).send();
         } catch (error) {
             next(error);
         }
