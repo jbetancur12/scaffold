@@ -53,7 +53,7 @@ export default function RawMaterialFormPage() {
     // Manual Cost IVA helper state
     const [manualIncludesIva, setManualIncludesIva] = useState(false);
     const [manualIvaPercentage, setManualIvaPercentage] = useState(19);
-    const [rawCostInput, setRawCostInput] = useState<number>(0);
+    const [manualBasePrice, setManualBasePrice] = useState<number>(0);
 
     const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
 
@@ -124,13 +124,11 @@ export default function RawMaterialFormPage() {
 
     // Recalculate cost when manual IVA helper changes
     useEffect(() => {
-        if (manualIncludesIva && rawCostInput > 0) {
-            const totalWithIva = rawCostInput * (1 + (manualIvaPercentage / 100));
+        if (manualIncludesIva && manualBasePrice > 0) {
+            const totalWithIva = manualBasePrice * (1 + (manualIvaPercentage / 100));
             setFormData(prev => ({ ...prev, cost: Number(totalWithIva.toFixed(2)) }));
-        } else if (!manualIncludesIva && rawCostInput > 0) {
-            setFormData(prev => ({ ...prev, cost: rawCostInput }));
         }
-    }, [rawCostInput, manualIncludesIva, manualIvaPercentage]);
+    }, [manualBasePrice, manualIncludesIva, manualIvaPercentage]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -260,33 +258,55 @@ export default function RawMaterialFormPage() {
                                     id="cost"
                                     value={formData.cost}
                                     onValueChange={(val) => {
-                                        setRawCostInput(val || 0);
                                         if (!manualIncludesIva) {
                                             setFormData({ ...formData, cost: val || 0 });
                                         }
                                     }}
+                                    readOnly={manualIncludesIva}
+                                    className={manualIncludesIva ? "bg-slate-50 cursor-not-allowed" : ""}
                                     required
                                 />
-                                <div className="flex items-center gap-4 mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                <div className="flex flex-col gap-2 mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
                                     <div className="flex items-center gap-2">
                                         <input
                                             type="checkbox"
                                             id="manual-iva"
                                             className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
                                             checked={manualIncludesIva}
-                                            onChange={(e) => setManualIncludesIva(e.target.checked)}
+                                            onChange={(e) => {
+                                                setManualIncludesIva(e.target.checked);
+                                                if (e.target.checked) {
+                                                    setManualBasePrice(formData.cost);
+                                                }
+                                            }}
                                         />
-                                        <Label htmlFor="manual-iva" className="text-xs font-normal cursor-pointer">Sumar IVA (%)</Label>
+                                        <Label htmlFor="manual-iva" className="text-xs font-semibold text-slate-700 cursor-pointer">Sumar IVA (%) al precio</Label>
                                     </div>
+
                                     {manualIncludesIva && (
-                                        <div className="flex items-center gap-1">
-                                            <Input
-                                                type="number"
-                                                className="h-6 w-14 text-xs px-1"
-                                                value={manualIvaPercentage}
-                                                onChange={(e) => setManualIvaPercentage(Number(e.target.value))}
-                                            />
-                                            <span className="text-xs text-slate-500">%</span>
+                                        <div className="flex items-center gap-3 pt-2 border-t border-slate-200/60">
+                                            <div className="flex-1 space-y-1">
+                                                <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Precio Neto</Label>
+                                                <CurrencyInput
+                                                    id="manual-base"
+                                                    className="h-8 text-xs bg-white"
+                                                    value={manualBasePrice}
+                                                    onValueChange={(val) => setManualBasePrice(val || 0)}
+                                                    autoFocus
+                                                />
+                                            </div>
+                                            <div className="w-20 space-y-1">
+                                                <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">% IVA</Label>
+                                                <div className="flex items-center gap-1">
+                                                    <Input
+                                                        type="number"
+                                                        className="h-8 text-xs px-1 bg-white"
+                                                        value={manualIvaPercentage}
+                                                        onChange={(e) => setManualIvaPercentage(Number(e.target.value))}
+                                                    />
+                                                    <span className="text-xs text-slate-400">%</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
