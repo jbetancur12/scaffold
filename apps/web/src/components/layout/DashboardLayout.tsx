@@ -15,7 +15,10 @@ import {
     ShoppingCart,
     Factory,
     Warehouse,
-    Settings
+    Settings,
+    ChevronDown,
+    ChevronRight,
+    Boxes
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
@@ -26,17 +29,19 @@ interface SidebarItemProps {
     label: string;
     active: boolean;
     onClick: () => void;
+    isChild?: boolean;
 }
 
-const SidebarItem = ({ icon: Icon, label, active, onClick }: SidebarItemProps) => (
+const SidebarItem = ({ icon: Icon, label, active, onClick, isChild }: SidebarItemProps) => (
     <button
         onClick={onClick}
         className={cn(
             "sidebar-link w-full",
-            active && "sidebar-link-active"
+            active && "sidebar-link-active",
+            isChild && "pl-11 py-1.5 h-auto text-xs opacity-80 hover:opacity-100"
         )}
     >
-        <Icon className="h-5 w-5" />
+        <Icon className={cn("h-5 w-5", isChild && "h-4 w-4")} />
         <span>{label}</span>
     </button>
 );
@@ -47,6 +52,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const { toast } = useToast();
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isMrpOpen, setIsMrpOpen] = useState(true);
 
     const roleLabels: Record<string, string> = {
         [UserRole.SUPERADMIN]: 'Super Administrador',
@@ -54,9 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         [UserRole.USER]: 'Usuario Estándar',
     };
 
-    const menuItems = [
-        { icon: LayoutDashboard, label: 'Resumen', path: '/dashboard', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: Users, label: 'Usuarios', path: '/dashboard/users', roles: [UserRole.SUPERADMIN] },
+    const mrpItems = [
         { icon: Package, label: 'Productos', path: '/dashboard/mrp/products', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Package, label: 'Materias Primas', path: '/dashboard/mrp/raw-materials', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: ShoppingCart, label: 'Proveedores', path: '/dashboard/mrp/suppliers', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
@@ -67,9 +71,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: Settings, label: 'Configuración Operativa', path: '/dashboard/mrp/operational-settings', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
     ];
 
-    const filteredItems = menuItems.filter(item =>
+    const filteredMrpItems = mrpItems.filter(item =>
         item.roles.includes(user?.role as UserRole)
     );
+
+    const isMrpActive = location.pathname.includes('/mrp/');
 
     const handleLogout = async () => {
         try {
@@ -88,6 +94,67 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
     };
 
+    const renderNavItems = (onItemClick?: () => void) => (
+        <>
+            <SidebarItem
+                icon={LayoutDashboard}
+                label="Resumen"
+                active={location.pathname === '/dashboard'}
+                onClick={() => {
+                    navigate('/dashboard');
+                    onItemClick?.();
+                }}
+            />
+
+            {/* MRP Group */}
+            <div className="space-y-1">
+                <button
+                    onClick={() => setIsMrpOpen(!isMrpOpen)}
+                    className={cn(
+                        "sidebar-link w-full justify-between pr-4",
+                        isMrpActive && "text-primary font-medium bg-primary/5"
+                    )}
+                >
+                    <div className="flex items-center gap-3">
+                        <Boxes className="h-5 w-5" />
+                        <span>Módulo MRP</span>
+                    </div>
+                    {isMrpOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+
+                {isMrpOpen && (
+                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                        {filteredMrpItems.map((item) => (
+                            <SidebarItem
+                                key={item.path}
+                                icon={item.icon}
+                                label={item.label}
+                                active={location.pathname === item.path}
+                                isChild={true}
+                                onClick={() => {
+                                    navigate(item.path);
+                                    onItemClick?.();
+                                }}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {user?.role === UserRole.SUPERADMIN && (
+                <SidebarItem
+                    icon={Users}
+                    label="Usuarios"
+                    active={location.pathname === '/dashboard/users'}
+                    onClick={() => {
+                        navigate('/dashboard/users');
+                        onItemClick?.();
+                    }}
+                />
+            )}
+        </>
+    );
+
     return (
         <div className="min-h-screen bg-[#f8fafc] flex">
             {/* Desktop Sidebar */}
@@ -99,16 +166,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span className="text-xl font-bold tracking-tight text-slate-900">Scaffold UI</span>
                 </div>
 
-                <nav className="flex-1 space-y-2">
-                    {filteredItems.map((item) => (
-                        <SidebarItem
-                            key={item.path}
-                            icon={item.icon}
-                            label={item.label}
-                            active={location.pathname === item.path}
-                            onClick={() => navigate(item.path)}
-                        />
-                    ))}
+                <nav className="flex-1 space-y-2 overflow-y-auto pr-2 custom-scrollbar">
+                    {renderNavItems()}
                 </nav>
 
                 <div className="mt-auto pt-6 border-t border-slate-100">
@@ -157,19 +216,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </Button>
                 </div>
 
-                <nav className="space-y-2">
-                    {filteredItems.map((item) => (
-                        <SidebarItem
-                            key={item.path}
-                            icon={item.icon}
-                            label={item.label}
-                            active={location.pathname === item.path}
-                            onClick={() => {
-                                navigate(item.path);
-                                setIsMobileMenuOpen(false);
-                            }}
-                        />
-                    ))}
+                <nav className="space-y-2 overflow-y-auto h-[calc(100vh-200px)]">
+                    {renderNavItems(() => setIsMobileMenuOpen(false))}
                 </nav>
             </aside>
 
