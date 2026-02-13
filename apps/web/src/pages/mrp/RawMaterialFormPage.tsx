@@ -16,6 +16,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { UnitType } from '@scaffold/types';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { formatCurrency } from '@/lib/utils';
 
 
 
@@ -41,6 +43,17 @@ export default function RawMaterialFormPage() {
         cost: 0,
         minStockLevel: 0,
     });
+
+    // IVA Calculator State
+    const [calcPrice, setCalcPrice] = useState<number>(0);
+    const [calcQty, setCalcQty] = useState<string>('');
+    const [calcMode, setCalcMode] = useState<'BASE' | 'TOTAL'>('TOTAL');
+    const [calcTaxRate, setCalcTaxRate] = useState(19);
+
+    // Manual Cost IVA helper state
+    const [manualIncludesIva, setManualIncludesIva] = useState(false);
+    const [manualIvaPercentage, setManualIvaPercentage] = useState(19);
+    const [rawCostInput, setRawCostInput] = useState<number>(0);
 
     const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
 
@@ -97,6 +110,27 @@ export default function RawMaterialFormPage() {
             }
         }
     }, [isEditing, loadMaterial, location]);
+
+    // Recalculate cost when calculator inputs change
+    useEffect(() => {
+        const qty = Number(calcQty);
+        if (calcPrice > 0 && qty > 0) {
+            const subtotal = calcMode === 'TOTAL'
+                ? calcPrice / (1 + (calcTaxRate / 100))
+                : calcPrice;
+            setFormData(prev => ({ ...prev, cost: Number((subtotal / qty).toFixed(2)) }));
+        }
+    }, [calcPrice, calcQty, calcMode, calcTaxRate]);
+
+    // Recalculate cost when manual IVA helper changes
+    useEffect(() => {
+        if (manualIncludesIva && rawCostInput > 0) {
+            const baseCost = rawCostInput / (1 + (manualIvaPercentage / 100));
+            setFormData(prev => ({ ...prev, cost: Number(baseCost.toFixed(2)) }));
+        } else if (!manualIncludesIva && rawCostInput > 0) {
+            setFormData(prev => ({ ...prev, cost: rawCostInput }));
+        }
+    }, [rawCostInput, manualIncludesIva, manualIvaPercentage]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -222,15 +256,41 @@ export default function RawMaterialFormPage() {
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="cost">Costo Estándar (Por Unidad)</Label>
-                                <Input
+                                <CurrencyInput
                                     id="cost"
-                                    type="number"
-                                    step="0.01"
                                     value={formData.cost}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, cost: Number(e.target.value) })}
+                                    onValueChange={(val) => {
+                                        setRawCostInput(val || 0);
+                                        if (!manualIncludesIva) {
+                                            setFormData({ ...formData, cost: val || 0 });
+                                        }
+                                    }}
                                     required
                                 />
-                                <p className="text-xs text-slate-500">
+                                <div className="flex items-center gap-4 mt-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="manual-iva"
+                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                            checked={manualIncludesIva}
+                                            onChange={(e) => setManualIncludesIva(e.target.checked)}
+                                        />
+                                        <Label htmlFor="manual-iva" className="text-xs font-normal cursor-pointer">Descontar IVA</Label>
+                                    </div>
+                                    {manualIncludesIva && (
+                                        <div className="flex items-center gap-1">
+                                            <Input
+                                                type="number"
+                                                className="h-6 w-14 text-xs px-1"
+                                                value={manualIvaPercentage}
+                                                onChange={(e) => setManualIvaPercentage(Number(e.target.value))}
+                                            />
+                                            <span className="text-xs text-slate-500">%</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">
                                     Costo promedio inicial. Se actualizará con las compras.
                                 </p>
                             </div>
@@ -251,47 +311,103 @@ export default function RawMaterialFormPage() {
                             </div>
 
                             {/* Calculator Helper */}
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
-                                <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                                    <Calculator className="h-4 w-4" />
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                                    <Calculator className="h-4 w-4 text-indigo-600" />
                                     Calculadora de Costo Unitario
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <Label htmlFor="calc-price" className="text-xs text-slate-500">Precio Total Compra</Label>
-                                        <Input
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="calc-price" className="text-xs text-slate-500">Precio de Referencia</Label>
+                                        <CurrencyInput
                                             id="calc-price"
-                                            type="number"
-                                            placeholder="ej. 40000"
-                                            className="h-8 text-sm"
-                                            onChange={(e) => {
-                                                const price = Number(e.target.value);
-                                                const qty = Number((document.getElementById('calc-qty') as HTMLInputElement)?.value || 0);
-                                                if (price > 0 && qty > 0) {
-                                                    setFormData(prev => ({ ...prev, cost: Number((price / qty).toFixed(2)) }));
-                                                }
-                                            }}
+                                            placeholder="ej. 40.000"
+                                            className="h-9 text-sm"
+                                            onValueChange={(val) => setCalcPrice(val || 0)}
                                         />
                                     </div>
-                                    <div>
+                                    <div className="space-y-1.5">
                                         <Label htmlFor="calc-qty" className="text-xs text-slate-500">Cantidad Total ({formData.unit})</Label>
                                         <Input
                                             id="calc-qty"
                                             type="number"
                                             placeholder="ej. 30"
-                                            className="h-8 text-sm"
-                                            onChange={(e) => {
-                                                const qty = Number(e.target.value);
-                                                const price = Number((document.getElementById('calc-price') as HTMLInputElement)?.value || 0);
-                                                if (price > 0 && qty > 0) {
-                                                    setFormData(prev => ({ ...prev, cost: Number((price / qty).toFixed(2)) }));
-                                                }
-                                            }}
+                                            className="h-9 text-sm"
+                                            value={calcQty}
+                                            onChange={(e) => setCalcQty(e.target.value)}
                                         />
                                     </div>
                                 </div>
-                                <p className="text-[10px] text-slate-400">
-                                    Ingresa el precio total y la cantidad comprada para calcular automáticamente el costo unitario.
+
+                                <div className="space-y-3">
+                                    <Label className="text-xs text-slate-500">¿El precio ingresado es?</Label>
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCalcMode('BASE')}
+                                            className={`flex-1 py-2 px-3 text-xs rounded-lg border transition-all ${calcMode === 'BASE'
+                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-medium'
+                                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                }`}
+                                        >
+                                            Antes de IVA (Neto)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCalcMode('TOTAL')}
+                                            className={`flex-1 py-2 px-3 text-xs rounded-lg border transition-all ${calcMode === 'TOTAL'
+                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-medium'
+                                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                }`}
+                                        >
+                                            Con IVA Incluido (Bruto)
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100">
+                                    <Label htmlFor="calc-iva-rate" className="text-xs text-slate-600">% IVA</Label>
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            id="calc-iva-rate"
+                                            type="number"
+                                            className="h-7 w-16 text-xs px-2"
+                                            value={calcTaxRate}
+                                            onChange={(e) => setCalcTaxRate(Number(e.target.value))}
+                                        />
+                                        <span className="text-xs text-slate-400">%</span>
+                                    </div>
+                                </div>
+
+                                {calcPrice > 0 && (
+                                    <div className="pt-3 border-t border-slate-200 space-y-2">
+                                        <div className="flex justify-between text-xs text-slate-500">
+                                            <span>Subtotal (Base):</span>
+                                            <span className="font-medium text-slate-700">
+                                                {formatCurrency(calcMode === 'TOTAL' ? calcPrice / (1 + (calcTaxRate / 100)) : calcPrice)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-500">
+                                            <span>IVA ({calcTaxRate}%):</span>
+                                            <span className="font-medium text-slate-700">
+                                                {formatCurrency(calcMode === 'TOTAL'
+                                                    ? calcPrice - (calcPrice / (1 + (calcTaxRate / 100)))
+                                                    : calcPrice * (calcTaxRate / 100)
+                                                )}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-xs font-semibold text-slate-900 pt-1 border-t border-dashed border-slate-200">
+                                            <span>Total Facturado:</span>
+                                            <span>
+                                                {formatCurrency(calcMode === 'TOTAL' ? calcPrice : calcPrice * (1 + (calcTaxRate / 100)))}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <p className="text-[10px] text-slate-400 leading-tight">
+                                    Nota: El sistema guardará el **Subtotal** dividido por la **Cantidad** como costo estándar, para mantener la base de costos sin impuestos.
                                 </p>
                             </div>
                         </div>

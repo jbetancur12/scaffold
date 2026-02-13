@@ -14,6 +14,7 @@ import {
 import { Database, Plus, Edit2, Search, ChevronLeft, ChevronRight, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
+import { formatCurrency } from '@/lib/utils';
 
 export default function RawMaterialListPage() {
     const navigate = useNavigate();
@@ -113,11 +114,11 @@ export default function RawMaterialListPage() {
                                         </TableCell>
                                         <TableCell>{material.sku}</TableCell>
                                         <TableCell>{material.unit}</TableCell>
-                                        <TableCell className="font-semibold text-slate-600">${material.cost?.toFixed(2) || '0.00'}</TableCell>
-                                        <TableCell className="font-bold text-primary">${material.averageCost && material.averageCost > 0 ? material.averageCost.toFixed(2) : '0.00'}</TableCell>
+                                        <TableCell className="font-semibold text-slate-600">{formatCurrency(material.cost)}</TableCell>
+                                        <TableCell className="font-bold text-primary">{formatCurrency(material.averageCost)}</TableCell>
                                         <TableCell>
                                             <div className="flex flex-col text-xs">
-                                                <span className="font-medium text-slate-900">${material.lastPurchasePrice?.toFixed(2) || '-'}</span>
+                                                <span className="font-medium text-slate-900">{formatCurrency(material.lastPurchasePrice)}</span>
                                                 <span className="text-slate-500">
                                                     {material.lastPurchaseDate ? new Date(material.lastPurchaseDate).toLocaleDateString() : 'N/A'}
                                                 </span>

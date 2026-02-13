@@ -13,6 +13,7 @@ import {
 import { Package, Plus, Layers, Trash2, Edit2, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
+import { formatCurrency } from '@/lib/utils';
 
 export default function ProductListPage() {
     const navigate = useNavigate();
@@ -132,7 +133,7 @@ export default function ProductListPage() {
                                         <TableCell>{product.sku}</TableCell>
                                         <TableCell>{variants.length}</TableCell>
                                         <TableCell className="font-bold text-slate-900">
-                                            {hasVariants ? `$${generalPrice.toFixed(2)}` : '-'}
+                                            {hasVariants ? formatCurrency(generalPrice) : '-'}
                                         </TableCell>
                                         <TableCell>
                                             {safetyMargin !== null ? (

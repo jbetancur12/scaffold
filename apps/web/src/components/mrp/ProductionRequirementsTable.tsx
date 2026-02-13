@@ -9,7 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copy, Star, Download } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatQuantity } from "@/lib/utils";
 
 interface SupplierInfo {
     supplier: {
@@ -117,14 +117,14 @@ export function ProductionRequirementsTable({ requirements }: ProductionRequirem
                                         <div className="text-xs text-muted-foreground">{req.material.sku}</div>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        {req.required.toFixed(2)} {req.material.unit}
+                                        {formatQuantity(req.required)} {req.material.unit}
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        {req.available.toFixed(2)} {req.material.unit}
+                                        {formatQuantity(req.available)} {req.material.unit}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <Badge variant={isMissing ? "destructive" : "outline"} className={!isMissing ? "bg-green-50 text-green-700 border-green-200" : ""}>
-                                            {isMissing ? `-${missing.toFixed(2)}` : "OK"}
+                                            {isMissing ? `-${formatQuantity(missing)}` : "OK"}
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="max-w-[400px]">

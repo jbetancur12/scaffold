@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { mrpApi } from '@/services/mrpApi';
 import { OperationalConfig } from '@scaffold/types';
-import { Save, Calculator, DollarSign, Clock, Users, Building, Percent } from 'lucide-react';
+import { Save, Calculator, Clock, Users, Building, Percent } from 'lucide-react';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { formatCurrency } from '@/lib/utils';
 
 export default function OperationalSettingsPage() {
     const { toast } = useToast();
@@ -56,7 +57,7 @@ export default function OperationalSettingsPage() {
             setConfig(updated);
             toast({
                 title: 'Configuración actualizada',
-                description: `Nuevo costo por minuto: $${updated.costPerMinute.toFixed(2)}`,
+                description: `Nuevo costo por minuto: ${formatCurrency(updated.costPerMinute)}`,
             });
         } catch (error) {
             toast({
@@ -97,14 +98,11 @@ export default function OperationalSettingsPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="operatorSalary">Salario Operario (Base)</Label>
                                 <div className="relative">
-                                    <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input
+                                    <CurrencyInput
                                         id="operatorSalary"
-                                        type="number"
-                                        min="0"
                                         className="pl-8"
                                         value={config.operatorSalary}
-                                        onChange={(e) => setConfig({ ...config, operatorSalary: Number(e.target.value) })}
+                                        onValueChange={(val) => setConfig({ ...config, operatorSalary: val || 0 })}
                                         required
                                     />
                                 </div>
@@ -115,14 +113,12 @@ export default function OperationalSettingsPage() {
                                     <Label htmlFor="loadFactor">Factor Prestacional</Label>
                                     <div className="relative">
                                         <Percent className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
+                                        <CurrencyInput
                                             id="loadFactor"
-                                            type="number"
-                                            step="0.01"
-                                            min="1"
+                                            prefix=""
                                             className="pl-8"
                                             value={config.operatorLoadFactor}
-                                            onChange={(e) => setConfig({ ...config, operatorLoadFactor: Number(e.target.value) })}
+                                            onValueChange={(val) => setConfig({ ...config, operatorLoadFactor: val || 0 })}
                                             required
                                         />
                                     </div>
@@ -132,13 +128,12 @@ export default function OperationalSettingsPage() {
                                     <Label htmlFor="realMinutes">Minutos Reales / Mes</Label>
                                     <div className="relative">
                                         <Clock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
+                                        <CurrencyInput
                                             id="realMinutes"
-                                            type="number"
-                                            min="1"
+                                            prefix=""
                                             className="pl-8"
                                             value={config.operatorRealMonthlyMinutes}
-                                            onChange={(e) => setConfig({ ...config, operatorRealMonthlyMinutes: Number(e.target.value) })}
+                                            onValueChange={(val) => setConfig({ ...config, operatorRealMonthlyMinutes: val || 0 })}
                                             required
                                         />
                                     </div>
@@ -163,28 +158,22 @@ export default function OperationalSettingsPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="rent">Arriendo</Label>
                                     <div className="relative">
-                                        <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
+                                        <CurrencyInput
                                             id="rent"
-                                            type="number"
-                                            min="0"
                                             className="pl-8"
                                             value={config.rent}
-                                            onChange={(e) => setConfig({ ...config, rent: Number(e.target.value) })}
+                                            onValueChange={(val) => setConfig({ ...config, rent: val || 0 })}
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="utilities">Servicios</Label>
                                     <div className="relative">
-                                        <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
+                                        <CurrencyInput
                                             id="utilities"
-                                            type="number"
-                                            min="0"
                                             className="pl-8"
                                             value={config.utilities}
-                                            onChange={(e) => setConfig({ ...config, utilities: Number(e.target.value) })}
+                                            onValueChange={(val) => setConfig({ ...config, utilities: val || 0 })}
                                         />
                                     </div>
                                 </div>
@@ -194,28 +183,22 @@ export default function OperationalSettingsPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="adminSalaries">Nómina Admin</Label>
                                     <div className="relative">
-                                        <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
+                                        <CurrencyInput
                                             id="adminSalaries"
-                                            type="number"
-                                            min="0"
                                             className="pl-8"
                                             value={config.adminSalaries}
-                                            onChange={(e) => setConfig({ ...config, adminSalaries: Number(e.target.value) })}
+                                            onValueChange={(val) => setConfig({ ...config, adminSalaries: val || 0 })}
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="otherExpenses">Otros Gastos</Label>
                                     <div className="relative">
-                                        <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
+                                        <CurrencyInput
                                             id="otherExpenses"
-                                            type="number"
-                                            min="0"
                                             className="pl-8"
                                             value={config.otherExpenses}
-                                            onChange={(e) => setConfig({ ...config, otherExpenses: Number(e.target.value) })}
+                                            onValueChange={(val) => setConfig({ ...config, otherExpenses: val || 0 })}
                                         />
                                     </div>
                                 </div>
@@ -225,13 +208,12 @@ export default function OperationalSettingsPage() {
                                 <Label htmlFor="operators">Número de Operarios</Label>
                                 <div className="relative">
                                     <Users className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <Input
+                                    <CurrencyInput
                                         id="operators"
-                                        type="number"
-                                        min="1"
+                                        prefix=""
                                         className="pl-8"
                                         value={config.numberOfOperators}
-                                        onChange={(e) => setConfig({ ...config, numberOfOperators: Number(e.target.value) })}
+                                        onValueChange={(val) => setConfig({ ...config, numberOfOperators: val || 0 })}
                                         required
                                     />
                                 </div>
@@ -253,7 +235,7 @@ export default function OperationalSettingsPage() {
                                 <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
                                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Costo MOD / Min</p>
                                     <div className="text-2xl font-bold text-blue-600">
-                                        ${config.modCostPerMinute?.toFixed(2) || '0.00'}
+                                        {formatCurrency(config.modCostPerMinute)}
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-1">Salario Real / Minutos Productivos</p>
                                 </div>
@@ -261,7 +243,7 @@ export default function OperationalSettingsPage() {
                                 <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm text-center">
                                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Costo CIF / Min</p>
                                     <div className="text-2xl font-bold text-orange-600">
-                                        ${config.cifCostPerMinute?.toFixed(2) || '0.00'}
+                                        {formatCurrency(config.cifCostPerMinute)}
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-1">Total Gastos / (Minutos * Operarios)</p>
                                 </div>
@@ -269,7 +251,7 @@ export default function OperationalSettingsPage() {
                                 <div className="bg-slate-900 p-4 rounded-xl shadow-sm text-center">
                                     <p className="text-xs font-medium text-slate-300 uppercase tracking-wider mb-1">Costo Total / Min</p>
                                     <div className="text-3xl font-bold text-white">
-                                        ${config.costPerMinute?.toFixed(2) || '0.00'}
+                                        {formatCurrency(config.costPerMinute)}
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-1">MOD + CIF</p>
                                 </div>

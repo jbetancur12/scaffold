@@ -4,6 +4,7 @@ import { mrpApi } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
 import { ArrowLeft, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { formatCurrency } from '@/lib/utils';
 import {
     Dialog,
     DialogContent,
@@ -227,7 +228,7 @@ export default function PurchaseOrderDetailPage() {
                         )}
                         <div>
                             <div className="text-sm text-slate-600">Total</div>
-                            <div className="font-medium text-lg">${order.totalAmount.toFixed(2)}</div>
+                            <div className="font-medium text-lg">{formatCurrency(order.totalAmount)}</div>
                         </div>
                     </div>
                     {order.notes && (
@@ -277,16 +278,12 @@ export default function PurchaseOrderDetailPage() {
                                                 {item.quantity} {item.rawMaterial.unit}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                            <div className="text-sm text-slate-900">
-                                                ${item.unitPrice.toFixed(2)}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                            <div className="text-sm font-medium text-slate-900">
-                                                ${item.subtotal.toFixed(2)}
-                                            </div>
-                                        </td>
+                                        <div className="text-sm text-slate-900">
+                                            {formatCurrency(item.unitPrice)}
+                                        </div>
+                                        <div className="text-sm font-medium text-slate-900">
+                                            {formatCurrency(item.subtotal)}
+                                        </div>
                                     </tr>
                                 ))}
                             </tbody>
@@ -296,7 +293,7 @@ export default function PurchaseOrderDetailPage() {
                                         Total:
                                     </td>
                                     <td className="px-6 py-4 text-right font-bold text-lg">
-                                        ${order.totalAmount.toFixed(2)}
+                                        {formatCurrency(order.totalAmount)}
                                     </td>
                                 </tr>
                             </tfoot>

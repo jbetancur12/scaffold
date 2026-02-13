@@ -4,6 +4,7 @@ import { mrpApi } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
 import { Plus, Eye, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { formatCurrency } from '@/lib/utils';
 import {
     Dialog,
     DialogContent,
@@ -206,7 +207,7 @@ export default function PurchaseOrderListPage() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                                        ${order.totalAmount.toFixed(2)}
+                                        {formatCurrency(order.totalAmount)}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         <div className="flex justify-end gap-2">

@@ -1,0 +1,1 @@
+src/pages/mrp/OperationalSettingsPage.tsx(9,28): error TS6133: 'DollarSign' is declared but its value is never read.

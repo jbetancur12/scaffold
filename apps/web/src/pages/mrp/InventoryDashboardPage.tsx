@@ -32,6 +32,8 @@ import {
 import { Loader2, Package, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { formatQuantity } from '@/lib/utils';
 
 interface PopulatedInventoryItem extends InventoryItem {
     variant?: ProductVariant & { product?: Product };
@@ -230,13 +232,11 @@ export default function InventoryDashboardPage() {
                                 </div>
                                 <div className="grid gap-2">
                                     <Label htmlFor="cost">Costo Unitario (para promedio)</Label>
-                                    <Input
+                                    <CurrencyInput
                                         id="cost"
-                                        type="number"
-                                        step="0.01"
                                         value={manualCost}
-                                        onChange={(e) => setManualCost(e.target.value)}
-                                        placeholder="Ej. 1500"
+                                        onValueChange={(val) => setManualCost(val?.toString() || '')}
+                                        placeholder="Ej. 1.500"
                                     />
                                 </div>
                             </div>
@@ -299,7 +299,7 @@ export default function InventoryDashboardPage() {
                                         <TableCell>{getItemType(item)}</TableCell>
                                         <TableCell>{item.warehouse?.name || '---'}</TableCell>
                                         <TableCell className="text-right font-bold text-lg text-slate-700">
-                                            {item.quantity}
+                                            {formatQuantity(item.quantity)}
                                         </TableCell>
                                         <TableCell className="text-muted-foreground">
                                             {item.updatedAt ? format(new Date(item.updatedAt), 'dd/MM/yyyy HH:mm') : '-'}
