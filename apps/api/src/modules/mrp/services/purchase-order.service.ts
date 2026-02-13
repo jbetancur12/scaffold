@@ -161,8 +161,12 @@ export class PurchaseOrderService {
     }
 
     private async updateLastPurchaseInfo(supplier: Supplier, item: PurchaseOrderItem): Promise<void> {
+        // Price with tax = (Base Price * Qty + Tax) / Qty
+        // Note: item.subtotal already includes taxAmount (see createPurchaseOrder)
+        const purchasePriceWithTax = item.quantity > 0 ? Number(item.subtotal) / Number(item.quantity) : Number(item.unitPrice);
+
         // Update global last purchase on raw material
-        item.rawMaterial.lastPurchasePrice = item.unitPrice;
+        item.rawMaterial.lastPurchasePrice = purchasePriceWithTax;
         item.rawMaterial.lastPurchaseDate = new Date();
 
         // Upsert SupplierMaterial link
@@ -175,11 +179,11 @@ export class PurchaseOrderService {
             supplierMaterial = this.supplierMaterialRepo.create({
                 supplier,
                 rawMaterial: item.rawMaterial,
-                lastPurchasePrice: item.unitPrice,
+                lastPurchasePrice: purchasePriceWithTax,
                 lastPurchaseDate: new Date(),
             } as SupplierMaterial);
         } else {
-            supplierMaterial.lastPurchasePrice = item.unitPrice;
+            supplierMaterial.lastPurchasePrice = purchasePriceWithTax;
             supplierMaterial.lastPurchaseDate = new Date();
         }
 
@@ -233,7 +237,7 @@ export class PurchaseOrderService {
         const receivedQty = item.quantity;
 
         // Use Gross Price (Total with tax) for inventory cost update
-        const purchasePriceWithTax = (item.unitPrice * item.quantity + (item.taxAmount || 0)) / item.quantity;
+        const purchasePriceWithTax = item.quantity > 0 ? Number(item.subtotal) / Number(item.quantity) : Number(item.unitPrice);
 
         if (currentStock + receivedQty > 0) {
             const newAvgCost =

@@ -19,6 +19,7 @@ const CreatePurchaseOrderSchema = z.object({
         rawMaterialId: z.string().uuid(),
         quantity: z.number().min(0.01),
         unitPrice: z.number().min(0),
+        taxAmount: z.number().min(0).optional(),
     })),
 });
 
