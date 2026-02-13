@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
-import { Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Calculator, Check, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '../../components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
@@ -36,6 +36,9 @@ export default function PurchaseOrderFormPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
+    const [activeCalcIdx, setActiveCalcIdx] = useState<number | null>(null);
+    const [calcBulkPrice, setCalcBulkPrice] = useState<number>(0);
+    const [calcBulkQty, setCalcBulkQty] = useState<number>(0);
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
 
@@ -286,15 +289,98 @@ export default function PurchaseOrderFormPage() {
                                             </div>
                                         </div>
 
-                                        <div className="md:col-span-2">
+                                        <div className="md:col-span-2 relative">
                                             <Label className="md:hidden">Precio Unitario *</Label>
-                                            <CurrencyInput
-                                                className="h-8 text-sm text-right"
-                                                value={item.unitPrice || ''}
-                                                onValueChange={(val) => updateItem(index, 'unitPrice', val || 0)}
-                                                placeholder="$0"
-                                                required
-                                            />
+                                            <div className="flex items-center gap-1">
+                                                <CurrencyInput
+                                                    className="h-8 text-sm text-right flex-1"
+                                                    value={item.unitPrice || ''}
+                                                    onValueChange={(val) => updateItem(index, 'unitPrice', val || 0)}
+                                                    placeholder="$0"
+                                                    required
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className={`h-8 w-8 p-0 ${activeCalcIdx === index ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+                                                    onClick={() => {
+                                                        if (activeCalcIdx === index) {
+                                                            setActiveCalcIdx(null);
+                                                        } else {
+                                                            setActiveCalcIdx(index);
+                                                            setCalcBulkPrice(0);
+                                                            setCalcBulkQty(0);
+                                                        }
+                                                    }}
+                                                    title="Calcular precio unitario"
+                                                >
+                                                    <Calculator className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+
+                                            {activeCalcIdx === index && (
+                                                <div className="absolute z-10 top-full right-0 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-xl p-3 space-y-3 animate-in fade-in zoom-in duration-200">
+                                                    <div className="flex justify-between items-center border-b pb-1 mb-2">
+                                                        <span className="text-xs font-bold text-slate-700">Calculadora de Precio</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setActiveCalcIdx(null)}
+                                                            className="text-slate-400 hover:text-slate-600"
+                                                        >
+                                                            <X className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <div>
+                                                            <label className="text-[10px] uppercase font-bold text-slate-500">Precio Total Cotizado</label>
+                                                            <CurrencyInput
+                                                                className="h-7 text-xs text-right"
+                                                                value={calcBulkPrice || ''}
+                                                                onValueChange={(val) => setCalcBulkPrice(val || 0)}
+                                                                placeholder="$0"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] uppercase font-bold text-slate-500">Cantidad en el Empaque / Rollo</label>
+                                                            <Input
+                                                                type="number"
+                                                                className="h-7 text-xs text-right"
+                                                                value={calcBulkQty || ''}
+                                                                onChange={(e) => setCalcBulkQty(parseFloat(e.target.value) || 0)}
+                                                                placeholder="Cant."
+                                                            />
+                                                        </div>
+
+                                                        {calcBulkPrice > 0 && calcBulkQty > 0 && (
+                                                            <div className="bg-slate-50 p-2 rounded border border-slate-100 text-center">
+                                                                <div className="text-[10px] text-slate-500 uppercase">Precio Unitario Resultante</div>
+                                                                <div className="text-sm font-bold text-blue-600">
+                                                                    {formatCurrency(calcBulkPrice / calcBulkQty)}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex gap-2 pt-1">
+                                                            <Button
+                                                                type="button"
+                                                                variant="default"
+                                                                size="sm"
+                                                                className="flex-1 h-7 text-xs"
+                                                                disabled={!calcBulkPrice || !calcBulkQty}
+                                                                onClick={() => {
+                                                                    const calculated = calcBulkPrice / calcBulkQty;
+                                                                    updateItem(index, 'unitPrice', calculated);
+                                                                    setActiveCalcIdx(null);
+                                                                }}
+                                                            >
+                                                                <Check className="h-3 w-3 mr-1" /> Aplicar
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="md:col-span-1 flex items-center justify-center md:justify-center">
@@ -314,7 +400,7 @@ export default function PurchaseOrderFormPage() {
                                             <div className="w-full md:w-auto">
                                                 <Label className="md:hidden">Total Línea</Label>
                                                 <div className="mt-1 md:mt-0 px-2 py-1 bg-slate-50 border border-slate-100 rounded md:border-none md:bg-transparent text-right text-sm font-semibold text-slate-700">
-                                                    {formatCurrency(subtotal * (item.hasIva ? 1.19 : 1))}
+                                                    {formatCurrency(subtotal)}
                                                 </div>
                                             </div>
                                         </div>
