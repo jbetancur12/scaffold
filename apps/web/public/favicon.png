@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Background -->
+  <rect width="256" height="256" fill="white"/>
+  
+  <!-- Dark blue outer circle (O) -->
+  <circle cx="128" cy="128" r="100" fill="#253779" stroke="#2866a9" stroke-width="8"/>
+  
+  <!-- Inner white circle to create the O shape -->
+  <circle cx="128" cy="128" r="70" fill="white"/>
+  
+  <!-- Stylized spine/vertebral column in the center -->
+  <g fill="#253779">
+    <!-- Top vertebra -->
+    <ellipse cx="128" cy="80" rx="12" ry="8"/>
+    <rect x="124" y="80" width="8" height="12" rx="2"/>
+    
+    <!-- Second vertebra -->
+    <ellipse cx="128" cy="100" rx="14" ry="8"/>
+    <rect x="123" y="100" width="10" height="12" rx="2"/>
+    
+    <!-- Third vertebra (middle) -->
+    <ellipse cx="128" cy="120" rx="15" ry="9"/>
+    <rect x="122" y="120" width="12" height="14" rx="2"/>
+    
+    <!-- Fourth vertebra -->
+    <ellipse cx="128" cy="142" rx="14" ry="8"/>
+    <rect x="123" y="142" width="10" height="12" rx="2"/>
+    
+    <!-- Bottom vertebra -->
+    <ellipse cx="128" cy="162" rx="12" ry="8"/>
+    <rect x="124" y="162" width="8" height="12" rx="2"/>
+    
+    <!-- Spinal cord line connecting vertebrae -->
+    <line x1="128" y1="75" x2="128" y2="175" stroke="#2866a9" stroke-width="3" opacity="0.6"/>
+  </g>
+</svg>
