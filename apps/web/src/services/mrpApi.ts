@@ -227,4 +227,10 @@ export const mrpApi = {
         const response = await api.put('/mrp/operational-config', data);
         return response.data;
     },
+
+    // Supplier Materials
+    removeSupplierMaterial: async (id: string, materialId: string) => {
+        const response = await api.delete(`/mrp/suppliers/${id}/materials/${materialId}`);
+        return response.data;
+    },
 };

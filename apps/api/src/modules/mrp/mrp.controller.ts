@@ -190,6 +190,16 @@ export class MrpController {
         }
     }
 
+    async removeSupplierMaterial(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id, materialId } = req.params;
+            await this.supplierService.removeSupplierMaterial(id, materialId);
+            res.status(204).send();
+        } catch (error) {
+            next(error);
+        }
+    }
+
     // --- Raw Materials ---
     async getRawMaterialSuppliers(req: Request, res: Response, next: NextFunction) {
         try {

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { mrpApi } from '@/services/mrpApi';
 import { RawMaterial } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import {
     Dialog,
@@ -113,6 +113,27 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
         }
     };
 
+    const handleRemoveMaterial = async (materialId: string) => {
+        if (!confirm('¿Está seguro de que desea desvincular este material del proveedor?')) {
+            return;
+        }
+
+        try {
+            await mrpApi.removeSupplierMaterial(supplierId, materialId);
+            toast({
+                title: "Éxito",
+                description: "Material desvinculado correctamente",
+            });
+            loadMaterials();
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: "No se pudo desvincular el material",
+                variant: "destructive"
+            });
+        }
+    };
+
     if (loading) {
         return <div className="p-4 text-center">Cargando materiales...</div>;
     }
@@ -183,12 +204,13 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
                             <th className="h-12 px-4 text-left font-medium text-muted-foreground">Material</th>
                             <th className="h-12 px-4 text-right font-medium text-muted-foreground">Último Precio</th>
                             <th className="h-12 px-4 text-right font-medium text-muted-foreground">Fecha Últ. Compra</th>
+                            <th className="h-12 px-4 text-right font-medium text-muted-foreground">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         {materials.length === 0 ? (
                             <tr>
-                                <td colSpan={4} className="p-4 text-center text-muted-foreground">
+                                <td colSpan={5} className="p-4 text-center text-muted-foreground">
                                     No hay materiales registrados para este proveedor.
                                 </td>
                             </tr>
@@ -202,6 +224,16 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
                                     </td>
                                     <td className="p-4 text-right">
                                         {new Date(item.lastPurchaseDate).toLocaleDateString()}
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="text-muted-foreground hover:text-red-600 h-8 w-8 p-0"
+                                            onClick={() => handleRemoveMaterial(item.rawMaterial.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </td>
                                 </tr>
                             ))

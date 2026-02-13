@@ -84,4 +84,16 @@ export class SupplierService {
 
         return link;
     }
+
+    async removeSupplierMaterial(supplierId: string, materialId: string) {
+        const supplierMaterialRepo = this.em.getRepository(SupplierMaterial);
+        const link = await supplierMaterialRepo.findOne({
+            supplier: supplierId,
+            rawMaterial: materialId
+        });
+
+        if (link) {
+            await this.em.removeAndFlush(link);
+        }
+    }
 }
