@@ -115,18 +115,18 @@ export default function RawMaterialFormPage() {
     useEffect(() => {
         const qty = Number(calcQty);
         if (calcPrice > 0 && qty > 0) {
-            const subtotal = calcMode === 'TOTAL'
-                ? calcPrice / (1 + (calcTaxRate / 100))
+            const total = calcMode === 'BASE'
+                ? calcPrice * (1 + (calcTaxRate / 100))
                 : calcPrice;
-            setFormData(prev => ({ ...prev, cost: Number((subtotal / qty).toFixed(2)) }));
+            setFormData(prev => ({ ...prev, cost: Number((total / qty).toFixed(2)) }));
         }
     }, [calcPrice, calcQty, calcMode, calcTaxRate]);
 
     // Recalculate cost when manual IVA helper changes
     useEffect(() => {
         if (manualIncludesIva && rawCostInput > 0) {
-            const baseCost = rawCostInput / (1 + (manualIvaPercentage / 100));
-            setFormData(prev => ({ ...prev, cost: Number(baseCost.toFixed(2)) }));
+            const totalWithIva = rawCostInput * (1 + (manualIvaPercentage / 100));
+            setFormData(prev => ({ ...prev, cost: Number(totalWithIva.toFixed(2)) }));
         } else if (!manualIncludesIva && rawCostInput > 0) {
             setFormData(prev => ({ ...prev, cost: rawCostInput }));
         }
@@ -276,7 +276,7 @@ export default function RawMaterialFormPage() {
                                             checked={manualIncludesIva}
                                             onChange={(e) => setManualIncludesIva(e.target.checked)}
                                         />
-                                        <Label htmlFor="manual-iva" className="text-xs font-normal cursor-pointer">Descontar IVA</Label>
+                                        <Label htmlFor="manual-iva" className="text-xs font-normal cursor-pointer">Sumar IVA (%)</Label>
                                     </div>
                                     {manualIncludesIva && (
                                         <div className="flex items-center gap-1">
@@ -398,7 +398,7 @@ export default function RawMaterialFormPage() {
                                             </span>
                                         </div>
                                         <div className="flex justify-between text-xs font-semibold text-slate-900 pt-1 border-t border-dashed border-slate-200">
-                                            <span>Total Facturado:</span>
+                                            <span>Total (IVA Incluido):</span>
                                             <span>
                                                 {formatCurrency(calcMode === 'TOTAL' ? calcPrice : calcPrice * (1 + (calcTaxRate / 100)))}
                                             </span>
@@ -407,7 +407,7 @@ export default function RawMaterialFormPage() {
                                 )}
 
                                 <p className="text-[10px] text-slate-400 leading-tight">
-                                    Nota: El sistema guardará el **Subtotal** dividido por la **Cantidad** como costo estándar, para mantener la base de costos sin impuestos.
+                                    Nota: El sistema guardará el **Total** dividido por la **Cantidad** como costo estándar, para incluir los impuestos en el costo del material.
                                 </p>
                             </div>
                         </div>
