@@ -148,7 +148,7 @@ export default function PurchaseOrderFormPage() {
                 description: 'Orden de compra creada exitosamente',
                 variant: 'default',
             });
-            navigate('/dashboard/mrp/purchase-orders');
+            navigate('/mrp/purchase-orders');
         } catch (error) {
             toast({
                 title: 'Error',
@@ -169,7 +169,7 @@ export default function PurchaseOrderFormPage() {
             <div className="mb-6">
                 <Button
                     variant="ghost"
-                    onClick={() => navigate('/dashboard/mrp/purchase-orders')}
+                    onClick={() => navigate('/mrp/purchase-orders')}
                     className="mb-4"
                 >
                     <ArrowLeft className="mr-2 h-4 w-4" />
@@ -444,7 +444,7 @@ export default function PurchaseOrderFormPage() {
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => navigate('/dashboard/mrp/purchase-orders')}
+                        onClick={() => navigate('/mrp/purchase-orders')}
                     >
                         Cancelar
                     </Button>

@@ -158,7 +158,7 @@ export default function ProductionOrderFormPage() {
                 const newOrder = await mrpApi.createProductionOrder(payload);
                 toast({ title: 'Éxito', description: 'Orden creada exitosamente' });
                 // Instead of navigating away, maybe go to view mode?
-                navigate(`/dashboard/mrp/production-orders/${newOrder.id}`);
+                navigate(`/mrp/production-orders/${newOrder.id}`);
             }
         } catch (error: unknown) {
             let message = 'Error al guardar';
@@ -194,7 +194,7 @@ export default function ProductionOrderFormPage() {
         <div className="space-y-8 max-w-5xl mx-auto">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/production-orders')}>
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/production-orders')}>
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div>
@@ -403,7 +403,7 @@ export default function ProductionOrderFormPage() {
                 )}
 
                 <div className="flex justify-end gap-4">
-                    <Button type="button" variant="ghost" onClick={() => navigate('/dashboard/mrp/production-orders')}>
+                    <Button type="button" variant="ghost" onClick={() => navigate('/mrp/production-orders')}>
                         Volver
                     </Button>
                     {!isReadOnly && (

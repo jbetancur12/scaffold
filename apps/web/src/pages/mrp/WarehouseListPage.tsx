@@ -66,7 +66,7 @@ export default function WarehouseListPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Almacenes</h1>
                     <p className="text-slate-500 mt-1">Gestiona los centros de almacenamiento y distribución.</p>
                 </div>
-                <Button onClick={() => navigate('/dashboard/mrp/warehouses/new')} className="shadow-lg shadow-primary/20">
+                <Button onClick={() => navigate('/mrp/warehouses/new')} className="shadow-lg shadow-primary/20">
                     <Plus className="mr-2 h-4 w-4" />
                     Nuevo Almacén
                 </Button>
@@ -111,7 +111,7 @@ export default function WarehouseListPage() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => navigate(`/dashboard/mrp/warehouses/${warehouse.id}/edit`)}
+                                                onClick={() => navigate(`/mrp/warehouses/${warehouse.id}/edit`)}
                                                 className="h-8 w-8 p-0"
                                             >
                                                 <Edit2 className="h-4 w-4 text-slate-400 group-hover:text-primary transition-colors" />

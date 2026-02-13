@@ -32,7 +32,7 @@ export default function ProductBOMPage() {
                 description: 'No se pudo cargar la información del producto',
                 variant: 'destructive',
             });
-            navigate('/dashboard/mrp/products');
+            navigate('/mrp/products');
         } finally {
             setLoading(false);
         }
@@ -87,7 +87,7 @@ export default function ProductBOMPage() {
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/products')}>
+                <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/products')}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>

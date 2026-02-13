@@ -27,7 +27,7 @@ export default function SupplierDetailPage() {
                 description: 'No se pudo cargar la información del proveedor',
                 variant: 'destructive',
             });
-            navigate('/dashboard/mrp/suppliers');
+            navigate('/mrp/suppliers');
         } finally {
             setLoading(false);
         }
@@ -52,7 +52,7 @@ export default function SupplierDetailPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/suppliers')}>
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/suppliers')}>
                         <ArrowLeft className="h-5 w-5" />
                     </Button>
                     <div className="flex items-center gap-3">
@@ -68,7 +68,7 @@ export default function SupplierDetailPage() {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={() => navigate(`/dashboard/mrp/suppliers/${id}/edit`)}>
+                    <Button onClick={() => navigate(`/mrp/suppliers/${id}/edit`)}>
                         <Edit2 className="mr-2 h-4 w-4" />
                         Editar Proveedor
                     </Button>

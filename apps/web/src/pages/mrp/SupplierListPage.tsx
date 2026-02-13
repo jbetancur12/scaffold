@@ -47,7 +47,7 @@ export default function SupplierListPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Proveedores</h1>
                     <p className="text-slate-500 mt-1">Gestiona la lista de proveedores y sus contactos.</p>
                 </div>
-                <Button onClick={() => navigate('/dashboard/mrp/suppliers/new')} className="shadow-lg shadow-primary/20">
+                <Button onClick={() => navigate('/mrp/suppliers/new')} className="shadow-lg shadow-primary/20">
                     <Plus className="mr-2 h-4 w-4" />
                     Nuevo Proveedor
                 </Button>
@@ -73,7 +73,7 @@ export default function SupplierListPage() {
                                 <TableRow
                                     key={supplier.id}
                                     className="group hover:bg-slate-50/50 transition-colors cursor-pointer"
-                                    onClick={() => navigate(`/dashboard/mrp/suppliers/${supplier.id}`)}
+                                    onClick={() => navigate(`/mrp/suppliers/${supplier.id}`)}
                                 >
                                     <TableCell className="font-medium">
                                         <div className="flex items-center gap-3">
@@ -92,7 +92,7 @@ export default function SupplierListPage() {
                                                 size="sm"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    navigate(`/dashboard/mrp/suppliers/${supplier.id}/edit`);
+                                                    navigate(`/mrp/suppliers/${supplier.id}/edit`);
                                                 }}
                                                 className="h-8 w-8 p-0"
                                             >

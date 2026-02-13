@@ -60,7 +60,7 @@ export default function ProductFormPage() {
                 description: 'No se pudo cargar el producto',
                 variant: 'destructive',
             });
-            navigate('/dashboard/mrp/products');
+            navigate('/mrp/products');
         } finally {
             setLoading(false);
         }
@@ -84,14 +84,14 @@ export default function ProductFormPage() {
                     title: 'Éxito',
                     description: 'Producto actualizado exitosamente',
                 });
-                navigate(`/dashboard/mrp/products/${id}`);
+                navigate(`/mrp/products/${id}`);
             } else {
                 const newProduct = await mrpApi.createProduct(formData);
                 toast({
                     title: 'Éxito',
                     description: 'Producto creado exitosamente',
                 });
-                navigate(`/dashboard/mrp/products/${newProduct.id}`);
+                navigate(`/mrp/products/${newProduct.id}`);
             }
         } catch (error) {
             if (error instanceof z.ZodError) {
@@ -123,7 +123,7 @@ export default function ProductFormPage() {
     return (
         <div className="space-y-6 max-w-2xl mx-auto">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => isEditing ? navigate(`/dashboard/mrp/products/${id}`) : navigate('/dashboard/mrp/products')}>
+                <Button variant="ghost" size="icon" onClick={() => isEditing ? navigate(`/mrp/products/${id}`) : navigate('/mrp/products')}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
@@ -199,7 +199,7 @@ export default function ProductFormPage() {
                     <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => isEditing ? navigate(`/dashboard/mrp/products/${id}`) : navigate('/dashboard/mrp/products')}
+                        onClick={() => isEditing ? navigate(`/mrp/products/${id}`) : navigate('/mrp/products')}
                     >
                         Cancelar
                     </Button>

@@ -33,7 +33,7 @@ export default function RawMaterialDetailPage() {
                 description: 'No se pudó cargar la información del material',
                 variant: 'destructive',
             });
-            navigate('/dashboard/mrp/raw-materials');
+            navigate('/mrp/raw-materials');
         } finally {
             setLoading(false);
         }
@@ -58,7 +58,7 @@ export default function RawMaterialDetailPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/raw-materials')}>
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/raw-materials')}>
                         <ArrowLeft className="h-5 w-5" />
                     </Button>
                     <div className="flex items-center gap-3">
@@ -74,7 +74,7 @@ export default function RawMaterialDetailPage() {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <Button onClick={() => navigate(`/dashboard/mrp/raw-materials/${id}/edit`)}>
+                    <Button onClick={() => navigate(`/mrp/raw-materials/${id}/edit`)}>
                         <Edit2 className="mr-2 h-4 w-4" />
                         Editar Material
                     </Button>

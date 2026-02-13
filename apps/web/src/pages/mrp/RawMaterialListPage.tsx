@@ -71,7 +71,7 @@ export default function RawMaterialListPage() {
                             className="pl-8 w-[200px] lg:w-[300px]"
                         />
                     </div>
-                    <Button onClick={() => navigate('/dashboard/mrp/raw-materials/new')} className="shadow-lg shadow-primary/20">
+                    <Button onClick={() => navigate('/mrp/raw-materials/new')} className="shadow-lg shadow-primary/20">
                         <Plus className="mr-2 h-4 w-4" />
                         Nuevo Material
                     </Button>
@@ -102,7 +102,7 @@ export default function RawMaterialListPage() {
                                     <TableRow
                                         key={material.id}
                                         className="group hover:bg-slate-50/50 transition-colors cursor-pointer"
-                                        onClick={() => navigate(`/dashboard/mrp/raw-materials/${material.id}`)}
+                                        onClick={() => navigate(`/mrp/raw-materials/${material.id}`)}
                                     >
                                         <TableCell className="font-medium">
                                             <div className="flex items-center gap-3">
@@ -131,7 +131,7 @@ export default function RawMaterialListPage() {
                                                     size="sm"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        navigate('/dashboard/mrp/raw-materials/new', {
+                                                        navigate('/mrp/raw-materials/new', {
                                                             state: {
                                                                 initialData: {
                                                                     ...material,
@@ -154,7 +154,7 @@ export default function RawMaterialListPage() {
                                                     size="sm"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        navigate(`/dashboard/mrp/raw-materials/${material.id}/edit`);
+                                                        navigate(`/mrp/raw-materials/${material.id}/edit`);
                                                     }}
                                                     title="Editar Material"
                                                     className="h-8 w-8 p-0"

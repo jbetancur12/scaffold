@@ -86,7 +86,7 @@ export default function PurchaseOrderDetailPage() {
                 description: 'No se pudo cargar la orden de compra',
                 variant: 'destructive',
             });
-            navigate('/dashboard/mrp/purchase-orders');
+            navigate('/mrp/purchase-orders');
         } finally {
             setLoading(false);
         }
@@ -138,7 +138,7 @@ export default function PurchaseOrderDetailPage() {
                 title: 'Éxito',
                 description: 'Orden cancelada',
             });
-            navigate('/dashboard/mrp/purchase-orders');
+            navigate('/mrp/purchase-orders');
         } catch (error) {
             toast({
                 title: 'Error',
@@ -165,7 +165,7 @@ export default function PurchaseOrderDetailPage() {
             <div className="mb-6">
                 <Button
                     variant="ghost"
-                    onClick={() => navigate('/dashboard/mrp/purchase-orders')}
+                    onClick={() => navigate('/mrp/purchase-orders')}
                     className="mb-4"
                 >
                     <ArrowLeft className="mr-2 h-4 w-4" />

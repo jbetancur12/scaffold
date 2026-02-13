@@ -66,7 +66,7 @@ export default function ProductListPage() {
                     <h1 className="text-3xl font-bold tracking-tight text-slate-900">Productos</h1>
                     <p className="text-slate-500 mt-1">Gestiona el catálogo de productos y sus variantes.</p>
                 </div>
-                <Button onClick={() => navigate('/dashboard/mrp/products/new')} className="shadow-lg shadow-primary/20">
+                <Button onClick={() => navigate('/mrp/products/new')} className="shadow-lg shadow-primary/20">
                     <Plus className="mr-2 h-4 w-4" />
                     Nuevo Producto
                 </Button>
@@ -146,13 +146,13 @@ export default function ProductListPage() {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
-                                                <Button size="sm" variant="ghost" onClick={() => navigate(`/dashboard/mrp/products/${product.id}/bom`)} title="BOM">
+                                                <Button size="sm" variant="ghost" onClick={() => navigate(`/mrp/products/${product.id}/bom`)} title="BOM">
                                                     <Layers className="h-4 w-4 text-slate-400 hover:text-primary" />
                                                 </Button>
-                                                <Button size="sm" variant="ghost" onClick={() => navigate(`/dashboard/mrp/products/${product.id}`)} title="Ver Detalle">
+                                                <Button size="sm" variant="ghost" onClick={() => navigate(`/mrp/products/${product.id}`)} title="Ver Detalle">
                                                     <Eye className="h-4 w-4 text-slate-400 hover:text-primary" />
                                                 </Button>
-                                                <Button size="sm" variant="ghost" onClick={() => navigate(`/dashboard/mrp/products/${product.id}/edit`)} title="Editar">
+                                                <Button size="sm" variant="ghost" onClick={() => navigate(`/mrp/products/${product.id}/edit`)} title="Editar">
                                                     <Edit2 className="h-4 w-4 text-slate-400 hover:text-primary" />
                                                 </Button>
                                                 <Button size="sm" variant="ghost" onClick={() => handleDeleteProduct(product.id)} title="Eliminar">

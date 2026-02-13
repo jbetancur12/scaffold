@@ -68,7 +68,7 @@ export default function ProductionOrderListPage() {
                         Gestiona y monitorea las órdenes de producción.
                     </p>
                 </div>
-                <Button onClick={() => navigate('/dashboard/mrp/production-orders/new')}>
+                <Button onClick={() => navigate('/mrp/production-orders/new')}>
                     <Plus className="mr-2 h-4 w-4" />
                     Nueva Orden
                 </Button>
@@ -114,7 +114,7 @@ export default function ProductionOrderListPage() {
                                         {order.endDate ? format(new Date(order.endDate), 'dd/MM/yyyy') : '-'}
                                     </TableCell>
                                     <TableCell>
-                                        <Button variant="ghost" size="icon" onClick={() => navigate(`/dashboard/mrp/production-orders/${order.id}`)}>
+                                        <Button variant="ghost" size="icon" onClick={() => navigate(`/mrp/production-orders/${order.id}`)}>
                                             <Eye className="h-4 w-4" />
                                         </Button>
                                     </TableCell>

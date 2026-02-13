@@ -51,7 +51,7 @@ export default function WarehouseFormPage() {
                 description: 'No se pudo cargar el almacén',
                 variant: 'destructive',
             });
-            navigate('/dashboard/mrp/warehouses');
+            navigate('/mrp/warehouses');
         } finally {
             setLoading(false);
         }
@@ -82,7 +82,7 @@ export default function WarehouseFormPage() {
                     description: 'Almacén creado correctamente',
                 });
             }
-            navigate('/dashboard/mrp/warehouses');
+            navigate('/mrp/warehouses');
         } catch (error: unknown) {
             let message = 'Error al guardar';
             if (error instanceof z.ZodError) {
@@ -101,7 +101,7 @@ export default function WarehouseFormPage() {
     return (
         <div className="space-y-8 max-w-2xl mx-auto">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/warehouses')}>
+                <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/warehouses')}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
@@ -160,7 +160,7 @@ export default function WarehouseFormPage() {
                     <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => navigate('/dashboard/mrp/warehouses')}
+                        onClick={() => navigate('/mrp/warehouses')}
                     >
                         Cancelar
                     </Button>

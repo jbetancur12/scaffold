@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import logo from '@/assets/logo.jpg';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -61,14 +62,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
 
     const mrpItems = [
-        { icon: Package, label: 'Productos', path: '/dashboard/mrp/products', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: Package, label: 'Materias Primas', path: '/dashboard/mrp/raw-materials', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: ShoppingCart, label: 'Proveedores', path: '/dashboard/mrp/suppliers', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: ShoppingCart, label: 'Órdenes de Compra', path: '/dashboard/mrp/purchase-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: Factory, label: 'Órdenes de Producción', path: '/dashboard/mrp/production-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: Warehouse, label: 'Inventario', path: '/dashboard/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: Warehouse, label: 'Almacenes', path: '/dashboard/mrp/warehouses', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: Settings, label: 'Configuración Operativa', path: '/dashboard/mrp/operational-settings', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Package, label: 'Productos', path: '/mrp/products', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Package, label: 'Materias Primas', path: '/mrp/raw-materials', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: ShoppingCart, label: 'Proveedores', path: '/mrp/suppliers', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: ShoppingCart, label: 'Órdenes de Compra', path: '/mrp/purchase-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Factory, label: 'Órdenes de Producción', path: '/mrp/production-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Warehouse, label: 'Inventario', path: '/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Warehouse, label: 'Almacenes', path: '/mrp/warehouses', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Settings, label: 'Configuración Operativa', path: '/mrp/operational-settings', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
     ];
 
     const filteredMrpItems = mrpItems.filter(item =>
@@ -99,9 +100,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <SidebarItem
                 icon={LayoutDashboard}
                 label="Resumen"
-                active={location.pathname === '/dashboard'}
+                active={location.pathname === '/'}
                 onClick={() => {
-                    navigate('/dashboard');
+                    navigate('/');
                     onItemClick?.();
                 }}
             />
@@ -145,9 +146,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidebarItem
                     icon={Users}
                     label="Usuarios"
-                    active={location.pathname === '/dashboard/users'}
+                    active={location.pathname === '/users'}
                     onClick={() => {
-                        navigate('/dashboard/users');
+                        navigate('/users');
                         onItemClick?.();
                     }}
                 />
@@ -160,10 +161,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Desktop Sidebar */}
             <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 p-6 sticky top-0 h-screen">
                 <div className="flex items-center gap-3 mb-10 px-2">
-                    <div className="h-10 w-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-                        <LayoutDashboard className="text-white h-6 w-6" />
-                    </div>
-                    <span className="text-xl font-bold tracking-tight text-slate-900">Scaffold UI</span>
+                    <img
+                        src={logo}
+                        alt="Colortópedicas"
+                        className="h-12 w-auto object-contain"
+                    />
                 </div>
 
                 <nav className="flex-1 space-y-2 overflow-y-auto pr-2 custom-scrollbar">
@@ -206,10 +208,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}>
                 <div className="flex items-center justify-between mb-10 px-2">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-primary rounded-xl flex items-center justify-center">
-                            <LayoutDashboard className="text-white h-6 w-6" />
-                        </div>
-                        <span className="text-xl font-bold text-slate-900">Scaffold UI</span>
+                        <img
+                            src={logo}
+                            alt="Colortópedicas"
+                            className="h-12 w-auto object-contain"
+                        />
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
                         <X className="h-6 w-6" />

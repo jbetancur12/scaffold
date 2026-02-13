@@ -30,7 +30,7 @@ export default function LoginPage() {
                 title: 'Éxito',
                 description: 'Has iniciado sesión correctamente.',
             });
-            navigate('/dashboard');
+            navigate('/');
         } catch (error: unknown) {
             let message = 'Credenciales inválidas. Por favor, inténtalo de nuevo.';
 

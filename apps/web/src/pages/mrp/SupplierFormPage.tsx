@@ -54,7 +54,7 @@ export default function SupplierFormPage() {
                 title: 'Éxito',
                 description: 'Proveedor creado exitosamente',
             });
-            navigate('/dashboard/mrp/suppliers');
+            navigate('/mrp/suppliers');
         } catch (error: unknown) {
             let message = 'Error al guardar';
             if (error instanceof z.ZodError) {
@@ -73,7 +73,7 @@ export default function SupplierFormPage() {
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/suppliers')}>
+                <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/suppliers')}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
@@ -190,7 +190,7 @@ export default function SupplierFormPage() {
                     <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => navigate('/dashboard/mrp/suppliers')}
+                        onClick={() => navigate('/mrp/suppliers')}
                     >
                         Cancelar
                     </Button>

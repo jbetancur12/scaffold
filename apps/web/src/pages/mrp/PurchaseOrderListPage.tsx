@@ -156,7 +156,7 @@ export default function PurchaseOrderListPage() {
                     <h1 className="text-3xl font-bold">Órdenes de Compra</h1>
                     <p className="text-slate-600">Gestiona las compras de materias primas.</p>
                 </div>
-                <Button onClick={() => navigate('/dashboard/mrp/purchase-orders/new')}>
+                <Button onClick={() => navigate('/mrp/purchase-orders/new')}>
                     <Plus className="mr-2 h-4 w-4" />
                     Nueva Orden
                 </Button>
@@ -214,7 +214,7 @@ export default function PurchaseOrderListPage() {
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={() => navigate(`/dashboard/mrp/purchase-orders/${order.id}`)}
+                                                onClick={() => navigate(`/mrp/purchase-orders/${order.id}`)}
                                             >
                                                 <Eye className="h-4 w-4" />
                                             </Button>

@@ -81,7 +81,7 @@ export default function ProductDetailPage() {
                 description: 'No se pudo cargar el producto',
                 variant: 'destructive',
             });
-            navigate('/dashboard/mrp/products');
+            navigate('/mrp/products');
         } finally {
             setLoading(false);
         }
@@ -126,7 +126,7 @@ export default function ProductDetailPage() {
         try {
             await mrpApi.deleteProduct(id!);
             toast({ title: 'Éxito', description: 'Producto eliminado' });
-            navigate('/dashboard/mrp/products');
+            navigate('/mrp/products');
         } catch (error) {
             toast({ title: 'Error', description: 'No se pudo eliminar el producto', variant: 'destructive' });
         }
@@ -187,7 +187,7 @@ export default function ProductDetailPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/products')}>
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/products')}>
                         <ArrowLeft className="h-5 w-5" />
                     </Button>
                     <div className="flex items-center gap-3">
@@ -205,7 +205,7 @@ export default function ProductDetailPage() {
                         <Trash2 className="mr-2 h-4 w-4" />
                         Eliminar
                     </Button>
-                    <Button onClick={() => navigate(`/dashboard/mrp/products/${id}/edit`)}>
+                    <Button onClick={() => navigate(`/mrp/products/${id}/edit`)}>
                         <Edit2 className="mr-2 h-4 w-4" />
                         Editar Producto
                     </Button>
@@ -377,7 +377,7 @@ export default function ProductDetailPage() {
                         <p className="text-slate-500 max-w-md mx-auto mt-2 mb-6">
                             Para configurar la receta y los materiales de cada variante, accede al editor avanzado de BOM.
                         </p>
-                        <Button onClick={() => navigate(`/dashboard/mrp/products/${id}/bom`)}>
+                        <Button onClick={() => navigate(`/mrp/products/${id}/bom`)}>
                             Ir al Editor BOM
                         </Button>
                     </div>

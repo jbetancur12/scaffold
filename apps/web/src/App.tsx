@@ -56,7 +56,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     }
 
     if (user) {
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate to="/" replace />;
     }
 
     return <>{children}</>;
@@ -86,44 +86,42 @@ export default function App() {
                             </ProtectedRoute>
                         }
                     >
-                        <Route path="/dashboard" element={<DashboardPage />} />
-                        <Route path="/dashboard/users" element={<UsersPage />} />
+                        <Route path="/" element={<DashboardPage />} />
+                        <Route path="/users" element={<UsersPage />} />
 
                         {/* MRP Routes */}
-                        <Route path="/dashboard/mrp/products" element={<ProductListPage />} />
-                        <Route path="/dashboard/mrp/products/new" element={<ProductFormPage />} />
-                        <Route path="/dashboard/mrp/products/:id/bom" element={<ProductBOMPage />} />
-                        <Route path="/dashboard/mrp/products/:id" element={<ProductDetailPage />} />
-                        <Route path="/dashboard/mrp/products/:id/edit" element={<ProductFormPage />} />
+                        <Route path="/mrp/products" element={<ProductListPage />} />
+                        <Route path="/mrp/products/new" element={<ProductFormPage />} />
+                        <Route path="/mrp/products/:id/bom" element={<ProductBOMPage />} />
+                        <Route path="/mrp/products/:id" element={<ProductDetailPage />} />
+                        <Route path="/mrp/products/:id/edit" element={<ProductFormPage />} />
 
-                        <Route path="/dashboard/mrp/suppliers" element={<SupplierListPage />} />
-                        <Route path="/dashboard/mrp/suppliers/new" element={<SupplierFormPage />} />
-                        <Route path="/dashboard/mrp/suppliers/:id" element={<SupplierDetailPage />} />
-                        <Route path="/dashboard/mrp/suppliers/:id/edit" element={<SupplierFormPage />} />
+                        <Route path="/mrp/suppliers" element={<SupplierListPage />} />
+                        <Route path="/mrp/suppliers/new" element={<SupplierFormPage />} />
+                        <Route path="/mrp/suppliers/:id" element={<SupplierDetailPage />} />
+                        <Route path="/mrp/suppliers/:id/edit" element={<SupplierFormPage />} />
 
-                        <Route path="/dashboard/mrp/raw-materials" element={<RawMaterialListPage />} />
-                        <Route path="/dashboard/mrp/raw-materials/new" element={<RawMaterialFormPage />} />
-                        <Route path="/dashboard/mrp/raw-materials/:id" element={<RawMaterialDetailPage />} />
-                        <Route path="/dashboard/mrp/raw-materials/:id/edit" element={<RawMaterialFormPage />} />
+                        <Route path="/mrp/raw-materials" element={<RawMaterialListPage />} />
+                        <Route path="/mrp/raw-materials/new" element={<RawMaterialFormPage />} />
+                        <Route path="/mrp/raw-materials/:id" element={<RawMaterialDetailPage />} />
+                        <Route path="/mrp/raw-materials/:id/edit" element={<RawMaterialFormPage />} />
 
-                        <Route path="/dashboard/mrp/production-orders" element={<ProductionOrderListPage />} />
-                        <Route path="/dashboard/mrp/production-orders/new" element={<ProductionOrderFormPage />} />
-                        <Route path="/dashboard/mrp/production-orders/:id" element={<ProductionOrderDetailPage />} />
-                        <Route path="/dashboard/mrp/production-orders/:id/edit" element={<ProductionOrderFormPage />} />
+                        <Route path="/mrp/production-orders" element={<ProductionOrderListPage />} />
+                        <Route path="/mrp/production-orders/new" element={<ProductionOrderFormPage />} />
+                        <Route path="/mrp/production-orders/:id" element={<ProductionOrderDetailPage />} />
+                        <Route path="/mrp/production-orders/:id/edit" element={<ProductionOrderFormPage />} />
 
-                        <Route path="/dashboard/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
-                        <Route path="/dashboard/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />
-                        <Route path="/dashboard/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+                        <Route path="/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
+                        <Route path="/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />
+                        <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
 
-                        <Route path="/dashboard/mrp/operational-settings" element={<OperationalSettingsPage />} />
+                        <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
 
-                        <Route path="/dashboard/mrp/inventory" element={<InventoryDashboardPage />} />
-                        <Route path="/dashboard/mrp/warehouses" element={<WarehouseListPage />} />
-                        <Route path="/dashboard/mrp/warehouses/new" element={<WarehouseFormPage />} />
-                        <Route path="/dashboard/mrp/warehouses/:id/edit" element={<WarehouseFormPage />} />
+                        <Route path="/mrp/inventory" element={<InventoryDashboardPage />} />
+                        <Route path="/mrp/warehouses" element={<WarehouseListPage />} />
+                        <Route path="/mrp/warehouses/new" element={<WarehouseFormPage />} />
+                        <Route path="/mrp/warehouses/:id/edit" element={<WarehouseFormPage />} />
                     </Route>
-
-                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 </Routes>
                 <Toaster />
             </AuthProvider>

@@ -83,7 +83,7 @@ export default function RawMaterialFormPage() {
                 description: 'No se pudo cargar el material',
                 variant: 'destructive',
             });
-            navigate('/dashboard/mrp/raw-materials');
+            navigate('/mrp/raw-materials');
         } finally {
             setLoading(false);
         }
@@ -157,7 +157,7 @@ export default function RawMaterialFormPage() {
                     description: 'Material creado exitosamente',
                 });
             }
-            navigate('/dashboard/mrp/raw-materials');
+            navigate('/mrp/raw-materials');
         } catch (error: unknown) {
             let message = 'Error al guardar';
             if (error instanceof z.ZodError) {
@@ -176,7 +176,7 @@ export default function RawMaterialFormPage() {
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/mrp/raw-materials')}>
+                <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/raw-materials')}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
@@ -438,7 +438,7 @@ export default function RawMaterialFormPage() {
                     <Button
                         type="button"
                         variant="ghost"
-                        onClick={() => navigate('/dashboard/mrp/raw-materials')}
+                        onClick={() => navigate('/mrp/raw-materials')}
                     >
                         Cancelar
                     </Button>
