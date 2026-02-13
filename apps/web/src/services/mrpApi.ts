@@ -85,6 +85,7 @@ export const mrpApi = {
             rawMaterialId: string;
             quantity: number;
             unitPrice: number;
+            taxAmount?: number;
         }>;
     }) => api.post('/mrp/purchase-orders', data),
 

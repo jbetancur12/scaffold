@@ -17,6 +17,7 @@ interface CreatePurchaseOrderData {
         rawMaterialId: string;
         quantity: number;
         unitPrice: number;
+        taxAmount?: number;
     }>;
 }
 
@@ -53,25 +54,35 @@ export class PurchaseOrderService {
         } as PurchaseOrder);
 
         let totalAmount = 0;
+        let taxTotal = 0;
+        let subtotalBase = 0;
 
         // Create purchase order items
         for (const itemData of data.items) {
             const rawMaterial = await this.rawMaterialRepo.findOneOrFail({ id: itemData.rawMaterialId });
 
             const subtotal = itemData.quantity * itemData.unitPrice;
-            totalAmount += subtotal;
+            const taxAmount = itemData.taxAmount || 0;
+            const itemTotal = subtotal + taxAmount;
+
+            subtotalBase += subtotal;
+            taxTotal += taxAmount;
+            totalAmount += itemTotal;
 
             const item = this.purchaseOrderItemRepo.create({
                 purchaseOrder,
                 rawMaterial,
                 quantity: itemData.quantity,
                 unitPrice: itemData.unitPrice,
-                subtotal,
+                taxAmount,
+                subtotal: itemTotal,
             } as PurchaseOrderItem);
 
             purchaseOrder.items.add(item);
         }
 
+        purchaseOrder.subtotalBase = subtotalBase;
+        purchaseOrder.taxTotal = taxTotal;
         purchaseOrder.totalAmount = totalAmount;
 
         await this.em.persistAndFlush(purchaseOrder);
@@ -220,16 +231,18 @@ export class PurchaseOrderService {
         const currentStock = inventory.quantity - item.quantity; // Stock before this purchase
         const currentAvgCost = item.rawMaterial.averageCost || 0;
         const receivedQty = item.quantity;
-        const purchasePrice = item.unitPrice;
+
+        // Use Gross Price (Total with tax) for inventory cost update
+        const purchasePriceWithTax = (item.unitPrice * item.quantity + (item.taxAmount || 0)) / item.quantity;
 
         if (currentStock + receivedQty > 0) {
             const newAvgCost =
-                (currentStock * currentAvgCost + receivedQty * purchasePrice) /
+                (currentStock * currentAvgCost + receivedQty * purchasePriceWithTax) /
                 (currentStock + receivedQty);
 
             item.rawMaterial.averageCost = newAvgCost;
         } else {
-            item.rawMaterial.averageCost = purchasePrice;
+            item.rawMaterial.averageCost = purchasePriceWithTax;
         }
 
         await this.em.persistAndFlush([inventory, item.rawMaterial]);

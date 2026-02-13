@@ -17,8 +17,11 @@ export class PurchaseOrderItem {
     @Property({ type: 'decimal', precision: 10, scale: 2 })
     quantity!: number;
 
-    @Property({ type: 'decimal', precision: 10, scale: 2 })
+    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
     unitPrice!: number;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+    taxAmount: number = 0;
 
     @Property({ type: 'decimal', precision: 10, scale: 2 })
     subtotal!: number;

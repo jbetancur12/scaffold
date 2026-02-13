@@ -27,6 +27,7 @@ interface OrderItem {
     rawMaterialId: string;
     quantity: number;
     unitPrice: number;
+    hasIva: boolean;
 }
 
 
@@ -45,7 +46,7 @@ export default function PurchaseOrderFormPage() {
     });
 
     const [items, setItems] = useState<OrderItem[]>([
-        { rawMaterialId: '', quantity: 0, unitPrice: 0 }
+        { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false }
     ]);
 
     const loadData = useCallback(async () => {
@@ -70,7 +71,7 @@ export default function PurchaseOrderFormPage() {
     }, [loadData]);
 
     const addItem = () => {
-        setItems([...items, { rawMaterialId: '', quantity: 0, unitPrice: 0 }]);
+        setItems([...items, { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false }]);
     };
 
     const removeItem = (index: number) => {
@@ -85,14 +86,22 @@ export default function PurchaseOrderFormPage() {
         setItems(items.filter((_, i) => i !== index));
     };
 
-    const updateItem = (index: number, field: keyof OrderItem, value: string | number) => {
+    const updateItem = (index: number, field: keyof OrderItem, value: string | number | boolean) => {
         const newItems = [...items];
-        newItems[index] = { ...newItems[index], [field]: value };
+        newItems[index] = { ...newItems[index], [field]: value } as OrderItem;
         setItems(newItems);
     };
 
-    const calculateTotal = () => {
-        return items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    const calculateTotals = () => {
+        return items.reduce((acc, item) => {
+            const subtotal = item.quantity * item.unitPrice;
+            const taxAmount = item.hasIva ? subtotal * 0.19 : 0;
+            return {
+                subtotal: acc.subtotal + subtotal,
+                tax: acc.tax + taxAmount,
+                total: acc.total + subtotal + taxAmount
+            };
+        }, { subtotal: 0, tax: 0, total: 0 });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -125,7 +134,10 @@ export default function PurchaseOrderFormPage() {
             const submitData = {
                 ...formData,
                 expectedDeliveryDate: formData.expectedDeliveryDate || undefined,
-                items,
+                items: items.map(item => ({
+                    ...item,
+                    taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0
+                })),
             };
             await mrpApi.createPurchaseOrder(submitData);
             toast({
@@ -219,23 +231,35 @@ export default function PurchaseOrderFormPage() {
                         </Button>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-2">
+                        {/* Header for Desktop */}
+                        {items.length > 0 && (
+                            <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-t-lg text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <div className="md:col-span-4">Materia Prima</div>
+                                <div className="md:col-span-1 text-center">Cantidad</div>
+                                <div className="md:col-span-2 text-right">Precio Unit.</div>
+                                <div className="md:col-span-1 text-center">IVA</div>
+                                <div className="md:col-span-3 text-right">Total Línea</div>
+                                <div className="md:col-span-1"></div>
+                            </div>
+                        )}
+
                         {items.map((item, index) => {
                             const material = getMaterialById(item.rawMaterialId);
                             const subtotal = item.quantity * item.unitPrice;
 
                             return (
-                                <div key={index} className="border border-slate-200 rounded-lg p-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                                        <div className="md:col-span-2">
-                                            <Label>Materia Prima *</Label>
+                                <div key={index} className="border border-slate-200 rounded-lg md:rounded-none md:border-t-0 p-4 md:p-3 hover:bg-slate-50/50 transition-colors">
+                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                                        <div className="md:col-span-4">
+                                            <Label className="md:hidden">Materia Prima *</Label>
                                             <select
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full mt-1 md:mt-0 px-2 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 value={item.rawMaterialId}
                                                 onChange={(e) => updateItem(index, 'rawMaterialId', e.target.value)}
                                                 required
                                             >
-                                                <option value="">Selecciona una materia prima</option>
+                                                <option value="">Selecciona...</option>
                                                 {rawMaterials.map((material) => (
                                                     <option key={material.id} value={material.id}>
                                                         {material.name} ({material.sku})
@@ -244,25 +268,28 @@ export default function PurchaseOrderFormPage() {
                                             </select>
                                         </div>
 
-                                        <div>
-                                            <Label>Cantidad *</Label>
-                                            <Input
-                                                type="number"
-                                                step="0.01"
-                                                min="0.01"
-                                                value={item.quantity || ''}
-                                                onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                                                placeholder="0.00"
-                                                required
-                                            />
-                                            {material && (
-                                                <span className="text-xs text-slate-500">{material.unit}</span>
-                                            )}
+                                        <div className="md:col-span-1">
+                                            <Label className="md:hidden">Cantidad *</Label>
+                                            <div className="flex items-center gap-1">
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0.01"
+                                                    className="px-2 py-1.5 h-8 text-sm text-center"
+                                                    value={item.quantity || ''}
+                                                    onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                                    required
+                                                />
+                                                {material && (
+                                                    <span className="text-[10px] text-slate-400 whitespace-nowrap">{material.unit}</span>
+                                                )}
+                                            </div>
                                         </div>
 
-                                        <div>
-                                            <Label>Precio Unitario *</Label>
+                                        <div className="md:col-span-2">
+                                            <Label className="md:hidden">Precio Unitario *</Label>
                                             <CurrencyInput
+                                                className="h-8 text-sm text-right"
                                                 value={item.unitPrice || ''}
                                                 onValueChange={(val) => updateItem(index, 'unitPrice', val || 0)}
                                                 placeholder="$0"
@@ -270,19 +297,35 @@ export default function PurchaseOrderFormPage() {
                                             />
                                         </div>
 
-                                        <div className="flex items-end gap-2">
-                                            <div className="flex-1">
-                                                <Label>Subtotal</Label>
-                                                <div className="mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-sm font-medium">
-                                                    {formatCurrency(subtotal)}
+                                        <div className="md:col-span-1 flex items-center justify-center md:justify-center">
+                                            <Label className="md:hidden mr-2">IVA (19%)</Label>
+                                            <div className="flex items-center h-8">
+                                                <input
+                                                    type="checkbox"
+                                                    id={`iva-${index}`}
+                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                                    checked={item.hasIva}
+                                                    onChange={(e) => updateItem(index, 'hasIva' as any, e.target.checked)}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="md:col-span-3 flex md:flex-row flex-col items-center justify-between md:justify-end gap-2">
+                                            <div className="w-full md:w-auto">
+                                                <Label className="md:hidden">Total Línea</Label>
+                                                <div className="mt-1 md:mt-0 px-2 py-1 bg-slate-50 border border-slate-100 rounded md:border-none md:bg-transparent text-right text-sm font-semibold text-slate-700">
+                                                    {formatCurrency(subtotal * (item.hasIva ? 1.19 : 1))}
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        <div className="md:col-span-1 flex justify-end">
                                             <Button
                                                 type="button"
                                                 variant="ghost"
                                                 size="sm"
                                                 onClick={() => removeItem(index)}
-                                                className="text-red-600 hover:text-red-700"
+                                                className="text-slate-400 hover:text-red-600 h-8 w-8 p-0"
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
@@ -294,9 +337,19 @@ export default function PurchaseOrderFormPage() {
                     </div>
 
                     <div className="flex justify-end pt-4 border-t">
-                        <div className="text-right">
-                            <div className="text-sm text-slate-600">Total</div>
-                            <div className="text-2xl font-bold">{formatCurrency(calculateTotal())}</div>
+                        <div className="w-full max-w-xs space-y-2">
+                            <div className="flex justify-between text-sm text-slate-600">
+                                <span>Subtotal (Base):</span>
+                                <span>{formatCurrency(calculateTotals().subtotal)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-slate-600">
+                                <span>IVA Total:</span>
+                                <span>{formatCurrency(calculateTotals().tax)}</span>
+                            </div>
+                            <div className="flex justify-between text-xl font-bold pt-2 border-t text-slate-900">
+                                <span>Gran Total</span>
+                                <span>{formatCurrency(calculateTotals().total)}</span>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -1339,6 +1339,30 @@
           "default": "0",
           "mappedType": "decimal"
         },
+        "tax_total": {
+          "name": "tax_total",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "precision": 10,
+          "scale": 2,
+          "default": "0",
+          "mappedType": "decimal"
+        },
+        "subtotal_base": {
+          "name": "subtotal_base",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "precision": 10,
+          "scale": 2,
+          "default": "0",
+          "mappedType": "decimal"
+        },
         "notes": {
           "name": "notes",
           "type": "varchar(255)",
@@ -1452,6 +1476,19 @@
           "nullable": false,
           "precision": 10,
           "scale": 2,
+          "default": "0",
+          "mappedType": "decimal"
+        },
+        "tax_amount": {
+          "name": "tax_amount",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "precision": 10,
+          "scale": 2,
+          "default": "0",
           "mappedType": "decimal"
         },
         "subtotal": {

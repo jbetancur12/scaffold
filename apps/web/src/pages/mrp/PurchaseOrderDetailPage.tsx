@@ -32,6 +32,7 @@ interface PurchaseOrderItem {
     };
     quantity: number;
     unitPrice: number;
+    taxAmount: number;
     subtotal: number;
 }
 
@@ -43,6 +44,8 @@ interface PurchaseOrder {
     receivedDate?: string;
     status: 'PENDING' | 'CONFIRMED' | 'RECEIVED' | 'CANCELLED';
     totalAmount: number;
+    taxTotal: number;
+    subtotalBase: number;
     notes?: string;
     items: PurchaseOrderItem[];
 }
@@ -278,21 +281,46 @@ export default function PurchaseOrderDetailPage() {
                                                 {item.quantity} {item.rawMaterial.unit}
                                             </div>
                                         </td>
-                                        <div className="text-sm text-slate-900">
-                                            {formatCurrency(item.unitPrice)}
-                                        </div>
-                                        <div className="text-sm font-medium text-slate-900">
-                                            {formatCurrency(item.subtotal)}
-                                        </div>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                            <div className="text-sm text-slate-900">
+                                                {formatCurrency(item.unitPrice)}
+                                            </div>
+                                            {item.taxAmount > 0 && (
+                                                <div className="text-[10px] text-slate-400">
+                                                    + {formatCurrency(item.taxAmount / item.quantity)} IVA
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                            <div className="text-sm font-medium text-slate-900">
+                                                {formatCurrency(item.subtotal)}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
-                            <tfoot className="bg-slate-50">
+                            <tfoot className="bg-slate-50 border-t-2 border-slate-200">
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-4 text-right font-semibold">
-                                        Total:
+                                    <td colSpan={4} className="px-6 py-2 text-right text-sm text-slate-500">
+                                        Subtotal (Base):
                                     </td>
-                                    <td className="px-6 py-4 text-right font-bold text-lg">
+                                    <td className="px-6 py-2 text-right text-sm text-slate-700">
+                                        {formatCurrency(order.subtotalBase)}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-2 text-right text-sm text-slate-500">
+                                        IVA Total:
+                                    </td>
+                                    <td className="px-6 py-2 text-right text-sm text-slate-700">
+                                        {formatCurrency(order.taxTotal)}
+                                    </td>
+                                </tr>
+                                <tr className="bg-slate-100/50">
+                                    <td colSpan={4} className="px-6 py-4 text-right font-bold text-slate-900">
+                                        Gran Total:
+                                    </td>
+                                    <td className="px-6 py-4 text-right font-bold text-xl text-slate-900">
                                         {formatCurrency(order.totalAmount)}
                                     </td>
                                 </tr>

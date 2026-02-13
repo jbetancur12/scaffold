@@ -33,6 +33,12 @@ export class PurchaseOrder {
     @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
     totalAmount: number = 0;
 
+    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+    taxTotal: number = 0;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+    subtotalBase: number = 0;
+
     @Property({ nullable: true })
     notes?: string;
 

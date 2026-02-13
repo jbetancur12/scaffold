@@ -10,7 +10,7 @@
         "format": "prettier --write \"src/**/*.ts\"",
         "ts-check": "tsc --noEmit",
         "migration:create": "cross-env NODE_ENV=development mikro-orm migration:create",
-        "migration:up": "mikro-orm migration:up",
+        "migration:up": "cross-env NODE_ENV=development mikro-orm migration:up",
         "migration:prod": "node dist/apps/api/src/scripts/run-migration.js",
         "migration:down": "cross-env NODE_ENV=development mikro-orm migration:down",
         "schema:update": "cross-env NODE_ENV=development mikro-orm schema:update --run",
