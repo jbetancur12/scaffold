@@ -14,10 +14,10 @@ export interface User {
 
 // MRP Enums
 export enum UnitType {
-    UNIT = 'unit',
+    UNIT = 'unidad',
     KG = 'kg',
-    LITER = 'liter',
-    METER = 'meter',
+    LITER = 'litro',
+    METER = 'metro',
 }
 
 export enum WarehouseType {
