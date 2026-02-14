@@ -90,8 +90,9 @@ services:
       timeout: 10s
       retries: 3
 
-  dozzle:
+  mrp_dozzle:
     image: amir20/dozzle:latest
+    container_name: mrp_dozzle
     restart: always
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
