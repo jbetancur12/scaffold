@@ -224,6 +224,50 @@ export default function ProductionOrderDetailPage() {
         }
     };
 
+    const getQcStatusLabel = (status?: string) => {
+        switch (status) {
+            case 'passed':
+                return 'Aprobado';
+            case 'failed':
+                return 'Rechazado';
+            case 'pending':
+            default:
+                return 'Pendiente';
+        }
+    };
+
+    const getPackagingStatusLabel = (status?: string) => {
+        switch (status) {
+            case 'packed':
+                return 'Empacado';
+            case 'pending':
+            default:
+                return 'Pendiente';
+        }
+    };
+
+    const getQcBadgeClass = (status?: string) => {
+        switch (status) {
+            case 'passed':
+                return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+            case 'failed':
+                return 'border-red-200 bg-red-50 text-red-700';
+            case 'pending':
+            default:
+                return 'border-amber-200 bg-amber-50 text-amber-700';
+        }
+    };
+
+    const getPackagingBadgeClass = (status?: string) => {
+        switch (status) {
+            case 'packed':
+                return 'border-blue-200 bg-blue-50 text-blue-700';
+            case 'pending':
+            default:
+                return 'border-slate-200 bg-slate-50 text-slate-700';
+        }
+    };
+
     if (loading) {
         return <div className="flex justify-center p-8">Cargando...</div>;
     }
@@ -376,6 +420,20 @@ export default function ProductionOrderDetailPage() {
                                 ) : (
                                     batches.map((batch) => (
                                         <div key={batch.id} className="border rounded-md p-3 space-y-3">
+                                            {(() => {
+                                                const units = batch.units ?? [];
+                                                const hasUnits = units.length > 0;
+                                                const allUnitsQcPassed = hasUnits ? units.every((u) => u.rejected || u.qcPassed) : true;
+                                                const canPackBatch = batch.qcStatus === 'passed'
+                                                    && batch.packagingStatus !== 'packed'
+                                                    && allUnitsQcPassed;
+                                                const packDisabledReason = batch.qcStatus !== 'passed'
+                                                    ? 'Debes aprobar QC del lote antes de empacar.'
+                                                    : !allUnitsQcPassed
+                                                        ? 'Todas las unidades deben pasar QC antes de empacar el lote.'
+                                                        : null;
+
+                                                return (
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div>
                                                     <div className="font-semibold">{batch.code}</div>
@@ -383,14 +441,60 @@ export default function ProductionOrderDetailPage() {
                                                         {batch.variant?.product?.name} - {batch.variant?.name} | Plan: {batch.plannedQty} | Producido: {batch.producedQty}
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                    <Badge variant="outline">QC: {batch.qcStatus}</Badge>
-                                                    <Badge variant="outline">Empaque: {batch.packagingStatus}</Badge>
-                                                    <Button size="sm" variant="outline" onClick={() => handleAddUnits(batch.id)}>+ Unidades</Button>
-                                                    <Button size="sm" variant="outline" onClick={() => handleBatchQc(batch.id, true)}>QC OK</Button>
-                                                    <Button size="sm" variant="outline" onClick={() => handleBatchPackaging(batch.id, true)}>Empacar</Button>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <Badge variant="outline" className={getQcBadgeClass(batch.qcStatus)}>
+                                                        QC: {getQcStatusLabel(batch.qcStatus)}
+                                                    </Badge>
+                                                    <Badge variant="outline" className={getPackagingBadgeClass(batch.packagingStatus)}>
+                                                        Empaque: {getPackagingStatusLabel(batch.packagingStatus)}
+                                                    </Badge>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleAddUnits(batch.id)}
+                                                        disabled={batch.packagingStatus === 'packed'}
+                                                    >
+                                                        + Unidades
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => handleBatchQc(batch.id, true)}
+                                                        disabled={batch.qcStatus === 'passed'}
+                                                    >
+                                                        Aprobar QC
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => handleBatchPackaging(batch.id, true)}
+                                                        disabled={!canPackBatch}
+                                                        title={packDisabledReason || ''}
+                                                    >
+                                                        Empacar Lote
+                                                    </Button>
                                                 </div>
                                             </div>
+                                                );
+                                            })()}
+
+                                            {(() => {
+                                                const units = batch.units ?? [];
+                                                const hasUnits = units.length > 0;
+                                                const allUnitsQcPassed = hasUnits ? units.every((u) => u.rejected || u.qcPassed) : true;
+                                                const canPackBatch = batch.qcStatus === 'passed'
+                                                    && batch.packagingStatus !== 'packed'
+                                                    && allUnitsQcPassed;
+                                                const packDisabledReason = batch.qcStatus !== 'passed'
+                                                    ? 'Debes aprobar QC del lote antes de empacar.'
+                                                    : !allUnitsQcPassed
+                                                        ? 'Todas las unidades deben pasar QC antes de empacar el lote.'
+                                                        : null;
+                                                return !canPackBatch && packDisabledReason ? (
+                                                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                        {packDisabledReason}
+                                                    </p>
+                                                ) : null;
+                                            })()}
 
                                             {(batch.units ?? []).length > 0 ? (
                                                 <div className="overflow-auto">
@@ -410,8 +514,22 @@ export default function ProductionOrderDetailPage() {
                                                                     <td className="p-1">{unit.qcPassed ? 'OK' : 'Pendiente'}</td>
                                                                     <td className="p-1">{unit.packaged ? 'Empacada' : 'Pendiente'}</td>
                                                                     <td className="p-1 text-right space-x-1">
-                                                                        <Button size="sm" variant="ghost" onClick={() => handleUnitQc(unit.id, true)}>QC</Button>
-                                                                        <Button size="sm" variant="ghost" onClick={() => handleUnitPackaging(unit.id, true)}>Emp</Button>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            onClick={() => handleUnitQc(unit.id, true)}
+                                                                            disabled={unit.qcPassed}
+                                                                        >
+                                                                            QC
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="ghost"
+                                                                            onClick={() => handleUnitPackaging(unit.id, true)}
+                                                                            disabled={!unit.qcPassed || unit.packaged}
+                                                                        >
+                                                                            Empacar
+                                                                        </Button>
                                                                     </td>
                                                                 </tr>
                                                             ))}
