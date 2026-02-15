@@ -11,6 +11,7 @@ import {
     RegulatoryDeviceType,
     RegulatoryLabelScopeType,
     RegulatoryLabelStatus,
+    QualityRiskControlStatus,
     TechnovigilanceCaseType,
     TechnovigilanceCausality,
     TechnovigilanceSeverity,
@@ -34,6 +35,9 @@ export default function QualityCompliancePage() {
         technovigilanceCases,
         recalls,
         regulatoryLabels,
+        complianceDashboard,
+        riskControls,
+        trainingEvidence,
         documents,
         openNc,
         ncForm,
@@ -42,18 +46,25 @@ export default function QualityCompliancePage() {
         technoForm,
         recallForm,
         regulatoryLabelForm,
+        riskControlForm,
+        trainingForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
         setTechnoForm,
         setRecallForm,
         setRegulatoryLabelForm,
+        setRiskControlForm,
+        setTrainingForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
         loadingTechno,
         loadingRecalls,
         loadingRegulatoryLabels,
+        loadingComplianceDashboard,
+        loadingRiskControls,
+        loadingTrainingEvidence,
         loadingDocuments,
         creatingNc,
         creatingCapa,
@@ -62,6 +73,9 @@ export default function QualityCompliancePage() {
         creatingRecall,
         savingRegulatoryLabel,
         validatingDispatch,
+        exportingCompliance,
+        creatingRiskControl,
+        creatingTrainingEvidence,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -81,6 +95,9 @@ export default function QualityCompliancePage() {
         quickCloseRecall,
         handleUpsertRegulatoryLabel,
         quickValidateDispatch,
+        handleExportCompliance,
+        handleCreateRiskControl,
+        handleCreateTrainingEvidence,
     } = useQualityCompliance();
 
     return (
@@ -99,6 +116,7 @@ export default function QualityCompliancePage() {
                     <TabsTrigger value="techno">Tecnovigilancia</TabsTrigger>
                     <TabsTrigger value="recall">Recall</TabsTrigger>
                     <TabsTrigger value="labeling">Etiquetado</TabsTrigger>
+                    <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
                     <TabsTrigger value="docs">Control documental</TabsTrigger>
                     <TabsTrigger value="audit">Auditoría</TabsTrigger>
                 </TabsList>
@@ -703,6 +721,171 @@ export default function QualityCompliancePage() {
                                     </Badge>
                                 </div>
                             ))}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="compliance" className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Tablero de Cumplimiento</CardTitle></CardHeader>
+                        <CardContent className="space-y-3">
+                            {loadingComplianceDashboard ? <div>Cargando...</div> : !complianceDashboard ? <div className="text-sm text-slate-500">Sin datos.</div> : (
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div className="border rounded-md p-3">
+                                        <div className="text-xs text-slate-500">NC abiertas</div>
+                                        <div className="text-2xl font-semibold">{complianceDashboard.nonConformitiesOpen}</div>
+                                    </div>
+                                    <div className="border rounded-md p-3">
+                                        <div className="text-xs text-slate-500">CAPA abiertas</div>
+                                        <div className="text-2xl font-semibold">{complianceDashboard.capasOpen}</div>
+                                    </div>
+                                    <div className="border rounded-md p-3">
+                                        <div className="text-xs text-slate-500">Tecnovigilancia abierta</div>
+                                        <div className="text-2xl font-semibold">{complianceDashboard.technovigilanceOpen}</div>
+                                    </div>
+                                    <div className="border rounded-md p-3">
+                                        <div className="text-xs text-slate-500">Recalls abiertos</div>
+                                        <div className="text-2xl font-semibold">{complianceDashboard.recallsOpen}</div>
+                                    </div>
+                                    <div className="border rounded-md p-3">
+                                        <div className="text-xs text-slate-500">Cobertura recall promedio</div>
+                                        <div className="text-2xl font-semibold">{complianceDashboard.recallCoverageAverage}%</div>
+                                    </div>
+                                    <div className="border rounded-md p-3">
+                                        <div className="text-xs text-slate-500">Eventos auditoría (30 días)</div>
+                                        <div className="text-2xl font-semibold">{complianceDashboard.auditEventsLast30Days}</div>
+                                    </div>
+                                    <div className="border rounded-md p-3">
+                                        <div className="text-xs text-slate-500">% Documentos aprobados</div>
+                                        <div className="text-2xl font-semibold">{complianceDashboard.documentApprovalRate}%</div>
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex gap-2 justify-end">
+                                <Button variant="outline" disabled={exportingCompliance} onClick={() => handleExportCompliance('csv')}>
+                                    {exportingCompliance ? 'Generando...' : 'Exportar CSV'}
+                                </Button>
+                                <Button variant="outline" disabled={exportingCompliance} onClick={() => handleExportCompliance('json')}>
+                                    {exportingCompliance ? 'Generando...' : 'Exportar JSON'}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Matriz de Riesgos y Controles</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={handleCreateRiskControl}>
+                                <div className="space-y-1">
+                                    <Label>Proceso</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={riskControlForm.process}
+                                        onChange={(e) => setRiskControlForm((p) => ({ ...p, process: e.target.value as DocumentProcess }))}
+                                    >
+                                        <option value={DocumentProcess.PRODUCCION}>Producción</option>
+                                        <option value={DocumentProcess.CONTROL_CALIDAD}>Control de calidad</option>
+                                        <option value={DocumentProcess.EMPAQUE}>Empaque</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Rol responsable</Label>
+                                    <Input value={riskControlForm.ownerRole} onChange={(e) => setRiskControlForm((p) => ({ ...p, ownerRole: e.target.value }))} required />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Riesgo</Label>
+                                    <Textarea value={riskControlForm.risk} onChange={(e) => setRiskControlForm((p) => ({ ...p, risk: e.target.value }))} required />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Control</Label>
+                                    <Textarea value={riskControlForm.control} onChange={(e) => setRiskControlForm((p) => ({ ...p, control: e.target.value }))} required />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Estado</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={riskControlForm.status}
+                                        onChange={(e) => setRiskControlForm((p) => ({ ...p, status: e.target.value as QualityRiskControlStatus }))}
+                                    >
+                                        {Object.values(QualityRiskControlStatus).map((s) => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Evidencia (opcional)</Label>
+                                    <Input value={riskControlForm.evidenceRef} onChange={(e) => setRiskControlForm((p) => ({ ...p, evidenceRef: e.target.value }))} />
+                                </div>
+                                <div className="md:col-span-2 flex justify-end">
+                                    <Button type="submit" disabled={creatingRiskControl}>
+                                        {creatingRiskControl ? 'Guardando...' : 'Agregar riesgo/control'}
+                                    </Button>
+                                </div>
+                            </form>
+
+                            <div className="space-y-2">
+                                {loadingRiskControls ? <div>Cargando...</div> : riskControls.length === 0 ? <div className="text-sm text-slate-500">Sin riesgos/controles.</div> : riskControls.map((r) => (
+                                    <div key={r.id} className="border rounded-md p-3">
+                                        <div className="font-medium">{r.process} | {r.ownerRole}</div>
+                                        <div className="text-xs text-slate-600 mt-1">Riesgo: {r.risk}</div>
+                                        <div className="text-xs text-slate-600 mt-1">Control: {r.control}</div>
+                                        <Badge variant="outline" className="mt-2">{r.status}</Badge>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Evidencia de Capacitación por Rol</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={handleCreateTrainingEvidence}>
+                                <div className="space-y-1">
+                                    <Label>Rol</Label>
+                                    <Input value={trainingForm.role} onChange={(e) => setTrainingForm((p) => ({ ...p, role: e.target.value }))} required />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Nombre del colaborador</Label>
+                                    <Input value={trainingForm.personName} onChange={(e) => setTrainingForm((p) => ({ ...p, personName: e.target.value }))} required />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Tema de capacitación</Label>
+                                    <Input value={trainingForm.trainingTopic} onChange={(e) => setTrainingForm((p) => ({ ...p, trainingTopic: e.target.value }))} required />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Fecha completada</Label>
+                                    <Input type="date" value={trainingForm.completedAt} onChange={(e) => setTrainingForm((p) => ({ ...p, completedAt: e.target.value }))} required />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Válido hasta (opcional)</Label>
+                                    <Input type="date" value={trainingForm.validUntil} onChange={(e) => setTrainingForm((p) => ({ ...p, validUntil: e.target.value }))} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Instructor (opcional)</Label>
+                                    <Input value={trainingForm.trainerName} onChange={(e) => setTrainingForm((p) => ({ ...p, trainerName: e.target.value }))} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Evidencia (opcional)</Label>
+                                    <Input value={trainingForm.evidenceRef} onChange={(e) => setTrainingForm((p) => ({ ...p, evidenceRef: e.target.value }))} />
+                                </div>
+                                <div className="md:col-span-2 flex justify-end">
+                                    <Button type="submit" disabled={creatingTrainingEvidence}>
+                                        {creatingTrainingEvidence ? 'Guardando...' : 'Registrar capacitación'}
+                                    </Button>
+                                </div>
+                            </form>
+
+                            <div className="space-y-2">
+                                {loadingTrainingEvidence ? <div>Cargando...</div> : trainingEvidence.length === 0 ? <div className="text-sm text-slate-500">Sin evidencias de capacitación.</div> : trainingEvidence.map((t) => (
+                                    <div key={t.id} className="border rounded-md p-3">
+                                        <div className="font-medium">{t.role} | {t.personName}</div>
+                                        <div className="text-xs text-slate-600 mt-1">Tema: {t.trainingTopic}</div>
+                                        <div className="text-xs text-slate-600 mt-1">
+                                            Completada: {new Date(t.completedAt).toLocaleDateString()} | Vence: {t.validUntil ? new Date(t.validUntil).toLocaleDateString() : 'N/A'}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>

@@ -24,6 +24,7 @@ import {
     RegulatoryDeviceType,
     RegulatoryCodingStandard,
     RegulatoryLabelStatus,
+    QualityRiskControlStatus,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -466,6 +467,40 @@ export const ListRegulatoryLabelsQuerySchema = z.object({
 export const ValidateDispatchReadinessSchema = z.object({
     productionBatchId: z.string().uuid(),
     actor: z.string().optional(),
+});
+
+export const ComplianceExportQuerySchema = z.object({
+    format: z.enum(['csv', 'json']).default('csv'),
+});
+
+export const CreateQualityRiskControlSchema = z.object({
+    process: z.nativeEnum(DocumentProcess),
+    risk: z.string().min(5),
+    control: z.string().min(5),
+    ownerRole: z.string().min(2),
+    status: z.nativeEnum(QualityRiskControlStatus).optional(),
+    evidenceRef: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const ListQualityRiskControlsQuerySchema = z.object({
+    process: z.nativeEnum(DocumentProcess).optional(),
+    status: z.nativeEnum(QualityRiskControlStatus).optional(),
+});
+
+export const CreateQualityTrainingEvidenceSchema = z.object({
+    role: z.string().min(2),
+    personName: z.string().min(2),
+    trainingTopic: z.string().min(3),
+    completedAt: z.coerce.date(),
+    validUntil: z.coerce.date().optional(),
+    trainerName: z.string().optional(),
+    evidenceRef: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const ListQualityTrainingEvidenceQuerySchema = z.object({
+    role: z.string().optional(),
 });
 
 export const OperationalConfigSchema = z.object({

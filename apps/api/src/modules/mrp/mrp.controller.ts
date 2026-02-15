@@ -48,6 +48,11 @@ import {
     UpsertRegulatoryLabelSchema,
     ListRegulatoryLabelsQuerySchema,
     ValidateDispatchReadinessSchema,
+    ComplianceExportQuerySchema,
+    CreateQualityRiskControlSchema,
+    ListQualityRiskControlsQuerySchema,
+    CreateQualityTrainingEvidenceSchema,
+    ListQualityTrainingEvidenceQuerySchema,
     CreateControlledDocumentSchema,
     ListControlledDocumentsQuerySchema,
     ActorPayloadSchema,
@@ -700,6 +705,65 @@ export class MrpController {
             const payload = ValidateDispatchReadinessSchema.parse(req.body);
             const result = await this.qualityService.validateDispatchReadiness(payload.productionBatchId, payload.actor);
             return ApiResponse.success(res, result, result.eligible ? 'Despacho habilitado' : 'Despacho bloqueado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getComplianceDashboard(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const data = await this.qualityService.getComplianceDashboard();
+            return ApiResponse.success(res, data, 'Tablero de cumplimiento');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async exportCompliance(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { format } = ComplianceExportQuerySchema.parse(req.query);
+            const data = await this.qualityService.exportCompliance(format);
+            return ApiResponse.success(res, data, 'Exportable de cumplimiento generado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createQualityRiskControl(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateQualityRiskControlSchema.parse(req.body);
+            const row = await this.qualityService.createRiskControl(payload);
+            return ApiResponse.success(res, row, 'Riesgo/control registrado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listQualityRiskControls(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListQualityRiskControlsQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listRiskControls(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createQualityTrainingEvidence(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateQualityTrainingEvidenceSchema.parse(req.body);
+            const row = await this.qualityService.createTrainingEvidence(payload);
+            return ApiResponse.success(res, row, 'Evidencia de capacitación registrada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listQualityTrainingEvidence(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListQualityTrainingEvidenceQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listTrainingEvidence(filters);
+            return ApiResponse.success(res, rows);
         } catch (error) {
             next(error);
         }

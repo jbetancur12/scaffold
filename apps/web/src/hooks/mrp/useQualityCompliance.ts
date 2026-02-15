@@ -16,6 +16,7 @@ import {
     RegulatoryLabelScopeType,
     RegulatoryDeviceType,
     RegulatoryCodingStandard,
+    QualityRiskControlStatus,
 } from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -44,6 +45,12 @@ import {
     useRegulatoryLabelsQuery,
     useUpsertRegulatoryLabelMutation,
     useValidateDispatchReadinessMutation,
+    useComplianceDashboardQuery,
+    useExportComplianceMutation,
+    useRiskControlsQuery,
+    useCreateRiskControlMutation,
+    useTrainingEvidenceQuery,
+    useCreateTrainingEvidenceMutation,
 } from '@/hooks/mrp/useQuality';
 
 export const useQualityCompliance = () => {
@@ -54,6 +61,9 @@ export const useQualityCompliance = () => {
     const { data: technovigilanceData, loading: loadingTechno } = useTechnovigilanceCasesQuery();
     const { data: recallsData, loading: loadingRecalls } = useRecallCasesQuery();
     const { data: regulatoryLabelsData, loading: loadingRegulatoryLabels } = useRegulatoryLabelsQuery();
+    const { data: complianceDashboardData, loading: loadingComplianceDashboard } = useComplianceDashboardQuery();
+    const { data: riskControlsData, loading: loadingRiskControls } = useRiskControlsQuery();
+    const { data: trainingEvidenceData, loading: loadingTrainingEvidence } = useTrainingEvidenceQuery();
     const { data: documentsData, loading: loadingDocuments } = useControlledDocumentsQuery();
     const { execute: createNc, loading: creatingNc } = useCreateNonConformityMutation();
     const { execute: updateNc } = useUpdateNonConformityMutation();
@@ -72,6 +82,9 @@ export const useQualityCompliance = () => {
     const { execute: closeRecallCase } = useCloseRecallCaseMutation();
     const { execute: upsertRegulatoryLabel, loading: savingRegulatoryLabel } = useUpsertRegulatoryLabelMutation();
     const { execute: validateDispatchReadiness, loading: validatingDispatch } = useValidateDispatchReadinessMutation();
+    const { execute: exportCompliance, loading: exportingCompliance } = useExportComplianceMutation();
+    const { execute: createRiskControl, loading: creatingRiskControl } = useCreateRiskControlMutation();
+    const { execute: createTrainingEvidence, loading: creatingTrainingEvidence } = useCreateTrainingEvidenceMutation();
 
     const [ncForm, setNcForm] = useState({
         title: '',
@@ -131,6 +144,23 @@ export const useQualityCompliance = () => {
         udiPi: '',
         internalCode: '',
     });
+    const [riskControlForm, setRiskControlForm] = useState({
+        process: DocumentProcess.PRODUCCION,
+        risk: '',
+        control: '',
+        ownerRole: '',
+        status: QualityRiskControlStatus.ACTIVO,
+        evidenceRef: '',
+    });
+    const [trainingForm, setTrainingForm] = useState({
+        role: '',
+        personName: '',
+        trainingTopic: '',
+        completedAt: '',
+        validUntil: '',
+        trainerName: '',
+        evidenceRef: '',
+    });
 
     const nonConformities = nonConformitiesData ?? [];
     const capas = capasData ?? [];
@@ -138,6 +168,9 @@ export const useQualityCompliance = () => {
     const technovigilanceCases = technovigilanceData ?? [];
     const recalls = recallsData ?? [];
     const regulatoryLabels = regulatoryLabelsData ?? [];
+    const complianceDashboard = complianceDashboardData;
+    const riskControls = riskControlsData ?? [];
+    const trainingEvidence = trainingEvidenceData ?? [];
     const documents = documentsData ?? [];
     const openNc = nonConformities.filter((n) => n.status !== NonConformityStatus.CERRADA);
 
@@ -474,6 +507,81 @@ export const useQualityCompliance = () => {
         }
     };
 
+    const handleExportCompliance = async (format: 'csv' | 'json') => {
+        try {
+            const file = await exportCompliance({ format });
+            if (!file.content) {
+                toast({ title: 'Error', description: 'No se pudo generar el archivo', variant: 'destructive' });
+                return;
+            }
+            const blob = new Blob([file.content], { type: format === 'csv' ? 'text/csv;charset=utf-8;' : 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', file.fileName.replace(/[:]/g, '-'));
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            toast({ title: 'Exportable generado', description: `Archivo ${format.toUpperCase()} descargado.` });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo exportar cumplimiento'), variant: 'destructive' });
+        }
+    };
+
+    const handleCreateRiskControl = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await createRiskControl({
+                process: riskControlForm.process,
+                risk: riskControlForm.risk,
+                control: riskControlForm.control,
+                ownerRole: riskControlForm.ownerRole,
+                status: riskControlForm.status,
+                evidenceRef: riskControlForm.evidenceRef || undefined,
+                actor: 'sistema-web',
+            });
+            setRiskControlForm({
+                process: DocumentProcess.PRODUCCION,
+                risk: '',
+                control: '',
+                ownerRole: '',
+                status: QualityRiskControlStatus.ACTIVO,
+                evidenceRef: '',
+            });
+            toast({ title: 'Riesgo/control creado', description: 'Matriz de riesgos actualizada.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo registrar el riesgo/control'), variant: 'destructive' });
+        }
+    };
+
+    const handleCreateTrainingEvidence = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await createTrainingEvidence({
+                role: trainingForm.role,
+                personName: trainingForm.personName,
+                trainingTopic: trainingForm.trainingTopic,
+                completedAt: trainingForm.completedAt,
+                validUntil: trainingForm.validUntil || undefined,
+                trainerName: trainingForm.trainerName || undefined,
+                evidenceRef: trainingForm.evidenceRef || undefined,
+                actor: 'sistema-web',
+            });
+            setTrainingForm({
+                role: '',
+                personName: '',
+                trainingTopic: '',
+                completedAt: '',
+                validUntil: '',
+                trainerName: '',
+                evidenceRef: '',
+            });
+            toast({ title: 'Capacitación registrada', description: 'Evidencia agregada correctamente.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo registrar la capacitación'), variant: 'destructive' });
+        }
+    };
+
     return {
         nonConformities,
         capas,
@@ -481,6 +589,9 @@ export const useQualityCompliance = () => {
         technovigilanceCases,
         recalls,
         regulatoryLabels,
+        complianceDashboard,
+        riskControls,
+        trainingEvidence,
         documents,
         openNc,
         ncForm,
@@ -489,18 +600,25 @@ export const useQualityCompliance = () => {
         technoForm,
         recallForm,
         regulatoryLabelForm,
+        riskControlForm,
+        trainingForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
         setTechnoForm,
         setRecallForm,
         setRegulatoryLabelForm,
+        setRiskControlForm,
+        setTrainingForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
         loadingTechno,
         loadingRecalls,
         loadingRegulatoryLabels,
+        loadingComplianceDashboard,
+        loadingRiskControls,
+        loadingTrainingEvidence,
         loadingDocuments,
         creatingNc,
         creatingCapa,
@@ -509,6 +627,9 @@ export const useQualityCompliance = () => {
         creatingRecall,
         savingRegulatoryLabel,
         validatingDispatch,
+        exportingCompliance,
+        creatingRiskControl,
+        creatingTrainingEvidence,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -528,5 +649,8 @@ export const useQualityCompliance = () => {
         quickCloseRecall,
         handleUpsertRegulatoryLabel,
         quickValidateDispatch,
+        handleExportCompliance,
+        handleCreateRiskControl,
+        handleCreateTrainingEvidence,
     };
 };

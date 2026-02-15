@@ -181,6 +181,12 @@ export enum RegulatoryLabelStatus {
     BLOQUEADA = 'bloqueada',
 }
 
+export enum QualityRiskControlStatus {
+    ACTIVO = 'activo',
+    MITIGADO = 'mitigado',
+    OBSOLETO = 'obsoleto',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -539,6 +545,51 @@ export interface DispatchValidationResult {
     errors: string[];
     requiredSerialLabels: number;
     validatedSerialLabels: number;
+}
+
+export interface ComplianceKpiDashboard {
+    generatedAt: string | Date;
+    nonConformitiesOpen: number;
+    capasOpen: number;
+    technovigilanceOpen: number;
+    recallsOpen: number;
+    recallCoverageAverage: number;
+    auditEventsLast30Days: number;
+    documentApprovalRate: number;
+}
+
+export interface ComplianceExportFile {
+    generatedAt: string | Date;
+    format: 'csv' | 'json';
+    fileName: string;
+    content: string;
+}
+
+export interface QualityRiskControl {
+    id: string;
+    process: DocumentProcess;
+    risk: string;
+    control: string;
+    ownerRole: string;
+    status: QualityRiskControlStatus;
+    evidenceRef?: string;
+    createdBy?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface QualityTrainingEvidence {
+    id: string;
+    role: string;
+    personName: string;
+    trainingTopic: string;
+    completedAt: string | Date;
+    validUntil?: string | Date;
+    trainerName?: string;
+    evidenceRef?: string;
+    createdBy?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
 }
 
 export interface OperationalConfig {

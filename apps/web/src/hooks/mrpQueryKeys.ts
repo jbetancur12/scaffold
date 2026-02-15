@@ -28,6 +28,9 @@ export const mrpQueryKeys = {
     qualityTechnovigilanceCases: 'mrp.quality.technovigilance-cases',
     qualityRecalls: 'mrp.quality.recalls',
     qualityRegulatoryLabels: 'mrp.quality.regulatory-labels',
+    qualityComplianceDashboard: 'mrp.quality.compliance-dashboard',
+    qualityRiskControls: 'mrp.quality.risk-controls',
+    qualityTrainingEvidence: 'mrp.quality.training-evidence',
     qualityDocuments: 'mrp.quality.documents',
     qualityActiveDocuments: (process: string) => `mrp.quality.documents.active.${process}`,
 };

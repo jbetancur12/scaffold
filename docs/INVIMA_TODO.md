@@ -32,7 +32,7 @@
 - [x] Validaciones previas a despacho.
 
 ## Fase 6 - Evidencia de cumplimiento y auditorias
-- [ ] Tablero de cumplimiento (KPIs de NC, CAPA, eventos, recall).
-- [ ] Exportables para inspeccion/auditoria.
-- [ ] Matriz de riesgos y controles por proceso.
-- [ ] Evidencia de capacitacion del personal por rol.
+- [x] Tablero de cumplimiento (KPIs de NC, CAPA, eventos, recall).
+- [x] Exportables para inspeccion/auditoria.
+- [x] Matriz de riesgos y controles por proceso.
+- [x] Evidencia de capacitacion del personal por rol.

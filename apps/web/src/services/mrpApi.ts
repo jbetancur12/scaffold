@@ -40,6 +40,11 @@ import {
     RegulatoryLabelScopeType,
     RegulatoryLabelStatus,
     DispatchValidationResult,
+    ComplianceKpiDashboard,
+    ComplianceExportFile,
+    QualityRiskControl,
+    QualityRiskControlStatus,
+    QualityTrainingEvidence,
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
@@ -234,6 +239,27 @@ export interface UpsertRegulatoryLabelPayload {
 
 export interface ValidateDispatchReadinessPayload {
     productionBatchId: string;
+    actor?: string;
+}
+
+export interface CreateQualityRiskControlPayload {
+    process: DocumentProcess;
+    risk: string;
+    control: string;
+    ownerRole: string;
+    status?: QualityRiskControlStatus;
+    evidenceRef?: string;
+    actor?: string;
+}
+
+export interface CreateQualityTrainingEvidencePayload {
+    role: string;
+    personName: string;
+    trainingTopic: string;
+    completedAt: string | Date;
+    validUntil?: string | Date;
+    trainerName?: string;
+    evidenceRef?: string;
     actor?: string;
 }
 
@@ -531,6 +557,33 @@ export const mrpApi = {
     },
     validateDispatchReadiness: async (data: ValidateDispatchReadinessPayload): Promise<DispatchValidationResult> => {
         const response = await api.post<DispatchValidationResult>('/mrp/quality/regulatory-labels/validate-dispatch', data);
+        return response.data;
+    },
+    getComplianceDashboard: async (): Promise<ComplianceKpiDashboard> => {
+        const response = await api.get<ComplianceKpiDashboard>('/mrp/quality/compliance-dashboard');
+        return response.data;
+    },
+    exportCompliance: async (format: 'csv' | 'json' = 'csv'): Promise<ComplianceExportFile> => {
+        const response = await api.get<ComplianceExportFile>('/mrp/quality/compliance-export', { params: { format } });
+        return response.data;
+    },
+    createQualityRiskControl: async (data: CreateQualityRiskControlPayload): Promise<QualityRiskControl> => {
+        const response = await api.post<QualityRiskControl>('/mrp/quality/risk-controls', data);
+        return response.data;
+    },
+    listQualityRiskControls: async (filters?: {
+        process?: DocumentProcess;
+        status?: QualityRiskControlStatus;
+    }): Promise<QualityRiskControl[]> => {
+        const response = await api.get<QualityRiskControl[]>('/mrp/quality/risk-controls', { params: filters });
+        return response.data;
+    },
+    createQualityTrainingEvidence: async (data: CreateQualityTrainingEvidencePayload): Promise<QualityTrainingEvidence> => {
+        const response = await api.post<QualityTrainingEvidence>('/mrp/quality/training-evidence', data);
+        return response.data;
+    },
+    listQualityTrainingEvidence: async (filters?: { role?: string }): Promise<QualityTrainingEvidence[]> => {
+        const response = await api.get<QualityTrainingEvidence[]>('/mrp/quality/training-evidence', { params: filters });
         return response.data;
     },
     createControlledDocument: async (data: CreateControlledDocumentPayload): Promise<ControlledDocument> => {

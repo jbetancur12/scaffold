@@ -28,6 +28,11 @@ import {
     RegulatoryLabelScopeType,
     RegulatoryLabelStatus,
     DispatchValidationResult,
+    ComplianceKpiDashboard,
+    ComplianceExportFile,
+    QualityRiskControl,
+    QualityRiskControlStatus,
+    QualityTrainingEvidence,
 } from '@scaffold/types';
 import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
@@ -329,6 +334,77 @@ export const useValidateDispatchReadinessMutation = () => {
         async (payload) => mrpApi.validateDispatchReadiness(payload),
         {
             onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useComplianceDashboardQuery = () => {
+    const fetcher = useCallback(async (): Promise<ComplianceKpiDashboard> => {
+        return mrpApi.getComplianceDashboard();
+    }, []);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityComplianceDashboard);
+};
+
+export const useExportComplianceMutation = () => {
+    return useMrpMutation<{ format?: 'csv' | 'json' }, ComplianceExportFile>(
+        async (payload) => mrpApi.exportCompliance(payload.format || 'csv')
+    );
+};
+
+export const useRiskControlsQuery = (filters?: { process?: DocumentProcess; status?: QualityRiskControlStatus }) => {
+    const fetcher = useCallback(async (): Promise<QualityRiskControl[]> => {
+        return mrpApi.listQualityRiskControls(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityRiskControls);
+};
+
+export const useCreateRiskControlMutation = () => {
+    return useMrpMutation<{
+        process: DocumentProcess;
+        risk: string;
+        control: string;
+        ownerRole: string;
+        status?: QualityRiskControlStatus;
+        evidenceRef?: string;
+        actor?: string;
+    }, QualityRiskControl>(
+        async (payload) => mrpApi.createQualityRiskControl(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityRiskControls);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useTrainingEvidenceQuery = (filters?: { role?: string }) => {
+    const fetcher = useCallback(async (): Promise<QualityTrainingEvidence[]> => {
+        return mrpApi.listQualityTrainingEvidence(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityTrainingEvidence);
+};
+
+export const useCreateTrainingEvidenceMutation = () => {
+    return useMrpMutation<{
+        role: string;
+        personName: string;
+        trainingTopic: string;
+        completedAt: string;
+        validUntil?: string;
+        trainerName?: string;
+        evidenceRef?: string;
+        actor?: string;
+    }, QualityTrainingEvidence>(
+        async (payload) => mrpApi.createQualityTrainingEvidence(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityTrainingEvidence);
                 invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
             },
         }

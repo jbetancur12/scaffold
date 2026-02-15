@@ -1,9 +1,14 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import {
     CapaStatus,
+    ComplianceExportFile,
+    ComplianceKpiDashboard,
     DispatchValidationResult,
+    DocumentProcess,
+    DocumentStatus,
     NonConformityStatus,
     QualitySeverity,
+    QualityRiskControlStatus,
     RecallNotificationChannel,
     RecallNotificationStatus,
     RecallScopeType,
@@ -24,9 +29,12 @@ import { NonConformity } from '../entities/non-conformity.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { ProductionOrder } from '../entities/production-order.entity';
+import { ControlledDocument } from '../entities/controlled-document.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RecallCase } from '../entities/recall-case.entity';
 import { RecallNotification } from '../entities/recall-notification.entity';
+import { QualityRiskControl } from '../entities/quality-risk-control.entity';
+import { QualityTrainingEvidence } from '../entities/quality-training-evidence.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 
@@ -39,6 +47,9 @@ export class QualityService {
     private readonly recallRepo: EntityRepository<RecallCase>;
     private readonly recallNotificationRepo: EntityRepository<RecallNotification>;
     private readonly regulatoryLabelRepo: EntityRepository<RegulatoryLabel>;
+    private readonly riskControlRepo: EntityRepository<QualityRiskControl>;
+    private readonly trainingEvidenceRepo: EntityRepository<QualityTrainingEvidence>;
+    private readonly controlledDocumentRepo: EntityRepository<ControlledDocument>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -49,6 +60,9 @@ export class QualityService {
         this.recallRepo = em.getRepository(RecallCase);
         this.recallNotificationRepo = em.getRepository(RecallNotification);
         this.regulatoryLabelRepo = em.getRepository(RegulatoryLabel);
+        this.riskControlRepo = em.getRepository(QualityRiskControl);
+        this.trainingEvidenceRepo = em.getRepository(QualityTrainingEvidence);
+        this.controlledDocumentRepo = em.getRepository(ControlledDocument);
     }
 
     async createNonConformity(payload: {
@@ -688,6 +702,156 @@ export class QualityService {
         });
 
         return result;
+    }
+
+    async getComplianceDashboard(): Promise<ComplianceKpiDashboard> {
+        const [nonConformitiesOpen, capasOpen, technovigilanceOpen, recallsOpen] = await Promise.all([
+            this.ncRepo.count({ status: { $ne: NonConformityStatus.CERRADA } }),
+            this.capaRepo.count({ status: { $ne: CapaStatus.CERRADA } }),
+            this.technoRepo.count({ status: { $ne: TechnovigilanceStatus.CERRADO } }),
+            this.recallRepo.count({ status: { $ne: RecallStatus.CERRADO } }),
+        ]);
+
+        const recalls = await this.recallRepo.findAll();
+        const recallCoverageAverage = recalls.length > 0
+            ? Number((recalls.reduce((sum, row) => sum + Number(row.coveragePercent || 0), 0) / recalls.length).toFixed(2))
+            : 0;
+
+        const thirtyDaysAgo = new Date(Date.now() - (30 * 24 * 60 * 60 * 1000));
+        const auditEventsLast30Days = await this.auditRepo.count({ createdAt: { $gte: thirtyDaysAgo } });
+
+        const totalDocuments = await this.controlledDocumentRepo.count();
+        const approvedDocuments = await this.controlledDocumentRepo.count({ status: DocumentStatus.APROBADO });
+        const documentApprovalRate = totalDocuments > 0
+            ? Number(((approvedDocuments / totalDocuments) * 100).toFixed(2))
+            : 0;
+
+        return {
+            generatedAt: new Date(),
+            nonConformitiesOpen,
+            capasOpen,
+            technovigilanceOpen,
+            recallsOpen,
+            recallCoverageAverage,
+            auditEventsLast30Days,
+            documentApprovalRate,
+        };
+    }
+
+    async exportCompliance(format: 'csv' | 'json'): Promise<ComplianceExportFile> {
+        const dashboard = await this.getComplianceDashboard();
+        const rows = await this.auditRepo.find({}, { orderBy: { createdAt: 'DESC' }, limit: 500 });
+
+        const generatedAt = new Date();
+        if (format === 'json') {
+            return {
+                generatedAt,
+                format,
+                fileName: `invima_compliance_${generatedAt.toISOString()}.json`,
+                content: JSON.stringify({ dashboard, auditEvents: rows }, null, 2),
+            };
+        }
+
+        const header = [
+            'id',
+            'fecha',
+            'entidad',
+            'entityId',
+            'accion',
+            'actor',
+            'notas',
+        ].join(',');
+        const lines = rows.map((row) => {
+            const parts = [
+                row.id,
+                new Date(row.createdAt).toISOString(),
+                row.entityType,
+                row.entityId,
+                row.action,
+                row.actor || '',
+                row.notes || '',
+            ].map((part) => `"${String(part).replace(/"/g, '""')}"`);
+            return parts.join(',');
+        });
+        return {
+            generatedAt,
+            format,
+            fileName: `invima_compliance_${generatedAt.toISOString()}.csv`,
+            content: [header, ...lines].join('\n'),
+        };
+    }
+
+    async createRiskControl(payload: {
+        process: DocumentProcess;
+        risk: string;
+        control: string;
+        ownerRole: string;
+        status?: QualityRiskControlStatus;
+        evidenceRef?: string;
+        actor?: string;
+    }) {
+        const row = this.riskControlRepo.create({
+            process: payload.process,
+            risk: payload.risk,
+            control: payload.control,
+            ownerRole: payload.ownerRole,
+            status: payload.status ?? QualityRiskControlStatus.ACTIVO,
+            evidenceRef: payload.evidenceRef,
+            createdBy: payload.actor,
+        } as unknown as QualityRiskControl);
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'quality_risk_control',
+            entityId: row.id,
+            action: 'created',
+            actor: payload.actor,
+            metadata: { process: row.process, status: row.status, ownerRole: row.ownerRole },
+        });
+        return row;
+    }
+
+    async listRiskControls(filters: { process?: DocumentProcess; status?: QualityRiskControlStatus }) {
+        const query: FilterQuery<QualityRiskControl> = {};
+        if (filters.process) query.process = filters.process;
+        if (filters.status) query.status = filters.status;
+        return this.riskControlRepo.find(query, { orderBy: { createdAt: 'DESC' } });
+    }
+
+    async createTrainingEvidence(payload: {
+        role: string;
+        personName: string;
+        trainingTopic: string;
+        completedAt: Date;
+        validUntil?: Date;
+        trainerName?: string;
+        evidenceRef?: string;
+        actor?: string;
+    }) {
+        const row = this.trainingEvidenceRepo.create({
+            role: payload.role,
+            personName: payload.personName,
+            trainingTopic: payload.trainingTopic,
+            completedAt: payload.completedAt,
+            validUntil: payload.validUntil,
+            trainerName: payload.trainerName,
+            evidenceRef: payload.evidenceRef,
+            createdBy: payload.actor,
+        } as unknown as QualityTrainingEvidence);
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'quality_training_evidence',
+            entityId: row.id,
+            action: 'created',
+            actor: payload.actor,
+            metadata: { role: row.role, personName: row.personName, trainingTopic: row.trainingTopic },
+        });
+        return row;
+    }
+
+    async listTrainingEvidence(filters: { role?: string }) {
+        const query: FilterQuery<QualityTrainingEvidence> = {};
+        if (filters.role) query.role = { $ilike: `%${filters.role}%` };
+        return this.trainingEvidenceRepo.find(query, { orderBy: { completedAt: 'DESC' } });
     }
 
     private calculateCoverage(affectedQuantity: number, retrievedQuantity: number) {
