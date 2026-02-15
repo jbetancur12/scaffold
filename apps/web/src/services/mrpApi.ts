@@ -6,6 +6,8 @@ import {
     RawMaterial,
     BOMItem,
     ProductionOrder,
+    ProductionBatch,
+    ProductionBatchUnit,
     ProductVariant,
     InventoryItem,
     OperationalConfig,
@@ -81,6 +83,13 @@ export interface PurchaseOrderListResponse {
     total: number;
     page: number;
     limit: number;
+}
+
+export interface CreateProductionBatchPayload {
+    variantId: string;
+    plannedQty: number;
+    code?: string;
+    notes?: string;
 }
 
 export const mrpApi = {
@@ -253,6 +262,34 @@ export const mrpApi = {
     },
     updateProductionOrderStatus: async (id: string, status: string, warehouseId?: string): Promise<ProductionOrder> => {
         const response = await api.patch(`/mrp/production-orders/${id}/status`, { status, warehouseId });
+        return response.data;
+    },
+    listProductionBatches: async (orderId: string): Promise<ProductionBatch[]> => {
+        const response = await api.get<ProductionBatch[]>(`/mrp/production-orders/${orderId}/batches`);
+        return response.data;
+    },
+    createProductionBatch: async (orderId: string, data: CreateProductionBatchPayload): Promise<ProductionBatch> => {
+        const response = await api.post<ProductionBatch>(`/mrp/production-orders/${orderId}/batches`, data);
+        return response.data;
+    },
+    addProductionBatchUnits: async (batchId: string, quantity: number): Promise<ProductionBatch> => {
+        const response = await api.post<ProductionBatch>(`/mrp/production-batches/${batchId}/units`, { quantity });
+        return response.data;
+    },
+    updateProductionBatchQc: async (batchId: string, passed: boolean): Promise<ProductionBatch> => {
+        const response = await api.patch<ProductionBatch>(`/mrp/production-batches/${batchId}/qc`, { passed });
+        return response.data;
+    },
+    updateProductionBatchPackaging: async (batchId: string, packed: boolean): Promise<ProductionBatch> => {
+        const response = await api.patch<ProductionBatch>(`/mrp/production-batches/${batchId}/packaging`, { packed });
+        return response.data;
+    },
+    updateProductionBatchUnitQc: async (unitId: string, passed: boolean): Promise<ProductionBatchUnit> => {
+        const response = await api.patch<ProductionBatchUnit>(`/mrp/production-batch-units/${unitId}/qc`, { passed });
+        return response.data;
+    },
+    updateProductionBatchUnitPackaging: async (unitId: string, packaged: boolean): Promise<ProductionBatchUnit> => {
+        const response = await api.patch<ProductionBatchUnit>(`/mrp/production-batch-units/${unitId}/packaging`, { packaged });
         return response.data;
     },
 

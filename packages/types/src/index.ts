@@ -35,6 +35,25 @@ export enum ProductionOrderStatus {
     CANCELLED = 'cancelled',
 }
 
+export enum ProductionBatchQcStatus {
+    PENDING = 'pending',
+    PASSED = 'passed',
+    FAILED = 'failed',
+}
+
+export enum ProductionBatchPackagingStatus {
+    PENDING = 'pending',
+    PACKED = 'packed',
+}
+
+export enum ProductionBatchStatus {
+    IN_PROGRESS = 'in_progress',
+    QC_PENDING = 'qc_pending',
+    QC_PASSED = 'qc_passed',
+    PACKING = 'packing',
+    READY = 'ready',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -165,6 +184,7 @@ export interface ProductionOrder {
     createdAt: string | Date;
     updatedAt: string | Date;
     items?: ProductionOrderItem[];
+    batches?: ProductionBatch[];
 }
 
 export interface ProductionOrderItem {
@@ -172,6 +192,34 @@ export interface ProductionOrderItem {
     productionOrderId: string;
     variantId: string;
     quantity: number;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface ProductionBatch {
+    id: string;
+    productionOrderId: string;
+    variantId: string;
+    code: string;
+    plannedQty: number;
+    producedQty: number;
+    qcStatus: ProductionBatchQcStatus;
+    packagingStatus: ProductionBatchPackagingStatus;
+    status: ProductionBatchStatus;
+    notes?: string;
+    variant?: ProductVariant & { product?: Product };
+    units?: ProductionBatchUnit[];
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface ProductionBatchUnit {
+    id: string;
+    productionBatchId: string;
+    serialCode: string;
+    qcPassed: boolean;
+    packaged: boolean;
+    rejected: boolean;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

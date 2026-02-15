@@ -19,6 +19,7 @@ export const mrpQueryKeys = {
     productionOrders: 'mrp.production-orders',
     productionOrdersList: (page: number, limit: number) => `mrp.production-orders.${page}.${limit}`,
     productionOrder: (id: string) => `mrp.production-order.${id}`,
+    productionBatches: (id: string) => `mrp.production-batches.${id}`,
     productionRequirements: (id: string) => `mrp.production-requirements.${id}`,
     operationalConfig: 'mrp.operational-config',
 };

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { ProductionOrder } from '@scaffold/types';
+import { ProductionBatch, ProductionBatchUnit, ProductionOrder } from '@scaffold/types';
 import { MaterialRequirement, mrpApi } from '@/services/mrpApi';
 import { CreateProductionOrderDto } from '@scaffold/schemas';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
@@ -31,6 +31,15 @@ export const useProductionRequirementsQuery = (id?: string) => {
     return useMrpQuery(fetchRequirements, Boolean(id), id ? mrpQueryKeys.productionRequirements(id) : undefined);
 };
 
+export const useProductionBatchesQuery = (orderId?: string) => {
+    const fetchBatches = useCallback(async (): Promise<ProductionBatch[]> => {
+        if (!orderId) throw new Error('Production order ID is required');
+        return mrpApi.listProductionBatches(orderId);
+    }, [orderId]);
+
+    return useMrpQuery(fetchBatches, Boolean(orderId), orderId ? mrpQueryKeys.productionBatches(orderId) : undefined);
+};
+
 export const useUpdateProductionOrderStatusMutation = () => {
     return useMrpMutation<
         { orderId: string; status: string; warehouseId?: string },
@@ -41,8 +50,9 @@ export const useUpdateProductionOrderStatusMutation = () => {
             onSuccess: async (order, input) => {
                 invalidateMrpQuery(mrpQueryKeys.productionOrder(order.id));
                 invalidateMrpQuery(mrpQueryKeys.productionRequirements(input.orderId));
+                invalidateMrpQuery(mrpQueryKeys.productionBatches(input.orderId));
                 invalidateMrpQueriesByPrefix(mrpQueryKeys.productionOrders);
-                if (input.status === 'COMPLETED') {
+                if (input.status === 'completed') {
                     invalidateMrpQueriesByPrefix(mrpQueryKeys.rawMaterials);
                 }
             },
@@ -57,6 +67,81 @@ export const useCreateProductionOrderMutation = () => {
             onSuccess: async (order) => {
                 invalidateMrpQueriesByPrefix(mrpQueryKeys.productionOrders);
                 invalidateMrpQuery(mrpQueryKeys.productionOrder(order.id));
+            },
+        }
+    );
+};
+
+export const useCreateProductionBatchMutation = () => {
+    return useMrpMutation<
+        { orderId: string; variantId: string; plannedQty: number; code?: string; notes?: string },
+        ProductionBatch
+    >(
+        async ({ orderId, ...payload }) => mrpApi.createProductionBatch(orderId, payload),
+        {
+            onSuccess: async (batch) => {
+                invalidateMrpQuery(mrpQueryKeys.productionBatches(batch.productionOrderId));
+                invalidateMrpQuery(mrpQueryKeys.productionOrder(batch.productionOrderId));
+            },
+        }
+    );
+};
+
+export const useAddProductionBatchUnitsMutation = () => {
+    return useMrpMutation<{ orderId: string; batchId: string; quantity: number }, ProductionBatch>(
+        async ({ batchId, quantity }) => mrpApi.addProductionBatchUnits(batchId, quantity),
+        {
+            onSuccess: async (_batch, input) => {
+                invalidateMrpQuery(mrpQueryKeys.productionBatches(input.orderId));
+                invalidateMrpQuery(mrpQueryKeys.productionOrder(input.orderId));
+            },
+        }
+    );
+};
+
+export const useUpdateProductionBatchQcMutation = () => {
+    return useMrpMutation<{ orderId: string; batchId: string; passed: boolean }, ProductionBatch>(
+        async ({ batchId, passed }) => mrpApi.updateProductionBatchQc(batchId, passed),
+        {
+            onSuccess: async (_batch, input) => {
+                invalidateMrpQuery(mrpQueryKeys.productionBatches(input.orderId));
+                invalidateMrpQuery(mrpQueryKeys.productionOrder(input.orderId));
+            },
+        }
+    );
+};
+
+export const useUpdateProductionBatchPackagingMutation = () => {
+    return useMrpMutation<{ orderId: string; batchId: string; packed: boolean }, ProductionBatch>(
+        async ({ batchId, packed }) => mrpApi.updateProductionBatchPackaging(batchId, packed),
+        {
+            onSuccess: async (_batch, input) => {
+                invalidateMrpQuery(mrpQueryKeys.productionBatches(input.orderId));
+                invalidateMrpQuery(mrpQueryKeys.productionOrder(input.orderId));
+            },
+        }
+    );
+};
+
+export const useUpdateProductionBatchUnitQcMutation = () => {
+    return useMrpMutation<{ orderId: string; unitId: string; passed: boolean }, ProductionBatchUnit>(
+        async ({ unitId, passed }) => mrpApi.updateProductionBatchUnitQc(unitId, passed),
+        {
+            onSuccess: async (_, input) => {
+                invalidateMrpQuery(mrpQueryKeys.productionBatches(input.orderId));
+                invalidateMrpQuery(mrpQueryKeys.productionOrder(input.orderId));
+            },
+        }
+    );
+};
+
+export const useUpdateProductionBatchUnitPackagingMutation = () => {
+    return useMrpMutation<{ orderId: string; unitId: string; packaged: boolean }, ProductionBatchUnit>(
+        async ({ unitId, packaged }) => mrpApi.updateProductionBatchUnitPackaging(unitId, packaged),
+        {
+            onSuccess: async (_, input) => {
+                invalidateMrpQuery(mrpQueryKeys.productionBatches(input.orderId));
+                invalidateMrpQuery(mrpQueryKeys.productionOrder(input.orderId));
             },
         }
     );

@@ -19,6 +19,7 @@ import {
     CreateProductVariantSchema,
     UpdateProductVariantSchema,
 } from '@scaffold/schemas';
+import { z } from 'zod';
 import { PurchaseOrderStatus } from './entities/purchase-order.entity';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -366,6 +367,88 @@ export class MrpController {
             const { id } = req.params;
             const requirements = await this.productionService.calculateMaterialRequirements(id);
             return ApiResponse.success(res, requirements);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listProductionBatches(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const batches = await this.productionService.listBatches(id);
+            return ApiResponse.success(res, batches);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createProductionBatch(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = z.object({
+                variantId: z.string().uuid(),
+                plannedQty: z.number().int().positive(),
+                code: z.string().min(3).optional(),
+                notes: z.string().optional(),
+            }).parse(req.body);
+
+            const batch = await this.productionService.createBatch(id, payload);
+            return ApiResponse.success(res, batch, 'Lote creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async addProductionBatchUnits(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { batchId } = req.params;
+            const payload = z.object({ quantity: z.number().int().positive() }).parse(req.body);
+            const batch = await this.productionService.addBatchUnits(batchId, payload.quantity);
+            return ApiResponse.success(res, batch, 'Unidades generadas');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateProductionBatchQc(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { batchId } = req.params;
+            const payload = z.object({ passed: z.boolean() }).parse(req.body);
+            const batch = await this.productionService.setBatchQc(batchId, payload.passed);
+            return ApiResponse.success(res, batch, 'QC de lote actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateProductionBatchPackaging(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { batchId } = req.params;
+            const payload = z.object({ packed: z.boolean() }).parse(req.body);
+            const batch = await this.productionService.setBatchPackaging(batchId, payload.packed);
+            return ApiResponse.success(res, batch, 'Empaque de lote actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateProductionBatchUnitQc(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { unitId } = req.params;
+            const payload = z.object({ passed: z.boolean() }).parse(req.body);
+            const unit = await this.productionService.setBatchUnitQc(unitId, payload.passed);
+            return ApiResponse.success(res, unit, 'QC de unidad actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateProductionBatchUnitPackaging(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { unitId } = req.params;
+            const payload = z.object({ packaged: z.boolean() }).parse(req.body);
+            const unit = await this.productionService.setBatchUnitPackaging(unitId, payload.packaged);
+            return ApiResponse.success(res, unit, 'Empaque de unidad actualizado');
         } catch (error) {
             next(error);
         }

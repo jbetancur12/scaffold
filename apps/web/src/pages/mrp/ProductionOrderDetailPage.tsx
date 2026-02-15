@@ -26,7 +26,18 @@ import {
 } from '@/components/ui/select';
 import { getErrorMessage } from '@/lib/api-error';
 import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
-import { useProductionOrderQuery, useProductionRequirementsQuery, useUpdateProductionOrderStatusMutation } from '@/hooks/mrp/useProductionOrders';
+import {
+    useAddProductionBatchUnitsMutation,
+    useCreateProductionBatchMutation,
+    useProductionBatchesQuery,
+    useProductionOrderQuery,
+    useProductionRequirementsQuery,
+    useUpdateProductionBatchPackagingMutation,
+    useUpdateProductionBatchQcMutation,
+    useUpdateProductionBatchUnitPackagingMutation,
+    useUpdateProductionBatchUnitQcMutation,
+    useUpdateProductionOrderStatusMutation,
+} from '@/hooks/mrp/useProductionOrders';
 
 export default function ProductionOrderDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -36,13 +47,24 @@ export default function ProductionOrderDetailPage() {
     // Warehouse selection for completion
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+    const [newBatchVariantId, setNewBatchVariantId] = useState<string>('');
+    const [newBatchQty, setNewBatchQty] = useState<number>(1);
+    const [newBatchCode, setNewBatchCode] = useState<string>('');
 
     const { data: order, loading, error, execute: reloadOrder } = useProductionOrderQuery(id);
     const { data: requirementsData, loading: loadingReqs, error: requirementsError } = useProductionRequirementsQuery(id);
+    const { data: batchesData, error: batchesError, execute: reloadBatches } = useProductionBatchesQuery(id);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
     const requirements = requirementsData ?? [];
+    const batches = batchesData ?? [];
     const warehouses = warehousesData ?? [];
     const { execute: updateOrderStatus, loading: submitting } = useUpdateProductionOrderStatusMutation();
+    const { execute: createBatch, loading: creatingBatch } = useCreateProductionBatchMutation();
+    const { execute: addBatchUnits } = useAddProductionBatchUnitsMutation();
+    const { execute: updateBatchQc } = useUpdateProductionBatchQcMutation();
+    const { execute: updateBatchPackaging } = useUpdateProductionBatchPackagingMutation();
+    const { execute: updateUnitQc } = useUpdateProductionBatchUnitQcMutation();
+    const { execute: updateUnitPackaging } = useUpdateProductionBatchUnitPackagingMutation();
 
     useEffect(() => {
         if (!error) return;
@@ -71,6 +93,15 @@ export default function ProductionOrderDetailPage() {
             variant: "destructive"
         });
     }, [warehousesError, toast]);
+
+    useEffect(() => {
+        if (!batchesError) return;
+        toast({
+            title: "Error",
+            description: getErrorMessage(batchesError, 'No se pudieron cargar los lotes'),
+            variant: "destructive"
+        });
+    }, [batchesError, toast]);
 
     const handleStatusChange = async (newStatus: ProductionOrderStatus) => {
         if (!order) return;
@@ -110,6 +141,86 @@ export default function ProductionOrderDetailPage() {
                 description: getErrorMessage(error, 'No se pudo completar la orden'),
                 variant: "destructive"
             });
+        }
+    };
+
+    const handleCreateBatch = async () => {
+        if (!id || !newBatchVariantId || newBatchQty <= 0) return;
+        try {
+            await createBatch({
+                orderId: id,
+                variantId: newBatchVariantId,
+                plannedQty: newBatchQty,
+                code: newBatchCode || undefined,
+            });
+            toast({ title: 'Lote creado', description: 'Lote creado correctamente.' });
+            setNewBatchCode('');
+            await reloadBatches({ force: true });
+            await reloadOrder({ force: true });
+        } catch (err) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(err, 'No se pudo crear el lote'),
+                variant: 'destructive',
+            });
+        }
+    };
+
+    const handleAddUnits = async (batchId: string) => {
+        if (!id) return;
+        const value = prompt('Cantidad de unidades a generar para este lote:', '1');
+        const quantity = Number(value);
+        if (!quantity || quantity <= 0) return;
+        try {
+            await addBatchUnits({ orderId: id, batchId, quantity });
+            toast({ title: 'Unidades generadas', description: `${quantity} unidades agregadas al lote.` });
+            await reloadBatches({ force: true });
+        } catch (err) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(err, 'No se pudieron generar unidades'),
+                variant: 'destructive',
+            });
+        }
+    };
+
+    const handleBatchQc = async (batchId: string, passed: boolean) => {
+        if (!id) return;
+        try {
+            await updateBatchQc({ orderId: id, batchId, passed });
+            await reloadBatches({ force: true });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo actualizar QC'), variant: 'destructive' });
+        }
+    };
+
+    const handleBatchPackaging = async (batchId: string, packed: boolean) => {
+        if (!id) return;
+        try {
+            await updateBatchPackaging({ orderId: id, batchId, packed });
+            await reloadBatches({ force: true });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo actualizar empaque'), variant: 'destructive' });
+        }
+    };
+
+    const handleUnitQc = async (unitId: string, passed: boolean) => {
+        if (!id) return;
+        try {
+            await updateUnitQc({ orderId: id, unitId, passed });
+            await reloadBatches({ force: true });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo actualizar QC de unidad'), variant: 'destructive' });
+        }
+    };
+
+    const handleUnitPackaging = async (unitId: string, packaged: boolean) => {
+        if (!id) return;
+        try {
+            await updateUnitPackaging({ orderId: id, unitId, packaged });
+            await reloadBatches({ force: true });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo actualizar empaque de unidad'), variant: 'destructive' });
         }
     };
 
@@ -215,6 +326,105 @@ export default function ProductionOrderDetailPage() {
                             </CardContent>
                         </Card>
                     </div>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Trazabilidad por Lotes</CardTitle>
+                            <CardDescription>
+                                Crea lotes, controla QC y empaque. La orden solo se puede finalizar cuando todos los lotes estén liberados.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                <Select value={newBatchVariantId} onValueChange={setNewBatchVariantId}>
+                                    <SelectTrigger className="md:col-span-2">
+                                        <SelectValue placeholder="Variante para el lote" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {(order.items ?? []).map((item) => {
+                                            const populatedItem = item as ProductionOrderItem & { variant?: ProductVariant & { product?: Product } };
+                                            return (
+                                                <SelectItem key={item.variantId} value={item.variantId}>
+                                                    {populatedItem.variant?.product?.name} - {populatedItem.variant?.name}
+                                                </SelectItem>
+                                            );
+                                        })}
+                                    </SelectContent>
+                                </Select>
+                                <input
+                                    className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                    type="number"
+                                    min={1}
+                                    value={newBatchQty}
+                                    onChange={(e) => setNewBatchQty(Number(e.target.value) || 1)}
+                                    placeholder="Cantidad"
+                                />
+                                <Button onClick={handleCreateBatch} disabled={!newBatchVariantId || creatingBatch}>
+                                    {creatingBatch ? 'Creando...' : 'Crear Lote'}
+                                </Button>
+                            </div>
+                            <input
+                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full md:w-1/2"
+                                value={newBatchCode}
+                                onChange={(e) => setNewBatchCode(e.target.value)}
+                                placeholder="Código lote opcional"
+                            />
+
+                            <div className="space-y-3">
+                                {batches.length === 0 ? (
+                                    <div className="text-sm text-slate-500">Sin lotes registrados.</div>
+                                ) : (
+                                    batches.map((batch) => (
+                                        <div key={batch.id} className="border rounded-md p-3 space-y-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div>
+                                                    <div className="font-semibold">{batch.code}</div>
+                                                    <div className="text-xs text-slate-500">
+                                                        {batch.variant?.product?.name} - {batch.variant?.name} | Plan: {batch.plannedQty} | Producido: {batch.producedQty}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Badge variant="outline">QC: {batch.qcStatus}</Badge>
+                                                    <Badge variant="outline">Empaque: {batch.packagingStatus}</Badge>
+                                                    <Button size="sm" variant="outline" onClick={() => handleAddUnits(batch.id)}>+ Unidades</Button>
+                                                    <Button size="sm" variant="outline" onClick={() => handleBatchQc(batch.id, true)}>QC OK</Button>
+                                                    <Button size="sm" variant="outline" onClick={() => handleBatchPackaging(batch.id, true)}>Empacar</Button>
+                                                </div>
+                                            </div>
+
+                                            {(batch.units ?? []).length > 0 ? (
+                                                <div className="overflow-auto">
+                                                    <table className="w-full text-xs">
+                                                        <thead>
+                                                            <tr className="border-b">
+                                                                <th className="text-left p-1">Serial</th>
+                                                                <th className="text-left p-1">QC</th>
+                                                                <th className="text-left p-1">Empaque</th>
+                                                                <th className="text-right p-1">Acciones</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {(batch.units ?? []).map((unit) => (
+                                                                <tr key={unit.id} className="border-b">
+                                                                    <td className="p-1">{unit.serialCode}</td>
+                                                                    <td className="p-1">{unit.qcPassed ? 'OK' : 'Pendiente'}</td>
+                                                                    <td className="p-1">{unit.packaged ? 'Empacada' : 'Pendiente'}</td>
+                                                                    <td className="p-1 text-right space-x-1">
+                                                                        <Button size="sm" variant="ghost" onClick={() => handleUnitQc(unit.id, true)}>QC</Button>
+                                                                        <Button size="sm" variant="ghost" onClick={() => handleUnitPackaging(unit.id, true)}>Emp</Button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : null}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
 
                 <TabsContent value="procurement">

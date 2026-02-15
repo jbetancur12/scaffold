@@ -1,5 +1,11 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
-import { ProductionOrderStatus, WarehouseType } from '@scaffold/types';
+import {
+    ProductionBatchPackagingStatus,
+    ProductionBatchQcStatus,
+    ProductionBatchStatus,
+    ProductionOrderStatus,
+    WarehouseType,
+} from '@scaffold/types';
 import { ProductionOrder } from '../entities/production-order.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { ProductionOrderItem } from '../entities/production-order-item.entity';
@@ -8,6 +14,8 @@ import { InventoryItem } from '../entities/inventory-item.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Supplier } from '../entities/supplier.entity';
+import { ProductionBatch } from '../entities/production-batch.entity';
+import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { AppError } from '../../../shared/utils/response';
@@ -16,11 +24,15 @@ export class ProductionService {
     private readonly em: EntityManager;
     private readonly productionOrderRepo: EntityRepository<ProductionOrder>;
     private readonly inventoryRepo: EntityRepository<InventoryItem>;
+    private readonly batchRepo: EntityRepository<ProductionBatch>;
+    private readonly batchUnitRepo: EntityRepository<ProductionBatchUnit>;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.productionOrderRepo = em.getRepository(ProductionOrder);
         this.inventoryRepo = em.getRepository(InventoryItem);
+        this.batchRepo = em.getRepository(ProductionBatch);
+        this.batchUnitRepo = em.getRepository(ProductionBatchUnit);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
@@ -77,8 +89,137 @@ export class ProductionService {
     async getOrder(id: string): Promise<ProductionOrder> {
         return await this.productionOrderRepo.findOneOrFail(
             { id },
-            { populate: ['items', 'items.variant', 'items.variant.product', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] }
+            {
+                populate: [
+                    'items',
+                    'items.variant',
+                    'items.variant.product',
+                    'items.variant.bomItems',
+                    'items.variant.bomItems.rawMaterial',
+                    'batches',
+                    'batches.variant',
+                    'batches.units',
+                ],
+            }
         );
+    }
+
+    async createBatch(orderId: string, payload: { variantId: string; plannedQty: number; code?: string; notes?: string }) {
+        const order = await this.productionOrderRepo.findOneOrFail(
+            { id: orderId },
+            { populate: ['items', 'items.variant'] }
+        );
+
+        if (order.status === ProductionOrderStatus.COMPLETED || order.status === ProductionOrderStatus.CANCELLED) {
+            throw new AppError('No puedes crear lotes en una orden cerrada', 400);
+        }
+
+        const hasVariantInOrder = order.items.getItems().some((i) => i.variant.id === payload.variantId);
+        if (!hasVariantInOrder) {
+            throw new AppError('La variante no pertenece a la orden', 400);
+        }
+
+        const code = payload.code || `LOT-${Date.now().toString(36).toUpperCase()}`;
+        const exists = await this.batchRepo.findOne({ code });
+        if (exists) {
+            throw new AppError('El código de lote ya existe', 409);
+        }
+
+        const batch = this.batchRepo.create({
+            productionOrder: order,
+            variant: this.em.getReference(ProductVariant, payload.variantId),
+            code,
+            plannedQty: payload.plannedQty,
+            producedQty: payload.plannedQty,
+            notes: payload.notes,
+            qcStatus: ProductionBatchQcStatus.PENDING,
+            packagingStatus: ProductionBatchPackagingStatus.PENDING,
+            status: ProductionBatchStatus.IN_PROGRESS,
+        } as unknown as ProductionBatch);
+
+        await this.em.persistAndFlush(batch);
+        return this.batchRepo.findOneOrFail(
+            { id: batch.id },
+            { populate: ['variant', 'variant.product', 'units'] }
+        );
+    }
+
+    async listBatches(orderId: string) {
+        return this.batchRepo.find(
+            { productionOrder: orderId },
+            { populate: ['variant', 'variant.product', 'units'], orderBy: { createdAt: 'DESC' } }
+        );
+    }
+
+    async addBatchUnits(batchId: string, quantity: number) {
+        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units'] });
+        if (quantity <= 0) {
+            throw new AppError('La cantidad debe ser mayor a 0', 400);
+        }
+
+        const currentCount = batch.units.length;
+        for (let i = 1; i <= quantity; i += 1) {
+            const serialCode = `${batch.code}-U${String(currentCount + i).padStart(4, '0')}`;
+            const unit = this.batchUnitRepo.create({
+                batch,
+                serialCode,
+                qcPassed: false,
+                packaged: false,
+                rejected: false,
+            } as unknown as ProductionBatchUnit);
+            batch.units.add(unit);
+        }
+
+        batch.producedQty = Math.max(batch.producedQty, batch.units.length);
+        await this.em.persistAndFlush(batch);
+        return this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['variant', 'units'] });
+    }
+
+    async setBatchQc(batchId: string, passed: boolean) {
+        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units'] });
+        batch.qcStatus = passed ? ProductionBatchQcStatus.PASSED : ProductionBatchQcStatus.FAILED;
+        batch.status = passed ? ProductionBatchStatus.QC_PASSED : ProductionBatchStatus.QC_PENDING;
+        await this.em.persistAndFlush(batch);
+        return batch;
+    }
+
+    async setBatchPackaging(batchId: string, packed: boolean) {
+        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units'] });
+        if (batch.qcStatus !== ProductionBatchQcStatus.PASSED) {
+            throw new AppError('Debes aprobar QC antes de empacar', 400);
+        }
+
+        if (packed && batch.units.length > 0) {
+            const allPacked = batch.units.getItems().every((u) => u.rejected || (u.qcPassed && u.packaged));
+            if (!allPacked) {
+                throw new AppError('Todas las unidades deben estar aprobadas y empacadas', 400);
+            }
+        }
+
+        batch.packagingStatus = packed ? ProductionBatchPackagingStatus.PACKED : ProductionBatchPackagingStatus.PENDING;
+        batch.status = packed ? ProductionBatchStatus.READY : ProductionBatchStatus.PACKING;
+        await this.em.persistAndFlush(batch);
+        return batch;
+    }
+
+    async setBatchUnitQc(unitId: string, passed: boolean) {
+        const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch'] });
+        unit.qcPassed = passed;
+        if (!passed) {
+            unit.packaged = false;
+        }
+        await this.em.persistAndFlush(unit);
+        return unit;
+    }
+
+    async setBatchUnitPackaging(unitId: string, packaged: boolean) {
+        const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch'] });
+        if (!unit.qcPassed && !unit.rejected) {
+            throw new AppError('La unidad debe pasar QC antes de empacar', 400);
+        }
+        unit.packaged = packaged;
+        await this.em.persistAndFlush(unit);
+        return unit;
     }
 
 
@@ -172,7 +313,7 @@ export class ProductionService {
             const productionOrderRepo = tx.getRepository(ProductionOrder);
             const inventoryRepo = tx.getRepository(InventoryItem);
             const warehouseRepo = tx.getRepository(Warehouse);
-            const order = await productionOrderRepo.findOneOrFail({ id }, { populate: ['items', 'items.variant'] });
+            const order = await productionOrderRepo.findOneOrFail({ id }, { populate: ['items', 'items.variant', 'batches', 'batches.units'] });
 
             // Basic transition validation
             if (order.status === ProductionOrderStatus.COMPLETED || order.status === ProductionOrderStatus.CANCELLED) {
@@ -183,6 +324,36 @@ export class ProductionService {
 
             // If status is changed to COMPLETED, update finished goods inventory
             if (status === ProductionOrderStatus.COMPLETED) {
+                const batches = order.batches.getItems();
+                const itemVariantIds = order.items.getItems().map((i) => i.variant.id);
+                const variantQuantities = new Map<string, number>();
+
+                for (const variantId of itemVariantIds) {
+                    const related = batches.filter((b) => b.variant.id === variantId);
+                    if (related.length === 0) {
+                        throw new AppError('Debes registrar lotes para todas las variantes antes de completar', 400);
+                    }
+
+                    let totalCompleted = 0;
+                    for (const batch of related) {
+                        if (batch.qcStatus !== ProductionBatchQcStatus.PASSED || batch.packagingStatus !== ProductionBatchPackagingStatus.PACKED) {
+                            throw new AppError(`El lote ${batch.code} no está listo (QC + Empaque)`, 400);
+                        }
+
+                        const units = batch.units.getItems();
+                        if (units.length > 0) {
+                            const allGood = units.every((u) => u.rejected || (u.qcPassed && u.packaged));
+                            if (!allGood) {
+                                throw new AppError(`El lote ${batch.code} tiene unidades sin liberar`, 400);
+                            }
+                            totalCompleted += units.filter((u) => !u.rejected && u.packaged).length;
+                        } else {
+                            totalCompleted += batch.producedQty > 0 ? batch.producedQty : batch.plannedQty;
+                        }
+                    }
+                    variantQuantities.set(variantId, totalCompleted);
+                }
+
                 // Get or create warehouse for finished goods
                 let warehouse: Warehouse | null = null;
                 if (warehouseId) {
@@ -203,18 +374,19 @@ export class ProductionService {
                 }
 
                 for (const item of order.items) {
+                    const completedQty = variantQuantities.get(item.variant.id) ?? item.quantity;
                     let inventoryItem = await inventoryRepo.findOne({
                         variant: item.variant,
                         warehouse
                     });
 
                     if (inventoryItem) {
-                        inventoryItem.quantity = Number(inventoryItem.quantity) + Number(item.quantity);
+                        inventoryItem.quantity = Number(inventoryItem.quantity) + Number(completedQty);
                     } else {
                         inventoryItem = inventoryRepo.create({
                             variant: item.variant,
                             warehouse,
-                            quantity: item.quantity,
+                            quantity: completedQty,
                             lastUpdated: new Date()
                         } as InventoryItem);
                     }
