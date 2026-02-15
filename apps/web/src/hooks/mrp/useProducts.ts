@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Product } from '@scaffold/types';
+import { InvimaRegistration, InvimaRegistrationStatus, Product } from '@scaffold/types';
 import { CreateProductVariantDto, UpdateProductVariantDto } from '@scaffold/schemas';
 import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
@@ -75,6 +75,33 @@ export const useDeleteVariantMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQueriesByPrefix(mrpQueryKeys.products);
+            },
+        }
+    );
+};
+
+export const useInvimaRegistrationsQuery = (filters?: { status?: InvimaRegistrationStatus }) => {
+    const fetcher = useCallback(async (): Promise<InvimaRegistration[]> => {
+        return mrpApi.listInvimaRegistrations(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.invimaRegistrations);
+};
+
+export const useCreateInvimaRegistrationMutation = () => {
+    return useMrpMutation<{
+        code: string;
+        holderName: string;
+        manufacturerName?: string;
+        validFrom?: string | Date;
+        validUntil?: string | Date;
+        status?: InvimaRegistrationStatus;
+        notes?: string;
+    }, InvimaRegistration>(
+        async (payload) => mrpApi.createInvimaRegistration(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.invimaRegistrations);
             },
         }
     );

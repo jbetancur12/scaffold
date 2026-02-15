@@ -24,6 +24,7 @@ import {
     RegulatoryDeviceType,
     RegulatoryCodingStandard,
     RegulatoryLabelStatus,
+    InvimaRegistrationStatus,
     QualityRiskControlStatus,
     IncomingInspectionResult,
     IncomingInspectionStatus,
@@ -84,12 +85,38 @@ export const PurchaseRecordSchema = z.object({
     date: z.string().or(z.date()),
 });
 
-export const ProductSchema = z.object({
+const ProductBaseSchema = z.object({
     name: z.string().min(1, 'El nombre es obligatorio'),
     description: z.string().optional(),
     sku: z.string().min(1, 'SKU es obligatorio'),
     categoryId: z.string().uuid().optional(),
+    requiresInvima: z.boolean().default(false),
+    productReference: z.string().min(2).optional(),
+    invimaRegistrationId: z.string().uuid().optional(),
 });
+
+const validateProductInvima = (
+    data: { requiresInvima?: boolean; invimaRegistrationId?: string; productReference?: string },
+    ctx: z.RefinementCtx
+) => {
+    if (data.requiresInvima && !data.invimaRegistrationId) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['invimaRegistrationId'],
+            message: 'Debes seleccionar un registro INVIMA para producto regulado',
+        });
+    }
+    if (data.requiresInvima && !data.productReference) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['productReference'],
+            message: 'Debes indicar la referencia del producto regulado',
+        });
+    }
+};
+
+export const ProductSchema = ProductBaseSchema.superRefine(validateProductInvima);
+export const UpdateProductSchema = ProductBaseSchema.partial().superRefine(validateProductInvima);
 
 export const ProductVariantSchema = z.object({
     productId: z.string().uuid(),
@@ -439,10 +466,10 @@ export const UpsertRegulatoryLabelSchema = z.object({
     scopeType: z.nativeEnum(RegulatoryLabelScopeType),
     deviceType: z.nativeEnum(RegulatoryDeviceType),
     codingStandard: z.nativeEnum(RegulatoryCodingStandard),
-    productName: z.string().min(3),
-    manufacturerName: z.string().min(3),
-    invimaRegistration: z.string().min(3),
-    lotCode: z.string().min(2),
+    productName: z.string().min(3).optional(),
+    manufacturerName: z.string().min(3).optional(),
+    invimaRegistration: z.string().min(3).optional(),
+    lotCode: z.string().min(2).optional(),
     serialCode: z.string().optional(),
     manufactureDate: z.coerce.date(),
     expirationDate: z.coerce.date().optional(),
@@ -459,6 +486,22 @@ export const UpsertRegulatoryLabelSchema = z.object({
             message: 'Para etiqueta serial debes enviar productionBatchUnitId',
         });
     }
+});
+
+export const CreateInvimaRegistrationSchema = z.object({
+    code: z.string().min(5),
+    holderName: z.string().min(2),
+    manufacturerName: z.string().min(2).optional(),
+    validFrom: z.coerce.date().optional(),
+    validUntil: z.coerce.date().optional(),
+    status: z.nativeEnum(InvimaRegistrationStatus).default(InvimaRegistrationStatus.ACTIVO),
+    notes: z.string().optional(),
+});
+
+export const UpdateInvimaRegistrationSchema = CreateInvimaRegistrationSchema.partial();
+
+export const ListInvimaRegistrationsQuerySchema = z.object({
+    status: z.nativeEnum(InvimaRegistrationStatus).optional(),
 });
 
 export const ListRegulatoryLabelsQuerySchema = z.object({

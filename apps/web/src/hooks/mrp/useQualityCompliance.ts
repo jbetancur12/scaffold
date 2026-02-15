@@ -18,6 +18,7 @@ import {
     RegulatoryCodingStandard,
     QualityRiskControlStatus,
     IncomingInspectionResult,
+    InvimaRegistrationStatus,
 } from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -58,6 +59,7 @@ import {
     useUpsertBatchReleaseChecklistMutation,
     useResolveIncomingInspectionMutation,
 } from '@/hooks/mrp/useQuality';
+import { useCreateInvimaRegistrationMutation, useInvimaRegistrationsQuery } from '@/hooks/mrp/useProducts';
 
 export const useQualityCompliance = () => {
     const { toast } = useToast();
@@ -69,6 +71,7 @@ export const useQualityCompliance = () => {
     const { data: regulatoryLabelsData, loading: loadingRegulatoryLabels } = useRegulatoryLabelsQuery();
     const { data: incomingInspectionsData, loading: loadingIncomingInspections } = useIncomingInspectionsQuery();
     const { data: batchReleasesData, loading: loadingBatchReleases } = useBatchReleasesQuery();
+    const { data: invimaRegistrationsData, loading: loadingInvimaRegistrations } = useInvimaRegistrationsQuery();
     const { data: complianceDashboardData, loading: loadingComplianceDashboard } = useComplianceDashboardQuery();
     const { data: riskControlsData, loading: loadingRiskControls } = useRiskControlsQuery();
     const { data: trainingEvidenceData, loading: loadingTrainingEvidence } = useTrainingEvidenceQuery();
@@ -96,6 +99,7 @@ export const useQualityCompliance = () => {
     const { execute: resolveIncomingInspection } = useResolveIncomingInspectionMutation();
     const { execute: upsertBatchReleaseChecklist, loading: savingBatchReleaseChecklist } = useUpsertBatchReleaseChecklistMutation();
     const { execute: signBatchRelease, loading: signingBatchRelease } = useSignBatchReleaseMutation();
+    const { execute: createInvimaRegistration, loading: creatingInvimaRegistration } = useCreateInvimaRegistrationMutation();
 
     const [ncForm, setNcForm] = useState({
         title: '',
@@ -181,6 +185,15 @@ export const useQualityCompliance = () => {
         checklistNotes: '',
         rejectedReason: '',
     });
+    const [invimaRegistrationForm, setInvimaRegistrationForm] = useState({
+        code: '',
+        holderName: '',
+        manufacturerName: '',
+        validFrom: '',
+        validUntil: '',
+        status: InvimaRegistrationStatus.ACTIVO,
+        notes: '',
+    });
 
     const nonConformities = nonConformitiesData ?? [];
     const capas = capasData ?? [];
@@ -190,6 +203,7 @@ export const useQualityCompliance = () => {
     const regulatoryLabels = regulatoryLabelsData ?? [];
     const incomingInspections = incomingInspectionsData ?? [];
     const batchReleases = batchReleasesData ?? [];
+    const invimaRegistrations = invimaRegistrationsData ?? [];
     const complianceDashboard = complianceDashboardData;
     const riskControls = riskControlsData ?? [];
     const trainingEvidence = trainingEvidenceData ?? [];
@@ -490,10 +504,10 @@ export const useQualityCompliance = () => {
                 scopeType: regulatoryLabelForm.scopeType,
                 deviceType: regulatoryLabelForm.deviceType,
                 codingStandard: regulatoryLabelForm.codingStandard,
-                productName: regulatoryLabelForm.productName,
-                manufacturerName: regulatoryLabelForm.manufacturerName,
-                invimaRegistration: regulatoryLabelForm.invimaRegistration,
-                lotCode: regulatoryLabelForm.lotCode,
+                productName: regulatoryLabelForm.productName || undefined,
+                manufacturerName: regulatoryLabelForm.manufacturerName || undefined,
+                invimaRegistration: regulatoryLabelForm.invimaRegistration || undefined,
+                lotCode: regulatoryLabelForm.lotCode || undefined,
                 serialCode: regulatoryLabelForm.serialCode || undefined,
                 manufactureDate: regulatoryLabelForm.manufactureDate,
                 expirationDate: regulatoryLabelForm.expirationDate || undefined,
@@ -701,6 +715,33 @@ export const useQualityCompliance = () => {
         }
     };
 
+    const handleCreateInvimaRegistration = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await createInvimaRegistration({
+                code: invimaRegistrationForm.code,
+                holderName: invimaRegistrationForm.holderName,
+                manufacturerName: invimaRegistrationForm.manufacturerName || undefined,
+                validFrom: invimaRegistrationForm.validFrom || undefined,
+                validUntil: invimaRegistrationForm.validUntil || undefined,
+                status: invimaRegistrationForm.status,
+                notes: invimaRegistrationForm.notes || undefined,
+            });
+            setInvimaRegistrationForm({
+                code: '',
+                holderName: '',
+                manufacturerName: '',
+                validFrom: '',
+                validUntil: '',
+                status: InvimaRegistrationStatus.ACTIVO,
+                notes: '',
+            });
+            toast({ title: 'Registro INVIMA creado', description: 'Ya se puede asociar a productos regulados.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear el registro INVIMA'), variant: 'destructive' });
+        }
+    };
+
     return {
         nonConformities,
         capas,
@@ -710,6 +751,7 @@ export const useQualityCompliance = () => {
         regulatoryLabels,
         incomingInspections,
         batchReleases,
+        invimaRegistrations,
         complianceDashboard,
         riskControls,
         trainingEvidence,
@@ -724,6 +766,7 @@ export const useQualityCompliance = () => {
         riskControlForm,
         trainingForm,
         batchReleaseForm,
+        invimaRegistrationForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
@@ -733,6 +776,7 @@ export const useQualityCompliance = () => {
         setRiskControlForm,
         setTrainingForm,
         setBatchReleaseForm,
+        setInvimaRegistrationForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
@@ -741,6 +785,7 @@ export const useQualityCompliance = () => {
         loadingRegulatoryLabels,
         loadingIncomingInspections,
         loadingBatchReleases,
+        loadingInvimaRegistrations,
         loadingComplianceDashboard,
         loadingRiskControls,
         loadingTrainingEvidence,
@@ -757,6 +802,7 @@ export const useQualityCompliance = () => {
         creatingTrainingEvidence,
         savingBatchReleaseChecklist,
         signingBatchRelease,
+        creatingInvimaRegistration,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -779,6 +825,7 @@ export const useQualityCompliance = () => {
         quickResolveIncomingInspection,
         handleUpsertBatchReleaseChecklist,
         quickSignBatchRelease,
+        handleCreateInvimaRegistration,
         handleExportCompliance,
         handleCreateRiskControl,
         handleCreateTrainingEvidence,

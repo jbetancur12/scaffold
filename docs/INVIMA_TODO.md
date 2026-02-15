@@ -33,6 +33,8 @@
 - [x] Campos regulatorios obligatorios por tipo de dispositivo.
 - [x] Integracion con estandar de codificacion aplicable.
 - [x] Validaciones previas a despacho.
+- [x] Catálogo de registros INVIMA y asociación por producto.
+- [x] Regla condicional: productos no regulados no requieren INVIMA.
 
 ## Fase 6 - Evidencia de cumplimiento y auditorias
 - [x] Tablero de cumplimiento (KPIs de NC, CAPA, eventos, recall).

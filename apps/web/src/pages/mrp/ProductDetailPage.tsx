@@ -254,6 +254,22 @@ export default function ProductDetailPage() {
                                     {product.description || 'Sin descripción'}
                                 </p>
                             </div>
+                            <div>
+                                <span className="text-sm text-slate-500 block">Referencia</span>
+                                <span className="font-medium">{product.productReference || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <span className="text-sm text-slate-500 block">Requiere INVIMA</span>
+                                <span className="font-medium">{product.requiresInvima ? 'Sí' : 'No'}</span>
+                            </div>
+                            <div className="col-span-2">
+                                <span className="text-sm text-slate-500 block">Registro INVIMA</span>
+                                <span className="font-medium">
+                                    {product.invimaRegistration?.code
+                                        ? `${product.invimaRegistration.code} (${product.invimaRegistration.holderName})`
+                                        : 'No asignado'}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </TabsContent>

@@ -1,19 +1,24 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
-import { ProductSchema } from '@scaffold/schemas';
+import { ProductSchema, UpdateProductSchema } from '@scaffold/schemas';
 import { OperationalConfig } from '../entities/operational-config.entity';
+import { InvimaRegistrationStatus } from '@scaffold/types';
+import { AppError } from '../../../shared/utils/response';
+import { InvimaRegistration } from '../entities/invima-registration.entity';
 import { z } from 'zod';
 
 export class ProductService {
     private readonly em: EntityManager;
     private readonly productRepo: EntityRepository<Product>;
     private readonly variantRepo: EntityRepository<ProductVariant>;
+    private readonly invimaRepo: EntityRepository<InvimaRegistration>;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.productRepo = em.getRepository(Product);
         this.variantRepo = em.getRepository(ProductVariant);
+        this.invimaRepo = em.getRepository(InvimaRegistration);
     }
 
 
@@ -56,16 +61,58 @@ export class ProductService {
     }
 
     async createProduct(data: z.infer<typeof ProductSchema>): Promise<Product> {
-        const product = this.productRepo.create(data as unknown as Product);
+        const { invimaRegistrationId, ...productData } = data;
+        let invimaRegistration: InvimaRegistration | undefined;
+        if (invimaRegistrationId) {
+            invimaRegistration = await this.invimaRepo.findOneOrFail({ id: invimaRegistrationId });
+            if (invimaRegistration.status !== InvimaRegistrationStatus.ACTIVO) {
+                throw new AppError('El registro INVIMA seleccionado no está activo', 400);
+            }
+        }
+
+        if (productData.requiresInvima && !invimaRegistration) {
+            throw new AppError('Debes seleccionar un registro INVIMA para productos regulados', 400);
+        }
+
+        const product = this.productRepo.create({
+            ...productData,
+            invimaRegistration,
+        } as unknown as Product);
         await this.em.persistAndFlush(product);
-        return product;
+        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants'] });
     }
 
-    async updateProduct(id: string, data: Partial<Product>): Promise<Product> {
-        const product = await this.productRepo.findOneOrFail({ id });
-        this.productRepo.assign(product, data);
+    async updateProduct(id: string, data: z.infer<typeof UpdateProductSchema>): Promise<Product> {
+        const product = await this.productRepo.findOneOrFail({ id }, { populate: ['invimaRegistration'] });
+        let invimaRegistration = product.invimaRegistration;
+        const { invimaRegistrationId, ...productData } = data;
+
+        if ('invimaRegistrationId' in data) {
+            if (invimaRegistrationId) {
+                invimaRegistration = await this.invimaRepo.findOneOrFail({ id: invimaRegistrationId });
+                if (invimaRegistration.status !== InvimaRegistrationStatus.ACTIVO) {
+                    throw new AppError('El registro INVIMA seleccionado no está activo', 400);
+                }
+            } else {
+                invimaRegistration = undefined;
+            }
+        }
+
+        const requiresInvima = typeof productData.requiresInvima === 'boolean' ? productData.requiresInvima : product.requiresInvima;
+        const productReference = productData.productReference !== undefined ? productData.productReference : product.productReference;
+        if (requiresInvima && !invimaRegistration) {
+            throw new AppError('Debes seleccionar un registro INVIMA para productos regulados', 400);
+        }
+        if (requiresInvima && !productReference) {
+            throw new AppError('Debes registrar la referencia del producto regulado', 400);
+        }
+
+        this.productRepo.assign(product, {
+            ...productData,
+            invimaRegistration,
+        });
         await this.em.persistAndFlush(product);
-        return product;
+        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants'] });
     }
 
     async deleteProduct(id: string): Promise<void> {
@@ -95,7 +142,7 @@ export class ProductService {
     }
 
     async getProduct(id: string): Promise<Product | null> {
-        return this.productRepo.findOne({ id }, { populate: ['variants'] });
+        return this.productRepo.findOne({ id }, { populate: ['variants', 'invimaRegistration'] });
     }
 
     async listProducts(page = 1, limit = 10): Promise<{ products: Product[]; total: number }> {
@@ -104,10 +151,56 @@ export class ProductService {
             {
                 limit,
                 offset: (page - 1) * limit,
-                populate: ['variants'],
+                populate: ['variants', 'invimaRegistration'],
             }
         );
         return { products, total };
+    }
+
+    async createInvimaRegistration(payload: {
+        code: string;
+        holderName: string;
+        manufacturerName?: string;
+        validFrom?: Date;
+        validUntil?: Date;
+        status?: InvimaRegistrationStatus;
+        notes?: string;
+    }) {
+        const row = this.invimaRepo.create({
+            code: payload.code.toUpperCase(),
+            holderName: payload.holderName,
+            manufacturerName: payload.manufacturerName,
+            validFrom: payload.validFrom,
+            validUntil: payload.validUntil,
+            status: payload.status ?? InvimaRegistrationStatus.ACTIVO,
+            notes: payload.notes,
+        } as unknown as InvimaRegistration);
+        await this.em.persistAndFlush(row);
+        return row;
+    }
+
+    async updateInvimaRegistration(id: string, payload: Partial<{
+        code: string;
+        holderName: string;
+        manufacturerName?: string;
+        validFrom?: Date;
+        validUntil?: Date;
+        status: InvimaRegistrationStatus;
+        notes?: string;
+    }>) {
+        const row = await this.invimaRepo.findOneOrFail({ id });
+        this.invimaRepo.assign(row, {
+            ...payload,
+            code: payload.code ? payload.code.toUpperCase() : undefined,
+        });
+        await this.em.persistAndFlush(row);
+        return row;
+    }
+
+    async listInvimaRegistrations(filters: { status?: InvimaRegistrationStatus }) {
+        const query: Record<string, unknown> = {};
+        if (filters.status) query.status = filters.status;
+        return this.invimaRepo.find(query, { orderBy: [{ status: 'ASC' }, { code: 'ASC' }] });
     }
 
     // Logic to update product cost based on variants will be here or in MrpService

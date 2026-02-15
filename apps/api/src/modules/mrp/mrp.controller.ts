@@ -10,6 +10,7 @@ import { QualityService } from './services/quality.service';
 import { DocumentControlService } from './services/document-control.service';
 import {
     ProductSchema,
+    UpdateProductSchema,
     ProductionOrderSchema,
     RawMaterialSchema,
     BOMItemSchema,
@@ -20,6 +21,9 @@ import {
     CreateProductionOrderSchema,
     CreateProductVariantSchema,
     UpdateProductVariantSchema,
+    CreateInvimaRegistrationSchema,
+    UpdateInvimaRegistrationSchema,
+    ListInvimaRegistrationsQuerySchema,
     PaginationQuerySchema,
     ListRawMaterialsQuerySchema,
     AddSupplierMaterialSchema,
@@ -132,7 +136,7 @@ export class MrpController {
     async updateProduct(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const data = ProductSchema.partial().parse(req.body);
+            const data = UpdateProductSchema.parse(req.body);
             const product = await this.productService.updateProduct(id, data);
             return ApiResponse.success(res, product, 'Producto actualizado');
         } catch (error) {
@@ -178,6 +182,37 @@ export class MrpController {
             const { variantId } = req.params;
             await this.productService.deleteVariant(variantId);
             return ApiResponse.success(res, null, 'Variante eliminada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createInvimaRegistration(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateInvimaRegistrationSchema.parse(req.body);
+            const row = await this.productService.createInvimaRegistration(payload);
+            return ApiResponse.success(res, row, 'Registro INVIMA creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateInvimaRegistration(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateInvimaRegistrationSchema.parse(req.body);
+            const row = await this.productService.updateInvimaRegistration(id, payload);
+            return ApiResponse.success(res, row, 'Registro INVIMA actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listInvimaRegistrations(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListInvimaRegistrationsQuerySchema.parse(req.query);
+            const rows = await this.productService.listInvimaRegistrations(filters);
+            return ApiResponse.success(res, rows);
         } catch (error) {
             next(error);
         }

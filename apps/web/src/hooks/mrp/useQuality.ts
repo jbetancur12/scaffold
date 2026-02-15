@@ -311,10 +311,10 @@ export const useUpsertRegulatoryLabelMutation = () => {
         scopeType: RegulatoryLabelScopeType;
         deviceType: RegulatoryDeviceType;
         codingStandard: RegulatoryCodingStandard;
-        productName: string;
-        manufacturerName: string;
-        invimaRegistration: string;
-        lotCode: string;
+        productName?: string;
+        manufacturerName?: string;
+        invimaRegistration?: string;
+        lotCode?: string;
         serialCode?: string;
         manufactureDate: string;
         expirationDate?: string;

@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { ProductSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
-import { useProductQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
+import { useInvimaRegistrationsQuery, useProductQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 
 export default function ProductFormPage() {
@@ -23,6 +23,9 @@ export default function ProductFormPage() {
         name: '',
         sku: '',
         description: '',
+        requiresInvima: false,
+        productReference: '',
+        invimaRegistrationId: '',
     });
 
     const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
@@ -37,6 +40,7 @@ export default function ProductFormPage() {
 
 
     const { data: product, loading: loadingProduct, error: productError } = useProductQuery(isEditing ? id : undefined);
+    const { data: invimaRegistrations, loading: loadingInvimaRegistrations } = useInvimaRegistrationsQuery();
     const { execute: saveProduct } = useSaveProductMutation();
 
     useEffect(() => {
@@ -45,6 +49,9 @@ export default function ProductFormPage() {
                 name: product.name,
                 sku: product.sku,
                 description: product.description || '',
+                requiresInvima: product.requiresInvima || false,
+                productReference: product.productReference || '',
+                invimaRegistrationId: product.invimaRegistrationId || '',
             });
             setSkuManuallyEdited(true);
         }
@@ -56,17 +63,22 @@ export default function ProductFormPage() {
         e.preventDefault();
         try {
             setLoading(true);
-            ProductSchema.parse(formData);
+            const payload = {
+                ...formData,
+                productReference: formData.productReference || undefined,
+                invimaRegistrationId: formData.invimaRegistrationId || undefined,
+            };
+            ProductSchema.parse(payload);
 
             if (isEditing && id) {
-                await saveProduct({ id, payload: formData });
+                await saveProduct({ id, payload });
                 toast({
                     title: 'Éxito',
                     description: 'Producto actualizado exitosamente',
                 });
                 navigate(`/mrp/products/${id}`);
             } else {
-                const newProduct = await saveProduct({ payload: formData });
+                const newProduct = await saveProduct({ payload });
                 toast({
                     title: 'Éxito',
                     description: 'Producto creado exitosamente',
@@ -152,6 +164,50 @@ export default function ProductFormPage() {
                                     <RefreshCw className="h-4 w-4" />
                                 </Button>
                             </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="productReference">Referencia del producto</Label>
+                            <Input
+                                id="productReference"
+                                value={formData.productReference}
+                                onChange={(e) => setFormData({ ...formData, productReference: e.target.value })}
+                                placeholder="Ej. REF-ORT-001"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="requiresInvima" className="cursor-pointer">Producto regulado por INVIMA</Label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    id="requiresInvima"
+                                    type="checkbox"
+                                    checked={formData.requiresInvima}
+                                    onChange={(e) => setFormData((prev) => ({
+                                        ...prev,
+                                        requiresInvima: e.target.checked,
+                                        invimaRegistrationId: e.target.checked ? prev.invimaRegistrationId : '',
+                                    }))}
+                                />
+                                <span className="text-sm text-slate-600">Requiere registro INVIMA para etiquetado y liberación</span>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="invimaRegistrationId">Registro INVIMA</Label>
+                            <select
+                                id="invimaRegistrationId"
+                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                disabled={!formData.requiresInvima || loadingInvimaRegistrations}
+                                value={formData.invimaRegistrationId}
+                                onChange={(e) => setFormData({ ...formData, invimaRegistrationId: e.target.value })}
+                            >
+                                <option value="">
+                                    {loadingInvimaRegistrations ? 'Cargando registros...' : formData.requiresInvima ? 'Selecciona registro...' : 'No aplica'}
+                                </option>
+                                {(invimaRegistrations ?? []).map((reg) => (
+                                    <option key={reg.id} value={reg.id}>
+                                        {reg.code} - {reg.holderName}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                     </div>
 

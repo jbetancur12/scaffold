@@ -175,6 +175,12 @@ export enum RegulatoryCodingStandard {
     INTERNO = 'interno',
 }
 
+export enum InvimaRegistrationStatus {
+    ACTIVO = 'activo',
+    INACTIVO = 'inactivo',
+    SUSPENDIDO = 'suspendido',
+}
+
 export enum RegulatoryLabelStatus {
     BORRADOR = 'borrador',
     VALIDADA = 'validada',
@@ -288,12 +294,29 @@ export interface PurchaseOrderListResponse {
     limit: number;
 }
 
+export interface InvimaRegistration {
+    id: string;
+    code: string;
+    holderName: string;
+    manufacturerName?: string;
+    validFrom?: string | Date;
+    validUntil?: string | Date;
+    status: InvimaRegistrationStatus;
+    notes?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
 export interface Product {
     id: string;
     name: string;
     description?: string;
     sku: string;
     categoryId?: string;
+    requiresInvima: boolean;
+    productReference?: string;
+    invimaRegistrationId?: string;
+    invimaRegistration?: Pick<InvimaRegistration, 'id' | 'code' | 'status' | 'holderName' | 'manufacturerName' | 'validFrom' | 'validUntil'>;
     createdAt: string | Date;
     updatedAt: string | Date;
     variants?: ProductVariant[];
@@ -644,6 +667,7 @@ export interface IncomingInspection {
 export interface BatchRelease {
     id: string;
     productionBatchId: string;
+    productionBatch?: Pick<ProductionBatch, 'id' | 'code'>;
     status: BatchReleaseStatus;
     qcApproved: boolean;
     labelingValidated: boolean;

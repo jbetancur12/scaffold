@@ -19,6 +19,9 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/products/:productId/variants', (req, res, next) => mrpController.createVariant(req, res, next));
     router.put('/variants/:variantId', (req, res, next) => mrpController.updateVariant(req, res, next));
     router.delete('/variants/:variantId', (req, res, next) => mrpController.deleteVariant(req, res, next));
+    router.post('/invima-registrations', (req, res, next) => mrpController.createInvimaRegistration(req, res, next));
+    router.get('/invima-registrations', (req, res, next) => mrpController.listInvimaRegistrations(req, res, next));
+    router.patch('/invima-registrations/:id', (req, res, next) => mrpController.updateInvimaRegistration(req, res, next));
 
     // Suppliers
     router.post('/suppliers', (req, res, next) => mrpController.createSupplier(req, res, next));

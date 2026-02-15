@@ -6,6 +6,7 @@ export const mrpQueryKeys = {
     suppliersList: (page: number, limit: number) => `mrp.suppliers.${page}.${limit}`,
     supplier: (id: string) => `mrp.supplier.${id}`,
     supplierMaterials: (id: string) => `mrp.supplier.materials.${id}`,
+    invimaRegistrations: 'mrp.invima-registrations',
     rawMaterials: 'mrp.raw-materials',
     rawMaterialsList: (page: number, limit: number, search: string) => `mrp.raw-materials.${page}.${limit}.${search || ''}`,
     rawMaterial: (id: string) => `mrp.raw-material.${id}`,

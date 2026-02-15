@@ -16,6 +16,7 @@ import {
     RegulatoryLabelStatus,
     QualityRiskControlStatus,
     IncomingInspectionStatus,
+    InvimaRegistrationStatus,
     TechnovigilanceCaseType,
     TechnovigilanceCausality,
     TechnovigilanceSeverity,
@@ -149,6 +150,7 @@ export default function QualityCompliancePage() {
         regulatoryLabels,
         incomingInspections,
         batchReleases,
+        invimaRegistrations,
         complianceDashboard,
         riskControls,
         trainingEvidence,
@@ -163,6 +165,7 @@ export default function QualityCompliancePage() {
         riskControlForm,
         trainingForm,
         batchReleaseForm,
+        invimaRegistrationForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
@@ -172,6 +175,7 @@ export default function QualityCompliancePage() {
         setRiskControlForm,
         setTrainingForm,
         setBatchReleaseForm,
+        setInvimaRegistrationForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
@@ -180,6 +184,7 @@ export default function QualityCompliancePage() {
         loadingRegulatoryLabels,
         loadingIncomingInspections,
         loadingBatchReleases,
+        loadingInvimaRegistrations,
         loadingComplianceDashboard,
         loadingRiskControls,
         loadingTrainingEvidence,
@@ -196,6 +201,7 @@ export default function QualityCompliancePage() {
         creatingTrainingEvidence,
         savingBatchReleaseChecklist,
         signingBatchRelease,
+        creatingInvimaRegistration,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -218,6 +224,7 @@ export default function QualityCompliancePage() {
         quickResolveIncomingInspection,
         handleUpsertBatchReleaseChecklist,
         quickSignBatchRelease,
+        handleCreateInvimaRegistration,
         handleExportCompliance,
         handleCreateRiskControl,
         handleCreateTrainingEvidence,
@@ -250,6 +257,7 @@ export default function QualityCompliancePage() {
                     <TabsTrigger value="labeling">Etiquetado</TabsTrigger>
                     <TabsTrigger value="incoming">Recepción</TabsTrigger>
                     <TabsTrigger value="batch-release">Liberación QA</TabsTrigger>
+                    <TabsTrigger value="invima">Registros INVIMA</TabsTrigger>
                     <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
                     <TabsTrigger value="docs">Control documental</TabsTrigger>
                     <TabsTrigger value="audit">Auditoría</TabsTrigger>
@@ -307,6 +315,97 @@ export default function QualityCompliancePage() {
                                     {n.status !== NonConformityStatus.CERRADA ? (
                                         <Button size="sm" variant="outline" onClick={() => quickCloseNc(n.id)}>Cerrar</Button>
                                     ) : null}
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="invima" className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Crear Registro INVIMA</CardTitle></CardHeader>
+                        <CardContent>
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={handleCreateInvimaRegistration}>
+                                <div className="space-y-1">
+                                    <Label>Código INVIMA</Label>
+                                    <Input
+                                        value={invimaRegistrationForm.code}
+                                        onChange={(e) => setInvimaRegistrationForm((p) => ({ ...p, code: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Titular</Label>
+                                    <Input
+                                        value={invimaRegistrationForm.holderName}
+                                        onChange={(e) => setInvimaRegistrationForm((p) => ({ ...p, holderName: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Fabricante (opcional)</Label>
+                                    <Input
+                                        value={invimaRegistrationForm.manufacturerName}
+                                        onChange={(e) => setInvimaRegistrationForm((p) => ({ ...p, manufacturerName: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Estado</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={invimaRegistrationForm.status}
+                                        onChange={(e) => setInvimaRegistrationForm((p) => ({ ...p, status: e.target.value as InvimaRegistrationStatus }))}
+                                    >
+                                        <option value={InvimaRegistrationStatus.ACTIVO}>activo</option>
+                                        <option value={InvimaRegistrationStatus.INACTIVO}>inactivo</option>
+                                        <option value={InvimaRegistrationStatus.SUSPENDIDO}>suspendido</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Válido desde (opcional)</Label>
+                                    <Input
+                                        type="date"
+                                        value={invimaRegistrationForm.validFrom}
+                                        onChange={(e) => setInvimaRegistrationForm((p) => ({ ...p, validFrom: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Válido hasta (opcional)</Label>
+                                    <Input
+                                        type="date"
+                                        value={invimaRegistrationForm.validUntil}
+                                        onChange={(e) => setInvimaRegistrationForm((p) => ({ ...p, validUntil: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Notas (opcional)</Label>
+                                    <Textarea
+                                        value={invimaRegistrationForm.notes}
+                                        onChange={(e) => setInvimaRegistrationForm((p) => ({ ...p, notes: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="md:col-span-2 flex justify-end">
+                                    <Button type="submit" disabled={creatingInvimaRegistration}>
+                                        {creatingInvimaRegistration ? 'Guardando...' : 'Guardar registro'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Registros INVIMA ({invimaRegistrations.length})</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            {loadingInvimaRegistrations ? <div>Cargando...</div> : invimaRegistrations.length === 0 ? <div className="text-sm text-slate-500">Sin registros.</div> : invimaRegistrations.map((reg) => (
+                                <div key={reg.id} className="border rounded-md p-3">
+                                    <div className="font-medium">{reg.code}</div>
+                                    <div className="text-xs text-slate-600 mt-1">
+                                        Titular: {reg.holderName} | Fabricante: {reg.manufacturerName || 'N/A'}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                        Vigencia: {reg.validFrom ? new Date(reg.validFrom).toLocaleDateString() : 'N/A'} - {reg.validUntil ? new Date(reg.validUntil).toLocaleDateString() : 'N/A'}
+                                    </div>
+                                    <Badge variant="outline" className="mt-2">{reg.status}</Badge>
                                 </div>
                             ))}
                         </CardContent>
@@ -735,7 +834,7 @@ export default function QualityCompliancePage() {
                                     <Input
                                         value={regulatoryLabelForm.productName}
                                         onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, productName: e.target.value }))}
-                                        required
+                                        placeholder="Si lo dejas vacío se toma del lote"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -743,7 +842,7 @@ export default function QualityCompliancePage() {
                                     <Input
                                         value={regulatoryLabelForm.manufacturerName}
                                         onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, manufacturerName: e.target.value }))}
-                                        required
+                                        placeholder="Opcional, autocompleta desde registro INVIMA"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -751,7 +850,7 @@ export default function QualityCompliancePage() {
                                     <Input
                                         value={regulatoryLabelForm.invimaRegistration}
                                         onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, invimaRegistration: e.target.value }))}
-                                        required
+                                        placeholder="Opcional si el producto tiene INVIMA asociado"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -759,7 +858,7 @@ export default function QualityCompliancePage() {
                                     <Input
                                         value={regulatoryLabelForm.lotCode}
                                         onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, lotCode: e.target.value }))}
-                                        required
+                                        placeholder="Opcional, por defecto usa código del lote"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -1188,7 +1287,10 @@ export default function QualityCompliancePage() {
                                 <div key={release.id} className="border rounded-md p-3 flex items-start justify-between gap-4">
                                     <div>
                                         <div className="font-medium">
-                                            Lote: <span title={release.productionBatchId}>{shortId(release.productionBatchId)}</span>
+                                            Lote: {release.productionBatch?.code || shortId(release.productionBatchId)}
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1">
+                                            ID: <span title={release.productionBatchId}>{release.productionBatchId}</span>
                                         </div>
                                         <div className="text-xs text-slate-600 mt-1">
                                             QC: {release.qcApproved ? 'ok' : 'pendiente'} | Etiquetado: {release.labelingValidated ? 'ok' : 'pendiente'} | Docs: {release.documentsCurrent ? 'ok' : 'pendiente'} | Evidencias: {release.evidencesComplete ? 'ok' : 'pendiente'}

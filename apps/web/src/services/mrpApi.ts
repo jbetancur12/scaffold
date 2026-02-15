@@ -50,6 +50,8 @@ import {
     IncomingInspectionStatus,
     BatchRelease,
     BatchReleaseStatus,
+    InvimaRegistration,
+    InvimaRegistrationStatus,
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
@@ -228,10 +230,10 @@ export interface UpsertRegulatoryLabelPayload {
     scopeType: RegulatoryLabelScopeType;
     deviceType: RegulatoryDeviceType;
     codingStandard: RegulatoryCodingStandard;
-    productName: string;
-    manufacturerName: string;
-    invimaRegistration: string;
-    lotCode: string;
+    productName?: string;
+    manufacturerName?: string;
+    invimaRegistration?: string;
+    lotCode?: string;
     serialCode?: string;
     manufactureDate: string | Date;
     expirationDate?: string | Date;
@@ -289,6 +291,26 @@ export interface UpsertBatchReleaseChecklistPayload {
     actor?: string;
 }
 
+export interface CreateInvimaRegistrationPayload {
+    code: string;
+    holderName: string;
+    manufacturerName?: string;
+    validFrom?: string | Date;
+    validUntil?: string | Date;
+    status?: InvimaRegistrationStatus;
+    notes?: string;
+}
+
+export interface UpdateInvimaRegistrationPayload {
+    code?: string;
+    holderName?: string;
+    manufacturerName?: string;
+    validFrom?: string | Date;
+    validUntil?: string | Date;
+    status?: InvimaRegistrationStatus;
+    notes?: string;
+}
+
 export const mrpApi = {
     // Products
     getProducts: async (page = 1, limit = 10) => {
@@ -322,6 +344,18 @@ export const mrpApi = {
     },
     deleteVariant: async (variantId: string): Promise<void> => {
         await api.delete(`/mrp/variants/${variantId}`);
+    },
+    createInvimaRegistration: async (data: CreateInvimaRegistrationPayload): Promise<InvimaRegistration> => {
+        const response = await api.post<InvimaRegistration>('/mrp/invima-registrations', data);
+        return response.data;
+    },
+    listInvimaRegistrations: async (filters?: { status?: InvimaRegistrationStatus }): Promise<InvimaRegistration[]> => {
+        const response = await api.get<InvimaRegistration[]>('/mrp/invima-registrations', { params: filters });
+        return response.data;
+    },
+    updateInvimaRegistration: async (id: string, data: UpdateInvimaRegistrationPayload): Promise<InvimaRegistration> => {
+        const response = await api.patch<InvimaRegistration>(`/mrp/invima-registrations/${id}`, data);
+        return response.data;
     },
 
     // Purchase Orders

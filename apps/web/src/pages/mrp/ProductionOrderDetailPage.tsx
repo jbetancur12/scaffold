@@ -238,6 +238,21 @@ export default function ProductionOrderDetailPage() {
         }
     };
 
+    const shortId = (value: string) => (value.length > 12 ? `${value.slice(0, 8)}...` : value);
+
+    const copyBatchId = async (batchId: string) => {
+        try {
+            await navigator.clipboard.writeText(batchId);
+            toast({ title: 'ID copiado', description: 'UUID del lote copiado al portapapeles.' });
+        } catch (_error) {
+            toast({
+                title: 'No se pudo copiar',
+                description: `Copia manualmente este ID: ${batchId}`,
+                variant: 'destructive',
+            });
+        }
+    };
+
     if (loading) {
         return <div className="flex justify-center p-8">Cargando...</div>;
     }
@@ -409,6 +424,21 @@ export default function ProductionOrderDetailPage() {
                                                     <div className="font-semibold">{batch.code}</div>
                                                     <div className="text-xs text-slate-500">
                                                         {batch.variant?.product?.name} - {batch.variant?.name} | Plan: {batch.plannedQty} | Producido: {batch.producedQty}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 mt-1">
+                                                        ID:{' '}
+                                                        <span title={batch.id} className="font-mono">
+                                                            {shortId(batch.id)}
+                                                        </span>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-6 px-2 ml-1 text-[11px]"
+                                                            onClick={() => copyBatchId(batch.id)}
+                                                            title="Copiar UUID completo"
+                                                        >
+                                                            Copiar ID
+                                                        </Button>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-wrap items-center gap-2">

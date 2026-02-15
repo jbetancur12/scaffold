@@ -23,6 +23,7 @@ import {
     RegulatoryDeviceType,
     RegulatoryLabelScopeType,
     RegulatoryLabelStatus,
+    InvimaRegistrationStatus,
     TechnovigilanceCaseType,
     TechnovigilanceCausality,
     TechnovigilanceSeverity,
@@ -543,10 +544,10 @@ export class QualityService {
         scopeType: RegulatoryLabelScopeType;
         deviceType: RegulatoryDeviceType;
         codingStandard: RegulatoryCodingStandard;
-        productName: string;
-        manufacturerName: string;
-        invimaRegistration: string;
-        lotCode: string;
+        productName?: string;
+        manufacturerName?: string;
+        invimaRegistration?: string;
+        lotCode?: string;
         serialCode?: string;
         manufactureDate: Date;
         expirationDate?: Date;
@@ -556,7 +557,11 @@ export class QualityService {
         internalCode?: string;
         actor?: string;
     }) {
-        const batch = await this.em.findOneOrFail(ProductionBatch, { id: payload.productionBatchId }, { populate: ['units'] });
+        const batch = await this.em.findOneOrFail(
+            ProductionBatch,
+            { id: payload.productionBatchId },
+            { populate: ['units', 'variant', 'variant.product', 'variant.product.invimaRegistration'] }
+        );
         let unit: ProductionBatchUnit | undefined;
 
         if (payload.productionBatchUnitId) {
@@ -576,6 +581,38 @@ export class QualityService {
         const serialCode = payload.scopeType === RegulatoryLabelScopeType.SERIAL
             ? (unit?.serialCode ?? payload.serialCode)
             : undefined;
+        const product = batch.variant.product;
+        const linkedRegistration = product.invimaRegistration;
+        const lotCode = payload.lotCode || batch.code;
+        const productName = payload.productName || product.name;
+        const manufacturerName = payload.manufacturerName || linkedRegistration?.manufacturerName || linkedRegistration?.holderName || 'Fabricante no definido';
+        let invimaRegistration = payload.invimaRegistration;
+
+        if (product.requiresInvima) {
+            if (!invimaRegistration) {
+                invimaRegistration = linkedRegistration?.code;
+            }
+            if (!invimaRegistration) {
+                throw new AppError('El producto requiere INVIMA y no tiene registro activo asociado', 400);
+            }
+            if (linkedRegistration) {
+                const now = new Date();
+                if (linkedRegistration.status !== InvimaRegistrationStatus.ACTIVO) {
+                    throw new AppError('El registro INVIMA asociado no está activo', 400);
+                }
+                if (linkedRegistration.validFrom && linkedRegistration.validFrom > now) {
+                    throw new AppError('El registro INVIMA aún no está vigente', 400);
+                }
+                if (linkedRegistration.validUntil && linkedRegistration.validUntil < now) {
+                    throw new AppError('El registro INVIMA está vencido', 400);
+                }
+            }
+        } else {
+            invimaRegistration = invimaRegistration || linkedRegistration?.code || 'NO_REQUIERE_INVIMA';
+        }
+        const effectiveInternalCode = payload.codingStandard === RegulatoryCodingStandard.INTERNO
+            ? (payload.internalCode || (serialCode ? `${lotCode}-${serialCode}` : lotCode))
+            : payload.internalCode;
 
         let row: RegulatoryLabel | null = null;
         if (payload.scopeType === RegulatoryLabelScopeType.SERIAL && unit) {
@@ -603,26 +640,26 @@ export class QualityService {
             scopeType: payload.scopeType,
             deviceType: payload.deviceType,
             codingStandard: payload.codingStandard,
-            productName: payload.productName,
-            manufacturerName: payload.manufacturerName,
-            invimaRegistration: payload.invimaRegistration,
-            lotCode: payload.lotCode,
+            productName,
+            manufacturerName,
+            invimaRegistration,
+            lotCode,
             serialCode,
             manufactureDate: payload.manufactureDate,
             expirationDate: payload.expirationDate,
             gtin: payload.gtin,
             udiDi: payload.udiDi,
             udiPi: payload.udiPi,
-            internalCode: payload.internalCode,
+            internalCode: effectiveInternalCode,
             codingValue: this.buildCodingValue({
                 codingStandard: payload.codingStandard,
                 gtin: payload.gtin,
-                lotCode: payload.lotCode,
+                lotCode,
                 serialCode,
                 expirationDate: payload.expirationDate,
                 udiDi: payload.udiDi,
                 udiPi: payload.udiPi,
-                internalCode: payload.internalCode,
+                internalCode: effectiveInternalCode,
             }),
         });
 
@@ -630,13 +667,13 @@ export class QualityService {
             scopeType: payload.scopeType,
             deviceType: payload.deviceType,
             codingStandard: payload.codingStandard,
-            lotCode: payload.lotCode,
+            lotCode,
             serialCode,
             manufactureDate: payload.manufactureDate,
             expirationDate: payload.expirationDate,
             gtin: payload.gtin,
             udiDi: payload.udiDi,
-            internalCode: payload.internalCode,
+            internalCode: effectiveInternalCode,
         });
 
         row.validationErrors = errors;
