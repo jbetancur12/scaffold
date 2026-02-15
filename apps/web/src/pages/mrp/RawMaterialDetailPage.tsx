@@ -8,6 +8,7 @@ import { MaterialSuppliersTable } from '@/components/mrp/MaterialSuppliersTable'
 import { ArrowLeft, Edit2, Package } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function RawMaterialDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -30,7 +31,7 @@ export default function RawMaterialDetailPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudó cargar la información del material',
+                description: getErrorMessage(error, 'No se pudo cargar la información del material'),
                 variant: 'destructive',
             });
             navigate('/mrp/raw-materials');

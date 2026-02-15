@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button';
 import { ArrowLeft, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api-error';
 import {
     Dialog,
     DialogContent,
@@ -83,7 +84,7 @@ export default function PurchaseOrderDetailPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar la orden de compra',
+                description: getErrorMessage(error, 'No se pudo cargar la orden de compra'),
                 variant: 'destructive',
             });
             navigate('/mrp/purchase-orders');
@@ -121,7 +122,7 @@ export default function PurchaseOrderDetailPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo recibir la orden',
+                description: getErrorMessage(error, 'No se pudo recibir la orden'),
                 variant: 'destructive',
             });
         } finally {
@@ -142,7 +143,7 @@ export default function PurchaseOrderDetailPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cancelar la orden',
+                description: getErrorMessage(error, 'No se pudo cancelar la orden'),
                 variant: 'destructive',
             });
         }

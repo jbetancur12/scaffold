@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save } from 'lucide-react';
 import { SupplierSchema } from '@scaffold/schemas';
-import { ZodError } from 'zod';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function SupplierFormPage() {
     const navigate = useNavigate();
@@ -44,13 +44,9 @@ export default function SupplierFormPage() {
             });
             navigate('/mrp/suppliers');
         } catch (error: unknown) {
-            let message = 'Error al guardar';
-            if (error instanceof ZodError) {
-                message = error.errors[0].message;
-            }
             toast({
                 title: 'Error',
-                description: message,
+                description: getErrorMessage(error, 'Error al guardar'),
                 variant: 'destructive',
             });
         } finally {

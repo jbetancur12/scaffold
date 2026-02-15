@@ -18,7 +18,7 @@ import { UnitType } from '@scaffold/types';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { RawMaterialSchema } from '@scaffold/schemas';
-import { ZodError } from 'zod';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function RawMaterialFormPage() {
     const { id } = useParams();
@@ -72,7 +72,7 @@ export default function RawMaterialFormPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar el material',
+                description: getErrorMessage(error, 'No se pudo cargar el material'),
                 variant: 'destructive',
             });
             navigate('/mrp/raw-materials');
@@ -148,13 +148,9 @@ export default function RawMaterialFormPage() {
             }
             navigate('/mrp/raw-materials');
         } catch (error: unknown) {
-            let message = 'Error al guardar';
-            if (error instanceof ZodError) {
-                message = error.errors[0].message;
-            }
             toast({
                 title: 'Error',
-                description: message,
+                description: getErrorMessage(error, 'Error al guardar'),
                 variant: 'destructive',
             });
         } finally {

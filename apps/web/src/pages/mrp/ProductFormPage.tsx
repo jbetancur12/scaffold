@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { ProductSchema } from '@scaffold/schemas';
-import { ZodError } from 'zod';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function ProductFormPage() {
     const { id } = useParams();
@@ -52,7 +52,7 @@ export default function ProductFormPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar el producto',
+                description: getErrorMessage(error, 'No se pudo cargar el producto'),
                 variant: 'destructive',
             });
             navigate('/mrp/products');
@@ -89,19 +89,11 @@ export default function ProductFormPage() {
                 navigate(`/mrp/products/${newProduct.id}`);
             }
         } catch (error) {
-            if (error instanceof ZodError) {
-                toast({
-                    title: 'Error de validación',
-                    description: error.errors[0].message,
-                    variant: 'destructive',
-                });
-            } else {
-                toast({
-                    title: 'Error',
-                    description: 'No se pudo guardar el producto',
-                    variant: 'destructive',
-                });
-            }
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo guardar el producto'),
+                variant: 'destructive',
+            });
         } finally {
             setLoading(false);
         }

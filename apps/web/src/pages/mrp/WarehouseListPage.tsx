@@ -14,6 +14,7 @@ import { Warehouse as WarehouseIcon, Plus, Edit2, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function WarehouseListPage() {
     const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function WarehouseListPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudieron cargar los almacenes',
+                description: getErrorMessage(error, 'No se pudieron cargar los almacenes'),
                 variant: 'destructive',
             });
         } finally {
@@ -53,7 +54,7 @@ export default function WarehouseListPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo eliminar el almacén.',
+                description: getErrorMessage(error, 'No se pudo eliminar el almacén.'),
                 variant: 'destructive',
             });
         }

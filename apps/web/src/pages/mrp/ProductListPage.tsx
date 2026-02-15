@@ -14,6 +14,7 @@ import { Package, Plus, Layers, Trash2, Edit2, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function ProductListPage() {
     const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function ProductListPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudieron cargar los productos',
+                description: getErrorMessage(error, 'No se pudieron cargar los productos'),
                 variant: 'destructive',
             });
         } finally {
@@ -53,7 +54,7 @@ export default function ProductListPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo eliminar el producto',
+                description: getErrorMessage(error, 'No se pudo eliminar el producto'),
                 variant: 'destructive',
             });
         }

@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/table';
 import { ArrowLeft, Plus, Save, Trash2, ClipboardList } from 'lucide-react';
 import { CreateProductionOrderSchema } from '@scaffold/schemas';
-import { ZodError } from 'zod';
+import { getErrorMessage } from '@/lib/api-error';
 
 interface OrderItem {
     id: string; // temp id for UI
@@ -83,7 +83,7 @@ export default function ProductionOrderFormPage() {
             loadRequirements(id!);
 
         } catch (error) {
-            toast({ title: 'Error', description: 'No se pudo cargar la orden', variant: 'destructive' });
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo cargar la orden'), variant: 'destructive' });
         } finally {
             setLoading(false);
         }
@@ -151,9 +151,7 @@ export default function ProductionOrderFormPage() {
                 navigate(`/mrp/production-orders/${newOrder.id}`);
             }
         } catch (error: unknown) {
-            let message = 'Error al guardar';
-            if (error instanceof ZodError) message = error.errors[0].message;
-            toast({ title: 'Error', description: message, variant: 'destructive' });
+            toast({ title: 'Error', description: getErrorMessage(error, 'Error al guardar'), variant: 'destructive' });
         } finally {
             setLoading(false);
         }
@@ -172,7 +170,7 @@ export default function ProductionOrderFormPage() {
             }
         } catch (error) {
             console.error(error);
-            toast({ title: 'Error', description: 'No se pudo actualizar el estado', variant: 'destructive' });
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo actualizar el estado'), variant: 'destructive' });
         } finally {
             setLoading(false);
         }

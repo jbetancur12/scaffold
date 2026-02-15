@@ -25,6 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function ProductionOrderDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -52,7 +53,7 @@ export default function ProductionOrderDetailPage() {
             console.error('Error loading production order:', error);
             toast({
                 title: "Error",
-                description: "No se pudo cargar la orden de producción",
+                description: getErrorMessage(error, 'No se pudo cargar la orden de producción'),
                 variant: "destructive"
             });
         } finally {
@@ -70,7 +71,7 @@ export default function ProductionOrderDetailPage() {
             console.error('Error loading requirements:', error);
             toast({
                 title: "Error",
-                description: "No se pudieron calcular los requerimientos",
+                description: getErrorMessage(error, 'No se pudieron calcular los requerimientos'),
                 variant: "destructive"
             });
         } finally {
@@ -111,7 +112,7 @@ export default function ProductionOrderDetailPage() {
         } catch (error) {
             toast({
                 title: "Error al actualizar",
-                description: "No se pudo cambiar el estado",
+                description: getErrorMessage(error, 'No se pudo cambiar el estado'),
                 variant: "destructive"
             });
         }
@@ -128,7 +129,7 @@ export default function ProductionOrderDetailPage() {
         } catch (error) {
             toast({
                 title: "Error",
-                description: "No se pudo completar la orden",
+                description: getErrorMessage(error, 'No se pudo completar la orden'),
                 variant: "destructive"
             });
         } finally {

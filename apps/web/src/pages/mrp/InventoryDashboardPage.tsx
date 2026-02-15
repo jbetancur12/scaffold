@@ -34,6 +34,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatQuantity } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api-error';
 
 interface PopulatedInventoryItem extends InventoryItem {
     variant?: ProductVariant & { product?: Product };
@@ -72,7 +73,7 @@ export default function InventoryDashboardPage() {
             setInventory(data.items as PopulatedInventoryItem[]);
         } catch (err) {
             console.error(err);
-            setError('Error al cargar el inventario');
+            setError(getErrorMessage(err, 'Error al cargar el inventario'));
         } finally {
             setLoading(false);
         }
@@ -130,7 +131,7 @@ export default function InventoryDashboardPage() {
             console.error(err);
             toast({
                 title: 'Error',
-                description: 'No se pudo agregar el stock manual.',
+                description: getErrorMessage(err, 'No se pudo agregar el stock manual.'),
                 variant: 'destructive',
             });
         } finally {

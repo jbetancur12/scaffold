@@ -13,8 +13,6 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { ZodError } from 'zod';
-import { isAxiosError } from 'axios';
 import {
     Dialog,
     DialogContent,
@@ -34,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { Trash2, UserPlus, Shield, User as UserIcon, Mail, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function UsersPage() {
     const { user: currentUser } = useAuth();
@@ -61,7 +60,7 @@ export default function UsersPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudieron cargar los usuarios',
+                description: getErrorMessage(error, 'No se pudieron cargar los usuarios'),
                 variant: 'destructive',
             });
         } finally {
@@ -88,17 +87,9 @@ export default function UsersPage() {
             setFormData({ email: '', password: '', role: UserRole.USER });
             loadUsers();
         } catch (error: unknown) {
-            let message = 'Error al crear el usuario';
-
-            if (error instanceof ZodError) {
-                message = error.errors[0].message;
-            } else if (isAxiosError(error) && error.response?.data?.message) {
-                message = error.response.data.message;
-            }
-
             toast({
                 title: 'Error de validación',
-                description: message,
+                description: getErrorMessage(error, 'Error al crear el usuario'),
                 variant: 'destructive',
             });
         }
@@ -117,7 +108,7 @@ export default function UsersPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo eliminar al usuario',
+                description: getErrorMessage(error, 'No se pudo eliminar al usuario'),
                 variant: 'destructive',
             });
         }

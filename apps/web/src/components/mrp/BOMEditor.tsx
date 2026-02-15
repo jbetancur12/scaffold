@@ -21,7 +21,7 @@ import {
 import { Trash2, Plus, Edit2, Save } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { BOMItemSchema } from '@scaffold/schemas';
-import { ZodError } from 'zod';
+import { getErrorMessage } from '@/lib/api-error';
 import FabricationCalculator from './FabricationCalculator';
 import FabricationLayoutPreview from './FabricationLayoutPreview';
 import {
@@ -104,13 +104,9 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
             setEditingItemId(null);
             loadBOM(); // Reload to refresh list and costs if backend updates them
         } catch (error: unknown) {
-            let message = 'Error al guardar material';
-            if (error instanceof ZodError) {
-                message = error.errors[0].message;
-            }
             toast({
                 title: 'Error',
-                description: message,
+                description: getErrorMessage(error, 'Error al guardar material'),
                 variant: 'destructive',
             });
         } finally {
@@ -141,7 +137,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
             if (editingItemId === id) handleCancelEdit();
             loadBOM();
         } catch (error) {
-            toast({ title: 'Error', description: 'No se pudo eliminar', variant: 'destructive' });
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo eliminar'), variant: 'destructive' });
         } finally {
             setLoading(false);
         }

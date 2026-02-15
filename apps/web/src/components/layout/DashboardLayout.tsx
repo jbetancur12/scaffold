@@ -24,6 +24,7 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
 import { cn } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api-error';
 
 interface SidebarItemProps {
     icon: React.ElementType;
@@ -89,7 +90,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cerrar la sesión. Inténtalo de nuevo.',
+                description: getErrorMessage(error, 'No se pudo cerrar la sesión. Inténtalo de nuevo.'),
                 variant: 'destructive',
             });
         }

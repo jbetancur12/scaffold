@@ -13,9 +13,12 @@ import {
 } from '@/components/ui/table';
 import { Plus, Eye } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/components/ui/use-toast';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function ProductionOrderListPage() {
     const navigate = useNavigate();
+    const { toast } = useToast();
     const [orders, setOrders] = useState<ProductionOrder[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -25,11 +28,15 @@ export default function ProductionOrderListPage() {
             const data = await mrpApi.getProductionOrders();
             setOrders(data.orders);
         } catch (error) {
-            console.error('Error loading production orders:', error);
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudieron cargar las órdenes de producción'),
+                variant: 'destructive',
+            });
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [toast]);
 
     useEffect(() => {
         loadData();

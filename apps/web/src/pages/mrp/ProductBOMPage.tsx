@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function ProductBOMPage() {
     const { id } = useParams();
@@ -29,7 +30,7 @@ export default function ProductBOMPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar la información del producto',
+                description: getErrorMessage(error, 'No se pudo cargar la información del producto'),
                 variant: 'destructive',
             });
             navigate('/mrp/products');
@@ -78,7 +79,7 @@ export default function ProductBOMPage() {
             // Ideally BOMEditor would expose a refresh, but simple reload works 
             window.location.reload();
         } catch (error) {
-            toast({ title: 'Error', description: 'No se pudieron copiar los materiales', variant: 'destructive' });
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudieron copiar los materiales'), variant: 'destructive' });
         } finally {
             setLoading(false);
         }

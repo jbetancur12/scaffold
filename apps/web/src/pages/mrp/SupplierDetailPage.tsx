@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Edit2, Factory, MapPin, Phone, Mail, Building, CreditCard, FileText } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { SupplierMaterialsTab } from './components/SupplierMaterialsTab';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function SupplierDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -24,7 +25,7 @@ export default function SupplierDetailPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar la información del proveedor',
+                description: getErrorMessage(error, 'No se pudo cargar la información del proveedor'),
                 variant: 'destructive',
             });
             navigate('/mrp/suppliers');

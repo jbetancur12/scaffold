@@ -21,6 +21,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { formatCurrency } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api-error';
 
 interface Material {
     rawMaterial: RawMaterial;
@@ -51,6 +52,11 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
             setMaterials(data);
         } catch (error) {
             console.error('Failed to load supplier materials', error);
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudieron cargar los materiales del proveedor'),
+                variant: 'destructive',
+            });
         } finally {
             setLoading(false);
         }
@@ -62,6 +68,11 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
             setAllMaterials(data.materials);
         } catch (error) {
             console.error('Failed to load raw materials list', error);
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo cargar la lista de materias primas'),
+                variant: 'destructive',
+            });
         }
     }, []);
 
@@ -105,7 +116,7 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
         } catch (error) {
             toast({
                 title: "Error",
-                description: "No se pudo vincular el material",
+                description: getErrorMessage(error, 'No se pudo vincular el material'),
                 variant: "destructive"
             });
         } finally {
@@ -128,7 +139,7 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
         } catch (error) {
             toast({
                 title: "Error",
-                description: "No se pudo desvincular el material",
+                description: getErrorMessage(error, 'No se pudo desvincular el material'),
                 variant: "destructive"
             });
         }

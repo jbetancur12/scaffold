@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { WarehouseType } from '@scaffold/types';
 import { WarehouseSchema } from '@scaffold/schemas';
-import { ZodError } from 'zod';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function WarehouseFormPage() {
     const { id } = useParams();
@@ -43,7 +43,7 @@ export default function WarehouseFormPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar el almacén',
+                description: getErrorMessage(error, 'No se pudo cargar el almacén'),
                 variant: 'destructive',
             });
             navigate('/mrp/warehouses');
@@ -79,13 +79,9 @@ export default function WarehouseFormPage() {
             }
             navigate('/mrp/warehouses');
         } catch (error: unknown) {
-            let message = 'Error al guardar';
-            if (error instanceof ZodError) {
-                message = error.errors[0].message;
-            }
             toast({
                 title: 'Error',
-                description: message,
+                description: getErrorMessage(error, 'Error al guardar'),
                 variant: 'destructive',
             });
         } finally {

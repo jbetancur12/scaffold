@@ -15,6 +15,7 @@ import { Database, Plus, Edit2, Search, ChevronLeft, ChevronRight, Copy } from '
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function RawMaterialListPage() {
     const navigate = useNavigate();
@@ -35,7 +36,7 @@ export default function RawMaterialListPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar la materia prima',
+                description: getErrorMessage(error, 'No se pudo cargar la materia prima'),
                 variant: 'destructive',
             });
         } finally {

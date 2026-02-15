@@ -13,6 +13,7 @@ import {
 import { Truck, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function SupplierListPage() {
     const navigate = useNavigate();
@@ -28,7 +29,7 @@ export default function SupplierListPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudieron cargar los proveedores',
+                description: getErrorMessage(error, 'No se pudieron cargar los proveedores'),
                 variant: 'destructive',
             });
         } finally {

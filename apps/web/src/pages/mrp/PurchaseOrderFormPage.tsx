@@ -10,8 +10,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '../../components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { CreatePurchaseOrderSchema } from '@scaffold/schemas';
-import { ZodError } from 'zod';
 import type { Supplier, RawMaterial } from '@scaffold/types';
+import { getErrorMessage } from '@/lib/api-error';
 
 interface OrderItem {
     rawMaterialId: string;
@@ -53,7 +53,7 @@ export default function PurchaseOrderFormPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar la información inicial',
+                description: getErrorMessage(error, 'No se pudo cargar la información inicial'),
                 variant: 'destructive',
             });
         }
@@ -143,12 +143,9 @@ export default function PurchaseOrderFormPage() {
             });
             navigate('/mrp/purchase-orders');
         } catch (error: unknown) {
-            const message = error instanceof ZodError
-                ? error.errors[0].message
-                : 'No se pudo crear la orden de compra';
             toast({
                 title: 'Error',
-                description: message,
+                description: getErrorMessage(error, 'No se pudo crear la orden de compra'),
                 variant: 'destructive',
             });
         } finally {

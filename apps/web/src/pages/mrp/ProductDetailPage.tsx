@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw, Package, Layers, Clock } from 'lucide-react';
 import { CreateProductVariantSchema, UpdateProductVariantSchema } from '@scaffold/schemas';
-import { ZodError } from 'zod';
+import { getErrorMessage } from '@/lib/api-error';
 import {
     Table,
     TableBody,
@@ -71,7 +71,7 @@ export default function ProductDetailPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar el producto',
+                description: getErrorMessage(error, 'No se pudo cargar el producto'),
                 variant: 'destructive',
             });
             navigate('/mrp/products');
@@ -121,7 +121,7 @@ export default function ProductDetailPage() {
             toast({ title: 'Éxito', description: 'Producto eliminado' });
             navigate('/mrp/products');
         } catch (error) {
-            toast({ title: 'Error', description: 'No se pudo eliminar el producto', variant: 'destructive' });
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo eliminar el producto'), variant: 'destructive' });
         }
     };
 
@@ -140,19 +140,11 @@ export default function ProductDetailPage() {
             setShowVariantDialog(false);
             loadProduct();
         } catch (error) {
-            if (error instanceof ZodError) {
-                toast({
-                    title: 'Error de validación',
-                    description: error.errors[0].message,
-                    variant: 'destructive',
-                });
-            } else {
-                toast({
-                    title: 'Error',
-                    description: 'No se pudo guardar la variante',
-                    variant: 'destructive',
-                });
-            }
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo guardar la variante'),
+                variant: 'destructive',
+            });
         }
     };
 
@@ -163,7 +155,7 @@ export default function ProductDetailPage() {
             toast({ title: 'Éxito', description: 'Variante eliminada exitosamente' });
             loadProduct();
         } catch (error) {
-            toast({ title: 'Error', description: 'No se pudo eliminar la variante', variant: 'destructive' });
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo eliminar la variante'), variant: 'destructive' });
         }
     };
 

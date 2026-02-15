@@ -8,6 +8,7 @@ import { OperationalConfig } from '@scaffold/types';
 import { Save, Calculator, Clock, Users, Building, Percent } from 'lucide-react';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
+import { getErrorMessage } from '@/lib/api-error';
 
 export default function OperationalSettingsPage() {
     const { toast } = useToast();
@@ -37,7 +38,7 @@ export default function OperationalSettingsPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo cargar la configuración operativa.',
+                description: getErrorMessage(error, 'No se pudo cargar la configuración operativa.'),
                 variant: 'destructive',
             });
         } finally {
@@ -62,7 +63,7 @@ export default function OperationalSettingsPage() {
         } catch (error) {
             toast({
                 title: 'Error',
-                description: 'No se pudo guardar la configuración.',
+                description: getErrorMessage(error, 'No se pudo guardar la configuración.'),
                 variant: 'destructive',
             });
         } finally {
