@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { mrpApi } from '@/services/mrpApi';
 import { Warehouse } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
@@ -15,42 +15,41 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { getErrorMessage } from '@/lib/api-error';
+import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
 export default function WarehouseListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-    const [loading, setLoading] = useState(true);
 
-    const loadWarehouses = useCallback(async () => {
+    const fetchWarehouses = useCallback(async () => {
         try {
-            setLoading(true);
             const data = await mrpApi.getWarehouses();
-            setWarehouses(data);
+            return data;
         } catch (error) {
             toast({
                 title: 'Error',
                 description: getErrorMessage(error, 'No se pudieron cargar los almacenes'),
                 variant: 'destructive',
             });
-        } finally {
-            setLoading(false);
+            throw error;
         }
     }, [toast]);
 
-    useEffect(() => {
-        loadWarehouses();
-    }, [loadWarehouses]);
+    const { data: warehousesData, loading, invalidate } = useMrpQuery<Warehouse[]>(fetchWarehouses, true);
+    const warehouses = warehousesData ?? [];
+    const { execute: deleteWarehouse } = useMrpMutation<string, void>(
+        async (id) => mrpApi.deleteWarehouse(id),
+        { onSuccess: async () => { await invalidate(); } }
+    );
 
     const handleDelete = async (id: string) => {
         if (!confirm('¿Estás seguro de que deseas eliminar este almacén?')) return;
         try {
-            await mrpApi.deleteWarehouse(id);
+            await deleteWarehouse(id);
             toast({
                 title: 'Almacén eliminado',
                 description: 'El almacén ha sido eliminado correctamente.',
             });
-            loadWarehouses();
         } catch (error) {
             toast({
                 title: 'Error',

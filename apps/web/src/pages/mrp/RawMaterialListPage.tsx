@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
+import { useMrpQuery } from '@/hooks/useMrpQuery';
 
 export default function RawMaterialListPage() {
     const navigate = useNavigate();
@@ -27,30 +28,34 @@ export default function RawMaterialListPage() {
     const [total, setTotal] = useState(0);
     const limit = 10;
 
-    const loadMaterials = useCallback(async () => {
+    const fetchMaterials = useCallback(async () => {
         try {
-            setLoading(true);
-            const response = await mrpApi.getRawMaterials(page, limit, search);
-            setMaterials(response.materials);
-            setTotal(response.total);
+            return await mrpApi.getRawMaterials(page, limit, search);
         } catch (error) {
             toast({
                 title: 'Error',
                 description: getErrorMessage(error, 'No se pudo cargar la materia prima'),
                 variant: 'destructive',
             });
-        } finally {
-            setLoading(false);
+            throw error;
         }
     }, [page, search, toast]);
 
+    const { execute, data, loading: queryLoading } = useMrpQuery(fetchMaterials, false);
+
     useEffect(() => {
         const timer = setTimeout(() => {
-            loadMaterials();
+            void execute();
         }, 300); // 300ms debounce
 
         return () => clearTimeout(timer);
-    }, [loadMaterials]);
+    }, [execute]);
+
+    useEffect(() => {
+        setLoading(queryLoading);
+        setMaterials(data?.materials || []);
+        setTotal(data?.total || 0);
+    }, [data, queryLoading]);
 
     return (
         <div className="space-y-8">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { mrpApi } from '@/services/mrpApi';
 import { Product } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
@@ -15,42 +15,41 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
+import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
 export default function ProductListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const [products, setProducts] = useState<Product[]>([]);
-    const [loading, setLoading] = useState(true);
 
-    const loadProducts = useCallback(async () => {
+    const fetchProducts = useCallback(async () => {
         try {
-            setLoading(true);
             const response = await mrpApi.getProducts();
-            setProducts(response.products);
+            return response.products;
         } catch (error) {
             toast({
                 title: 'Error',
                 description: getErrorMessage(error, 'No se pudieron cargar los productos'),
                 variant: 'destructive',
             });
-        } finally {
-            setLoading(false);
+            throw error;
         }
     }, [toast]);
 
-    useEffect(() => {
-        loadProducts();
-    }, [loadProducts]);
+    const { data: productsData, loading, invalidate } = useMrpQuery<Product[]>(fetchProducts, true);
+    const products = productsData ?? [];
+    const { execute: deleteProduct } = useMrpMutation<string, void>(
+        async (id) => mrpApi.deleteProduct(id),
+        { onSuccess: async () => { await invalidate(); } }
+    );
 
     const handleDeleteProduct = async (id: string) => {
         if (!confirm('¿Estás seguro de eliminar este producto? Esta acción no se puede deshacer.')) return;
         try {
-            await mrpApi.deleteProduct(id);
+            await deleteProduct(id);
             toast({
                 title: 'Éxito',
                 description: 'Producto eliminado correctamente',
             });
-            loadProducts();
         } catch (error) {
             toast({
                 title: 'Error',

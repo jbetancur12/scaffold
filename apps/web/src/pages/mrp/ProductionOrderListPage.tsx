@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { mrpApi } from '@/services/mrpApi';
 import { ProductionOrder, ProductionOrderStatus } from '@scaffold/types';
@@ -15,32 +15,28 @@ import { Plus, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
+import { useMrpQuery } from '@/hooks/useMrpQuery';
 
 export default function ProductionOrderListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const [orders, setOrders] = useState<ProductionOrder[]>([]);
-    const [loading, setLoading] = useState(true);
 
-    const loadData = useCallback(async () => {
+    const fetchOrders = useCallback(async () => {
         try {
-            setLoading(true);
             const data = await mrpApi.getProductionOrders();
-            setOrders(data.orders);
+            return data.orders;
         } catch (error) {
             toast({
                 title: 'Error',
                 description: getErrorMessage(error, 'No se pudieron cargar las órdenes de producción'),
                 variant: 'destructive',
             });
-        } finally {
-            setLoading(false);
+            throw error;
         }
     }, [toast]);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
+    const { data: ordersData, loading } = useMrpQuery<ProductionOrder[]>(fetchOrders, true);
+    const orders = ordersData ?? [];
 
     const getStatusColor = (status: ProductionOrderStatus) => {
         switch (status) {

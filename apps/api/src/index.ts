@@ -15,6 +15,7 @@ import { createMrpRoutes } from './modules/mrp/mrp.routes';
 import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './shared/middleware/error.middleware';
 import { setupSwagger } from './config/swagger';
+import { ApiResponse } from './shared/utils/response';
 
 const app = express();
 const PORT = env.PORT;
@@ -81,7 +82,7 @@ const main = async () => {
         app.use('/api', apiRouter);
 
         app.get('/', (_req, res) => {
-            res.json({ message: 'API is running' });
+            return ApiResponse.success(res, { status: 'ok' }, 'API is running');
         });
 
         // Global Error Handler (Must be last)
