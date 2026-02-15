@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mrpApi } from '../../services/mrpApi';
+import { mrpApi, PurchaseOrder } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
 import { ArrowLeft, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,34 +22,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Warehouse } from '@scaffold/types';
-
-interface PurchaseOrderItem {
-    id: string;
-    rawMaterial: {
-        id: string;
-        name: string;
-        sku: string;
-        unit: string;
-    };
-    quantity: number;
-    unitPrice: number;
-    taxAmount: number;
-    subtotal: number;
-}
-
-interface PurchaseOrder {
-    id: string;
-    supplier: { id: string; name: string };
-    orderDate: string;
-    expectedDeliveryDate?: string;
-    receivedDate?: string;
-    status: 'PENDING' | 'CONFIRMED' | 'RECEIVED' | 'CANCELLED';
-    totalAmount: number;
-    taxTotal: number;
-    subtotalBase: number;
-    notes?: string;
-    items: PurchaseOrderItem[];
-}
 
 const statusLabels = {
     PENDING: 'Pendiente',
@@ -79,8 +51,8 @@ export default function PurchaseOrderDetailPage() {
     const loadOrder = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await mrpApi.getPurchaseOrder(id!);
-            setOrder(response.data);
+            const purchaseOrder = await mrpApi.getPurchaseOrder(id!);
+            setOrder(purchaseOrder);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -267,7 +239,7 @@ export default function PurchaseOrderDetailPage() {
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-slate-200">
-                                {order.items.map((item) => (
+                                {(order.items ?? []).map((item) => (
                                     <tr key={item.id}>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-medium text-slate-900">

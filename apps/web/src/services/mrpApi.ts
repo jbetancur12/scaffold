@@ -2,9 +2,11 @@ import api from './api';
 import {
     Product,
     Supplier,
+    SupplierMaterial,
     RawMaterial,
     BOMItem,
     ProductionOrder,
+    ProductVariant,
     InventoryItem,
     OperationalConfig,
     Warehouse
@@ -44,6 +46,43 @@ export interface ListResponse<T> {
     total: number;
 }
 
+export type PurchaseOrderStatus = 'PENDING' | 'CONFIRMED' | 'RECEIVED' | 'CANCELLED';
+
+export interface PurchaseOrderItem {
+    id: string;
+    rawMaterial: {
+        id: string;
+        name: string;
+        sku: string;
+        unit: string;
+    };
+    quantity: number;
+    unitPrice: number;
+    taxAmount: number;
+    subtotal: number;
+}
+
+export interface PurchaseOrder {
+    id: string;
+    supplier: { id: string; name: string };
+    orderDate: string;
+    expectedDeliveryDate?: string;
+    receivedDate?: string;
+    status: PurchaseOrderStatus;
+    totalAmount: number;
+    taxTotal: number;
+    subtotalBase: number;
+    notes?: string;
+    items?: PurchaseOrderItem[];
+}
+
+export interface PurchaseOrderListResponse {
+    data: PurchaseOrder[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
 export const mrpApi = {
     // Products
     getProducts: async (page = 1, limit = 10) => {
@@ -67,34 +106,47 @@ export const mrpApi = {
     },
 
     // Variants
-    createVariant: async (productId: string, data: CreateProductVariantDto): Promise<unknown> => {
-        const response = await api.post(`/mrp/products/${productId}/variants`, data);
+    createVariant: async (productId: string, data: CreateProductVariantDto): Promise<ProductVariant> => {
+        const response = await api.post<ProductVariant>(`/mrp/products/${productId}/variants`, data);
         return response.data;
     },
-    updateVariant: async (variantId: string, data: UpdateProductVariantDto): Promise<unknown> => {
-        const response = await api.put(`/mrp/variants/${variantId}`, data);
+    updateVariant: async (variantId: string, data: UpdateProductVariantDto): Promise<ProductVariant> => {
+        const response = await api.put<ProductVariant>(`/mrp/variants/${variantId}`, data);
         return response.data;
     },
-    deleteVariant: (variantId: string) =>
-        api.delete(`/mrp/variants/${variantId}`),
+    deleteVariant: async (variantId: string): Promise<void> => {
+        await api.delete(`/mrp/variants/${variantId}`);
+    },
 
     // Purchase Orders
-    createPurchaseOrder: (data: CreatePurchaseOrderDto) => api.post('/mrp/purchase-orders', data),
+    createPurchaseOrder: async (data: CreatePurchaseOrderDto): Promise<PurchaseOrder> => {
+        const response = await api.post<PurchaseOrder>('/mrp/purchase-orders', data);
+        return response.data;
+    },
 
-    listPurchaseOrders: (page: number = 1, limit: number = 10, filters?: { status?: string; supplierId?: string }) =>
-        api.get('/mrp/purchase-orders', { params: { page, limit, ...filters } }),
+    listPurchaseOrders: async (page: number = 1, limit: number = 10, filters?: { status?: string; supplierId?: string }): Promise<PurchaseOrderListResponse> => {
+        const response = await api.get<PurchaseOrderListResponse>('/mrp/purchase-orders', { params: { page, limit, ...filters } });
+        return response.data;
+    },
 
-    getPurchaseOrder: (id: string) =>
-        api.get(`/mrp/purchase-orders/${id}`),
+    getPurchaseOrder: async (id: string): Promise<PurchaseOrder> => {
+        const response = await api.get<PurchaseOrder>(`/mrp/purchase-orders/${id}`);
+        return response.data;
+    },
 
-    updatePurchaseOrderStatus: (id: string, status: string) =>
-        api.put(`/mrp/purchase-orders/${id}/status`, { status }),
+    updatePurchaseOrderStatus: async (id: string, status: PurchaseOrderStatus): Promise<PurchaseOrder> => {
+        const response = await api.put<PurchaseOrder>(`/mrp/purchase-orders/${id}/status`, { status });
+        return response.data;
+    },
 
-    receivePurchaseOrder: (id: string, warehouseId?: string) =>
-        api.post(`/mrp/purchase-orders/${id}/receive`, { warehouseId }),
+    receivePurchaseOrder: async (id: string, warehouseId?: string): Promise<PurchaseOrder> => {
+        const response = await api.post<PurchaseOrder>(`/mrp/purchase-orders/${id}/receive`, { warehouseId });
+        return response.data;
+    },
 
-    cancelPurchaseOrder: (id: string) =>
-        api.delete(`/mrp/purchase-orders/${id}`),
+    cancelPurchaseOrder: async (id: string): Promise<void> => {
+        await api.delete(`/mrp/purchase-orders/${id}`);
+    },
 
     // Warehouses
     getWarehouses: async () => {
@@ -130,12 +182,12 @@ export const mrpApi = {
         const response = await api.post('/mrp/suppliers', data);
         return response.data;
     },
-    getSupplierMaterials: async (id: string) => {
+    getSupplierMaterials: async (id: string): Promise<{ rawMaterial: RawMaterial; lastPurchasePrice: number; lastPurchaseDate: string }[]> => {
         const response = await api.get<{ rawMaterial: RawMaterial; lastPurchasePrice: number; lastPurchaseDate: string }[]>(`/mrp/suppliers/${id}/materials`);
         return response.data;
     },
-    addSupplierMaterial: async (id: string, data: { rawMaterialId: string; price: number }) => {
-        const response = await api.post(`/mrp/suppliers/${id}/materials`, data);
+    addSupplierMaterial: async (id: string, data: { rawMaterialId: string; price: number }): Promise<SupplierMaterial> => {
+        const response = await api.post<SupplierMaterial>(`/mrp/suppliers/${id}/materials`, data);
         return response.data;
     },
 
@@ -191,7 +243,7 @@ export const mrpApi = {
         const response = await api.post('/mrp/production-orders', data);
         return response.data;
     },
-    getMaterialRequirements: async (orderId: string) => {
+    getMaterialRequirements: async (orderId: string): Promise<MaterialRequirement[]> => {
         const response = await api.get<MaterialRequirement[]>(`/mrp/production-orders/${orderId}/requirements`);
         return response.data;
     },
@@ -205,8 +257,8 @@ export const mrpApi = {
         const response = await api.get<{ items: InventoryItem[], total: number }>(`/mrp/inventory`, { params: { page, limit, warehouseId } });
         return response.data;
     },
-    addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }) => {
-        const response = await api.post('/mrp/inventory/manual-add', data);
+    addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }): Promise<InventoryItem> => {
+        const response = await api.post<InventoryItem>('/mrp/inventory/manual-add', data);
         return response.data;
     },
 
@@ -221,8 +273,7 @@ export const mrpApi = {
     },
 
     // Supplier Materials
-    removeSupplierMaterial: async (id: string, materialId: string) => {
-        const response = await api.delete(`/mrp/suppliers/${id}/materials/${materialId}`);
-        return response.data;
+    removeSupplierMaterial: async (id: string, materialId: string): Promise<void> => {
+        await api.delete(`/mrp/suppliers/${id}/materials/${materialId}`);
     },
 };

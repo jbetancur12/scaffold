@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mrpApi } from '../../services/mrpApi';
+import { mrpApi, PurchaseOrder } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
 import { Plus, Eye, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,17 +22,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Warehouse } from '@scaffold/types';
-
-interface PurchaseOrder {
-    id: string;
-    supplier: { id: string; name: string };
-    orderDate: string;
-    expectedDeliveryDate?: string;
-    receivedDate?: string;
-    status: 'PENDING' | 'CONFIRMED' | 'RECEIVED' | 'CANCELLED';
-    totalAmount: number;
-    notes?: string;
-}
 
 const statusLabels = {
     PENDING: 'Pendiente',
@@ -68,8 +57,8 @@ export default function PurchaseOrderListPage() {
         try {
             setLoading(true);
             const response = await mrpApi.listPurchaseOrders(page, limit);
-            setOrders(response.data.data);
-            setTotal(response.data.total);
+            setOrders(response.data);
+            setTotal(response.total);
         } catch (error) {
             toast({
                 title: 'Error',

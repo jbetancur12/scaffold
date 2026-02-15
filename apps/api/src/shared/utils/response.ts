@@ -13,6 +13,14 @@ export class AppError extends Error {
 }
 
 export const ApiResponse = {
+    result: <T>(res: Response, success: boolean, data: T, message: string, statusCode: number) => {
+        return res.status(statusCode).json({
+            success,
+            message,
+            data
+        });
+    },
+
     success: <T>(res: Response, data: T, message: string = 'Success', statusCode: number = 200) => {
         return res.status(statusCode).json({
             success: true,

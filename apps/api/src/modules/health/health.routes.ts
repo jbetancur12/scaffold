@@ -26,12 +26,13 @@ export const createHealthRoutes = (orm: MikroORM) => {
             health.services.redis = isRedisReady ? 'Connected' : 'Disconnected';
 
             const overallHealth = isConnected && isRedisReady;
-
-            return res.status(overallHealth ? 200 : 503).json({
-                success: overallHealth,
-                message: overallHealth ? 'System is healthy' : 'System is impaired',
-                data: health
-            });
+            return ApiResponse.result(
+                res,
+                overallHealth,
+                health,
+                overallHealth ? 'System is healthy' : 'System is impaired',
+                overallHealth ? 200 : 503
+            );
         } catch (error) {
             return ApiResponse.error(res, 'Health check failed', 503);
         }
