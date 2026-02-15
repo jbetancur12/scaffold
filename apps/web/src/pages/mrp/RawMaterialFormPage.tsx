@@ -19,6 +19,7 @@ import { formatCurrency } from '@/lib/utils';
 import { RawMaterialSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
 import { useRawMaterialQuery, useSaveRawMaterialMutation } from '@/hooks/mrp/useRawMaterials';
+import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 
 export default function RawMaterialFormPage() {
     const { id } = useParams();
@@ -93,15 +94,7 @@ export default function RawMaterialFormPage() {
         }
     }, [isEditing, materialData, location]);
 
-    useEffect(() => {
-        if (!materialError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(materialError, 'No se pudo cargar el material'),
-            variant: 'destructive',
-        });
-        navigate('/mrp/raw-materials');
-    }, [materialError, navigate, toast]);
+    useMrpQueryErrorRedirect(materialError, 'No se pudo cargar el material', '/mrp/raw-materials');
 
     // Recalculate cost when calculator inputs change
     useEffect(() => {

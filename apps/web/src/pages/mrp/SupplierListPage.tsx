@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -10,25 +9,16 @@ import {
 } from '@/components/ui/table';
 import { Truck, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/components/ui/use-toast';
-import { getErrorMessage } from '@/lib/api-error';
 import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 export default function SupplierListPage() {
     const navigate = useNavigate();
-    const { toast } = useToast();
 
     const { data: suppliersResponse, loading, error } = useSuppliersQuery();
     const suppliers = suppliersResponse?.suppliers ?? [];
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(error, 'No se pudieron cargar los proveedores'),
-            variant: 'destructive',
-        });
-    }, [error, toast]);
+    useMrpQueryErrorToast(error, 'No se pudieron cargar los proveedores');
 
     return (
         <div className="space-y-8">

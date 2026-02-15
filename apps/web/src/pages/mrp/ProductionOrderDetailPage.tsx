@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ProductionOrderStatus, ProductionOrderItem, ProductVariant, Product } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { getErrorMessage } from '@/lib/api-error';
+import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
 import {
     useAddProductionBatchUnitsMutation,
@@ -66,42 +68,10 @@ export default function ProductionOrderDetailPage() {
     const { execute: updateUnitQc } = useUpdateProductionBatchUnitQcMutation();
     const { execute: updateUnitPackaging } = useUpdateProductionBatchUnitPackagingMutation();
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: "Error",
-            description: getErrorMessage(error, 'No se pudo cargar la orden de producción'),
-            variant: "destructive"
-        });
-        navigate('/mrp/production-orders');
-    }, [error, navigate, toast]);
-
-    useEffect(() => {
-        if (!requirementsError) return;
-        toast({
-            title: "Error",
-            description: getErrorMessage(requirementsError, 'No se pudieron calcular los requerimientos'),
-            variant: "destructive"
-        });
-    }, [requirementsError, toast]);
-
-    useEffect(() => {
-        if (!warehousesError) return;
-        toast({
-            title: "Error",
-            description: getErrorMessage(warehousesError, 'No se pudieron cargar los almacenes'),
-            variant: "destructive"
-        });
-    }, [warehousesError, toast]);
-
-    useEffect(() => {
-        if (!batchesError) return;
-        toast({
-            title: "Error",
-            description: getErrorMessage(batchesError, 'No se pudieron cargar los lotes'),
-            variant: "destructive"
-        });
-    }, [batchesError, toast]);
+    useMrpQueryErrorRedirect(error, 'No se pudo cargar la orden de producción', '/mrp/production-orders');
+    useMrpQueryErrorToast(requirementsError, 'No se pudieron calcular los requerimientos');
+    useMrpQueryErrorToast(warehousesError, 'No se pudieron cargar los almacenes');
+    useMrpQueryErrorToast(batchesError, 'No se pudieron cargar los lotes');
 
     const handleStatusChange = async (newStatus: ProductionOrderStatus) => {
         if (!order) return;

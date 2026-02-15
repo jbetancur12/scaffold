@@ -22,4 +22,9 @@ export const mrpQueryKeys = {
     productionBatches: (id: string) => `mrp.production-batches.${id}`,
     productionRequirements: (id: string) => `mrp.production-requirements.${id}`,
     operationalConfig: 'mrp.operational-config',
+    qualityNonConformities: 'mrp.quality.non-conformities',
+    qualityCapas: 'mrp.quality.capa-actions',
+    qualityAuditEvents: 'mrp.quality.audit-events',
+    qualityDocuments: 'mrp.quality.documents',
+    qualityActiveDocuments: (process: string) => `mrp.quality.documents.active.${process}`,
 };

@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProductionOrderStatus } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
@@ -12,25 +11,16 @@ import {
 } from '@/components/ui/table';
 import { Plus, Eye } from 'lucide-react';
 import { format } from 'date-fns';
-import { useToast } from '@/components/ui/use-toast';
-import { getErrorMessage } from '@/lib/api-error';
 import { useProductionOrdersQuery } from '@/hooks/mrp/useProductionOrders';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 export default function ProductionOrderListPage() {
     const navigate = useNavigate();
-    const { toast } = useToast();
 
     const { data: ordersResponse, loading, error } = useProductionOrdersQuery();
     const orders = ordersResponse?.orders ?? [];
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(error, 'No se pudieron cargar las órdenes de producción'),
-            variant: 'destructive',
-        });
-    }, [error, toast]);
+    useMrpQueryErrorToast(error, 'No se pudieron cargar las órdenes de producción');
 
     const getStatusColor = (status: ProductionOrderStatus) => {
         switch (status) {

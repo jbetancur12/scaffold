@@ -1,32 +1,21 @@
-import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MaterialSuppliersTable } from '@/components/mrp/MaterialSuppliersTable';
 import { ArrowLeft, Edit2, Package } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { getErrorMessage } from '@/lib/api-error';
 import { useRawMaterialQuery, useRawMaterialSuppliersQuery } from '@/hooks/mrp/useRawMaterials';
+import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 
 export default function RawMaterialDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { toast } = useToast();
 
     const { data: material, loading, error } = useRawMaterialQuery(id);
     const { data: suppliersData } = useRawMaterialSuppliersQuery(id);
     const suppliers = suppliersData ?? [];
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(error, 'No se pudo cargar la información del material'),
-            variant: 'destructive',
-        });
-        navigate('/mrp/raw-materials');
-    }, [error, navigate, toast]);
+    useMrpQueryErrorRedirect(error, 'No se pudo cargar la información del material', '/mrp/raw-materials');
 
     if (error) return null;
 

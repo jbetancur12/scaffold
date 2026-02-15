@@ -11,7 +11,16 @@ import {
     ProductVariant,
     InventoryItem,
     OperationalConfig,
-    Warehouse
+    Warehouse,
+    NonConformity,
+    CapaAction,
+    AuditEvent,
+    NonConformityStatus,
+    QualitySeverity,
+    CapaStatus,
+    ControlledDocument,
+    DocumentProcess,
+    DocumentStatus,
 } from '@scaffold/types';
 import type {
     CreatePurchaseOrderDto,
@@ -90,6 +99,60 @@ export interface CreateProductionBatchPayload {
     plannedQty: number;
     code?: string;
     notes?: string;
+}
+
+export interface CreateNonConformityPayload {
+    title: string;
+    description: string;
+    severity?: QualitySeverity;
+    source?: string;
+    productionOrderId?: string;
+    productionBatchId?: string;
+    productionBatchUnitId?: string;
+    createdBy?: string;
+}
+
+export interface UpdateNonConformityPayload {
+    status?: NonConformityStatus;
+    rootCause?: string;
+    correctiveAction?: string;
+    severity?: QualitySeverity;
+    description?: string;
+    title?: string;
+    actor?: string;
+}
+
+export interface CreateCapaPayload {
+    nonConformityId: string;
+    actionPlan: string;
+    owner?: string;
+    dueDate?: string | Date;
+    actor?: string;
+}
+
+export interface UpdateCapaPayload {
+    actionPlan?: string;
+    owner?: string;
+    dueDate?: string | Date;
+    verificationNotes?: string;
+    status?: CapaStatus;
+    actor?: string;
+}
+
+export interface CreateControlledDocumentPayload {
+    code: string;
+    title: string;
+    process: DocumentProcess;
+    version?: number;
+    content?: string;
+    effectiveDate?: string | Date;
+    expiresAt?: string | Date;
+    actor?: string;
+}
+
+export interface ListControlledDocumentsFilters {
+    process?: DocumentProcess;
+    status?: DocumentStatus;
 }
 
 export const mrpApi = {
@@ -290,6 +353,56 @@ export const mrpApi = {
     },
     updateProductionBatchUnitPackaging: async (unitId: string, packaged: boolean): Promise<ProductionBatchUnit> => {
         const response = await api.patch<ProductionBatchUnit>(`/mrp/production-batch-units/${unitId}/packaging`, { packaged });
+        return response.data;
+    },
+
+    // Quality / INVIMA
+    createNonConformity: async (data: CreateNonConformityPayload): Promise<NonConformity> => {
+        const response = await api.post<NonConformity>('/mrp/quality/non-conformities', data);
+        return response.data;
+    },
+    listNonConformities: async (filters?: { status?: NonConformityStatus; severity?: QualitySeverity; source?: string }): Promise<NonConformity[]> => {
+        const response = await api.get<NonConformity[]>('/mrp/quality/non-conformities', { params: filters });
+        return response.data;
+    },
+    updateNonConformity: async (id: string, data: UpdateNonConformityPayload): Promise<NonConformity> => {
+        const response = await api.patch<NonConformity>(`/mrp/quality/non-conformities/${id}`, data);
+        return response.data;
+    },
+    createCapaAction: async (data: CreateCapaPayload): Promise<CapaAction> => {
+        const response = await api.post<CapaAction>('/mrp/quality/capa-actions', data);
+        return response.data;
+    },
+    listCapaActions: async (filters?: { status?: CapaStatus; nonConformityId?: string }): Promise<CapaAction[]> => {
+        const response = await api.get<CapaAction[]>('/mrp/quality/capa-actions', { params: filters });
+        return response.data;
+    },
+    updateCapaAction: async (id: string, data: UpdateCapaPayload): Promise<CapaAction> => {
+        const response = await api.patch<CapaAction>(`/mrp/quality/capa-actions/${id}`, data);
+        return response.data;
+    },
+    listQualityAuditEvents: async (filters?: { entityType?: string; entityId?: string }): Promise<AuditEvent[]> => {
+        const response = await api.get<AuditEvent[]>('/mrp/quality/audit-events', { params: filters });
+        return response.data;
+    },
+    createControlledDocument: async (data: CreateControlledDocumentPayload): Promise<ControlledDocument> => {
+        const response = await api.post<ControlledDocument>('/mrp/quality/documents', data);
+        return response.data;
+    },
+    listControlledDocuments: async (filters?: ListControlledDocumentsFilters): Promise<ControlledDocument[]> => {
+        const response = await api.get<ControlledDocument[]>('/mrp/quality/documents', { params: filters });
+        return response.data;
+    },
+    submitControlledDocument: async (id: string, actor?: string): Promise<ControlledDocument> => {
+        const response = await api.post<ControlledDocument>(`/mrp/quality/documents/${id}/submit-review`, { actor });
+        return response.data;
+    },
+    approveControlledDocument: async (id: string, actor?: string): Promise<ControlledDocument> => {
+        const response = await api.post<ControlledDocument>(`/mrp/quality/documents/${id}/approve`, { actor });
+        return response.data;
+    },
+    listActiveControlledDocumentsByProcess: async (process: DocumentProcess): Promise<ControlledDocument[]> => {
+        const response = await api.get<ControlledDocument[]>(`/mrp/quality/documents/active/${process}`);
         return response.data;
     },
 

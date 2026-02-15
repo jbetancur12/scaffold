@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { ArrowLeft, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
+import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import {
     Dialog,
     DialogContent,
@@ -50,24 +52,8 @@ export default function PurchaseOrderDetailPage() {
     const { execute: cancelOrder } = useCancelPurchaseOrderMutation();
     const warehouses = warehousesData ?? [];
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(error, 'No se pudo cargar la orden de compra'),
-            variant: 'destructive',
-        });
-        navigate('/mrp/purchase-orders');
-    }, [error, navigate, toast]);
-
-    useEffect(() => {
-        if (!warehousesError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(warehousesError, 'No se pudieron cargar los almacenes'),
-            variant: 'destructive',
-        });
-    }, [toast, warehousesError]);
+    useMrpQueryErrorRedirect(error, 'No se pudo cargar la orden de compra', '/mrp/purchase-orders');
+    useMrpQueryErrorToast(warehousesError, 'No se pudieron cargar los almacenes');
 
     const handleReceive = async () => {
         if (!id) return;

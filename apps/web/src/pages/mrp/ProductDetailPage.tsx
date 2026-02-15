@@ -28,6 +28,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
 import { useDeleteProductMutation, useDeleteVariantMutation, useProductQuery, useSaveVariantMutation } from '@/hooks/mrp/useProducts';
+import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 
 interface VariantFormData {
     id?: string;
@@ -60,15 +61,7 @@ export default function ProductDetailPage() {
     const { execute: saveVariant } = useSaveVariantMutation();
     const { execute: deleteVariant } = useDeleteVariantMutation();
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(error, 'No se pudo cargar el producto'),
-            variant: 'destructive',
-        });
-        navigate('/mrp/products');
-    }, [error, navigate, toast]);
+    useMrpQueryErrorRedirect(error, 'No se pudo cargar el producto', '/mrp/products');
 
     // Variant SKU generation listener
     useEffect(() => {

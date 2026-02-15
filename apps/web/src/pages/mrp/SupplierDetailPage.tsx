@@ -1,28 +1,17 @@
-import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Edit2, Factory, MapPin, Phone, Mail, Building, CreditCard, FileText } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
 import { SupplierMaterialsTab } from './components/SupplierMaterialsTab';
-import { getErrorMessage } from '@/lib/api-error';
 import { useSupplierQuery } from '@/hooks/mrp/useSuppliers';
+import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 
 export default function SupplierDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { toast } = useToast();
     const { data: supplier, loading, error } = useSupplierQuery(id);
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(error, 'No se pudo cargar la información del proveedor'),
-            variant: 'destructive',
-        });
-        navigate('/mrp/suppliers');
-    }, [error, navigate, toast]);
+    useMrpQueryErrorRedirect(error, 'No se pudo cargar la información del proveedor', '/mrp/suppliers');
 
     if (loading) {
         return (

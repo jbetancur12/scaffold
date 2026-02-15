@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -14,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { getErrorMessage } from '@/lib/api-error';
 import { useDeleteWarehouseMutation, useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 export default function WarehouseListPage() {
     const navigate = useNavigate();
@@ -23,14 +23,7 @@ export default function WarehouseListPage() {
     const warehouses = warehousesData ?? [];
     const { execute: deleteWarehouse } = useDeleteWarehouseMutation();
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(error, 'No se pudieron cargar los almacenes'),
-            variant: 'destructive',
-        });
-    }, [error, toast]);
+    useMrpQueryErrorToast(error, 'No se pudieron cargar los almacenes');
 
     const handleDelete = async (id: string) => {
         if (!confirm('¿Estás seguro de que deseas eliminar este almacén?')) return;

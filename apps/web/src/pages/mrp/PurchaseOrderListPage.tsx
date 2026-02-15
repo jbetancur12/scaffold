@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PurchaseOrder } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
@@ -6,6 +6,7 @@ import { Plus, Eye, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import {
     Dialog,
     DialogContent,
@@ -60,23 +61,8 @@ export default function PurchaseOrderListPage() {
     const total = ordersResponse?.total || 0;
     const warehouses = warehousesData ?? [];
 
-    useEffect(() => {
-        if (!ordersError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(ordersError, 'No se pudieron cargar las órdenes de compra'),
-            variant: 'destructive',
-        });
-    }, [ordersError, toast]);
-
-    useEffect(() => {
-        if (!warehousesError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(warehousesError, 'No se pudieron cargar los almacenes'),
-            variant: 'destructive',
-        });
-    }, [warehousesError, toast]);
+    useMrpQueryErrorToast(ordersError, 'No se pudieron cargar las órdenes de compra');
+    useMrpQueryErrorToast(warehousesError, 'No se pudieron cargar los almacenes');
 
 
     const handleReceiveClick = (id: string) => {

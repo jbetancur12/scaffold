@@ -17,6 +17,7 @@ import {
     Factory,
     Warehouse,
     Settings,
+    ShieldCheck,
     ChevronDown,
     ChevronRight,
     Boxes
@@ -71,6 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: Warehouse, label: 'Inventario', path: '/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Almacenes', path: '/mrp/warehouses', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Settings, label: 'Configuración Operativa', path: '/mrp/operational-settings', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: ShieldCheck, label: 'Calidad e INVIMA', path: '/mrp/quality', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
     ];
 
     const filteredMrpItems = mrpItems.filter(item =>

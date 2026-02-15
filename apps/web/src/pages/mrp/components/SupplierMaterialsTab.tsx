@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,6 +22,7 @@ import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 import { useLinkSupplierMaterialMutation, useSupplierMaterialsQuery, useUnlinkSupplierMaterialMutation } from '@/hooks/mrp/useSuppliers';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 interface SupplierMaterialsTabProps {
     supplierId: string;
@@ -40,23 +41,8 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
     const { execute: unlinkSupplierMaterial } = useUnlinkSupplierMaterialMutation();
     const materials = supplierMaterialsData ?? [];
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(error, 'No se pudieron cargar los materiales del proveedor'),
-            variant: 'destructive',
-        });
-    }, [error, toast]);
-
-    useEffect(() => {
-        if (!rawMaterialsError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(rawMaterialsError, 'No se pudo cargar la lista de materias primas'),
-            variant: 'destructive',
-        });
-    }, [rawMaterialsError, toast]);
+    useMrpQueryErrorToast(error, 'No se pudieron cargar los materiales del proveedor');
+    useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar la lista de materias primas');
 
     const handleAddMaterial = async () => {
         if (!selectedMaterial) {

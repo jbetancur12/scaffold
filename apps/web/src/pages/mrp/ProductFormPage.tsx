@@ -10,6 +10,7 @@ import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { ProductSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
 import { useProductQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
+import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 
 export default function ProductFormPage() {
     const { id } = useParams();
@@ -49,15 +50,7 @@ export default function ProductFormPage() {
         }
     }, [product]);
 
-    useEffect(() => {
-        if (!productError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(productError, 'No se pudo cargar el producto'),
-            variant: 'destructive',
-        });
-        navigate('/mrp/products');
-    }, [navigate, productError, toast]);
+    useMrpQueryErrorRedirect(productError, 'No se pudo cargar el producto', '/mrp/products');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

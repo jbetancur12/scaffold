@@ -27,6 +27,7 @@ import { CreateProductionOrderSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
 import { useProductsQuery } from '@/hooks/mrp/useProducts';
 import { useCreateProductionOrderMutation, useProductionOrderQuery, useProductionRequirementsQuery, useUpdateProductionOrderStatusMutation } from '@/hooks/mrp/useProductionOrders';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 interface OrderItem {
     id: string; // temp id for UI
@@ -85,14 +86,9 @@ export default function ProductionOrderFormPage() {
         setRequirements(requirementsData ?? []);
     }, [requirementsData]);
 
-    useEffect(() => {
-        if (!productsError && !orderError && !requirementsError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(productsError || orderError || requirementsError, 'No se pudo cargar la información'),
-            variant: 'destructive',
-        });
-    }, [orderError, productsError, requirementsError, toast]);
+    useMrpQueryErrorToast(productsError, 'No se pudo cargar la información');
+    useMrpQueryErrorToast(orderError, 'No se pudo cargar la información');
+    useMrpQueryErrorToast(requirementsError, 'No se pudo cargar la información');
 
     const handleAddItem = () => {
         setItems([

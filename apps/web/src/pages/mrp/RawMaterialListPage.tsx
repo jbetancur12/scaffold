@@ -11,9 +11,9 @@ import {
 } from '@/components/ui/table';
 import { Database, Plus, Edit2, Search, ChevronLeft, ChevronRight, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 export default function RawMaterialListPage() {
     const navigate = useNavigate();
@@ -21,7 +21,6 @@ export default function RawMaterialListPage() {
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [page, setPage] = useState(1);
     const limit = 10;
-    const { toast } = useToast();
 
     const { materials, total, loading, error } = useRawMaterialsQuery(page, limit, debouncedSearch);
 
@@ -33,14 +32,7 @@ export default function RawMaterialListPage() {
         return () => clearTimeout(timer);
     }, [search]);
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: 'No se pudo cargar la materia prima',
-            variant: 'destructive',
-        });
-    }, [error, toast]);
+    useMrpQueryErrorToast(error, 'No se pudo cargar la materia prima');
 
     return (
         <div className="space-y-8">

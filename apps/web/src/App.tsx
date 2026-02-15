@@ -25,6 +25,7 @@ import ProductionOrderDetailPage from '@/pages/mrp/ProductionOrderDetailPage';
 import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
 import WarehouseListPage from '@/pages/mrp/WarehouseListPage';
 import WarehouseFormPage from '@/pages/mrp/WarehouseFormPage';
+import QualityCompliancePage from '@/pages/mrp/QualityCompliancePage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, isLoading } = useAuth();
@@ -116,6 +117,7 @@ export default function App() {
                         <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
 
                         <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
+                        <Route path="/mrp/quality" element={<QualityCompliancePage />} />
 
                         <Route path="/mrp/inventory" element={<InventoryDashboardPage />} />
                         <Route path="/mrp/warehouses" element={<WarehouseListPage />} />

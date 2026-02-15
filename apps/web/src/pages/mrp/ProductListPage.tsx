@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -14,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
 import { useDeleteProductMutation, useProductsQuery } from '@/hooks/mrp/useProducts';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 export default function ProductListPage() {
     const navigate = useNavigate();
@@ -23,14 +23,7 @@ export default function ProductListPage() {
     const products = productsResponse?.products ?? [];
     const { execute: deleteProduct } = useDeleteProductMutation();
 
-    useEffect(() => {
-        if (!error) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(error, 'No se pudieron cargar los productos'),
-            variant: 'destructive',
-        });
-    }, [error, toast]);
+    useMrpQueryErrorToast(error, 'No se pudieron cargar los productos');
 
     const handleDeleteProduct = async (id: string) => {
         if (!confirm('¿Estás seguro de eliminar este producto? Esta acción no se puede deshacer.')) return;

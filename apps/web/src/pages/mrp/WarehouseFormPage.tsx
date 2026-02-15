@@ -16,6 +16,7 @@ import { WarehouseType } from '@scaffold/types';
 import { WarehouseSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
 import { useSaveWarehouseMutation, useWarehouseQuery } from '@/hooks/mrp/useWarehouses';
+import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 
 export default function WarehouseFormPage() {
     const { id } = useParams();
@@ -43,15 +44,7 @@ export default function WarehouseFormPage() {
         }
     }, [warehouse]);
 
-    useEffect(() => {
-        if (!warehouseError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(warehouseError, 'No se pudo cargar el almacén'),
-            variant: 'destructive',
-        });
-        navigate('/mrp/warehouses');
-    }, [navigate, toast, warehouseError]);
+    useMrpQueryErrorRedirect(warehouseError, 'No se pudo cargar el almacén', '/mrp/warehouses');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

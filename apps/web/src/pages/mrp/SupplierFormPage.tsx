@@ -9,6 +9,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import { SupplierSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
 import { useSaveSupplierMutation, useSupplierQuery } from '@/hooks/mrp/useSuppliers';
+import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 
 export default function SupplierFormPage() {
     const { id } = useParams();
@@ -48,15 +49,7 @@ export default function SupplierFormPage() {
         });
     }, [supplier]);
 
-    useEffect(() => {
-        if (!supplierError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(supplierError, 'No se pudo cargar el proveedor'),
-            variant: 'destructive',
-        });
-        navigate('/mrp/suppliers');
-    }, [navigate, supplierError, toast]);
+    useMrpQueryErrorRedirect(supplierError, 'No se pudo cargar el proveedor', '/mrp/suppliers');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

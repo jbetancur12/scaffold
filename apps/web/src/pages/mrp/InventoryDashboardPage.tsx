@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { InventoryItem, ProductVariant, RawMaterial, Warehouse, Product } from '@scaffold/types';
 import {
     Table,
@@ -36,6 +36,7 @@ import { getErrorMessage } from '@/lib/api-error';
 import { useInventoryQuery, useManualStockMutation } from '@/hooks/mrp/useInventory';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 interface PopulatedInventoryItem extends InventoryItem {
     variant?: ProductVariant & { product?: Product };
@@ -45,7 +46,6 @@ interface PopulatedInventoryItem extends InventoryItem {
 
 export default function InventoryDashboardPage() {
     const { toast } = useToast();
-    const [error, setError] = useState('');
 
     // Manual Add State
     const [isManualAddOpen, setIsManualAddOpen] = useState(false);
@@ -61,20 +61,10 @@ export default function InventoryDashboardPage() {
     const { execute: addManualStock, loading: submittingManual } = useManualStockMutation();
     const inventory = (inventoryData?.items as PopulatedInventoryItem[]) ?? [];
     const warehouses: Warehouse[] = warehousesData ?? [];
+    const inventoryErrorMessage = inventoryError ? getErrorMessage(inventoryError, 'Error al cargar el inventario') : '';
 
-    useEffect(() => {
-        if (!inventoryError) return;
-        setError(getErrorMessage(inventoryError, 'Error al cargar el inventario'));
-    }, [inventoryError]);
-
-    useEffect(() => {
-        if (!rawMaterialsError && !warehousesError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(rawMaterialsError || warehousesError, 'No se pudo cargar información auxiliar'),
-            variant: 'destructive',
-        });
-    }, [rawMaterialsError, toast, warehousesError]);
+    useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar información auxiliar');
+    useMrpQueryErrorToast(warehousesError, 'No se pudo cargar información auxiliar');
 
     const handleManualAdd = async () => {
         if (!selectedMaterialId || !manualQuantity || !manualCost) {
@@ -240,9 +230,9 @@ export default function InventoryDashboardPage() {
                 <div className="flex justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
-            ) : error ? (
+            ) : inventoryErrorMessage ? (
                 <div className="p-4 text-red-500 bg-red-50 rounded-md">
-                    {error}
+                    {inventoryErrorMessage}
                 </div>
             ) : (
                 <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm">

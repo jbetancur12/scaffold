@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -13,6 +13,7 @@ import { getErrorMessage } from '@/lib/api-error';
 import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 import { useCreatePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 interface OrderItem {
     rawMaterialId: string;
@@ -45,14 +46,8 @@ export default function PurchaseOrderFormPage() {
     const { execute: createPurchaseOrder } = useCreatePurchaseOrderMutation();
     const suppliers = suppliersResponse?.suppliers ?? [];
 
-    useEffect(() => {
-        if (!suppliersError && !rawMaterialsError) return;
-        toast({
-            title: 'Error',
-            description: getErrorMessage(suppliersError || rawMaterialsError, 'No se pudo cargar la información inicial'),
-            variant: 'destructive',
-        });
-    }, [rawMaterialsError, suppliersError, toast]);
+    useMrpQueryErrorToast(suppliersError, 'No se pudo cargar la información inicial');
+    useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar la información inicial');
 
     const addItem = () => {
         setItems([...items, { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false }]);
