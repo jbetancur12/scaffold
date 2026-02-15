@@ -19,23 +19,15 @@ import {
     QualitySeverity,
     CapaStatus,
     ControlledDocument,
-    DocumentApprovalMethod,
     DocumentProcess,
-    DocumentStatus,
     TechnovigilanceCase,
     TechnovigilanceCaseType,
     TechnovigilanceCausality,
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
-    TechnovigilanceReportChannel,
     RecallCase,
     RecallNotification,
-    RecallNotificationChannel,
-    RecallNotificationStatus,
-    RecallScopeType,
     RecallStatus,
-    RegulatoryCodingStandard,
-    RegulatoryDeviceType,
     RegulatoryLabel,
     RegulatoryLabelScopeType,
     RegulatoryLabelStatus,
@@ -46,7 +38,6 @@ import {
     QualityRiskControlStatus,
     QualityTrainingEvidence,
     IncomingInspection,
-    IncomingInspectionResult,
     IncomingInspectionStatus,
     BatchRelease,
     BatchReleaseStatus,
@@ -61,6 +52,34 @@ import {
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
+    CreateProductionBatchPayload,
+    CreateNonConformityPayload,
+    UpdateNonConformityPayload,
+    CreateCapaPayload,
+    UpdateCapaPayload,
+    CreateControlledDocumentPayload,
+    ListControlledDocumentsFilters,
+    CreateTechnovigilanceCasePayload,
+    UpdateTechnovigilanceCasePayload,
+    ReportTechnovigilanceCasePayload,
+    CreateRecallCasePayload,
+    UpdateRecallProgressPayload,
+    CreateRecallNotificationPayload,
+    UpdateRecallNotificationPayload,
+    CloseRecallCasePayload,
+    CreateCustomerPayload,
+    CreateShipmentPayload,
+    CreateDmrTemplatePayload,
+    UpsertRegulatoryLabelPayload,
+    ValidateDispatchReadinessPayload,
+    CreateQualityRiskControlPayload,
+    CreateQualityTrainingEvidencePayload,
+    ResolveIncomingInspectionPayload,
+    UpsertBatchReleaseChecklistPayload,
+    SignBatchReleasePayload,
+    ApproveControlledDocumentPayload,
+    CreateInvimaRegistrationPayload,
+    UpdateInvimaRegistrationPayload,
 } from '@scaffold/types';
 import type {
     CreatePurchaseOrderDto,
@@ -95,264 +114,6 @@ export interface RawMaterialSupplier {
 export interface ListResponse<T> {
     [key: string]: T[] | number; // Dynamic key based on return type (products, materials, etc)
     total: number;
-}
-
-export interface CreateProductionBatchPayload {
-    variantId: string;
-    plannedQty: number;
-    code?: string;
-    notes?: string;
-}
-
-export interface CreateNonConformityPayload {
-    title: string;
-    description: string;
-    severity?: QualitySeverity;
-    source?: string;
-    productionOrderId?: string;
-    productionBatchId?: string;
-    productionBatchUnitId?: string;
-    createdBy?: string;
-}
-
-export interface UpdateNonConformityPayload {
-    status?: NonConformityStatus;
-    rootCause?: string;
-    correctiveAction?: string;
-    severity?: QualitySeverity;
-    description?: string;
-    title?: string;
-    actor?: string;
-}
-
-export interface CreateCapaPayload {
-    nonConformityId: string;
-    actionPlan: string;
-    owner?: string;
-    dueDate?: string | Date;
-    actor?: string;
-}
-
-export interface UpdateCapaPayload {
-    actionPlan?: string;
-    owner?: string;
-    dueDate?: string | Date;
-    verificationNotes?: string;
-    status?: CapaStatus;
-    actor?: string;
-}
-
-export interface CreateControlledDocumentPayload {
-    code: string;
-    title: string;
-    process: DocumentProcess;
-    version?: number;
-    content?: string;
-    effectiveDate?: string | Date;
-    expiresAt?: string | Date;
-    actor?: string;
-}
-
-export interface ListControlledDocumentsFilters {
-    process?: DocumentProcess;
-    status?: DocumentStatus;
-}
-
-export interface CreateTechnovigilanceCasePayload {
-    title: string;
-    description: string;
-    type?: TechnovigilanceCaseType;
-    severity?: TechnovigilanceSeverity;
-    causality?: TechnovigilanceCausality;
-    productionOrderId?: string;
-    productionBatchId?: string;
-    productionBatchUnitId?: string;
-    lotCode?: string;
-    serialCode?: string;
-    createdBy?: string;
-}
-
-export interface UpdateTechnovigilanceCasePayload {
-    status?: TechnovigilanceStatus;
-    severity?: TechnovigilanceSeverity;
-    causality?: TechnovigilanceCausality;
-    investigationSummary?: string;
-    resolution?: string;
-    actor?: string;
-}
-
-export interface ReportTechnovigilanceCasePayload {
-    reportNumber: string;
-    reportChannel: TechnovigilanceReportChannel;
-    reportPayloadRef?: string;
-    reportedAt?: string | Date;
-    ackAt?: string | Date;
-    actor?: string;
-}
-
-export interface CreateRecallCasePayload {
-    title: string;
-    reason: string;
-    scopeType: RecallScopeType;
-    lotCode?: string;
-    serialCode?: string;
-    affectedQuantity: number;
-    isMock?: boolean;
-    targetResponseMinutes?: number;
-    actor?: string;
-}
-
-export interface UpdateRecallProgressPayload {
-    retrievedQuantity: number;
-    actor?: string;
-}
-
-export interface CreateRecallNotificationPayload {
-    recipientName: string;
-    recipientContact: string;
-    channel: RecallNotificationChannel;
-    evidenceNotes?: string;
-    actor?: string;
-}
-
-export interface UpdateRecallNotificationPayload {
-    status: RecallNotificationStatus;
-    sentAt?: string | Date;
-    acknowledgedAt?: string | Date;
-    evidenceNotes?: string;
-    actor?: string;
-}
-
-export interface CloseRecallCasePayload {
-    closureEvidence: string;
-    endedAt?: string | Date;
-    actualResponseMinutes?: number;
-    actor?: string;
-}
-
-export interface CreateCustomerPayload {
-    name: string;
-    documentType?: string;
-    documentNumber?: string;
-    contactName?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-    notes?: string;
-}
-
-export interface CreateShipmentPayload {
-    customerId: string;
-    commercialDocument: string;
-    shippedAt?: string | Date;
-    dispatchedBy?: string;
-    notes?: string;
-    items: Array<{
-        productionBatchId: string;
-        productionBatchUnitId?: string;
-        quantity: number;
-    }>;
-}
-
-export interface CreateDmrTemplatePayload {
-    productId?: string;
-    process: DocumentProcess;
-    code: string;
-    title: string;
-    version?: number;
-    sections: string[];
-    requiredEvidence?: string[];
-    isActive?: boolean;
-    createdBy?: string;
-    approvedBy?: string;
-    approvedAt?: string | Date;
-}
-
-export interface UpsertRegulatoryLabelPayload {
-    productionBatchId: string;
-    productionBatchUnitId?: string;
-    scopeType: RegulatoryLabelScopeType;
-    deviceType: RegulatoryDeviceType;
-    codingStandard: RegulatoryCodingStandard;
-    productName?: string;
-    manufacturerName?: string;
-    invimaRegistration?: string;
-    lotCode?: string;
-    serialCode?: string;
-    manufactureDate: string | Date;
-    expirationDate?: string | Date;
-    gtin?: string;
-    udiDi?: string;
-    udiPi?: string;
-    internalCode?: string;
-    actor?: string;
-}
-
-export interface ValidateDispatchReadinessPayload {
-    productionBatchId: string;
-    actor?: string;
-}
-
-export interface CreateQualityRiskControlPayload {
-    process: DocumentProcess;
-    risk: string;
-    control: string;
-    ownerRole: string;
-    status?: QualityRiskControlStatus;
-    evidenceRef?: string;
-    actor?: string;
-}
-
-export interface CreateQualityTrainingEvidencePayload {
-    role: string;
-    personName: string;
-    trainingTopic: string;
-    completedAt: string | Date;
-    validUntil?: string | Date;
-    trainerName?: string;
-    evidenceRef?: string;
-    actor?: string;
-}
-
-export interface ResolveIncomingInspectionPayload {
-    inspectionResult: IncomingInspectionResult;
-    supplierLotCode?: string;
-    certificateRef?: string;
-    notes?: string;
-    quantityAccepted: number;
-    quantityRejected: number;
-    actor?: string;
-}
-
-export interface UpsertBatchReleaseChecklistPayload {
-    productionBatchId: string;
-    qcApproved: boolean;
-    labelingValidated: boolean;
-    documentsCurrent: boolean;
-    evidencesComplete: boolean;
-    checklistNotes?: string;
-    rejectedReason?: string;
-    actor?: string;
-}
-
-export interface CreateInvimaRegistrationPayload {
-    code: string;
-    holderName: string;
-    manufacturerName?: string;
-    validFrom?: string | Date;
-    validUntil?: string | Date;
-    status?: InvimaRegistrationStatus;
-    notes?: string;
-}
-
-export interface UpdateInvimaRegistrationPayload {
-    code?: string;
-    holderName?: string;
-    manufacturerName?: string;
-    validFrom?: string | Date;
-    validUntil?: string | Date;
-    status?: InvimaRegistrationStatus;
-    notes?: string;
 }
 
 export const mrpApi = {
@@ -757,7 +518,7 @@ export const mrpApi = {
     },
     signBatchRelease: async (
         productionBatchId: string,
-        payload: { actor: string; approvalMethod: DocumentApprovalMethod; approvalSignature: string }
+        payload: SignBatchReleasePayload
     ): Promise<BatchRelease> => {
         const response = await api.post<BatchRelease>(`/mrp/quality/batch-releases/${productionBatchId}/sign`, payload);
         return response.data;
@@ -776,7 +537,7 @@ export const mrpApi = {
     },
     approveControlledDocument: async (
         id: string,
-        payload: { actor: string; approvalMethod: DocumentApprovalMethod; approvalSignature: string }
+        payload: ApproveControlledDocumentPayload
     ): Promise<ControlledDocument> => {
         const response = await api.post<ControlledDocument>(`/mrp/quality/documents/${id}/approve`, payload);
         return response.data;

@@ -25,7 +25,22 @@ import ProductionOrderDetailPage from '@/pages/mrp/ProductionOrderDetailPage';
 import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
 import WarehouseListPage from '@/pages/mrp/WarehouseListPage';
 import WarehouseFormPage from '@/pages/mrp/WarehouseFormPage';
-import QualityCompliancePage from '@/pages/mrp/QualityCompliancePage';
+import { qualitySections } from '@/constants/mrpNavigation';
+import {
+    PostmarketRecallPage,
+    PostmarketShipmentPage,
+    PostmarketTechnoPage,
+    QualityAuditPage,
+    QualityBatchReleasePage,
+    QualityCapaPage,
+    QualityComplianceDashboardPage,
+    QualityDhrDmrPage,
+    QualityDocsPage,
+    QualityIncomingPage,
+    QualityInvimaPage,
+    QualityLabelingPage,
+    QualityNcPage,
+} from '@/pages/quality/QualitySectionPages';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, isLoading } = useAuth();
@@ -65,12 +80,14 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function LegacyQualitySectionRedirect() {
     const { section } = useParams<{ section: string }>();
-    return <Navigate to={`/quality/${section || 'nc'}`} replace />;
+    const sectionExists = qualitySections.some((item) => item.domain === 'quality' && item.value === section);
+    return <Navigate to={sectionExists ? `/quality/${section}` : '/quality/nc'} replace />;
 }
 
 function LegacyPostmarketSectionRedirect() {
     const { section } = useParams<{ section: string }>();
-    return <Navigate to={`/postmarket/${section || 'techno'}`} replace />;
+    const sectionExists = qualitySections.some((item) => item.domain === 'postmarket' && item.value === section);
+    return <Navigate to={sectionExists ? `/postmarket/${section}` : '/postmarket/techno'} replace />;
 }
 
 export default function App() {
@@ -128,9 +145,22 @@ export default function App() {
 
                         <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
                         <Route path="/quality" element={<Navigate to="/quality/nc" replace />} />
-                        <Route path="/quality/:section" element={<QualityCompliancePage />} />
+                        <Route path="/quality/nc" element={<QualityNcPage />} />
+                        <Route path="/quality/capa" element={<QualityCapaPage />} />
+                        <Route path="/quality/dhr-dmr" element={<QualityDhrDmrPage />} />
+                        <Route path="/quality/labeling" element={<QualityLabelingPage />} />
+                        <Route path="/quality/incoming" element={<QualityIncomingPage />} />
+                        <Route path="/quality/batch-release" element={<QualityBatchReleasePage />} />
+                        <Route path="/quality/invima" element={<QualityInvimaPage />} />
+                        <Route path="/quality/compliance" element={<QualityComplianceDashboardPage />} />
+                        <Route path="/quality/docs" element={<QualityDocsPage />} />
+                        <Route path="/quality/audit" element={<QualityAuditPage />} />
+                        <Route path="/quality/:section" element={<LegacyQualitySectionRedirect />} />
                         <Route path="/postmarket" element={<Navigate to="/postmarket/techno" replace />} />
-                        <Route path="/postmarket/:section" element={<QualityCompliancePage />} />
+                        <Route path="/postmarket/techno" element={<PostmarketTechnoPage />} />
+                        <Route path="/postmarket/recall" element={<PostmarketRecallPage />} />
+                        <Route path="/postmarket/shipment" element={<PostmarketShipmentPage />} />
+                        <Route path="/postmarket/:section" element={<LegacyPostmarketSectionRedirect />} />
                         <Route path="/mrp/quality" element={<Navigate to="/quality/nc" replace />} />
                         <Route path="/mrp/quality/:section" element={<LegacyQualitySectionRedirect />} />
                         <Route path="/mrp/postmarket" element={<Navigate to="/postmarket/techno" replace />} />

@@ -149,11 +149,11 @@ const formatAuditMetadata = (
     return fallback.join(' | ');
 };
 
-export default function QualityCompliancePage() {
+export default function QualityCompliancePage({ forcedSection }: { forcedSection?: QualitySection }) {
     const navigate = useNavigate();
     const location = useLocation();
     const [expandedIncomingInspectionId, setExpandedIncomingInspectionId] = useState<string | null>(null);
-    const activeTab = getQualityTabFromPath(location.pathname);
+    const activeTab = forcedSection ?? getQualityTabFromPath(location.pathname);
 
     const {
         nonConformities,
@@ -282,6 +282,7 @@ export default function QualityCompliancePage() {
     }, {});
 
     const handleTabChange = (value: QualitySection) => {
+        if (forcedSection) return;
         const selectedSection = qualitySections.find((section) => section.value === value);
         if (!selectedSection) return;
         if (location.pathname !== selectedSection.path) {
@@ -299,7 +300,7 @@ export default function QualityCompliancePage() {
             </div>
 
             <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as QualitySection)} className="w-full">
-                <div className="md:hidden mb-3">
+                {!forcedSection ? <div className="md:hidden mb-3">
                     <Select value={activeTab} onValueChange={(value) => handleTabChange(value as QualitySection)}>
                         <SelectTrigger>
                             <SelectValue placeholder="Selecciona un módulo" />
@@ -310,7 +311,7 @@ export default function QualityCompliancePage() {
                             ))}
                         </SelectContent>
                     </Select>
-                </div>
+                </div> : null}
 
                 <TabsContent value="nc" className="space-y-4">
                     <Card>
