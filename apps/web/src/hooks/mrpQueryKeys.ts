@@ -30,6 +30,8 @@ export const mrpQueryKeys = {
     qualityRecalls: 'mrp.quality.recalls',
     qualityCustomers: 'mrp.quality.customers',
     qualityShipments: 'mrp.quality.shipments',
+    qualityDmrTemplates: 'mrp.quality.dmr-templates',
+    qualityBatchDhr: (batchId: string) => `mrp.quality.dhr.${batchId}`,
     qualityRegulatoryLabels: 'mrp.quality.regulatory-labels',
     qualityComplianceDashboard: 'mrp.quality.compliance-dashboard',
     qualityRiskControls: 'mrp.quality.risk-controls',

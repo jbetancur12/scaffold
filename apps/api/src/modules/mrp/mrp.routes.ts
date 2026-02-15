@@ -77,6 +77,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/customers', (req, res, next) => mrpController.listCustomers(req, res, next));
     router.post('/quality/shipments', (req, res, next) => mrpController.createShipment(req, res, next));
     router.get('/quality/shipments', (req, res, next) => mrpController.listShipments(req, res, next));
+    router.post('/quality/dmr-templates', (req, res, next) => mrpController.createDmrTemplate(req, res, next));
+    router.get('/quality/dmr-templates', (req, res, next) => mrpController.listDmrTemplates(req, res, next));
+    router.get('/quality/dhr/:productionBatchId', (req, res, next) => mrpController.getBatchDhr(req, res, next));
+    router.get('/quality/dhr/:productionBatchId/export', (req, res, next) => mrpController.exportBatchDhr(req, res, next));
     router.get('/quality/recalls/:id/affected-customers', (req, res, next) => mrpController.listRecallAffectedCustomers(req, res, next));
     router.patch('/quality/recalls/:id/progress', (req, res, next) => mrpController.updateRecallProgress(req, res, next));
     router.post('/quality/recalls/:id/notifications', (req, res, next) => mrpController.createRecallNotification(req, res, next));

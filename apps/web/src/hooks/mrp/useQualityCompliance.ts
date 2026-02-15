@@ -37,14 +37,18 @@ import {
     useRecallCasesQuery,
     useCustomersQuery,
     useShipmentsQuery,
+    useDmrTemplatesQuery,
+    useBatchDhrQuery,
     useCreateCustomerMutation,
     useCreateShipmentMutation,
+    useCreateDmrTemplateMutation,
     useCreateRecallCaseMutation,
     useUpdateRecallProgressMutation,
     useCreateRecallNotificationMutation,
     useUpdateRecallNotificationMutation,
     useCloseRecallCaseMutation,
     useComplianceDashboardQuery,
+    useExportBatchDhrMutation,
     useExportComplianceMutation,
     useRiskControlsQuery,
     useCreateRiskControlMutation,
@@ -66,6 +70,7 @@ export const useQualityCompliance = () => {
     const { data: recallsData, loading: loadingRecalls } = useRecallCasesQuery();
     const { data: customersData, loading: loadingCustomers } = useCustomersQuery();
     const { data: shipmentsData, loading: loadingShipments } = useShipmentsQuery();
+    const { data: dmrTemplatesData, loading: loadingDmrTemplates } = useDmrTemplatesQuery();
     const { data: complianceDashboardData, loading: loadingComplianceDashboard } = useComplianceDashboardQuery();
     const { data: riskControlsData, loading: loadingRiskControls } = useRiskControlsQuery();
     const { data: trainingEvidenceData, loading: loadingTrainingEvidence } = useTrainingEvidenceQuery();
@@ -84,11 +89,13 @@ export const useQualityCompliance = () => {
     const { execute: createRecallCase, loading: creatingRecall } = useCreateRecallCaseMutation();
     const { execute: createCustomer, loading: creatingCustomer } = useCreateCustomerMutation();
     const { execute: createShipment, loading: creatingShipment } = useCreateShipmentMutation();
+    const { execute: createDmrTemplate, loading: creatingDmrTemplate } = useCreateDmrTemplateMutation();
     const { execute: updateRecallProgress } = useUpdateRecallProgressMutation();
     const { execute: createRecallNotification } = useCreateRecallNotificationMutation();
     const { execute: updateRecallNotification } = useUpdateRecallNotificationMutation();
     const { execute: closeRecallCase } = useCloseRecallCaseMutation();
     const { execute: exportCompliance, loading: exportingCompliance } = useExportComplianceMutation();
+    const { execute: exportBatchDhr, loading: exportingBatchDhr } = useExportBatchDhrMutation();
     const { execute: createRiskControl, loading: creatingRiskControl } = useCreateRiskControlMutation();
     const { execute: createTrainingEvidence, loading: creatingTrainingEvidence } = useCreateTrainingEvidenceMutation();
 
@@ -150,6 +157,16 @@ export const useQualityCompliance = () => {
         notes: '',
         items: [{ productionBatchId: '', productionBatchUnitId: '', quantity: 1 }],
     });
+    const [dmrTemplateForm, setDmrTemplateForm] = useState({
+        productId: '',
+        process: DocumentProcess.PRODUCCION,
+        code: '',
+        title: '',
+        version: 1,
+        sections: '',
+        requiredEvidence: '',
+    });
+    const [dhrBatchId, setDhrBatchId] = useState('');
     const [riskControlForm, setRiskControlForm] = useState({
         process: DocumentProcess.PRODUCCION,
         risk: '',
@@ -179,6 +196,8 @@ export const useQualityCompliance = () => {
     const riskControls = riskControlsData ?? [];
     const trainingEvidence = trainingEvidenceData ?? [];
     const documents = documentsData ?? [];
+    const dmrTemplates = dmrTemplatesData ?? [];
+    const { data: batchDhrData, loading: loadingBatchDhr } = useBatchDhrQuery(dhrBatchId || undefined, 'sistema-web');
     const openNc = nonConformities.filter((n) => n.status !== NonConformityStatus.CERRADA);
 
     const handleCreateNc = async (e: React.FormEvent) => {
@@ -488,6 +507,68 @@ export const useQualityCompliance = () => {
         }
     };
 
+    const handleCreateDmrTemplate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const sections = dmrTemplateForm.sections.split('\n').map((v) => v.trim()).filter(Boolean);
+        if (sections.length === 0) {
+            toast({ title: 'Error', description: 'Debes agregar al menos una sección DMR', variant: 'destructive' });
+            return;
+        }
+        const requiredEvidence = dmrTemplateForm.requiredEvidence
+            .split('\n')
+            .map((v) => v.trim())
+            .filter(Boolean);
+        try {
+            await createDmrTemplate({
+                productId: dmrTemplateForm.productId || undefined,
+                process: dmrTemplateForm.process,
+                code: dmrTemplateForm.code,
+                title: dmrTemplateForm.title,
+                version: Number(dmrTemplateForm.version) || 1,
+                sections,
+                requiredEvidence,
+                createdBy: 'sistema-web',
+            });
+            setDmrTemplateForm({
+                productId: '',
+                process: DocumentProcess.PRODUCCION,
+                code: '',
+                title: '',
+                version: 1,
+                sections: '',
+                requiredEvidence: '',
+            });
+            toast({ title: 'Plantilla DMR creada', description: 'Plantilla disponible para expediente de lote.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear la plantilla DMR'), variant: 'destructive' });
+        }
+    };
+
+    const handleExportBatchDhr = async (format: 'csv' | 'json') => {
+        if (!dhrBatchId) {
+            toast({ title: 'Error', description: 'Indica el ID del lote para exportar', variant: 'destructive' });
+            return;
+        }
+        try {
+            const file = await exportBatchDhr({
+                productionBatchId: dhrBatchId,
+                format,
+                actor: 'sistema-web',
+            });
+            const blob = new Blob([file.content], { type: format === 'csv' ? 'text/csv;charset=utf-8;' : 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', file.fileName.replace(/[:]/g, '-'));
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            toast({ title: 'DHR exportado', description: `Archivo ${format.toUpperCase()} descargado.` });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo exportar el DHR'), variant: 'destructive' });
+        }
+    };
+
     const quickUpdateRecallProgress = async (id: string, current: number) => {
         try {
             const value = window.prompt('Cantidad recuperada acumulada', String(current));
@@ -653,6 +734,8 @@ export const useQualityCompliance = () => {
         recalls,
         customers,
         shipments,
+        dmrTemplates,
+        batchDhrData,
         regulatoryLabels: regulatoryFlow.regulatoryLabels,
         incomingInspections: receptionReleaseFlow.incomingInspections,
         batchReleases: receptionReleaseFlow.batchReleases,
@@ -669,6 +752,8 @@ export const useQualityCompliance = () => {
         recallForm,
         customerForm,
         shipmentForm,
+        dmrTemplateForm,
+        dhrBatchId,
         regulatoryLabelForm: regulatoryFlow.regulatoryLabelForm,
         riskControlForm,
         trainingForm,
@@ -681,6 +766,8 @@ export const useQualityCompliance = () => {
         setRecallForm,
         setCustomerForm,
         setShipmentForm,
+        setDmrTemplateForm,
+        setDhrBatchId,
         setRegulatoryLabelForm: regulatoryFlow.setRegulatoryLabelForm,
         setRiskControlForm,
         setTrainingForm,
@@ -693,6 +780,8 @@ export const useQualityCompliance = () => {
         loadingRecalls,
         loadingCustomers,
         loadingShipments,
+        loadingDmrTemplates,
+        loadingBatchDhr,
         loadingRegulatoryLabels: regulatoryFlow.loadingRegulatoryLabels,
         loadingIncomingInspections: receptionReleaseFlow.loadingIncomingInspections,
         loadingBatchReleases: receptionReleaseFlow.loadingBatchReleases,
@@ -708,9 +797,11 @@ export const useQualityCompliance = () => {
         creatingRecall,
         creatingCustomer,
         creatingShipment,
+        creatingDmrTemplate,
         savingRegulatoryLabel: regulatoryFlow.savingRegulatoryLabel,
         validatingDispatch: regulatoryFlow.validatingDispatch,
         exportingCompliance,
+        exportingBatchDhr,
         creatingRiskControl,
         creatingTrainingEvidence,
         savingBatchReleaseChecklist: receptionReleaseFlow.savingBatchReleaseChecklist,
@@ -731,6 +822,7 @@ export const useQualityCompliance = () => {
         handleCreateRecall,
         handleCreateCustomer,
         handleCreateShipment,
+        handleCreateDmrTemplate,
         addShipmentItem,
         removeShipmentItem,
         updateShipmentItem,
@@ -746,6 +838,7 @@ export const useQualityCompliance = () => {
         quickSignBatchRelease: receptionReleaseFlow.quickSignBatchRelease,
         handleCreateInvimaRegistration: regulatoryFlow.handleCreateInvimaRegistration,
         handleExportCompliance,
+        handleExportBatchDhr,
         handleCreateRiskControl,
         handleCreateTrainingEvidence,
     };

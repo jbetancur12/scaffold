@@ -20,6 +20,9 @@ import {
     Customer,
     Shipment,
     RecallAffectedCustomer,
+    DmrTemplate,
+    BatchDhrExpedient,
+    BatchDhrExportFile,
     RecallNotification,
     RecallNotificationChannel,
     RecallNotificationStatus,
@@ -288,6 +291,65 @@ export const useCreateShipmentMutation = () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
             },
         }
+    );
+};
+
+export const useDmrTemplatesQuery = (filters?: {
+    productId?: string;
+    process?: DocumentProcess;
+    isActive?: boolean;
+}) => {
+    const fetcher = useCallback(async (): Promise<DmrTemplate[]> => {
+        return mrpApi.listDmrTemplates(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityDmrTemplates);
+};
+
+export const useCreateDmrTemplateMutation = () => {
+    return useMrpMutation<{
+        productId?: string;
+        process: DocumentProcess;
+        code: string;
+        title: string;
+        version?: number;
+        sections: string[];
+        requiredEvidence?: string[];
+        isActive?: boolean;
+        createdBy?: string;
+        approvedBy?: string;
+        approvedAt?: string;
+    }, DmrTemplate>(
+        async (payload) => mrpApi.createDmrTemplate(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityDmrTemplates);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useBatchDhrQuery = (productionBatchId?: string, actor?: string) => {
+    const fetcher = useCallback(async (): Promise<BatchDhrExpedient | null> => {
+        if (!productionBatchId) return null;
+        return mrpApi.getBatchDhr(productionBatchId, actor);
+    }, [productionBatchId, actor]);
+
+    return useMrpQuery(
+        fetcher,
+        Boolean(productionBatchId),
+        productionBatchId ? mrpQueryKeys.qualityBatchDhr(productionBatchId) : undefined
+    );
+};
+
+export const useExportBatchDhrMutation = () => {
+    return useMrpMutation<{
+        productionBatchId: string;
+        format?: 'csv' | 'json';
+        actor?: string;
+    }, BatchDhrExportFile>(
+        async ({ productionBatchId, format, actor }) => mrpApi.exportBatchDhr(productionBatchId, format || 'json', actor)
     );
 };
 

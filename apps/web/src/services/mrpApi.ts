@@ -55,6 +55,9 @@ import {
     Customer,
     Shipment,
     RecallAffectedCustomer,
+    DmrTemplate,
+    BatchDhrExpedient,
+    BatchDhrExportFile,
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
@@ -249,6 +252,20 @@ export interface CreateShipmentPayload {
         productionBatchUnitId?: string;
         quantity: number;
     }>;
+}
+
+export interface CreateDmrTemplatePayload {
+    productId?: string;
+    process: DocumentProcess;
+    code: string;
+    title: string;
+    version?: number;
+    sections: string[];
+    requiredEvidence?: string[];
+    isActive?: boolean;
+    createdBy?: string;
+    approvedBy?: string;
+    approvedAt?: string | Date;
 }
 
 export interface UpsertRegulatoryLabelPayload {
@@ -637,6 +654,26 @@ export const mrpApi = {
     },
     listRecallAffectedCustomers: async (recallCaseId: string): Promise<RecallAffectedCustomer[]> => {
         const response = await api.get<RecallAffectedCustomer[]>(`/mrp/quality/recalls/${recallCaseId}/affected-customers`);
+        return response.data;
+    },
+    createDmrTemplate: async (data: CreateDmrTemplatePayload): Promise<DmrTemplate> => {
+        const response = await api.post<DmrTemplate>('/mrp/quality/dmr-templates', data);
+        return response.data;
+    },
+    listDmrTemplates: async (filters?: {
+        productId?: string;
+        process?: DocumentProcess;
+        isActive?: boolean;
+    }): Promise<DmrTemplate[]> => {
+        const response = await api.get<DmrTemplate[]>('/mrp/quality/dmr-templates', { params: filters });
+        return response.data;
+    },
+    getBatchDhr: async (productionBatchId: string, actor?: string): Promise<BatchDhrExpedient> => {
+        const response = await api.get<BatchDhrExpedient>(`/mrp/quality/dhr/${productionBatchId}`, { params: { actor } });
+        return response.data;
+    },
+    exportBatchDhr: async (productionBatchId: string, format: 'csv' | 'json' = 'json', actor?: string): Promise<BatchDhrExportFile> => {
+        const response = await api.get<BatchDhrExportFile>(`/mrp/quality/dhr/${productionBatchId}/export`, { params: { format, actor } });
         return response.data;
     },
     updateRecallProgress: async (id: string, data: UpdateRecallProgressPayload): Promise<RecallCase> => {

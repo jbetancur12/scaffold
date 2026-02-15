@@ -469,6 +469,31 @@ export const ListShipmentsQuerySchema = z.object({
     commercialDocument: z.string().optional(),
 });
 
+export const CreateDmrTemplateSchema = z.object({
+    productId: z.string().uuid().optional(),
+    process: z.nativeEnum(DocumentProcess),
+    code: z.string().min(2),
+    title: z.string().min(3),
+    version: z.number().int().positive().default(1),
+    sections: z.array(z.string().min(2)).min(1),
+    requiredEvidence: z.array(z.string().min(2)).default([]),
+    isActive: z.boolean().optional(),
+    createdBy: z.string().optional(),
+    approvedBy: z.string().optional(),
+    approvedAt: z.coerce.date().optional(),
+});
+
+export const ListDmrTemplatesQuerySchema = z.object({
+    productId: z.string().uuid().optional(),
+    process: z.nativeEnum(DocumentProcess).optional(),
+    isActive: z.coerce.boolean().optional(),
+});
+
+export const ExportBatchDhrQuerySchema = z.object({
+    format: z.enum(['csv', 'json']).default('json'),
+    actor: z.string().optional(),
+});
+
 export const UpdateRecallProgressSchema = z.object({
     retrievedQuantity: z.number().int().nonnegative(),
     actor: z.string().optional(),

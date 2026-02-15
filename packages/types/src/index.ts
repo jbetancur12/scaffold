@@ -734,6 +734,99 @@ export interface RecallAffectedCustomer {
     }>;
 }
 
+export interface DmrTemplate {
+    id: string;
+    productId?: string;
+    product?: Pick<Product, 'id' | 'name' | 'sku'>;
+    process: DocumentProcess;
+    code: string;
+    title: string;
+    version: number;
+    sections: string[];
+    requiredEvidence: string[];
+    isActive: boolean;
+    createdBy?: string;
+    approvedBy?: string;
+    approvedAt?: string | Date;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface BatchDhrExpedient {
+    generatedAt: string | Date;
+    generatedBy?: string;
+    productionBatch: {
+        id: string;
+        code: string;
+        plannedQty: number;
+        producedQty: number;
+        qcStatus: ProductionBatchQcStatus;
+        packagingStatus: ProductionBatchPackagingStatus;
+        status: ProductionBatchStatus;
+        productionOrder?: {
+            id: string;
+            code: string;
+            status: ProductionOrderStatus;
+        };
+        variant?: {
+            id: string;
+            name: string;
+            sku: string;
+            product?: {
+                id: string;
+                name: string;
+                sku: string;
+            };
+        };
+    };
+    dmrTemplate?: {
+        id: string;
+        code: string;
+        title: string;
+        process: DocumentProcess;
+        version: number;
+        sections: string[];
+        requiredEvidence: string[];
+    };
+    materials: Array<{
+        rawMaterialId: string;
+        rawMaterialName: string;
+        rawMaterialSku: string;
+        plannedQuantity: number;
+        latestInspection?: {
+            id: string;
+            status: IncomingInspectionStatus;
+            inspectionResult?: IncomingInspectionResult;
+            inspectedBy?: string;
+            inspectedAt?: string | Date;
+            certificateRef?: string;
+        };
+    }>;
+    productionAndQuality: {
+        qcPassedUnits: number;
+        qcFailedUnits: number;
+        packagedUnits: number;
+        rejectedUnits: number;
+        lastUpdatedAt: string | Date;
+    };
+    regulatoryLabels: RegulatoryLabel[];
+    batchRelease?: BatchRelease;
+    shipments: Shipment[];
+    incidents: {
+        nonConformities: NonConformity[];
+        capas: CapaAction[];
+        technovigilanceCases: TechnovigilanceCase[];
+        recalls: RecallCase[];
+    };
+}
+
+export interface BatchDhrExportFile {
+    generatedAt: string | Date;
+    format: 'csv' | 'json';
+    fileName: string;
+    content: string;
+}
+
 export interface OperationalConfig {
     id: string;
     // MOD (Mano de Obra Directa)

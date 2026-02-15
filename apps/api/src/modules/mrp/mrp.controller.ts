@@ -49,6 +49,9 @@ import {
     ListCustomersQuerySchema,
     CreateShipmentSchema,
     ListShipmentsQuerySchema,
+    CreateDmrTemplateSchema,
+    ListDmrTemplatesQuerySchema,
+    ExportBatchDhrQuerySchema,
     UpdateRecallProgressSchema,
     CreateRecallNotificationSchema,
     UpdateRecallNotificationSchema,
@@ -715,6 +718,48 @@ export class MrpController {
             const filters = ListShipmentsQuerySchema.parse(req.query);
             const rows = await this.qualityService.listShipments(filters);
             return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createDmrTemplate(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateDmrTemplateSchema.parse(req.body);
+            const row = await this.qualityService.createDmrTemplate(payload);
+            return ApiResponse.success(res, row, 'Plantilla DMR creada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listDmrTemplates(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListDmrTemplatesQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listDmrTemplates(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getBatchDhr(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productionBatchId } = req.params;
+            const actor = typeof req.query.actor === 'string' ? req.query.actor : undefined;
+            const row = await this.qualityService.getBatchDhr(productionBatchId, actor);
+            return ApiResponse.success(res, row, 'Expediente DHR generado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async exportBatchDhr(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productionBatchId } = req.params;
+            const { format, actor } = ExportBatchDhrQuerySchema.parse(req.query);
+            const row = await this.qualityService.exportBatchDhr(productionBatchId, format, actor);
+            return ApiResponse.success(res, row, 'Exportable DHR generado');
         } catch (error) {
             next(error);
         }

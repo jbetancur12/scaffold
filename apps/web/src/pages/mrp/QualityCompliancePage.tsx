@@ -46,6 +46,8 @@ const auditEntityLabels: Record<string, string> = {
     production_order: 'Orden de producción',
     quality_risk_control: 'Riesgo/control',
     quality_training_evidence: 'Capacitación',
+    dmr_template: 'Plantilla DMR',
+    batch_dhr: 'Expediente DHR',
 };
 
 const auditActionLabels: Record<string, string> = {
@@ -65,6 +67,7 @@ const auditActionLabels: Record<string, string> = {
     checklist_updated: 'Checklist actualizado',
     signed: 'Liberación firmada',
     reopened: 'Liberación reabierta',
+    generated: 'Generado',
 };
 
 const shortId = (value?: string) => {
@@ -149,6 +152,8 @@ export default function QualityCompliancePage() {
         recalls,
         customers,
         shipments,
+        dmrTemplates,
+        batchDhrData,
         regulatoryLabels,
         incomingInspections,
         batchReleases,
@@ -165,6 +170,8 @@ export default function QualityCompliancePage() {
         recallForm,
         customerForm,
         shipmentForm,
+        dmrTemplateForm,
+        dhrBatchId,
         regulatoryLabelForm,
         riskControlForm,
         trainingForm,
@@ -177,6 +184,8 @@ export default function QualityCompliancePage() {
         setRecallForm,
         setCustomerForm,
         setShipmentForm,
+        setDmrTemplateForm,
+        setDhrBatchId,
         setRegulatoryLabelForm,
         setRiskControlForm,
         setTrainingForm,
@@ -189,6 +198,8 @@ export default function QualityCompliancePage() {
         loadingRecalls,
         loadingCustomers,
         loadingShipments,
+        loadingDmrTemplates,
+        loadingBatchDhr,
         loadingRegulatoryLabels,
         loadingIncomingInspections,
         loadingBatchReleases,
@@ -204,9 +215,11 @@ export default function QualityCompliancePage() {
         creatingRecall,
         creatingCustomer,
         creatingShipment,
+        creatingDmrTemplate,
         savingRegulatoryLabel,
         validatingDispatch,
         exportingCompliance,
+        exportingBatchDhr,
         creatingRiskControl,
         creatingTrainingEvidence,
         savingBatchReleaseChecklist,
@@ -227,6 +240,7 @@ export default function QualityCompliancePage() {
         handleCreateRecall,
         handleCreateCustomer,
         handleCreateShipment,
+        handleCreateDmrTemplate,
         addShipmentItem,
         removeShipmentItem,
         updateShipmentItem,
@@ -242,6 +256,7 @@ export default function QualityCompliancePage() {
         quickSignBatchRelease,
         handleCreateInvimaRegistration,
         handleExportCompliance,
+        handleExportBatchDhr,
         handleCreateRiskControl,
         handleCreateTrainingEvidence,
     } = useQualityCompliance();
@@ -271,6 +286,7 @@ export default function QualityCompliancePage() {
                     <TabsTrigger value="techno">Tecnovigilancia</TabsTrigger>
                     <TabsTrigger value="recall">Recall</TabsTrigger>
                     <TabsTrigger value="shipment">Despachos</TabsTrigger>
+                    <TabsTrigger value="dhr-dmr">DHR/DMR</TabsTrigger>
                     <TabsTrigger value="labeling">Etiquetado</TabsTrigger>
                     <TabsTrigger value="incoming">Recepción</TabsTrigger>
                     <TabsTrigger value="batch-release">Liberación QA</TabsTrigger>
@@ -931,6 +947,157 @@ export default function QualityCompliancePage() {
                                     </div>
                                 </div>
                             ))}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="dhr-dmr" className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Plantilla DMR por producto/proceso</CardTitle></CardHeader>
+                        <CardContent>
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={handleCreateDmrTemplate}>
+                                <div className="space-y-1">
+                                    <Label>ID Producto (opcional)</Label>
+                                    <Input
+                                        value={dmrTemplateForm.productId}
+                                        onChange={(e) => setDmrTemplateForm((p) => ({ ...p, productId: e.target.value }))}
+                                        placeholder="UUID del producto"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Proceso</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                        value={dmrTemplateForm.process}
+                                        onChange={(e) => setDmrTemplateForm((p) => ({ ...p, process: e.target.value as DocumentProcess }))}
+                                    >
+                                        <option value={DocumentProcess.PRODUCCION}>Producción</option>
+                                        <option value={DocumentProcess.CONTROL_CALIDAD}>Control de calidad</option>
+                                        <option value={DocumentProcess.EMPAQUE}>Empaque</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Código</Label>
+                                    <Input
+                                        value={dmrTemplateForm.code}
+                                        onChange={(e) => setDmrTemplateForm((p) => ({ ...p, code: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Título</Label>
+                                    <Input
+                                        value={dmrTemplateForm.title}
+                                        onChange={(e) => setDmrTemplateForm((p) => ({ ...p, title: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Versión</Label>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        value={dmrTemplateForm.version}
+                                        onChange={(e) => setDmrTemplateForm((p) => ({ ...p, version: Number(e.target.value) || 1 }))}
+                                    />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Secciones (una por línea)</Label>
+                                    <Textarea
+                                        value={dmrTemplateForm.sections}
+                                        onChange={(e) => setDmrTemplateForm((p) => ({ ...p, sections: e.target.value }))}
+                                        placeholder={'Materia prima\nHitos de producción/QC\nEtiquetado\nLiberación QA\nDespacho\nIncidencias'}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Evidencias requeridas (una por línea)</Label>
+                                    <Textarea
+                                        value={dmrTemplateForm.requiredEvidence}
+                                        onChange={(e) => setDmrTemplateForm((p) => ({ ...p, requiredEvidence: e.target.value }))}
+                                        placeholder={'Acta QC\nFirma QA\nEvidencia de empaque'}
+                                    />
+                                </div>
+                                <div className="md:col-span-2 flex justify-end">
+                                    <Button type="submit" disabled={creatingDmrTemplate}>
+                                        {creatingDmrTemplate ? 'Guardando...' : 'Guardar plantilla DMR'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Plantillas DMR ({dmrTemplates.length})</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            {loadingDmrTemplates ? <div>Cargando...</div> : dmrTemplates.length === 0 ? <div className="text-sm text-slate-500">Sin plantillas DMR.</div> : dmrTemplates.map((template) => (
+                                <div key={template.id} className="border rounded-md p-3">
+                                    <div className="font-medium">{template.code} v{template.version} - {template.title}</div>
+                                    <div className="text-xs text-slate-600 mt-1">
+                                        Proceso: {qualityProcessLabels[template.process]} | Producto: {template.product?.name || 'Genérico'}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                        Secciones: {template.sections.join(' | ')}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                        Evidencias: {template.requiredEvidence.length > 0 ? template.requiredEvidence.join(' | ') : 'Sin lista obligatoria'}
+                                    </div>
+                                    <Badge variant="outline" className="mt-2">{template.isActive ? 'activa' : 'inactiva'}</Badge>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Expediente DHR por lote</CardTitle></CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>ID Lote</Label>
+                                    <Input
+                                        value={dhrBatchId}
+                                        onChange={(e) => setDhrBatchId(e.target.value)}
+                                        placeholder="UUID del lote de producción"
+                                    />
+                                </div>
+                                <div className="flex items-end justify-end gap-2">
+                                    <Button variant="outline" disabled={exportingBatchDhr} onClick={() => handleExportBatchDhr('json')}>
+                                        {exportingBatchDhr ? 'Generando...' : 'Exportar JSON'}
+                                    </Button>
+                                    <Button variant="outline" disabled={exportingBatchDhr} onClick={() => handleExportBatchDhr('csv')}>
+                                        {exportingBatchDhr ? 'Generando...' : 'Exportar CSV'}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {!dhrBatchId ? (
+                                <div className="text-sm text-slate-500">Ingresa un ID de lote para cargar el expediente DHR.</div>
+                            ) : loadingBatchDhr ? (
+                                <div>Cargando expediente...</div>
+                            ) : !batchDhrData ? (
+                                <div className="text-sm text-slate-500">Sin expediente.</div>
+                            ) : (
+                                <div className="space-y-2 border rounded-md p-3">
+                                    <div className="font-medium">
+                                        Lote: {batchDhrData.productionBatch.code} | Producto: {batchDhrData.productionBatch.variant?.product?.name || 'N/A'}
+                                    </div>
+                                    <div className="text-xs text-slate-600">
+                                        Orden: {batchDhrData.productionBatch.productionOrder?.code || 'N/A'} | Producido: {batchDhrData.productionBatch.producedQty} / Planeado: {batchDhrData.productionBatch.plannedQty}
+                                    </div>
+                                    <div className="text-xs text-slate-600">
+                                        QC: {batchDhrData.productionAndQuality.qcPassedUnits} aprobadas, {batchDhrData.productionAndQuality.qcFailedUnits} no aprobadas, {batchDhrData.productionAndQuality.rejectedUnits} rechazadas
+                                    </div>
+                                    <div className="text-xs text-slate-600">
+                                        Empaque: {batchDhrData.productionAndQuality.packagedUnits} empaquetadas | Etiquetas: {batchDhrData.regulatoryLabels.length} | Despachos: {batchDhrData.shipments.length}
+                                    </div>
+                                    <div className="text-xs text-slate-600">
+                                        Incidencias: NC {batchDhrData.incidents.nonConformities.length} | CAPA {batchDhrData.incidents.capas.length} | Tecnovigilancia {batchDhrData.incidents.technovigilanceCases.length} | Recall {batchDhrData.incidents.recalls.length}
+                                    </div>
+                                    <div className="text-xs text-slate-600">
+                                        Plantilla DMR: {batchDhrData.dmrTemplate ? `${batchDhrData.dmrTemplate.code} v${batchDhrData.dmrTemplate.version}` : 'No definida'}
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
