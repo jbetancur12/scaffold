@@ -1,10 +1,12 @@
-import { Entity, Property, ManyToOne } from '@mikro-orm/core';
+import { Entity, Property, ManyToOne, Unique } from '@mikro-orm/core';
 import { BaseEntity } from '../../../shared/entities/base.entity';
 import { InventoryItem as IInventoryItem } from '@scaffold/types';
 import { Warehouse } from './warehouse.entity';
 import { RawMaterial } from './raw-material.entity';
 import { ProductVariant } from './product-variant.entity';
 
+@Unique({ properties: ['warehouse', 'rawMaterial'] })
+@Unique({ properties: ['warehouse', 'variant'] })
 @Entity()
 export class InventoryItem extends BaseEntity implements IInventoryItem {
     @ManyToOne(() => Warehouse)

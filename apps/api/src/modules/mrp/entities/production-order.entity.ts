@@ -5,7 +5,7 @@ import { ProductionOrderItem } from './production-order-item.entity';
 
 @Entity()
 export class ProductionOrder extends BaseEntity implements IProductionOrder {
-    @Property()
+    @Property({ unique: true })
     code!: string;
 
     @Enum(() => ProductionOrderStatus)

@@ -17,7 +17,7 @@ export class ProductVariant extends BaseEntity implements IProductVariant {
     @Property()
     name!: string;
 
-    @Property()
+    @Property({ unique: true })
     sku!: string;
 
     @Property()
