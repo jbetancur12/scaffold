@@ -48,6 +48,18 @@ Resultado esperado:
 Resultado esperado:
 - solicitud queda en `aprobado`.
 
+## Flujo E - Bloqueo operativo por cambio crítico
+
+1. Registrar cambio crítico para orden/lote en estado `borrador` o `en_evaluacion`.
+2. Intentar:
+- crear lote,
+- pasar orden a `in_progress`/`completed`,
+- firmar liberación QA,
+- despachar lote.
+
+Resultado esperado:
+- operación bloqueada hasta que el cambio crítico esté aprobado y efectivo.
+
 ## Flujo D - KPI
 
 1. Ir a `Calidad > Cumplimiento`.

@@ -37,6 +37,32 @@ export const useQualityChangeControlFlow = () => {
     });
 
     const changeControls = changeControlsData ?? [];
+    const approvalMatrix: Record<ChangeControlType, Record<ChangeImpactLevel, string[]>> = {
+        [ChangeControlType.MATERIAL]: {
+            [ChangeImpactLevel.BAJO]: ['QA'],
+            [ChangeImpactLevel.MEDIO]: ['QA'],
+            [ChangeImpactLevel.ALTO]: ['QA', 'Producción'],
+            [ChangeImpactLevel.CRITICO]: ['QA', 'Producción', 'Regulatorio'],
+        },
+        [ChangeControlType.PROCESO]: {
+            [ChangeImpactLevel.BAJO]: ['QA'],
+            [ChangeImpactLevel.MEDIO]: ['QA', 'Producción'],
+            [ChangeImpactLevel.ALTO]: ['QA', 'Producción'],
+            [ChangeImpactLevel.CRITICO]: ['QA', 'Producción', 'Regulatorio'],
+        },
+        [ChangeControlType.DOCUMENTO]: {
+            [ChangeImpactLevel.BAJO]: ['QA'],
+            [ChangeImpactLevel.MEDIO]: ['QA', 'Regulatorio'],
+            [ChangeImpactLevel.ALTO]: ['QA', 'Regulatorio'],
+            [ChangeImpactLevel.CRITICO]: ['QA', 'Regulatorio', 'Dirección Técnica'],
+        },
+        [ChangeControlType.PARAMETRO]: {
+            [ChangeImpactLevel.BAJO]: ['QA'],
+            [ChangeImpactLevel.MEDIO]: ['QA', 'Producción'],
+            [ChangeImpactLevel.ALTO]: ['QA', 'Producción'],
+            [ChangeImpactLevel.CRITICO]: ['QA', 'Producción', 'Regulatorio'],
+        },
+    };
 
     const handleCreateChangeControl = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -82,7 +108,12 @@ export const useQualityChangeControlFlow = () => {
 
     const quickAddApproval = async (changeControlId: string) => {
         try {
-            const role = window.prompt('Rol aprobador (ej: QA, Producción, Regulatorio)', 'QA');
+            const row = changeControls.find((item) => item.id === changeControlId);
+            if (!row) return;
+            const requiredRoles = approvalMatrix[row.type][row.impactLevel];
+            const approvedRoles = new Set((row.approvals || []).filter((a) => a.decision === ChangeApprovalDecision.APROBADO).map((a) => a.role.toLowerCase()));
+            const defaultRole = requiredRoles.find((role) => !approvedRoles.has(role.toLowerCase())) ?? requiredRoles[0];
+            const role = window.prompt(`Rol aprobador (${requiredRoles.join(', ')})`, defaultRole);
             if (!role) return;
             const decisionRaw = window.prompt('Decisión (pendiente, aprobado, rechazado)', ChangeApprovalDecision.APROBADO);
             if (!decisionRaw) return;
@@ -107,6 +138,7 @@ export const useQualityChangeControlFlow = () => {
 
     return {
         changeControls,
+        approvalMatrix,
         changeControlForm,
         setChangeControlForm,
         loadingChangeControls,

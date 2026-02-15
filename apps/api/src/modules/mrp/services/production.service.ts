@@ -1,5 +1,7 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import {
+    ChangeControlStatus,
+    ChangeImpactLevel,
     DocumentProcess,
     ProductionBatchPackagingStatus,
     ProductionBatchQcStatus,
@@ -23,6 +25,7 @@ import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
 import { BatchRelease } from '../entities/batch-release.entity';
+import { ChangeControl } from '../entities/change-control.entity';
 import { DocumentControlService } from './document-control.service';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema } from '@scaffold/schemas';
 import { z } from 'zod';
@@ -37,6 +40,7 @@ export class ProductionService {
     private readonly auditRepo: EntityRepository<QualityAuditEvent>;
     private readonly regulatoryLabelRepo: EntityRepository<RegulatoryLabel>;
     private readonly batchReleaseRepo: EntityRepository<BatchRelease>;
+    private readonly changeControlRepo: EntityRepository<ChangeControl>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -47,6 +51,7 @@ export class ProductionService {
         this.auditRepo = em.getRepository(QualityAuditEvent);
         this.regulatoryLabelRepo = em.getRepository(RegulatoryLabel);
         this.batchReleaseRepo = em.getRepository(BatchRelease);
+        this.changeControlRepo = em.getRepository(ChangeControl);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
@@ -120,6 +125,7 @@ export class ProductionService {
 
     async createBatch(orderId: string, payload: { variantId: string; plannedQty: number; code?: string; notes?: string }) {
         await this.assertProcessDocument(DocumentProcess.PRODUCCION);
+        await this.assertNoBlockingCriticalChanges(orderId);
         const order = await this.productionOrderRepo.findOneOrFail(
             { id: orderId },
             { populate: ['items', 'items.variant'] }
@@ -400,6 +406,7 @@ export class ProductionService {
             // If status is changed to COMPLETED, update finished goods inventory
             if (status === ProductionOrderStatus.IN_PROGRESS) {
                 await this.assertProcessDocument(DocumentProcess.PRODUCCION);
+                await this.assertNoBlockingCriticalChanges(order.id);
                 const requirements = await this.calculateMaterialRequirements(order.id);
                 const missingMaterials = requirements.filter((req) => Number(req.available) < Number(req.required));
                 if (missingMaterials.length > 0) {
@@ -412,6 +419,7 @@ export class ProductionService {
 
             // If status is changed to COMPLETED, update finished goods inventory
             if (status === ProductionOrderStatus.COMPLETED) {
+                await this.assertNoBlockingCriticalChanges(order.id);
                 const batches = order.batches.getItems();
                 const itemVariantIds = order.items.getItems().map((i) => i.variant.id);
                 const variantQuantities = new Map<string, number>();
@@ -530,5 +538,38 @@ export class ProductionService {
             reason,
             status: release.status,
         });
+    }
+
+    private async assertNoBlockingCriticalChanges(productionOrderId: string) {
+        const rows = await this.changeControlRepo.find({
+            impactLevel: ChangeImpactLevel.CRITICO,
+            affectedProductionOrder: productionOrderId,
+            status: {
+                $in: [
+                    ChangeControlStatus.BORRADOR,
+                    ChangeControlStatus.EN_EVALUACION,
+                    ChangeControlStatus.APROBADO,
+                ],
+            },
+        }, { orderBy: { createdAt: 'DESC' }, limit: 10 });
+
+        const now = new Date();
+        const blockers = rows.filter((row) => {
+            if (row.status === ChangeControlStatus.APROBADO) {
+                if (!row.effectiveDate) return true;
+                return row.effectiveDate > now;
+            }
+            return true;
+        });
+
+        if (blockers.length > 0) {
+            const details = blockers
+                .map((row) => row.status === ChangeControlStatus.APROBADO && row.effectiveDate
+                    ? `${row.code} (vigente desde ${row.effectiveDate.toISOString()})`
+                    : `${row.code} (${row.status})`
+                )
+                .join(', ');
+            throw new AppError(`Hay cambios críticos pendientes/no efectivos para la orden: ${details}`, 400);
+        }
     }
 }

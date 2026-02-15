@@ -95,6 +95,9 @@ export function QualityChangeControlTab({ model }: { model: QualityComplianceMod
                                 <div className="text-xs text-slate-500 mt-1">Tipo: {row.type} | Impacto: {row.impactLevel} | Lote: {row.affectedProductionBatchId || 'N/A'}</div>
                                 <div className="text-xs text-slate-500">Antes: {row.beforeChangeBatchCode || 'N/A'} | Después: {row.afterChangeBatchCode || 'N/A'}</div>
                                 <div className="text-xs text-slate-500">Aprobaciones: {row.approvals?.length || 0}</div>
+                                <div className="text-xs text-slate-500">
+                                    Roles requeridos: {model.approvalMatrix[row.type][row.impactLevel].join(', ')}
+                                </div>
                                 <div className="flex gap-2 mt-2"><Badge variant="outline">{row.status}</Badge></div>
                             </div>
                             <div className="flex gap-2">

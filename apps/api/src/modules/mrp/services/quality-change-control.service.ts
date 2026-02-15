@@ -12,6 +12,35 @@ import { ControlledDocument } from '../entities/controlled-document.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionOrder } from '../entities/production-order.entity';
 
+const APPROVAL_MATRIX: Record<ChangeControlType, Record<ChangeImpactLevel, string[]>> = {
+    [ChangeControlType.MATERIAL]: {
+        [ChangeImpactLevel.BAJO]: ['QA'],
+        [ChangeImpactLevel.MEDIO]: ['QA'],
+        [ChangeImpactLevel.ALTO]: ['QA', 'Producción'],
+        [ChangeImpactLevel.CRITICO]: ['QA', 'Producción', 'Regulatorio'],
+    },
+    [ChangeControlType.PROCESO]: {
+        [ChangeImpactLevel.BAJO]: ['QA'],
+        [ChangeImpactLevel.MEDIO]: ['QA', 'Producción'],
+        [ChangeImpactLevel.ALTO]: ['QA', 'Producción'],
+        [ChangeImpactLevel.CRITICO]: ['QA', 'Producción', 'Regulatorio'],
+    },
+    [ChangeControlType.DOCUMENTO]: {
+        [ChangeImpactLevel.BAJO]: ['QA'],
+        [ChangeImpactLevel.MEDIO]: ['QA', 'Regulatorio'],
+        [ChangeImpactLevel.ALTO]: ['QA', 'Regulatorio'],
+        [ChangeImpactLevel.CRITICO]: ['QA', 'Regulatorio', 'Dirección Técnica'],
+    },
+    [ChangeControlType.PARAMETRO]: {
+        [ChangeImpactLevel.BAJO]: ['QA'],
+        [ChangeImpactLevel.MEDIO]: ['QA', 'Producción'],
+        [ChangeImpactLevel.ALTO]: ['QA', 'Producción'],
+        [ChangeImpactLevel.CRITICO]: ['QA', 'Producción', 'Regulatorio'],
+    },
+};
+
+const normalizeRole = (role: string) => role.trim().toLowerCase();
+
 type QualityAuditLogger = (payload: {
     entityType: string;
     entityId: string;
@@ -63,9 +92,14 @@ export class QualityChangeControlService {
             linkedDocument: payload.linkedDocumentId ? this.em.getReference(ControlledDocument, payload.linkedDocumentId) : undefined,
             affectedProductionOrder: payload.affectedProductionOrderId ? this.em.getReference(ProductionOrder, payload.affectedProductionOrderId) : undefined,
             affectedProductionBatch: payload.affectedProductionBatchId ? this.em.getReference(ProductionBatch, payload.affectedProductionBatchId) : undefined,
-            beforeChangeBatchCode: payload.beforeChangeBatchCode,
+            beforeChangeBatchCode: payload.beforeChangeBatchCode || undefined,
             afterChangeBatchCode: payload.afterChangeBatchCode,
         } as unknown as ChangeControl);
+
+        if (!row.beforeChangeBatchCode && row.affectedProductionBatch) {
+            const batch = await this.em.findOne(ProductionBatch, { id: row.affectedProductionBatch.id });
+            row.beforeChangeBatchCode = batch?.code;
+        }
 
         await this.em.persistAndFlush(row);
         await this.logEvent({
@@ -122,10 +156,18 @@ export class QualityChangeControlService {
         beforeChangeBatchCode: string;
         afterChangeBatchCode: string;
     }>, actor?: string) {
-        const row = await this.changeControlRepo.findOneOrFail({ id }, { populate: ['approvalRows'] });
+        const row = await this.changeControlRepo.findOneOrFail({ id }, { populate: ['approvalRows', 'affectedProductionBatch'] });
 
         if (payload.status === ChangeControlStatus.APROBADO) {
             await this.assertApprovalRequirements(row);
+        }
+        if (payload.status === ChangeControlStatus.IMPLEMENTADO) {
+            if (row.status !== ChangeControlStatus.APROBADO && payload.status !== row.status) {
+                throw new AppError('Solo puedes implementar un cambio previamente aprobado', 400);
+            }
+            if (row.effectiveDate && row.effectiveDate > new Date()) {
+                throw new AppError('No puedes implementar un cambio antes de su fecha efectiva', 400);
+            }
         }
 
         if (payload.linkedDocumentId !== undefined) {
@@ -150,6 +192,15 @@ export class QualityChangeControlService {
             beforeChangeBatchCode: payload.beforeChangeBatchCode,
             afterChangeBatchCode: payload.afterChangeBatchCode,
         });
+
+        if (!row.beforeChangeBatchCode && row.affectedProductionBatch) {
+            const batch = await this.em.findOne(ProductionBatch, { id: row.affectedProductionBatch.id });
+            row.beforeChangeBatchCode = batch?.code;
+        }
+        if (payload.status === ChangeControlStatus.IMPLEMENTADO && !row.afterChangeBatchCode && row.affectedProductionBatch) {
+            const batch = await this.em.findOne(ProductionBatch, { id: row.affectedProductionBatch.id });
+            row.afterChangeBatchCode = batch?.code;
+        }
 
         await this.em.persistAndFlush(row);
         await this.logEvent({
@@ -177,6 +228,10 @@ export class QualityChangeControlService {
         const change = await this.changeControlRepo.findOneOrFail({ id: payload.changeControlId }, { populate: ['approvalRows'] });
         if (change.status === ChangeControlStatus.IMPLEMENTADO || change.status === ChangeControlStatus.CANCELADO) {
             throw new AppError('No puedes registrar aprobaciones sobre cambios implementados/cancelados', 409);
+        }
+        const allowedRoles = APPROVAL_MATRIX[change.type][change.impactLevel].map(normalizeRole);
+        if (!allowedRoles.includes(normalizeRole(payload.role))) {
+            throw new AppError(`Rol no permitido para este cambio. Roles requeridos: ${APPROVAL_MATRIX[change.type][change.impactLevel].join(', ')}`, 400);
         }
 
         const existing = change.approvalRows.getItems().find((row) => row.role.toLowerCase() === payload.role.toLowerCase());
@@ -243,15 +298,48 @@ export class QualityChangeControlService {
             throw new AppError('No se puede aprobar el cambio: existe aprobación rechazada', 400);
         }
 
-        if (row.impactLevel === ChangeImpactLevel.CRITICO) {
-            if (approved.length < 2) {
-                throw new AppError('Cambio crítico requiere al menos 2 aprobaciones', 400);
-            }
-            return;
+        const requiredRoles = APPROVAL_MATRIX[row.type][row.impactLevel];
+        const approvedRoles = new Set(approved.map((item) => normalizeRole(item.role)));
+        const missingRoles = requiredRoles.filter((role) => !approvedRoles.has(normalizeRole(role)));
+        if (missingRoles.length > 0) {
+            throw new AppError(`Faltan aprobaciones requeridas: ${missingRoles.join(', ')}`, 400);
+        }
+        if (row.impactLevel === ChangeImpactLevel.CRITICO && !row.effectiveDate) {
+            throw new AppError('Cambio crítico requiere fecha efectiva definida', 400);
+        }
+    }
+
+    async getBatchBlockingIssues(productionBatchId: string): Promise<string[]> {
+        const batch = await this.em.findOne(ProductionBatch, { id: productionBatchId }, { populate: ['productionOrder'] });
+        if (!batch) {
+            return [];
         }
 
-        if (approved.length < 1) {
-            throw new AppError('Debes registrar al menos una aprobación para aprobar el cambio', 400);
+        const criticalRows = await this.changeControlRepo.find({
+            impactLevel: ChangeImpactLevel.CRITICO,
+            $or: [
+                { affectedProductionBatch: batch.id },
+                { affectedProductionOrder: batch.productionOrder.id },
+            ],
+        }, { orderBy: { createdAt: 'DESC' } });
+
+        const now = new Date();
+        const blockers: string[] = [];
+        for (const row of criticalRows) {
+            if (row.status === ChangeControlStatus.APROBADO && row.effectiveDate && row.effectiveDate <= now) {
+                continue;
+            }
+            if (row.status === ChangeControlStatus.IMPLEMENTADO || row.status === ChangeControlStatus.CANCELADO || row.status === ChangeControlStatus.RECHAZADO) {
+                continue;
+            }
+
+            if (row.status === ChangeControlStatus.APROBADO && row.effectiveDate && row.effectiveDate > now) {
+                blockers.push(`Cambio crítico ${row.code} aprobado pero no efectivo hasta ${row.effectiveDate.toISOString()}`);
+                continue;
+            }
+            blockers.push(`Cambio crítico ${row.code} pendiente (${row.status})`);
         }
+
+        return blockers;
     }
 }

@@ -100,14 +100,22 @@ export class QualityService {
             em,
             this.logEvent.bind(this),
             this.labelingService.validateDispatchReadiness.bind(this.labelingService),
-            this.deviationOosService.getBatchBlockingIssues.bind(this.deviationOosService)
+            this.getBatchOperationalBlockingIssues.bind(this)
         );
         this.postmarketService = new QualityPostmarketService(
             em,
             this.logEvent.bind(this),
             this.labelingService.validateDispatchReadiness.bind(this.labelingService),
-            this.deviationOosService.getBatchBlockingIssues.bind(this.deviationOosService)
+            this.getBatchOperationalBlockingIssues.bind(this)
         );
+    }
+
+    private async getBatchOperationalBlockingIssues(productionBatchId: string): Promise<string[]> {
+        const [deviationAndOos, criticalChanges] = await Promise.all([
+            this.deviationOosService.getBatchBlockingIssues(productionBatchId),
+            this.changeControlService.getBatchBlockingIssues(productionBatchId),
+        ]);
+        return [...deviationAndOos, ...criticalChanges];
     }
 
     async createNonConformity(payload: {
