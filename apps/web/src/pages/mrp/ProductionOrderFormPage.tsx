@@ -23,18 +23,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { ArrowLeft, Plus, Save, Trash2, ClipboardList } from 'lucide-react';
-import { z } from 'zod';
-
-
-const productionOrderSchema = z.object({
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    notes: z.string().optional(),
-    items: z.array(z.object({
-        variantId: z.string().min(1, 'La variante es requerida'),
-        quantity: z.number().min(1, 'La cantidad debe ser mayor a 0'),
-    })).min(1, 'Debe agregar al menos un item'),
-});
+import { CreateProductionOrderSchema } from '@scaffold/schemas';
+import { ZodError } from 'zod';
 
 interface OrderItem {
     id: string; // temp id for UI
@@ -150,7 +140,7 @@ export default function ProductionOrderFormPage() {
                     quantity: item.quantity
                 }))
             };
-            productionOrderSchema.parse(payload);
+            CreateProductionOrderSchema.parse(payload);
 
             if (isEditing) {
                 toast({ title: 'Info', description: 'Edición en construcción' });
@@ -162,7 +152,7 @@ export default function ProductionOrderFormPage() {
             }
         } catch (error: unknown) {
             let message = 'Error al guardar';
-            if (error instanceof z.ZodError) message = error.errors[0].message;
+            if (error instanceof ZodError) message = error.errors[0].message;
             toast({ title: 'Error', description: message, variant: 'destructive' });
         } finally {
             setLoading(false);

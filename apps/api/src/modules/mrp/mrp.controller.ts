@@ -6,24 +6,20 @@ import { MrpService } from './services/mrp.service';
 import { InventoryService } from './services/inventory.service';
 import { ProductionService } from './services/production.service';
 import { PurchaseOrderService } from './services/purchase-order.service';
-import { ProductSchema, ProductionOrderSchema, RawMaterialSchema, BOMItemSchema, SupplierSchema } from '@scaffold/schemas';
+import {
+    ProductSchema,
+    ProductionOrderSchema,
+    RawMaterialSchema,
+    BOMItemSchema,
+    SupplierSchema,
+    WarehouseSchema,
+    CreatePurchaseOrderSchema,
+    ManualStockSchema,
+    CreateProductionOrderSchema,
+    CreateProductVariantSchema,
+    UpdateProductVariantSchema,
+} from '@scaffold/schemas';
 import { PurchaseOrderStatus } from './entities/purchase-order.entity';
-import { z } from 'zod';
-
-const CreatePurchaseOrderSchema = z.object({
-    supplierId: z.string().uuid(),
-    expectedDeliveryDate: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
-    notes: z.string().optional(),
-    warehouseId: z.string().uuid().optional(),
-    items: z.array(z.object({
-        rawMaterialId: z.string().uuid(),
-        quantity: z.number().min(0.01),
-        unitPrice: z.number().min(0),
-        taxAmount: z.number().min(0).optional(),
-    })),
-});
-
-import { WarehouseSchema } from '@scaffold/schemas';
 
 export class MrpController {
     // ...
@@ -106,7 +102,7 @@ export class MrpController {
     async createVariant(req: Request, res: Response, next: NextFunction) {
         try {
             const { productId } = req.params;
-            const data = req.body;
+            const data = CreateProductVariantSchema.parse(req.body);
             const variant = await this.productService.createVariant(productId, data);
             res.status(201).json(variant);
         } catch (error) {
@@ -117,7 +113,7 @@ export class MrpController {
     async updateVariant(req: Request, res: Response, next: NextFunction) {
         try {
             const { variantId } = req.params;
-            const data = req.body;
+            const data = UpdateProductVariantSchema.parse(req.body);
             const variant = await this.productService.updateVariant(variantId, data);
             res.json(variant);
         } catch (error) {
@@ -320,9 +316,8 @@ export class MrpController {
 
     async createProductionOrder(req: Request, res: Response, next: NextFunction) {
         try {
-            // Expect body to have { order: ..., items: [...] } logic or modify schema to include items
-            // For now assuming: { ...orderData, items: [{variantId, quantity}] }
-            const { items, ...orderData } = req.body;
+            const { items, ...baseOrderData } = CreateProductionOrderSchema.parse(req.body);
+            const orderData: Record<string, unknown> = { ...baseOrderData };
 
             // Auto-generate code if not provided
             if (!orderData.code) {
@@ -337,15 +332,8 @@ export class MrpController {
 
             const validatedOrder = ProductionOrderSchema.parse(orderData);
 
-            // Validate items without productionOrderId (it doesn't exist yet)
-            const itemCreationSchema = z.array(z.object({
-                variantId: z.string().uuid(),
-                quantity: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
-            }));
-            const validatedItems = itemCreationSchema.parse(items);
-
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const order = await this.productionService.createOrder(validatedOrder, validatedItems as any);
+            const order = await this.productionService.createOrder(validatedOrder, items as any);
             res.status(201).json(order);
         } catch (error) {
             next(error);
@@ -388,13 +376,7 @@ export class MrpController {
 
     async addManualStock(req: Request, res: Response, next: NextFunction) {
         try {
-            const schema = z.object({
-                rawMaterialId: z.string(),
-                quantity: z.number().min(0.01),
-                unitCost: z.number().min(0),
-                warehouseId: z.string().optional(),
-            });
-            const data = schema.parse(req.body);
+            const data = ManualStockSchema.parse(req.body);
             const result = await this.inventoryService.addManualStock(data);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             res.status(200).json(result);

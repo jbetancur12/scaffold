@@ -3,7 +3,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { UserService } from '../user/user.service';
 import { User } from '../user/user.entity';
 import { RequiredEntityData } from '@mikro-orm/core';
-import { LoginDto, RegisterDto } from './auth.dto';
+import type { LoginDto, RegisterDto } from '@scaffold/schemas';
 
 export class AuthService {
     constructor(

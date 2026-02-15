@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, RefreshCw, Calculator } from 'lucide-react';
-import { z } from 'zod';
 import { generateRawMaterialSku } from '@/utils/skuGenerator';
 import {
     Select,
@@ -18,15 +17,8 @@ import {
 import { UnitType } from '@scaffold/types';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
-
-
-
-const rawMaterialSchema = z.object({
-    name: z.string().min(1, 'El nombre es requerido'),
-    sku: z.string().min(1, 'El SKU es requerido'),
-    unit: z.nativeEnum(UnitType),
-    cost: z.coerce.number().min(0, 'El costo debe ser mayor o igual a 0'),
-});
+import { RawMaterialSchema } from '@scaffold/schemas';
+import { ZodError } from 'zod';
 
 export default function RawMaterialFormPage() {
     const { id } = useParams();
@@ -134,24 +126,21 @@ export default function RawMaterialFormPage() {
         e.preventDefault();
         try {
             setLoading(true);
-            rawMaterialSchema.parse(formData);
+            const payload = {
+                ...formData,
+                cost: Number(formData.cost),
+                minStockLevel: Number(formData.minStockLevel || 0),
+            };
+            RawMaterialSchema.parse(payload);
 
             if (isEditing) {
-                await mrpApi.updateRawMaterial(id!, {
-                    ...formData,
-                    cost: Number(formData.cost),
-                    minStockLevel: Number(formData.minStockLevel || 0)
-                });
+                await mrpApi.updateRawMaterial(id!, payload);
                 toast({
                     title: 'Éxito',
                     description: 'Material actualizado exitosamente',
                 });
             } else {
-                await mrpApi.createRawMaterial({
-                    ...formData,
-                    cost: Number(formData.cost),
-                    minStockLevel: Number(formData.minStockLevel || 0)
-                });
+                await mrpApi.createRawMaterial(payload);
                 toast({
                     title: 'Éxito',
                     description: 'Material creado exitosamente',
@@ -160,7 +149,7 @@ export default function RawMaterialFormPage() {
             navigate('/mrp/raw-materials');
         } catch (error: unknown) {
             let message = 'Error al guardar';
-            if (error instanceof z.ZodError) {
+            if (error instanceof ZodError) {
                 message = error.errors[0].message;
             }
             toast({

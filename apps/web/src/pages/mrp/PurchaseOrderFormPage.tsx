@@ -9,19 +9,9 @@ import { Plus, Trash2, ArrowLeft, Calculator, Check, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '../../components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
-
-interface Supplier {
-    id: string;
-    name: string;
-}
-
-interface RawMaterial {
-    id: string;
-    name: string;
-    sku: string;
-    unit: string;
-    cost: number;
-}
+import { CreatePurchaseOrderSchema } from '@scaffold/schemas';
+import { ZodError } from 'zod';
+import type { Supplier, RawMaterial } from '@scaffold/types';
 
 interface OrderItem {
     rawMaterialId: string;
@@ -138,21 +128,27 @@ export default function PurchaseOrderFormPage() {
                 ...formData,
                 expectedDeliveryDate: formData.expectedDeliveryDate || undefined,
                 items: items.map(item => ({
-                    ...item,
+                    rawMaterialId: item.rawMaterialId,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
                     taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0
                 })),
             };
-            await mrpApi.createPurchaseOrder(submitData);
+            const validatedData = CreatePurchaseOrderSchema.parse(submitData);
+            await mrpApi.createPurchaseOrder(validatedData);
             toast({
                 title: 'Éxito',
                 description: 'Orden de compra creada exitosamente',
                 variant: 'default',
             });
             navigate('/mrp/purchase-orders');
-        } catch (error) {
+        } catch (error: unknown) {
+            const message = error instanceof ZodError
+                ? error.errors[0].message
+                : 'No se pudo crear la orden de compra';
             toast({
                 title: 'Error',
-                description: 'No se pudo crear la orden de compra',
+                description: message,
                 variant: 'destructive',
             });
         } finally {

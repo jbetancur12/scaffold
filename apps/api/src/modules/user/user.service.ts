@@ -1,20 +1,8 @@
 import { EntityManager, EntityRepository, RequiredEntityData } from '@mikro-orm/core';
 import { User } from './user.entity';
-import { UserRole } from '@scaffold/types';
+import type { CreateUserDto, UpdateUserDto } from '@scaffold/schemas';
 import argon2 from 'argon2';
 import { winstonLogger } from '../../config/logger';
-
-export interface CreateUserDto {
-    email: string;
-    password: string;
-    role: UserRole;
-}
-
-export interface UpdateUserDto {
-    email?: string;
-    password?: string;
-    role?: UserRole;
-}
 
 export class UserService {
     private readonly em: EntityManager;

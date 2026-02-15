@@ -9,13 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
-import { z } from 'zod';
-
-const productSchema = z.object({
-    name: z.string().min(1, 'El nombre es requerido'),
-    sku: z.string().min(1, 'El SKU es requerido'),
-    description: z.string().optional(),
-});
+import { ProductSchema } from '@scaffold/schemas';
+import { ZodError } from 'zod';
 
 export default function ProductFormPage() {
     const { id } = useParams();
@@ -76,7 +71,7 @@ export default function ProductFormPage() {
         e.preventDefault();
         try {
             setLoading(true);
-            productSchema.parse(formData);
+            ProductSchema.parse(formData);
 
             if (isEditing) {
                 await mrpApi.updateProduct(id!, formData);
@@ -94,7 +89,7 @@ export default function ProductFormPage() {
                 navigate(`/mrp/products/${newProduct.id}`);
             }
         } catch (error) {
-            if (error instanceof z.ZodError) {
+            if (error instanceof ZodError) {
                 toast({
                     title: 'Error de validación',
                     description: error.errors[0].message,

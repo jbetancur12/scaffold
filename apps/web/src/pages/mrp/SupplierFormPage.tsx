@@ -7,20 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save } from 'lucide-react';
-import { z } from 'zod';
-
-const supplierSchema = z.object({
-    name: z.string().min(1, 'El nombre es requerido'),
-    email: z.string().email('Email inválido').optional().or(z.literal('')),
-    contactName: z.string().optional(),
-    phoneNumber: z.string().optional(),
-    address: z.string().optional(),
-    city: z.string().optional(),
-    department: z.string().optional(),
-    bankDetails: z.string().optional(),
-    paymentConditions: z.string().optional(),
-    notes: z.string().optional(),
-});
+import { SupplierSchema } from '@scaffold/schemas';
+import { ZodError } from 'zod';
 
 export default function SupplierFormPage() {
     const navigate = useNavigate();
@@ -33,7 +21,7 @@ export default function SupplierFormPage() {
         name: '',
         email: '',
         contactName: '',
-        phoneNumber: '',
+        phone: '',
         address: '',
         city: '',
         department: '',
@@ -46,7 +34,7 @@ export default function SupplierFormPage() {
         e.preventDefault();
         try {
             setLoading(true);
-            supplierSchema.parse(formData);
+            SupplierSchema.parse(formData);
 
             await mrpApi.createSupplier(formData);
 
@@ -57,7 +45,7 @@ export default function SupplierFormPage() {
             navigate('/mrp/suppliers');
         } catch (error: unknown) {
             let message = 'Error al guardar';
-            if (error instanceof z.ZodError) {
+            if (error instanceof ZodError) {
                 message = error.errors[0].message;
             }
             toast({
@@ -116,11 +104,11 @@ export default function SupplierFormPage() {
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="phoneNumber">Teléfono</Label>
+                            <Label htmlFor="phone">Teléfono</Label>
                             <Input
-                                id="phoneNumber"
-                                value={formData.phoneNumber}
-                                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                                id="phone"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                             />
                         </div>
                     </div>

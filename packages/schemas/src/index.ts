@@ -75,6 +75,16 @@ export const ProductVariantSchema = z.object({
     productionMinutes: z.number().min(0).optional(),
 });
 
+export const CreateProductVariantSchema = z.object({
+    name: z.string().min(1, 'El nombre es obligatorio'),
+    sku: z.string().min(1, 'SKU es obligatorio'),
+    price: z.number().min(0),
+    targetMargin: z.number().min(0).max(1).default(0.4),
+    productionMinutes: z.number().min(0).optional(),
+});
+
+export const UpdateProductVariantSchema = CreateProductVariantSchema.partial();
+
 export const BOMItemSchema = z.object({
     variantId: z.string().uuid(),
     rawMaterialId: z.string().uuid(),
@@ -119,6 +129,38 @@ export const ProductionOrderItemSchema = z.object({
     quantity: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
 });
 
+export const ProductionOrderItemCreateSchema = z.object({
+    variantId: z.string().uuid(),
+    quantity: z.number().int().min(1, 'La cantidad debe ser al menos 1'),
+});
+
+export const CreatePurchaseOrderSchema = z.object({
+    supplierId: z.string().uuid(),
+    expectedDeliveryDate: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    notes: z.string().optional(),
+    warehouseId: z.string().uuid().optional(),
+    items: z.array(z.object({
+        rawMaterialId: z.string().uuid(),
+        quantity: z.number().min(0.01),
+        unitPrice: z.number().min(0),
+        taxAmount: z.number().min(0).optional(),
+    })),
+});
+
+export const ManualStockSchema = z.object({
+    rawMaterialId: z.string().uuid(),
+    quantity: z.number().min(0.01),
+    unitCost: z.number().min(0),
+    warehouseId: z.string().uuid().optional(),
+});
+
+export const CreateProductionOrderSchema = z.object({
+    startDate: z.string().or(z.date()).optional(),
+    endDate: z.string().or(z.date()).optional(),
+    notes: z.string().optional(),
+    items: z.array(ProductionOrderItemCreateSchema).min(1, 'Debe agregar al menos un item'),
+});
+
 export const OperationalConfigSchema = z.object({
     // MOD
     operatorSalary: z.number().min(0, 'Salario debe ser mayor o igual a 0'),
@@ -134,3 +176,11 @@ export const OperationalConfigSchema = z.object({
     numberOfOperators: z.number().min(1, 'Debe haber al menos 1 operario'),
 });
 
+export type CreateUserDto = z.infer<typeof CreateUserSchema>;
+export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
+export type CreatePurchaseOrderDto = z.infer<typeof CreatePurchaseOrderSchema>;
+export type CreateProductionOrderDto = z.infer<typeof CreateProductionOrderSchema>;
+export type LoginDto = z.infer<typeof LoginSchema>;
+export type RegisterDto = z.infer<typeof RegisterSchema>;
+export type CreateProductVariantDto = z.infer<typeof CreateProductVariantSchema>;
+export type UpdateProductVariantDto = z.infer<typeof UpdateProductVariantSchema>;

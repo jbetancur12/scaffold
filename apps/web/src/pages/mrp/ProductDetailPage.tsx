@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw, Package, Layers, Clock } from 'lucide-react';
-import { z } from 'zod';
+import { CreateProductVariantSchema, UpdateProductVariantSchema } from '@scaffold/schemas';
+import { ZodError } from 'zod';
 import {
     Table,
     TableBody,
@@ -26,14 +27,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-const variantSchema = z.object({
-    name: z.string().min(1, 'El nombre es requerido'),
-    sku: z.string().min(1, 'El SKU es requerido'),
-    price: z.number().min(0, 'El precio debe ser mayor o igual a 0'),
-    targetMargin: z.number().min(0).max(1, 'El margen debe estar entre 0 y 100%'),
-    productionMinutes: z.number().min(0, 'El tiempo debe ser mayor o igual a 0').optional(),
-});
 
 interface VariantFormData {
     id?: string;
@@ -134,20 +127,20 @@ export default function ProductDetailPage() {
 
     const handleSaveVariant = async () => {
         try {
-            variantSchema.parse(variantFormData);
-
             if (editingVariant?.id) {
-                await mrpApi.updateVariant(editingVariant.id, variantFormData);
+                const validatedData = UpdateProductVariantSchema.parse(variantFormData);
+                await mrpApi.updateVariant(editingVariant.id, validatedData);
                 toast({ title: 'Éxito', description: 'Variante actualizada exitosamente' });
             } else {
-                await mrpApi.createVariant(id!, variantFormData);
+                const validatedData = CreateProductVariantSchema.parse(variantFormData);
+                await mrpApi.createVariant(id!, validatedData);
                 toast({ title: 'Éxito', description: 'Variante creada exitosamente' });
             }
 
             setShowVariantDialog(false);
             loadProduct();
         } catch (error) {
-            if (error instanceof z.ZodError) {
+            if (error instanceof ZodError) {
                 toast({
                     title: 'Error de validación',
                     description: error.errors[0].message,

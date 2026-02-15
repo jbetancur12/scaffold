@@ -7,19 +7,8 @@ import { InventoryItem } from '../entities/inventory-item.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { WarehouseType } from '@scaffold/types';
+import type { CreatePurchaseOrderDto } from '@scaffold/schemas';
 import { MrpService } from './mrp.service';
-
-interface CreatePurchaseOrderData {
-    supplierId: string;
-    expectedDeliveryDate?: Date;
-    notes?: string;
-    items: Array<{
-        rawMaterialId: string;
-        quantity: number;
-        unitPrice: number;
-        taxAmount?: number;
-    }>;
-}
 
 export class PurchaseOrderService {
     private purchaseOrderRepo: EntityRepository<PurchaseOrder>;
@@ -41,7 +30,7 @@ export class PurchaseOrderService {
         this.supplierMaterialRepo = em.getRepository(SupplierMaterial);
     }
 
-    async createPurchaseOrder(data: CreatePurchaseOrderData): Promise<PurchaseOrder> {
+    async createPurchaseOrder(data: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
         // Fetch supplier
         const supplier = await this.supplierRepo.findOneOrFail({ id: data.supplierId });
 

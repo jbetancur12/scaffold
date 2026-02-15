@@ -20,7 +20,8 @@ import {
 } from '@/components/ui/select';
 import { Trash2, Plus, Edit2, Save } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { z } from 'zod';
+import { BOMItemSchema } from '@scaffold/schemas';
+import { ZodError } from 'zod';
 import FabricationCalculator from './FabricationCalculator';
 import FabricationLayoutPreview from './FabricationLayoutPreview';
 import {
@@ -36,20 +37,6 @@ interface BOMEditorProps {
     variant: ProductVariant;
     materials: RawMaterial[];
 }
-
-const bomItemSchema = z.object({
-    variantId: z.string(),
-    rawMaterialId: z.string().min(1, 'Selecciona un material'),
-    quantity: z.number().min(0.0001, 'Cantidad requerida'),
-    fabricationParams: z.object({
-        calculationType: z.enum(['area', 'linear']).optional(),
-        quantityPerUnit: z.number().optional(),
-        rollWidth: z.number(),
-        pieceWidth: z.number(),
-        pieceLength: z.number(),
-        orientation: z.enum(['normal', 'rotated'])
-    }).optional()
-});
 
 export default function BOMEditor({ variant, materials }: BOMEditorProps) {
     const { toast } = useToast();
@@ -101,7 +88,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
             };
 
             // Validate
-            bomItemSchema.parse(payload);
+            BOMItemSchema.parse(payload);
 
             setLoading(true);
 
@@ -118,7 +105,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
             loadBOM(); // Reload to refresh list and costs if backend updates them
         } catch (error: unknown) {
             let message = 'Error al guardar material';
-            if (error instanceof z.ZodError) {
+            if (error instanceof ZodError) {
                 message = error.errors[0].message;
             }
             toast({

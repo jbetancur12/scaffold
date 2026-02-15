@@ -9,6 +9,12 @@ import {
     OperationalConfig,
     Warehouse
 } from '@scaffold/types';
+import type {
+    CreatePurchaseOrderDto,
+    CreateProductionOrderDto,
+    CreateProductVariantDto,
+    UpdateProductVariantDto,
+} from '@scaffold/schemas';
 
 export interface MaterialRequirement {
     material: {
@@ -32,10 +38,6 @@ export interface RawMaterialSupplier {
     lastPurchasePrice: number;
     lastPurchaseDate: string;
 }
-
-export type CreateProductionOrderDTO = Omit<Partial<ProductionOrder>, 'items'> & {
-    items: { variantId: string; quantity: number }[];
-};
 
 export interface ListResponse<T> {
     [key: string]: T[] | number; // Dynamic key based on return type (products, materials, etc)
@@ -65,11 +67,11 @@ export const mrpApi = {
     },
 
     // Variants
-    createVariant: async (productId: string, data: Partial<{ name: string; sku: string; price: number; targetMargin: number; productionMinutes: number }>): Promise<unknown> => {
+    createVariant: async (productId: string, data: CreateProductVariantDto): Promise<unknown> => {
         const response = await api.post(`/mrp/products/${productId}/variants`, data);
         return response.data;
     },
-    updateVariant: async (variantId: string, data: Partial<{ name: string; sku: string; price: number; targetMargin: number; productionMinutes: number }>): Promise<unknown> => {
+    updateVariant: async (variantId: string, data: UpdateProductVariantDto): Promise<unknown> => {
         const response = await api.put(`/mrp/variants/${variantId}`, data);
         return response.data;
     },
@@ -77,17 +79,7 @@ export const mrpApi = {
         api.delete(`/mrp/variants/${variantId}`),
 
     // Purchase Orders
-    createPurchaseOrder: (data: {
-        supplierId: string;
-        expectedDeliveryDate?: string;
-        notes?: string;
-        items: Array<{
-            rawMaterialId: string;
-            quantity: number;
-            unitPrice: number;
-            taxAmount?: number;
-        }>;
-    }) => api.post('/mrp/purchase-orders', data),
+    createPurchaseOrder: (data: CreatePurchaseOrderDto) => api.post('/mrp/purchase-orders', data),
 
     listPurchaseOrders: (page: number = 1, limit: number = 10, filters?: { status?: string; supplierId?: string }) =>
         api.get('/mrp/purchase-orders', { params: { page, limit, ...filters } }),
@@ -195,7 +187,7 @@ export const mrpApi = {
         const response = await api.get<ProductionOrder>(`/mrp/production-orders/${id}`);
         return response.data;
     },
-    createProductionOrder: async (data: CreateProductionOrderDTO): Promise<ProductionOrder> => {
+    createProductionOrder: async (data: CreateProductionOrderDto): Promise<ProductionOrder> => {
         const response = await api.post('/mrp/production-orders', data);
         return response.data;
     },

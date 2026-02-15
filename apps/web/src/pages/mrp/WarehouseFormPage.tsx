@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save } from 'lucide-react';
-import { z } from 'zod';
 import {
     Select,
     SelectContent,
@@ -15,12 +14,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { WarehouseType } from '@scaffold/types';
-
-const warehouseSchema = z.object({
-    name: z.string().min(1, 'El nombre es obligatorio'),
-    location: z.string().optional(),
-    type: z.nativeEnum(WarehouseType),
-});
+import { WarehouseSchema } from '@scaffold/schemas';
+import { ZodError } from 'zod';
 
 export default function WarehouseFormPage() {
     const { id } = useParams();
@@ -67,7 +62,7 @@ export default function WarehouseFormPage() {
         e.preventDefault();
         try {
             setLoading(true);
-            warehouseSchema.parse(formData);
+            WarehouseSchema.parse(formData);
 
             if (isEditing) {
                 await mrpApi.updateWarehouse(id!, formData);
@@ -85,7 +80,7 @@ export default function WarehouseFormPage() {
             navigate('/mrp/warehouses');
         } catch (error: unknown) {
             let message = 'Error al guardar';
-            if (error instanceof z.ZodError) {
+            if (error instanceof ZodError) {
                 message = error.errors[0].message;
             }
             toast({

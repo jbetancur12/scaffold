@@ -1,17 +1,8 @@
 import api from './api';
-import { User, UserRole } from '@scaffold/types';
-
-export interface CreateUserData {
-    email: string;
-    password: string;
-    role: UserRole;
-}
-
-export interface UpdateUserData {
-    email?: string;
-    password?: string;
-    role?: UserRole;
-}
+import { User } from '@scaffold/types';
+import type { CreateUserDto, UpdateUserDto } from '@scaffold/schemas';
+export type CreateUserData = CreateUserDto;
+export type UpdateUserData = UpdateUserDto;
 
 export interface UsersResponse {
     items: User[];

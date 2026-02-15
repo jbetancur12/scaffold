@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginSchema, RegisterSchema } from './auth.dto';
+import { LoginSchema, RegisterSchema } from '@scaffold/schemas';
 import { RedisService } from '../../shared/services/redis.service';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 import { asyncHandler } from '../../shared/middleware/error.middleware';
