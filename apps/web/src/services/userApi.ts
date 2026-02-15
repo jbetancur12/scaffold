@@ -17,22 +17,22 @@ export interface UsersResponse {
 export const userApi = {
     getUsers: async (page: number = 1, limit: number = 10): Promise<UsersResponse> => {
         const response = await api.get(`/users?page=${page}&limit=${limit}`);
-        return response.data.data;
+        return response.data;
     },
 
     getUserById: async (id: string): Promise<User> => {
         const response = await api.get(`/users/${id}`);
-        return response.data.data;
+        return response.data;
     },
 
     createUser: async (data: CreateUserData): Promise<User> => {
         const response = await api.post('/users', data);
-        return response.data.data;
+        return response.data;
     },
 
     updateUser: async (id: string, data: UpdateUserData): Promise<User> => {
         const response = await api.put(`/users/${id}`, data);
-        return response.data.data;
+        return response.data;
     },
 
     deleteUser: async (id: string): Promise<void> => {

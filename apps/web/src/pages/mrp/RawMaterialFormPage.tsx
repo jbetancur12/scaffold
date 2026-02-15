@@ -19,6 +19,8 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { RawMaterialSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
+import { invalidateMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 export default function RawMaterialFormPage() {
     const { id } = useParams();
@@ -138,12 +140,16 @@ export default function RawMaterialFormPage() {
 
             if (isEditing) {
                 await mrpApi.updateRawMaterial(id!, payload);
+                invalidateMrpQuery(mrpQueryKeys.rawMaterials);
+                invalidateMrpQuery(mrpQueryKeys.rawMaterial(id!));
                 toast({
                     title: 'Éxito',
                     description: 'Material actualizado exitosamente',
                 });
             } else {
-                await mrpApi.createRawMaterial(payload);
+                const created = await mrpApi.createRawMaterial(payload);
+                invalidateMrpQuery(mrpQueryKeys.rawMaterials);
+                invalidateMrpQuery(mrpQueryKeys.rawMaterial(created.id));
                 toast({
                     title: 'Éxito',
                     description: 'Material creado exitosamente',

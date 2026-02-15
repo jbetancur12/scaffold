@@ -101,7 +101,8 @@ export function useMrpQuery<T>(
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<unknown>(null);
 
-    const ttlMs = options?.ttlMs ?? 30_000;
+    // Conservative default: no stale-cache behavior unless explicitly enabled per query.
+    const ttlMs = options?.ttlMs ?? 0;
     const retry = options?.retry ?? 0;
     const retryDelayMs = options?.retryDelayMs ?? 400;
     const backoffFactor = options?.backoffFactor ?? 2;
@@ -110,7 +111,7 @@ export function useMrpQuery<T>(
 
     const execute = useCallback(async (params?: { force?: boolean }) => {
         const force = params?.force ?? false;
-        if (queryKey && !force) {
+        if (queryKey && ttlMs > 0 && !force) {
             const cached = queryCache.get(queryKey) as { data: T; expiresAt: number } | undefined;
             if (cached && Date.now() < cached.expiresAt) {
                 setData(cached.data);
@@ -156,7 +157,7 @@ export function useMrpQuery<T>(
             const result = await requestPromise;
             const expiresAt = Date.now() + ttlMs;
 
-            if (queryKey) {
+            if (queryKey && ttlMs > 0) {
                 queryCache.set(queryKey, { data: result, expiresAt });
                 if (persist) {
                     writePersistedCache(queryKey, result, expiresAt);
@@ -177,13 +178,13 @@ export function useMrpQuery<T>(
     }, [backoffFactor, fetcher, persist, queryKey, retry, retryDelayMs, shouldRetry, ttlMs]);
 
     useEffect(() => {
-        if (!queryKey || !persist) return;
+        if (!queryKey || !persist || ttlMs <= 0) return;
         const persisted = readPersistedCache<T>(queryKey);
         if (persisted) {
             queryCache.set(queryKey, persisted);
             setData(persisted.data);
         }
-    }, [persist, queryKey]);
+    }, [persist, queryKey, ttlMs]);
 
     useEffect(() => {
         if (immediate) {

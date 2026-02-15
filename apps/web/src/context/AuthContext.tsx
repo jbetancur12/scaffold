@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         try {
             const response = await api.get('/users/me');
-            setUser(response.data.data);
+            setUser(response.data);
         } catch {
             localStorage.removeItem('token');
             setUser(null);
@@ -40,7 +40,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const login = async (email: string, password: string) => {
         const response = await api.post('/auth/login', { email, password });
-        const { accessToken, user: userData } = response.data.data;
+        const { accessToken, user: userData } = response.data;
         localStorage.setItem('token', accessToken);
         setUser(userData);
     };
