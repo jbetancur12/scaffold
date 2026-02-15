@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { mrpApi } from '@/services/mrpApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,8 +18,7 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { RawMaterialSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
-import { invalidateMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useRawMaterialQuery, useSaveRawMaterialMutation } from '@/hooks/mrp/useRawMaterials';
 
 export default function RawMaterialFormPage() {
     const { id } = useParams();
@@ -63,33 +61,20 @@ export default function RawMaterialFormPage() {
         }
     }, [formData.name, isEditing, skuManuallyEdited]);
 
-    const loadMaterial = useCallback(async () => {
-        if (!id) return;
-        try {
-            setLoading(true);
-            const material = await mrpApi.getRawMaterial(id);
-            setFormData({
-                name: material.name,
-                sku: material.sku,
-                unit: material.unit as UnitType,
-                cost: material.cost,
-                minStockLevel: material.minStockLevel || 0,
-            });
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar el material'),
-                variant: 'destructive',
-            });
-            navigate('/mrp/raw-materials');
-        } finally {
-            setLoading(false);
-        }
-    }, [id, navigate, toast]);
+    const { data: materialData, loading: loadingMaterial, error: materialError } = useRawMaterialQuery(isEditing ? id : undefined);
+    const { execute: saveRawMaterial } = useSaveRawMaterialMutation();
 
     useEffect(() => {
         if (isEditing) {
-            loadMaterial();
+            if (materialData) {
+                setFormData({
+                    name: materialData.name,
+                    sku: materialData.sku,
+                    unit: materialData.unit as UnitType,
+                    cost: materialData.cost,
+                    minStockLevel: materialData.minStockLevel || 0,
+                });
+            }
         } else {
             // Check for initial data from navigation state (Duplicate)
             const state = location.state as RawMaterialFormLocationState | null;
@@ -106,7 +91,17 @@ export default function RawMaterialFormPage() {
                 }
             }
         }
-    }, [isEditing, loadMaterial, location]);
+    }, [isEditing, materialData, location]);
+
+    useEffect(() => {
+        if (!materialError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(materialError, 'No se pudo cargar el material'),
+            variant: 'destructive',
+        });
+        navigate('/mrp/raw-materials');
+    }, [materialError, navigate, toast]);
 
     // Recalculate cost when calculator inputs change
     useEffect(() => {
@@ -138,18 +133,14 @@ export default function RawMaterialFormPage() {
             };
             RawMaterialSchema.parse(payload);
 
-            if (isEditing) {
-                await mrpApi.updateRawMaterial(id!, payload);
-                invalidateMrpQuery(mrpQueryKeys.rawMaterials);
-                invalidateMrpQuery(mrpQueryKeys.rawMaterial(id!));
+            if (isEditing && id) {
+                await saveRawMaterial({ id, payload });
                 toast({
                     title: 'Éxito',
                     description: 'Material actualizado exitosamente',
                 });
             } else {
-                const created = await mrpApi.createRawMaterial(payload);
-                invalidateMrpQuery(mrpQueryKeys.rawMaterials);
-                invalidateMrpQuery(mrpQueryKeys.rawMaterial(created.id));
+                await saveRawMaterial({ payload });
                 toast({
                     title: 'Éxito',
                     description: 'Material creado exitosamente',
@@ -166,6 +157,14 @@ export default function RawMaterialFormPage() {
             setLoading(false);
         }
     };
+
+    if (isEditing && loadingMaterial && !materialData) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-lg text-slate-500">Cargando material...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8 max-w-4xl mx-auto">

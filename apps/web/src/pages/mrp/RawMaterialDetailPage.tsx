@@ -1,7 +1,5 @@
-import { useCallback } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mrpApi, RawMaterialSupplier } from '@/services/mrpApi';
-import { RawMaterial } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MaterialSuppliersTable } from '@/components/mrp/MaterialSuppliersTable';
@@ -9,49 +7,28 @@ import { ArrowLeft, Edit2, Package } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
-import { useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useRawMaterialQuery, useRawMaterialSuppliersQuery } from '@/hooks/mrp/useRawMaterials';
 
 export default function RawMaterialDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const fetchMaterial = useCallback(async () => {
-        if (!id) {
-            throw new Error('Raw material ID is required');
-        }
-        try {
-            return await mrpApi.getRawMaterial(id);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar la información del material'),
-                variant: 'destructive',
-            });
-            navigate('/mrp/raw-materials');
-            throw error;
-        }
-    }, [id, navigate, toast]);
-
-    const fetchSuppliers = useCallback(async () => {
-        if (!id) {
-            throw new Error('Raw material ID is required');
-        }
-        return mrpApi.getRawMaterialSuppliers(id);
-    }, [id]);
-
-    const { data: material, loading } = useMrpQuery<RawMaterial>(
-        fetchMaterial,
-        Boolean(id),
-        id ? mrpQueryKeys.rawMaterial(id) : undefined
-    );
-    const { data: suppliersData } = useMrpQuery<RawMaterialSupplier[]>(
-        fetchSuppliers,
-        Boolean(id),
-        id ? mrpQueryKeys.rawMaterialSuppliers(id) : undefined
-    );
+    const { data: material, loading, error } = useRawMaterialQuery(id);
+    const { data: suppliersData } = useRawMaterialSuppliersQuery(id);
     const suppliers = suppliersData ?? [];
+
+    useEffect(() => {
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(error, 'No se pudo cargar la información del material'),
+            variant: 'destructive',
+        });
+        navigate('/mrp/raw-materials');
+    }, [error, navigate, toast]);
+
+    if (error) return null;
 
     if (loading) {
         return (

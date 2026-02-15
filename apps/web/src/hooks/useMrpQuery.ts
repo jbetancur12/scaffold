@@ -74,6 +74,26 @@ export const invalidateMrpQueries = (queryKeys: string[]) => {
     }
 };
 
+export const invalidateMrpQueriesByPrefix = (prefix: string) => {
+    const keysToInvalidate = new Set<string>();
+
+    for (const key of queryCache.keys()) {
+        if (key.startsWith(prefix)) {
+            keysToInvalidate.add(key);
+        }
+    }
+
+    for (const key of querySubscriptions.keys()) {
+        if (key.startsWith(prefix)) {
+            keysToInvalidate.add(key);
+        }
+    }
+
+    for (const key of keysToInvalidate) {
+        invalidateMrpQuery(key);
+    }
+};
+
 interface UseMrpQueryOptions {
     ttlMs?: number;
     persist?: boolean;

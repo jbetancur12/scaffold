@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-import { mrpApi } from '@/services/mrpApi';
-import { RawMaterial } from '@scaffold/types';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -15,48 +13,34 @@ import { Database, Plus, Edit2, Search, ChevronLeft, ChevronRight, Copy } from '
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
-import { getErrorMessage } from '@/lib/api-error';
-import { useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 
 export default function RawMaterialListPage() {
     const navigate = useNavigate();
-    const { toast } = useToast();
-    const [materials, setMaterials] = useState<RawMaterial[]>([]);
-    const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [page, setPage] = useState(1);
-    const [total, setTotal] = useState(0);
     const limit = 10;
+    const { toast } = useToast();
 
-    const fetchMaterials = useCallback(async () => {
-        try {
-            return await mrpApi.getRawMaterials(page, limit, search);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar la materia prima'),
-                variant: 'destructive',
-            });
-            throw error;
-        }
-    }, [page, search, toast]);
-
-    const { execute, data, loading: queryLoading } = useMrpQuery(fetchMaterials, false, mrpQueryKeys.rawMaterials);
+    const { materials, total, loading, error } = useRawMaterialsQuery(page, limit, debouncedSearch);
 
     useEffect(() => {
         const timer = setTimeout(() => {
-            void execute();
+            setDebouncedSearch(search);
         }, 300); // 300ms debounce
 
         return () => clearTimeout(timer);
-    }, [execute]);
+    }, [search]);
 
     useEffect(() => {
-        setLoading(queryLoading);
-        setMaterials(data?.materials || []);
-        setTotal(data?.total || 0);
-    }, [data, queryLoading]);
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: 'No se pudo cargar la materia prima',
+            variant: 'destructive',
+        });
+    }, [error, toast]);
 
     return (
         <div className="space-y-8">
