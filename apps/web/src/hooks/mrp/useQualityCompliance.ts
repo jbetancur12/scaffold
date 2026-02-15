@@ -13,12 +13,7 @@ import {
     RecallScopeType,
     RecallNotificationChannel,
     RecallNotificationStatus,
-    RegulatoryLabelScopeType,
-    RegulatoryDeviceType,
-    RegulatoryCodingStandard,
     QualityRiskControlStatus,
-    IncomingInspectionResult,
-    InvimaRegistrationStatus,
 } from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -44,38 +39,31 @@ import {
     useCreateRecallNotificationMutation,
     useUpdateRecallNotificationMutation,
     useCloseRecallCaseMutation,
-    useRegulatoryLabelsQuery,
-    useUpsertRegulatoryLabelMutation,
-    useValidateDispatchReadinessMutation,
     useComplianceDashboardQuery,
     useExportComplianceMutation,
     useRiskControlsQuery,
     useCreateRiskControlMutation,
     useTrainingEvidenceQuery,
     useCreateTrainingEvidenceMutation,
-    useIncomingInspectionsQuery,
-    useBatchReleasesQuery,
-    useSignBatchReleaseMutation,
-    useUpsertBatchReleaseChecklistMutation,
-    useResolveIncomingInspectionMutation,
 } from '@/hooks/mrp/useQuality';
-import { useCreateInvimaRegistrationMutation, useInvimaRegistrationsQuery } from '@/hooks/mrp/useProducts';
+import { useQualityRegulatoryFlow } from '@/hooks/mrp/useQualityRegulatoryFlow';
+import { useQualityReceptionReleaseFlow } from '@/hooks/mrp/useQualityReceptionReleaseFlow';
 
 export const useQualityCompliance = () => {
     const { toast } = useToast();
+    const regulatoryFlow = useQualityRegulatoryFlow();
+    const receptionReleaseFlow = useQualityReceptionReleaseFlow();
+
     const { data: nonConformitiesData, loading: loadingNc } = useNonConformitiesQuery();
     const { data: capasData, loading: loadingCapas } = useCapasQuery();
     const { data: auditData, loading: loadingAudit } = useQualityAuditQuery();
     const { data: technovigilanceData, loading: loadingTechno } = useTechnovigilanceCasesQuery();
     const { data: recallsData, loading: loadingRecalls } = useRecallCasesQuery();
-    const { data: regulatoryLabelsData, loading: loadingRegulatoryLabels } = useRegulatoryLabelsQuery();
-    const { data: incomingInspectionsData, loading: loadingIncomingInspections } = useIncomingInspectionsQuery();
-    const { data: batchReleasesData, loading: loadingBatchReleases } = useBatchReleasesQuery();
-    const { data: invimaRegistrationsData, loading: loadingInvimaRegistrations } = useInvimaRegistrationsQuery();
     const { data: complianceDashboardData, loading: loadingComplianceDashboard } = useComplianceDashboardQuery();
     const { data: riskControlsData, loading: loadingRiskControls } = useRiskControlsQuery();
     const { data: trainingEvidenceData, loading: loadingTrainingEvidence } = useTrainingEvidenceQuery();
     const { data: documentsData, loading: loadingDocuments } = useControlledDocumentsQuery();
+
     const { execute: createNc, loading: creatingNc } = useCreateNonConformityMutation();
     const { execute: updateNc } = useUpdateNonConformityMutation();
     const { execute: createCapa, loading: creatingCapa } = useCreateCapaMutation();
@@ -91,15 +79,9 @@ export const useQualityCompliance = () => {
     const { execute: createRecallNotification } = useCreateRecallNotificationMutation();
     const { execute: updateRecallNotification } = useUpdateRecallNotificationMutation();
     const { execute: closeRecallCase } = useCloseRecallCaseMutation();
-    const { execute: upsertRegulatoryLabel, loading: savingRegulatoryLabel } = useUpsertRegulatoryLabelMutation();
-    const { execute: validateDispatchReadiness, loading: validatingDispatch } = useValidateDispatchReadinessMutation();
     const { execute: exportCompliance, loading: exportingCompliance } = useExportComplianceMutation();
     const { execute: createRiskControl, loading: creatingRiskControl } = useCreateRiskControlMutation();
     const { execute: createTrainingEvidence, loading: creatingTrainingEvidence } = useCreateTrainingEvidenceMutation();
-    const { execute: resolveIncomingInspection } = useResolveIncomingInspectionMutation();
-    const { execute: upsertBatchReleaseChecklist, loading: savingBatchReleaseChecklist } = useUpsertBatchReleaseChecklistMutation();
-    const { execute: signBatchRelease, loading: signingBatchRelease } = useSignBatchReleaseMutation();
-    const { execute: createInvimaRegistration, loading: creatingInvimaRegistration } = useCreateInvimaRegistrationMutation();
 
     const [ncForm, setNcForm] = useState({
         title: '',
@@ -141,24 +123,6 @@ export const useQualityCompliance = () => {
         isMock: false,
         targetResponseMinutes: '',
     });
-    const [regulatoryLabelForm, setRegulatoryLabelForm] = useState({
-        productionBatchId: '',
-        productionBatchUnitId: '',
-        scopeType: RegulatoryLabelScopeType.LOTE,
-        deviceType: RegulatoryDeviceType.CLASE_I,
-        codingStandard: RegulatoryCodingStandard.GS1,
-        productName: '',
-        manufacturerName: '',
-        invimaRegistration: '',
-        lotCode: '',
-        serialCode: '',
-        manufactureDate: '',
-        expirationDate: '',
-        gtin: '',
-        udiDi: '',
-        udiPi: '',
-        internalCode: '',
-    });
     const [riskControlForm, setRiskControlForm] = useState({
         process: DocumentProcess.PRODUCCION,
         risk: '',
@@ -176,34 +140,12 @@ export const useQualityCompliance = () => {
         trainerName: '',
         evidenceRef: '',
     });
-    const [batchReleaseForm, setBatchReleaseForm] = useState({
-        productionBatchId: '',
-        qcApproved: false,
-        labelingValidated: false,
-        documentsCurrent: false,
-        evidencesComplete: false,
-        checklistNotes: '',
-        rejectedReason: '',
-    });
-    const [invimaRegistrationForm, setInvimaRegistrationForm] = useState({
-        code: '',
-        holderName: '',
-        manufacturerName: '',
-        validFrom: '',
-        validUntil: '',
-        status: InvimaRegistrationStatus.ACTIVO,
-        notes: '',
-    });
 
     const nonConformities = nonConformitiesData ?? [];
     const capas = capasData ?? [];
     const audits = auditData ?? [];
     const technovigilanceCases = technovigilanceData ?? [];
     const recalls = recallsData ?? [];
-    const regulatoryLabels = regulatoryLabelsData ?? [];
-    const incomingInspections = incomingInspectionsData ?? [];
-    const batchReleases = batchReleasesData ?? [];
-    const invimaRegistrations = invimaRegistrationsData ?? [];
     const complianceDashboard = complianceDashboardData;
     const riskControls = riskControlsData ?? [];
     const trainingEvidence = trainingEvidenceData ?? [];
@@ -495,54 +437,6 @@ export const useQualityCompliance = () => {
         }
     };
 
-    const handleUpsertRegulatoryLabel = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            await upsertRegulatoryLabel({
-                productionBatchId: regulatoryLabelForm.productionBatchId,
-                productionBatchUnitId: regulatoryLabelForm.productionBatchUnitId || undefined,
-                scopeType: regulatoryLabelForm.scopeType,
-                deviceType: regulatoryLabelForm.deviceType,
-                codingStandard: regulatoryLabelForm.codingStandard,
-                productName: regulatoryLabelForm.productName || undefined,
-                manufacturerName: regulatoryLabelForm.manufacturerName || undefined,
-                invimaRegistration: regulatoryLabelForm.invimaRegistration || undefined,
-                lotCode: regulatoryLabelForm.lotCode || undefined,
-                serialCode: regulatoryLabelForm.serialCode || undefined,
-                manufactureDate: regulatoryLabelForm.manufactureDate,
-                expirationDate: regulatoryLabelForm.expirationDate || undefined,
-                gtin: regulatoryLabelForm.gtin || undefined,
-                udiDi: regulatoryLabelForm.udiDi || undefined,
-                udiPi: regulatoryLabelForm.udiPi || undefined,
-                internalCode: regulatoryLabelForm.internalCode || undefined,
-                actor: 'sistema-web',
-            });
-            toast({ title: 'Etiqueta registrada', description: 'Etiqueta regulatoria guardada y validada.' });
-        } catch (err) {
-            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo registrar la etiqueta'), variant: 'destructive' });
-        }
-    };
-
-    const quickValidateDispatch = async () => {
-        try {
-            const productionBatchId = window.prompt('ID del lote a validar para despacho');
-            if (!productionBatchId) return;
-
-            const result = await validateDispatchReadiness({ productionBatchId, actor: 'sistema-web' });
-            if (result.eligible) {
-                toast({ title: 'Despacho habilitado', description: 'El lote cumple con etiquetado regulatorio.' });
-                return;
-            }
-            toast({
-                title: 'Despacho bloqueado',
-                description: result.errors.join(' | ') || 'El lote no cumple validaciones de etiquetado.',
-                variant: 'destructive',
-            });
-        } catch (err) {
-            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo validar el despacho'), variant: 'destructive' });
-        }
-    };
-
     const handleExportCompliance = async (format: 'csv' | 'json') => {
         try {
             const file = await exportCompliance({ format });
@@ -618,140 +512,16 @@ export const useQualityCompliance = () => {
         }
     };
 
-    const quickResolveIncomingInspection = async (id: string, quantityReceived: number) => {
-        try {
-            const resultRaw = window.prompt(
-                'Resultado de inspección (aprobado, condicional, rechazado)',
-                IncomingInspectionResult.APROBADO
-            );
-            if (!resultRaw) return;
-            if (!Object.values(IncomingInspectionResult).includes(resultRaw as IncomingInspectionResult)) {
-                toast({ title: 'Error', description: 'Resultado de inspección inválido', variant: 'destructive' });
-                return;
-            }
-
-            const acceptedRaw = window.prompt('Cantidad aceptada', String(quantityReceived));
-            if (acceptedRaw === null) return;
-            const quantityAccepted = Number(acceptedRaw);
-            if (Number.isNaN(quantityAccepted) || quantityAccepted < 0) {
-                toast({ title: 'Error', description: 'Cantidad aceptada inválida', variant: 'destructive' });
-                return;
-            }
-            const quantityRejected = Number((quantityReceived - quantityAccepted).toFixed(4));
-            if (quantityRejected < 0) {
-                toast({ title: 'Error', description: 'La cantidad aceptada no puede exceder la recibida', variant: 'destructive' });
-                return;
-            }
-
-            const supplierLotCode = window.prompt('Lote del proveedor (opcional)') || undefined;
-            const certificateRef = window.prompt('Referencia de certificado (opcional)') || undefined;
-            const notes = window.prompt('Notas de inspección (opcional)') || undefined;
-
-            await resolveIncomingInspection({
-                id,
-                inspectionResult: resultRaw as IncomingInspectionResult,
-                supplierLotCode,
-                certificateRef,
-                notes,
-                quantityAccepted,
-                quantityRejected,
-                actor: 'sistema-web',
-            });
-            toast({ title: 'Inspección resuelta', description: 'La recepción fue liberada/rechazada correctamente.' });
-        } catch (err) {
-            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo resolver la inspección'), variant: 'destructive' });
-        }
-    };
-
-    const handleUpsertBatchReleaseChecklist = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!batchReleaseForm.productionBatchId) {
-            toast({ title: 'Error', description: 'Debes indicar el ID del lote', variant: 'destructive' });
-            return;
-        }
-        try {
-            await upsertBatchReleaseChecklist({
-                productionBatchId: batchReleaseForm.productionBatchId.trim(),
-                qcApproved: batchReleaseForm.qcApproved,
-                labelingValidated: batchReleaseForm.labelingValidated,
-                documentsCurrent: batchReleaseForm.documentsCurrent,
-                evidencesComplete: batchReleaseForm.evidencesComplete,
-                checklistNotes: batchReleaseForm.checklistNotes || undefined,
-                rejectedReason: batchReleaseForm.rejectedReason || undefined,
-                actor: 'sistema-web',
-            });
-            toast({ title: 'Checklist guardado', description: 'La liberación quedó actualizada.' });
-            setBatchReleaseForm((prev) => ({ ...prev, checklistNotes: '', rejectedReason: '' }));
-        } catch (err) {
-            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo guardar checklist de liberación'), variant: 'destructive' });
-        }
-    };
-
-    const quickSignBatchRelease = async (productionBatchId: string) => {
-        try {
-            const approvalSignature = window.prompt('Firma de aprobación QA (nombre completo o identificador)');
-            if (!approvalSignature) return;
-
-            const methodRaw = window.prompt(
-                'Método de firma (firma_manual, firma_digital)',
-                DocumentApprovalMethod.FIRMA_MANUAL
-            );
-            if (!methodRaw) return;
-
-            if (!Object.values(DocumentApprovalMethod).includes(methodRaw as DocumentApprovalMethod)) {
-                toast({ title: 'Error', description: 'Método de firma inválido', variant: 'destructive' });
-                return;
-            }
-
-            await signBatchRelease({
-                productionBatchId,
-                actor: 'sistema-web',
-                approvalMethod: methodRaw as DocumentApprovalMethod,
-                approvalSignature,
-            });
-            toast({ title: 'Lote liberado', description: 'La liberación QA quedó firmada.' });
-        } catch (err) {
-            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo firmar la liberación QA'), variant: 'destructive' });
-        }
-    };
-
-    const handleCreateInvimaRegistration = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            await createInvimaRegistration({
-                code: invimaRegistrationForm.code,
-                holderName: invimaRegistrationForm.holderName,
-                manufacturerName: invimaRegistrationForm.manufacturerName || undefined,
-                validFrom: invimaRegistrationForm.validFrom || undefined,
-                validUntil: invimaRegistrationForm.validUntil || undefined,
-                status: invimaRegistrationForm.status,
-                notes: invimaRegistrationForm.notes || undefined,
-            });
-            setInvimaRegistrationForm({
-                code: '',
-                holderName: '',
-                manufacturerName: '',
-                validFrom: '',
-                validUntil: '',
-                status: InvimaRegistrationStatus.ACTIVO,
-                notes: '',
-            });
-            toast({ title: 'Registro INVIMA creado', description: 'Ya se puede asociar a productos regulados.' });
-        } catch (err) {
-            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear el registro INVIMA'), variant: 'destructive' });
-        }
-    };
-
     return {
         nonConformities,
         capas,
         audits,
         technovigilanceCases,
         recalls,
-        regulatoryLabels,
-        incomingInspections,
-        batchReleases,
-        invimaRegistrations,
+        regulatoryLabels: regulatoryFlow.regulatoryLabels,
+        incomingInspections: receptionReleaseFlow.incomingInspections,
+        batchReleases: receptionReleaseFlow.batchReleases,
+        invimaRegistrations: regulatoryFlow.invimaRegistrations,
         complianceDashboard,
         riskControls,
         trainingEvidence,
@@ -762,30 +532,30 @@ export const useQualityCompliance = () => {
         documentForm,
         technoForm,
         recallForm,
-        regulatoryLabelForm,
+        regulatoryLabelForm: regulatoryFlow.regulatoryLabelForm,
         riskControlForm,
         trainingForm,
-        batchReleaseForm,
-        invimaRegistrationForm,
+        batchReleaseForm: receptionReleaseFlow.batchReleaseForm,
+        invimaRegistrationForm: regulatoryFlow.invimaRegistrationForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
         setTechnoForm,
         setRecallForm,
-        setRegulatoryLabelForm,
+        setRegulatoryLabelForm: regulatoryFlow.setRegulatoryLabelForm,
         setRiskControlForm,
         setTrainingForm,
-        setBatchReleaseForm,
-        setInvimaRegistrationForm,
+        setBatchReleaseForm: receptionReleaseFlow.setBatchReleaseForm,
+        setInvimaRegistrationForm: regulatoryFlow.setInvimaRegistrationForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
         loadingTechno,
         loadingRecalls,
-        loadingRegulatoryLabels,
-        loadingIncomingInspections,
-        loadingBatchReleases,
-        loadingInvimaRegistrations,
+        loadingRegulatoryLabels: regulatoryFlow.loadingRegulatoryLabels,
+        loadingIncomingInspections: receptionReleaseFlow.loadingIncomingInspections,
+        loadingBatchReleases: receptionReleaseFlow.loadingBatchReleases,
+        loadingInvimaRegistrations: regulatoryFlow.loadingInvimaRegistrations,
         loadingComplianceDashboard,
         loadingRiskControls,
         loadingTrainingEvidence,
@@ -795,14 +565,14 @@ export const useQualityCompliance = () => {
         creatingDocument,
         creatingTechnoCase,
         creatingRecall,
-        savingRegulatoryLabel,
-        validatingDispatch,
+        savingRegulatoryLabel: regulatoryFlow.savingRegulatoryLabel,
+        validatingDispatch: regulatoryFlow.validatingDispatch,
         exportingCompliance,
         creatingRiskControl,
         creatingTrainingEvidence,
-        savingBatchReleaseChecklist,
-        signingBatchRelease,
-        creatingInvimaRegistration,
+        savingBatchReleaseChecklist: receptionReleaseFlow.savingBatchReleaseChecklist,
+        signingBatchRelease: receptionReleaseFlow.signingBatchRelease,
+        creatingInvimaRegistration: regulatoryFlow.creatingInvimaRegistration,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -820,12 +590,12 @@ export const useQualityCompliance = () => {
         quickCreateRecallNotification,
         quickUpdateRecallNotificationStatus,
         quickCloseRecall,
-        handleUpsertRegulatoryLabel,
-        quickValidateDispatch,
-        quickResolveIncomingInspection,
-        handleUpsertBatchReleaseChecklist,
-        quickSignBatchRelease,
-        handleCreateInvimaRegistration,
+        handleUpsertRegulatoryLabel: regulatoryFlow.handleUpsertRegulatoryLabel,
+        quickValidateDispatch: regulatoryFlow.quickValidateDispatch,
+        quickResolveIncomingInspection: receptionReleaseFlow.quickResolveIncomingInspection,
+        handleUpsertBatchReleaseChecklist: receptionReleaseFlow.handleUpsertBatchReleaseChecklist,
+        quickSignBatchRelease: receptionReleaseFlow.quickSignBatchRelease,
+        handleCreateInvimaRegistration: regulatoryFlow.handleCreateInvimaRegistration,
         handleExportCompliance,
         handleCreateRiskControl,
         handleCreateTrainingEvidence,
