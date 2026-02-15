@@ -17,6 +17,7 @@ import {
 } from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
+import { mrpApi } from '@/services/mrpApi';
 import {
     useCapasQuery,
     useControlledDocumentsQuery,
@@ -34,6 +35,10 @@ import {
     useUpdateTechnovigilanceCaseMutation,
     useReportTechnovigilanceCaseMutation,
     useRecallCasesQuery,
+    useCustomersQuery,
+    useShipmentsQuery,
+    useCreateCustomerMutation,
+    useCreateShipmentMutation,
     useCreateRecallCaseMutation,
     useUpdateRecallProgressMutation,
     useCreateRecallNotificationMutation,
@@ -59,6 +64,8 @@ export const useQualityCompliance = () => {
     const { data: auditData, loading: loadingAudit } = useQualityAuditQuery();
     const { data: technovigilanceData, loading: loadingTechno } = useTechnovigilanceCasesQuery();
     const { data: recallsData, loading: loadingRecalls } = useRecallCasesQuery();
+    const { data: customersData, loading: loadingCustomers } = useCustomersQuery();
+    const { data: shipmentsData, loading: loadingShipments } = useShipmentsQuery();
     const { data: complianceDashboardData, loading: loadingComplianceDashboard } = useComplianceDashboardQuery();
     const { data: riskControlsData, loading: loadingRiskControls } = useRiskControlsQuery();
     const { data: trainingEvidenceData, loading: loadingTrainingEvidence } = useTrainingEvidenceQuery();
@@ -75,6 +82,8 @@ export const useQualityCompliance = () => {
     const { execute: updateTechnoCase } = useUpdateTechnovigilanceCaseMutation();
     const { execute: reportTechnoCase } = useReportTechnovigilanceCaseMutation();
     const { execute: createRecallCase, loading: creatingRecall } = useCreateRecallCaseMutation();
+    const { execute: createCustomer, loading: creatingCustomer } = useCreateCustomerMutation();
+    const { execute: createShipment, loading: creatingShipment } = useCreateShipmentMutation();
     const { execute: updateRecallProgress } = useUpdateRecallProgressMutation();
     const { execute: createRecallNotification } = useCreateRecallNotificationMutation();
     const { execute: updateRecallNotification } = useUpdateRecallNotificationMutation();
@@ -123,6 +132,24 @@ export const useQualityCompliance = () => {
         isMock: false,
         targetResponseMinutes: '',
     });
+    const [customerForm, setCustomerForm] = useState({
+        name: '',
+        documentType: '',
+        documentNumber: '',
+        contactName: '',
+        email: '',
+        phone: '',
+        address: '',
+        notes: '',
+    });
+    const [shipmentForm, setShipmentForm] = useState({
+        customerId: '',
+        commercialDocument: '',
+        shippedAt: '',
+        dispatchedBy: 'sistema-web',
+        notes: '',
+        items: [{ productionBatchId: '', productionBatchUnitId: '', quantity: 1 }],
+    });
     const [riskControlForm, setRiskControlForm] = useState({
         process: DocumentProcess.PRODUCCION,
         risk: '',
@@ -146,6 +173,8 @@ export const useQualityCompliance = () => {
     const audits = auditData ?? [];
     const technovigilanceCases = technovigilanceData ?? [];
     const recalls = recallsData ?? [];
+    const customers = customersData ?? [];
+    const shipments = shipmentsData ?? [];
     const complianceDashboard = complianceDashboardData;
     const riskControls = riskControlsData ?? [];
     const trainingEvidence = trainingEvidenceData ?? [];
@@ -355,6 +384,110 @@ export const useQualityCompliance = () => {
         }
     };
 
+    const handleCreateCustomer = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await createCustomer({
+                name: customerForm.name,
+                documentType: customerForm.documentType || undefined,
+                documentNumber: customerForm.documentNumber || undefined,
+                contactName: customerForm.contactName || undefined,
+                email: customerForm.email || undefined,
+                phone: customerForm.phone || undefined,
+                address: customerForm.address || undefined,
+                notes: customerForm.notes || undefined,
+            });
+            setCustomerForm({
+                name: '',
+                documentType: '',
+                documentNumber: '',
+                contactName: '',
+                email: '',
+                phone: '',
+                address: '',
+                notes: '',
+            });
+            toast({ title: 'Cliente creado', description: 'Cliente registrado para trazabilidad de despacho.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear el cliente'), variant: 'destructive' });
+        }
+    };
+
+    const handleCreateShipment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!shipmentForm.customerId) {
+            toast({ title: 'Error', description: 'Selecciona un cliente', variant: 'destructive' });
+            return;
+        }
+        const hasInvalid = shipmentForm.items.some((item) => !item.productionBatchId || Number(item.quantity) <= 0);
+        if (hasInvalid) {
+            toast({ title: 'Error', description: 'Completa los ítems del despacho', variant: 'destructive' });
+            return;
+        }
+        try {
+            await createShipment({
+                customerId: shipmentForm.customerId,
+                commercialDocument: shipmentForm.commercialDocument,
+                shippedAt: shipmentForm.shippedAt || undefined,
+                dispatchedBy: shipmentForm.dispatchedBy || 'sistema-web',
+                notes: shipmentForm.notes || undefined,
+                items: shipmentForm.items.map((item) => ({
+                    productionBatchId: item.productionBatchId.trim(),
+                    productionBatchUnitId: item.productionBatchUnitId?.trim() || undefined,
+                    quantity: Number(item.quantity),
+                })),
+            });
+            setShipmentForm({
+                customerId: '',
+                commercialDocument: '',
+                shippedAt: '',
+                dispatchedBy: 'sistema-web',
+                notes: '',
+                items: [{ productionBatchId: '', productionBatchUnitId: '', quantity: 1 }],
+            });
+            toast({ title: 'Despacho registrado', description: 'Trazabilidad bidireccional actualizada.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo registrar el despacho'), variant: 'destructive' });
+        }
+    };
+
+    const addShipmentItem = () => {
+        setShipmentForm((prev) => ({
+            ...prev,
+            items: [...prev.items, { productionBatchId: '', productionBatchUnitId: '', quantity: 1 }],
+        }));
+    };
+
+    const removeShipmentItem = (index: number) => {
+        setShipmentForm((prev) => ({
+            ...prev,
+            items: prev.items.filter((_, i) => i !== index),
+        }));
+    };
+
+    const updateShipmentItem = (index: number, field: 'productionBatchId' | 'productionBatchUnitId' | 'quantity', value: string | number) => {
+        setShipmentForm((prev) => ({
+            ...prev,
+            items: prev.items.map((item, i) => (
+                i === index ? { ...item, [field]: value } : item
+            )),
+        }));
+    };
+
+    const quickShowRecallAffectedCustomers = async (recallCaseId: string) => {
+        try {
+            const rows = await mrpApi.listRecallAffectedCustomers(recallCaseId);
+            if (rows.length === 0) {
+                toast({ title: 'Sin destinatarios', description: 'No se encontraron clientes afectados para ese recall.' });
+                return;
+            }
+            const summary = rows.map((row) => `${row.customerName} (${row.shipments.length} envío(s))`).join(' | ');
+            toast({ title: 'Clientes potencialmente afectados', description: summary });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo consultar clientes afectados'), variant: 'destructive' });
+        }
+    };
+
     const quickUpdateRecallProgress = async (id: string, current: number) => {
         try {
             const value = window.prompt('Cantidad recuperada acumulada', String(current));
@@ -518,6 +651,8 @@ export const useQualityCompliance = () => {
         audits,
         technovigilanceCases,
         recalls,
+        customers,
+        shipments,
         regulatoryLabels: regulatoryFlow.regulatoryLabels,
         incomingInspections: receptionReleaseFlow.incomingInspections,
         batchReleases: receptionReleaseFlow.batchReleases,
@@ -532,6 +667,8 @@ export const useQualityCompliance = () => {
         documentForm,
         technoForm,
         recallForm,
+        customerForm,
+        shipmentForm,
         regulatoryLabelForm: regulatoryFlow.regulatoryLabelForm,
         riskControlForm,
         trainingForm,
@@ -542,6 +679,8 @@ export const useQualityCompliance = () => {
         setDocumentForm,
         setTechnoForm,
         setRecallForm,
+        setCustomerForm,
+        setShipmentForm,
         setRegulatoryLabelForm: regulatoryFlow.setRegulatoryLabelForm,
         setRiskControlForm,
         setTrainingForm,
@@ -552,6 +691,8 @@ export const useQualityCompliance = () => {
         loadingAudit,
         loadingTechno,
         loadingRecalls,
+        loadingCustomers,
+        loadingShipments,
         loadingRegulatoryLabels: regulatoryFlow.loadingRegulatoryLabels,
         loadingIncomingInspections: receptionReleaseFlow.loadingIncomingInspections,
         loadingBatchReleases: receptionReleaseFlow.loadingBatchReleases,
@@ -565,6 +706,8 @@ export const useQualityCompliance = () => {
         creatingDocument,
         creatingTechnoCase,
         creatingRecall,
+        creatingCustomer,
+        creatingShipment,
         savingRegulatoryLabel: regulatoryFlow.savingRegulatoryLabel,
         validatingDispatch: regulatoryFlow.validatingDispatch,
         exportingCompliance,
@@ -586,7 +729,13 @@ export const useQualityCompliance = () => {
         quickSetTechnoStatus,
         quickReportTechno,
         handleCreateRecall,
+        handleCreateCustomer,
+        handleCreateShipment,
+        addShipmentItem,
+        removeShipmentItem,
+        updateShipmentItem,
         quickUpdateRecallProgress,
+        quickShowRecallAffectedCustomers,
         quickCreateRecallNotification,
         quickUpdateRecallNotificationStatus,
         quickCloseRecall,

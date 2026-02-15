@@ -44,6 +44,9 @@ import { InventoryItem } from '../entities/inventory-item.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RecallCase } from '../entities/recall-case.entity';
 import { RecallNotification } from '../entities/recall-notification.entity';
+import { Customer } from '../entities/customer.entity';
+import { Shipment } from '../entities/shipment.entity';
+import { ShipmentItem } from '../entities/shipment-item.entity';
 import { QualityRiskControl } from '../entities/quality-risk-control.entity';
 import { QualityTrainingEvidence } from '../entities/quality-training-evidence.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
@@ -60,6 +63,9 @@ export class QualityService {
     private readonly technoRepo: EntityRepository<TechnovigilanceCase>;
     private readonly recallRepo: EntityRepository<RecallCase>;
     private readonly recallNotificationRepo: EntityRepository<RecallNotification>;
+    private readonly customerRepo: EntityRepository<Customer>;
+    private readonly shipmentRepo: EntityRepository<Shipment>;
+    private readonly shipmentItemRepo: EntityRepository<ShipmentItem>;
     private readonly regulatoryLabelRepo: EntityRepository<RegulatoryLabel>;
     private readonly riskControlRepo: EntityRepository<QualityRiskControl>;
     private readonly trainingEvidenceRepo: EntityRepository<QualityTrainingEvidence>;
@@ -77,6 +83,9 @@ export class QualityService {
         this.technoRepo = em.getRepository(TechnovigilanceCase);
         this.recallRepo = em.getRepository(RecallCase);
         this.recallNotificationRepo = em.getRepository(RecallNotification);
+        this.customerRepo = em.getRepository(Customer);
+        this.shipmentRepo = em.getRepository(Shipment);
+        this.shipmentItemRepo = em.getRepository(ShipmentItem);
         this.regulatoryLabelRepo = em.getRepository(RegulatoryLabel);
         this.riskControlRepo = em.getRepository(QualityRiskControl);
         this.trainingEvidenceRepo = em.getRepository(QualityTrainingEvidence);
@@ -536,6 +545,186 @@ export class QualityService {
             },
         });
         return row;
+    }
+
+    async createCustomer(payload: {
+        name: string;
+        documentType?: string;
+        documentNumber?: string;
+        contactName?: string;
+        email?: string;
+        phone?: string;
+        address?: string;
+        notes?: string;
+    }, actor?: string) {
+        const row = this.customerRepo.create({
+            ...payload,
+            email: payload.email || undefined,
+        } as unknown as Customer);
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'customer',
+            entityId: row.id,
+            action: 'created',
+            actor,
+            metadata: { name: row.name, documentNumber: row.documentNumber },
+        });
+        return row;
+    }
+
+    async listCustomers(filters: { search?: string }) {
+        const query: FilterQuery<Customer> = {};
+        if (filters.search) {
+            query.$or = [
+                { name: { $ilike: `%${filters.search}%` } },
+                { documentNumber: { $ilike: `%${filters.search}%` } },
+            ];
+        }
+        return this.customerRepo.find(query, { orderBy: { name: 'ASC' } });
+    }
+
+    async createShipment(payload: {
+        customerId: string;
+        commercialDocument: string;
+        shippedAt?: Date;
+        dispatchedBy?: string;
+        notes?: string;
+        items: Array<{
+            productionBatchId: string;
+            productionBatchUnitId?: string;
+            quantity: number;
+        }>;
+    }, actor?: string) {
+        const customer = await this.customerRepo.findOneOrFail({ id: payload.customerId });
+        const shipment = this.shipmentRepo.create({
+            customer,
+            commercialDocument: payload.commercialDocument,
+            shippedAt: payload.shippedAt ?? new Date(),
+            dispatchedBy: payload.dispatchedBy,
+            notes: payload.notes,
+        } as unknown as Shipment);
+
+        for (const item of payload.items) {
+            const batch = await this.em.findOneOrFail(ProductionBatch, { id: item.productionBatchId }, { populate: ['units'] });
+            const release = await this.batchReleaseRepo.findOne({ productionBatch: batch.id });
+            if (!release || release.status !== BatchReleaseStatus.LIBERADO_QA) {
+                throw new AppError(`No puedes despachar: el lote ${batch.code} no está liberado por QA`, 400);
+            }
+            const dispatchValidation = await this.validateDispatchReadiness(batch.id, actor);
+            if (!dispatchValidation.eligible) {
+                throw new AppError(`No puedes despachar lote ${batch.code}: ${dispatchValidation.errors.join(' | ')}`, 400);
+            }
+
+            let batchUnit: ProductionBatchUnit | undefined;
+            if (item.productionBatchUnitId) {
+                batchUnit = await this.em.findOneOrFail(ProductionBatchUnit, { id: item.productionBatchUnitId }, { populate: ['batch'] });
+                if (batchUnit.batch.id !== batch.id) {
+                    throw new AppError('La unidad serial no pertenece al lote indicado', 400);
+                }
+                const alreadyDispatched = await this.shipmentItemRepo.count({ productionBatchUnit: batchUnit.id });
+                if (alreadyDispatched > 0) {
+                    throw new AppError(`La unidad serial ${batchUnit.serialCode} ya fue despachada`, 409);
+                }
+            }
+
+            const shipmentItem = this.shipmentItemRepo.create({
+                shipment,
+                productionBatch: batch,
+                productionBatchUnit: batchUnit,
+                quantity: item.quantity,
+            } as unknown as ShipmentItem);
+            shipment.items.add(shipmentItem);
+        }
+
+        await this.em.persistAndFlush(shipment);
+        await this.logEvent({
+            entityType: 'shipment',
+            entityId: shipment.id,
+            action: 'created',
+            actor: actor || payload.dispatchedBy,
+            metadata: {
+                customerId: customer.id,
+                commercialDocument: shipment.commercialDocument,
+                items: payload.items.length,
+            },
+        });
+
+        return this.shipmentRepo.findOneOrFail(
+            { id: shipment.id },
+            { populate: ['customer', 'items', 'items.productionBatch', 'items.productionBatchUnit'] }
+        );
+    }
+
+    async listShipments(filters: {
+        customerId?: string;
+        productionBatchId?: string;
+        serialCode?: string;
+        commercialDocument?: string;
+    }) {
+        const query: FilterQuery<Shipment> = {};
+        if (filters.customerId) query.customer = filters.customerId;
+        if (filters.commercialDocument) query.commercialDocument = { $ilike: `%${filters.commercialDocument}%` };
+        if (filters.productionBatchId && filters.serialCode) {
+            query.items = {
+                productionBatch: filters.productionBatchId,
+                productionBatchUnit: { serialCode: { $ilike: `%${filters.serialCode}%` } },
+            };
+        } else if (filters.productionBatchId) {
+            query.items = { productionBatch: filters.productionBatchId };
+        } else if (filters.serialCode) {
+            query.items = { productionBatchUnit: { serialCode: { $ilike: `%${filters.serialCode}%` } } };
+        }
+
+        return this.shipmentRepo.find(query, {
+            populate: ['customer', 'items', 'items.productionBatch', 'items.productionBatchUnit'],
+            orderBy: { shippedAt: 'DESC' },
+        });
+    }
+
+    async listRecallAffectedCustomers(recallCaseId: string) {
+        const recallCase = await this.recallRepo.findOneOrFail({ id: recallCaseId });
+        const shipments = await this.shipmentRepo.find(
+            {},
+            { populate: ['customer', 'items', 'items.productionBatch', 'items.productionBatchUnit'] }
+        );
+
+        const filtered = shipments.filter((shipment) =>
+            shipment.items.getItems().some((item) => {
+                if (recallCase.scopeType === RecallScopeType.LOTE) {
+                    return Boolean(recallCase.lotCode) && item.productionBatch.code === recallCase.lotCode;
+                }
+                if (recallCase.scopeType === RecallScopeType.SERIAL) {
+                    return Boolean(recallCase.serialCode) && item.productionBatchUnit?.serialCode === recallCase.serialCode;
+                }
+                return false;
+            })
+        );
+
+        const grouped = new Map<string, {
+            customerId: string;
+            customerName: string;
+            customerContact?: string;
+            shipments: Array<{ shipmentId: string; commercialDocument: string; shippedAt: Date }>;
+        }>();
+
+        for (const shipment of filtered) {
+            const key = shipment.customer.id;
+            if (!grouped.has(key)) {
+                grouped.set(key, {
+                    customerId: shipment.customer.id,
+                    customerName: shipment.customer.name,
+                    customerContact: shipment.customer.email || shipment.customer.phone,
+                    shipments: [],
+                });
+            }
+            grouped.get(key)!.shipments.push({
+                shipmentId: shipment.id,
+                commercialDocument: shipment.commercialDocument,
+                shippedAt: shipment.shippedAt,
+            });
+        }
+
+        return Array.from(grouped.values());
     }
 
     async upsertRegulatoryLabel(payload: {

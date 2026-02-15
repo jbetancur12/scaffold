@@ -17,6 +17,9 @@ import {
     TechnovigilanceStatus,
     TechnovigilanceReportChannel,
     RecallCase,
+    Customer,
+    Shipment,
+    RecallAffectedCustomer,
     RecallNotification,
     RecallNotificationChannel,
     RecallNotificationStatus,
@@ -222,6 +225,79 @@ export const useCreateRecallCaseMutation = () => {
             },
         }
     );
+};
+
+export const useCustomersQuery = (search?: string) => {
+    const fetcher = useCallback(async (): Promise<Customer[]> => {
+        return mrpApi.listCustomers(search);
+    }, [search]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityCustomers);
+};
+
+export const useCreateCustomerMutation = () => {
+    return useMrpMutation<{
+        name: string;
+        documentType?: string;
+        documentNumber?: string;
+        contactName?: string;
+        email?: string;
+        phone?: string;
+        address?: string;
+        notes?: string;
+    }, Customer>(
+        async (payload) => mrpApi.createCustomer(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityCustomers);
+            },
+        }
+    );
+};
+
+export const useShipmentsQuery = (filters?: {
+    customerId?: string;
+    productionBatchId?: string;
+    serialCode?: string;
+    commercialDocument?: string;
+}) => {
+    const fetcher = useCallback(async (): Promise<Shipment[]> => {
+        return mrpApi.listShipments(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityShipments);
+};
+
+export const useCreateShipmentMutation = () => {
+    return useMrpMutation<{
+        customerId: string;
+        commercialDocument: string;
+        shippedAt?: string;
+        dispatchedBy?: string;
+        notes?: string;
+        items: Array<{
+            productionBatchId: string;
+            productionBatchUnitId?: string;
+            quantity: number;
+        }>;
+    }, Shipment>(
+        async (payload) => mrpApi.createShipment(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityShipments);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useRecallAffectedCustomersQuery = (recallCaseId?: string) => {
+    const fetcher = useCallback(async (): Promise<RecallAffectedCustomer[]> => {
+        if (!recallCaseId) return [];
+        return mrpApi.listRecallAffectedCustomers(recallCaseId);
+    }, [recallCaseId]);
+
+    return useMrpQuery(fetcher, Boolean(recallCaseId), recallCaseId ? `${mrpQueryKeys.qualityRecalls}.affected.${recallCaseId}` : undefined);
 };
 
 export const useUpdateRecallProgressMutation = () => {

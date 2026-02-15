@@ -28,6 +28,8 @@ export const mrpQueryKeys = {
     qualityAuditEvents: 'mrp.quality.audit-events',
     qualityTechnovigilanceCases: 'mrp.quality.technovigilance-cases',
     qualityRecalls: 'mrp.quality.recalls',
+    qualityCustomers: 'mrp.quality.customers',
+    qualityShipments: 'mrp.quality.shipments',
     qualityRegulatoryLabels: 'mrp.quality.regulatory-labels',
     qualityComplianceDashboard: 'mrp.quality.compliance-dashboard',
     qualityRiskControls: 'mrp.quality.risk-controls',

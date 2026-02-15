@@ -52,6 +52,9 @@ import {
     BatchReleaseStatus,
     InvimaRegistration,
     InvimaRegistrationStatus,
+    Customer,
+    Shipment,
+    RecallAffectedCustomer,
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
@@ -222,6 +225,30 @@ export interface CloseRecallCasePayload {
     endedAt?: string | Date;
     actualResponseMinutes?: number;
     actor?: string;
+}
+
+export interface CreateCustomerPayload {
+    name: string;
+    documentType?: string;
+    documentNumber?: string;
+    contactName?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    notes?: string;
+}
+
+export interface CreateShipmentPayload {
+    customerId: string;
+    commercialDocument: string;
+    shippedAt?: string | Date;
+    dispatchedBy?: string;
+    notes?: string;
+    items: Array<{
+        productionBatchId: string;
+        productionBatchUnitId?: string;
+        quantity: number;
+    }>;
 }
 
 export interface UpsertRegulatoryLabelPayload {
@@ -585,6 +612,31 @@ export const mrpApi = {
     },
     listRecallCases: async (filters?: { status?: RecallStatus; isMock?: boolean }): Promise<RecallCase[]> => {
         const response = await api.get<RecallCase[]>('/mrp/quality/recalls', { params: filters });
+        return response.data;
+    },
+    createCustomer: async (data: CreateCustomerPayload): Promise<Customer> => {
+        const response = await api.post<Customer>('/mrp/quality/customers', data);
+        return response.data;
+    },
+    listCustomers: async (search?: string): Promise<Customer[]> => {
+        const response = await api.get<Customer[]>('/mrp/quality/customers', { params: { search } });
+        return response.data;
+    },
+    createShipment: async (data: CreateShipmentPayload): Promise<Shipment> => {
+        const response = await api.post<Shipment>('/mrp/quality/shipments', data);
+        return response.data;
+    },
+    listShipments: async (filters?: {
+        customerId?: string;
+        productionBatchId?: string;
+        serialCode?: string;
+        commercialDocument?: string;
+    }): Promise<Shipment[]> => {
+        const response = await api.get<Shipment[]>('/mrp/quality/shipments', { params: filters });
+        return response.data;
+    },
+    listRecallAffectedCustomers: async (recallCaseId: string): Promise<RecallAffectedCustomer[]> => {
+        const response = await api.get<RecallAffectedCustomer[]>(`/mrp/quality/recalls/${recallCaseId}/affected-customers`);
         return response.data;
     },
     updateRecallProgress: async (id: string, data: UpdateRecallProgressPayload): Promise<RecallCase> => {

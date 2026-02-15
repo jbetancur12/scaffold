@@ -73,6 +73,11 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/quality/technovigilance-cases/:id/report-invima', (req, res, next) => mrpController.reportTechnovigilanceCase(req, res, next));
     router.post('/quality/recalls', (req, res, next) => mrpController.createRecallCase(req, res, next));
     router.get('/quality/recalls', (req, res, next) => mrpController.listRecallCases(req, res, next));
+    router.post('/quality/customers', (req, res, next) => mrpController.createCustomer(req, res, next));
+    router.get('/quality/customers', (req, res, next) => mrpController.listCustomers(req, res, next));
+    router.post('/quality/shipments', (req, res, next) => mrpController.createShipment(req, res, next));
+    router.get('/quality/shipments', (req, res, next) => mrpController.listShipments(req, res, next));
+    router.get('/quality/recalls/:id/affected-customers', (req, res, next) => mrpController.listRecallAffectedCustomers(req, res, next));
     router.patch('/quality/recalls/:id/progress', (req, res, next) => mrpController.updateRecallProgress(req, res, next));
     router.post('/quality/recalls/:id/notifications', (req, res, next) => mrpController.createRecallNotification(req, res, next));
     router.patch('/quality/recall-notifications/:notificationId', (req, res, next) => mrpController.updateRecallNotification(req, res, next));

@@ -69,6 +69,21 @@ export const SupplierSchema = z.object({
     notes: z.string().optional(),
 });
 
+export const CustomerSchema = z.object({
+    name: z.string().min(2, 'El nombre es obligatorio'),
+    documentType: z.string().optional(),
+    documentNumber: z.string().optional(),
+    contactName: z.string().optional(),
+    email: z.string().email('Email inválido').optional().or(z.literal('')),
+    phone: z.string().optional(),
+    address: z.string().optional(),
+    notes: z.string().optional(),
+});
+
+export const ListCustomersQuerySchema = z.object({
+    search: z.string().optional(),
+});
+
 export const RawMaterialSchema = z.object({
     name: z.string().min(1, 'El nombre es obligatorio'),
     sku: z.string().min(1, 'SKU es obligatorio'),
@@ -430,6 +445,28 @@ export const CreateRecallCaseSchema = z.object({
 export const ListRecallCasesQuerySchema = z.object({
     status: z.nativeEnum(RecallStatus).optional(),
     isMock: z.coerce.boolean().optional(),
+});
+
+export const ShipmentItemInputSchema = z.object({
+    productionBatchId: z.string().uuid(),
+    productionBatchUnitId: z.string().uuid().optional(),
+    quantity: z.number().positive(),
+});
+
+export const CreateShipmentSchema = z.object({
+    customerId: z.string().uuid(),
+    commercialDocument: z.string().min(3),
+    shippedAt: z.coerce.date().optional(),
+    dispatchedBy: z.string().optional(),
+    notes: z.string().optional(),
+    items: z.array(ShipmentItemInputSchema).min(1),
+});
+
+export const ListShipmentsQuerySchema = z.object({
+    customerId: z.string().uuid().optional(),
+    productionBatchId: z.string().uuid().optional(),
+    serialCode: z.string().optional(),
+    commercialDocument: z.string().optional(),
 });
 
 export const UpdateRecallProgressSchema = z.object({

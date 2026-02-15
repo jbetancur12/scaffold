@@ -684,6 +684,56 @@ export interface BatchRelease {
     updatedAt: string | Date;
 }
 
+export interface Customer {
+    id: string;
+    name: string;
+    documentType?: string;
+    documentNumber?: string;
+    contactName?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    notes?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface ShipmentItem {
+    id: string;
+    shipmentId: string;
+    productionBatchId: string;
+    productionBatch?: Pick<ProductionBatch, 'id' | 'code'>;
+    productionBatchUnitId?: string;
+    productionBatchUnit?: Pick<ProductionBatchUnit, 'id' | 'serialCode'>;
+    quantity: number;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface Shipment {
+    id: string;
+    customerId: string;
+    customer?: Pick<Customer, 'id' | 'name' | 'documentNumber'>;
+    commercialDocument: string;
+    shippedAt: string | Date;
+    dispatchedBy?: string;
+    notes?: string;
+    items: ShipmentItem[];
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface RecallAffectedCustomer {
+    customerId: string;
+    customerName: string;
+    customerContact?: string;
+    shipments: Array<{
+        shipmentId: string;
+        commercialDocument: string;
+        shippedAt: string | Date;
+    }>;
+}
+
 export interface OperationalConfig {
     id: string;
     // MOD (Mano de Obra Directa)

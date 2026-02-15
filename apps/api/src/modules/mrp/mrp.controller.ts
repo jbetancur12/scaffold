@@ -45,6 +45,10 @@ import {
     ReportTechnovigilanceCaseSchema,
     CreateRecallCaseSchema,
     ListRecallCasesQuerySchema,
+    CustomerSchema,
+    ListCustomersQuerySchema,
+    CreateShipmentSchema,
+    ListShipmentsQuerySchema,
     UpdateRecallProgressSchema,
     CreateRecallNotificationSchema,
     UpdateRecallNotificationSchema,
@@ -670,6 +674,56 @@ export class MrpController {
         try {
             const filters = ListRecallCasesQuerySchema.parse(req.query);
             const rows = await this.qualityService.listRecallCases(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createCustomer(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CustomerSchema.parse(req.body);
+            const row = await this.qualityService.createCustomer(payload);
+            return ApiResponse.success(res, row, 'Cliente creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listCustomers(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { search } = ListCustomersQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listCustomers({ search });
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createShipment(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateShipmentSchema.parse(req.body);
+            const row = await this.qualityService.createShipment(payload, payload.dispatchedBy || 'sistema-web');
+            return ApiResponse.success(res, row, 'Despacho registrado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listShipments(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListShipmentsQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listShipments(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listRecallAffectedCustomers(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const rows = await this.qualityService.listRecallAffectedCustomers(id);
             return ApiResponse.success(res, rows);
         } catch (error) {
             next(error);

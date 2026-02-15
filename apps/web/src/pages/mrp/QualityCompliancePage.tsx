@@ -147,6 +147,8 @@ export default function QualityCompliancePage() {
         audits,
         technovigilanceCases,
         recalls,
+        customers,
+        shipments,
         regulatoryLabels,
         incomingInspections,
         batchReleases,
@@ -161,6 +163,8 @@ export default function QualityCompliancePage() {
         documentForm,
         technoForm,
         recallForm,
+        customerForm,
+        shipmentForm,
         regulatoryLabelForm,
         riskControlForm,
         trainingForm,
@@ -171,6 +175,8 @@ export default function QualityCompliancePage() {
         setDocumentForm,
         setTechnoForm,
         setRecallForm,
+        setCustomerForm,
+        setShipmentForm,
         setRegulatoryLabelForm,
         setRiskControlForm,
         setTrainingForm,
@@ -181,6 +187,8 @@ export default function QualityCompliancePage() {
         loadingAudit,
         loadingTechno,
         loadingRecalls,
+        loadingCustomers,
+        loadingShipments,
         loadingRegulatoryLabels,
         loadingIncomingInspections,
         loadingBatchReleases,
@@ -194,6 +202,8 @@ export default function QualityCompliancePage() {
         creatingDocument,
         creatingTechnoCase,
         creatingRecall,
+        creatingCustomer,
+        creatingShipment,
         savingRegulatoryLabel,
         validatingDispatch,
         exportingCompliance,
@@ -215,7 +225,13 @@ export default function QualityCompliancePage() {
         quickSetTechnoStatus,
         quickReportTechno,
         handleCreateRecall,
+        handleCreateCustomer,
+        handleCreateShipment,
+        addShipmentItem,
+        removeShipmentItem,
+        updateShipmentItem,
         quickUpdateRecallProgress,
+        quickShowRecallAffectedCustomers,
         quickCreateRecallNotification,
         quickUpdateRecallNotificationStatus,
         quickCloseRecall,
@@ -254,6 +270,7 @@ export default function QualityCompliancePage() {
                     <TabsTrigger value="capa">CAPA</TabsTrigger>
                     <TabsTrigger value="techno">Tecnovigilancia</TabsTrigger>
                     <TabsTrigger value="recall">Recall</TabsTrigger>
+                    <TabsTrigger value="shipment">Despachos</TabsTrigger>
                     <TabsTrigger value="labeling">Etiquetado</TabsTrigger>
                     <TabsTrigger value="incoming">Recepción</TabsTrigger>
                     <TabsTrigger value="batch-release">Liberación QA</TabsTrigger>
@@ -704,6 +721,9 @@ export default function QualityCompliancePage() {
                                             <Badge variant="outline" className="mt-2">{recall.status}</Badge>
                                         </div>
                                         <div className="flex flex-wrap gap-2 justify-end">
+                                            <Button size="sm" variant="outline" onClick={() => quickShowRecallAffectedCustomers(recall.id)}>
+                                                Ver afectados
+                                            </Button>
                                             {recall.status !== RecallStatus.CERRADO ? (
                                                 <>
                                                     <Button size="sm" variant="outline" onClick={() => quickUpdateRecallProgress(recall.id, recall.retrievedQuantity)}>
@@ -767,6 +787,147 @@ export default function QualityCompliancePage() {
                                         )) : (
                                             <div className="text-xs text-slate-500">Sin notificaciones registradas.</div>
                                         )}
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="shipment" className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Crear Cliente</CardTitle></CardHeader>
+                        <CardContent>
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={handleCreateCustomer}>
+                                <div className="space-y-1">
+                                    <Label>Nombre</Label>
+                                    <Input value={customerForm.name} onChange={(e) => setCustomerForm((p) => ({ ...p, name: e.target.value }))} required />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Documento</Label>
+                                    <Input value={customerForm.documentNumber} onChange={(e) => setCustomerForm((p) => ({ ...p, documentNumber: e.target.value }))} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Contacto</Label>
+                                    <Input value={customerForm.contactName} onChange={(e) => setCustomerForm((p) => ({ ...p, contactName: e.target.value }))} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Email</Label>
+                                    <Input type="email" value={customerForm.email} onChange={(e) => setCustomerForm((p) => ({ ...p, email: e.target.value }))} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Teléfono</Label>
+                                    <Input value={customerForm.phone} onChange={(e) => setCustomerForm((p) => ({ ...p, phone: e.target.value }))} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Dirección</Label>
+                                    <Input value={customerForm.address} onChange={(e) => setCustomerForm((p) => ({ ...p, address: e.target.value }))} />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Notas</Label>
+                                    <Textarea value={customerForm.notes} onChange={(e) => setCustomerForm((p) => ({ ...p, notes: e.target.value }))} />
+                                </div>
+                                <div className="md:col-span-2 flex justify-end">
+                                    <Button type="submit" disabled={creatingCustomer}>{creatingCustomer ? 'Guardando...' : 'Crear cliente'}</Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Registrar Despacho</CardTitle></CardHeader>
+                        <CardContent>
+                            <form className="space-y-3" onSubmit={handleCreateShipment}>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="space-y-1">
+                                        <Label>Cliente</Label>
+                                        <select
+                                            className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                            value={shipmentForm.customerId}
+                                            onChange={(e) => setShipmentForm((p) => ({ ...p, customerId: e.target.value }))}
+                                        >
+                                            <option value="">{loadingCustomers ? 'Cargando...' : 'Selecciona cliente...'}</option>
+                                            {customers.map((customer) => (
+                                                <option key={customer.id} value={customer.id}>{customer.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>Documento comercial</Label>
+                                        <Input
+                                            value={shipmentForm.commercialDocument}
+                                            onChange={(e) => setShipmentForm((p) => ({ ...p, commercialDocument: e.target.value }))}
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label>Fecha despacho</Label>
+                                        <Input
+                                            type="datetime-local"
+                                            value={shipmentForm.shippedAt}
+                                            onChange={(e) => setShipmentForm((p) => ({ ...p, shippedAt: e.target.value }))}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <Label>Ítems de despacho</Label>
+                                        <Button type="button" variant="outline" size="sm" onClick={addShipmentItem}>+ Ítem</Button>
+                                    </div>
+                                    {shipmentForm.items.map((item, index) => (
+                                        <div key={`shipment-item-${index}`} className="grid grid-cols-1 md:grid-cols-4 gap-2 border rounded-md p-2">
+                                            <Input
+                                                placeholder="ID lote (UUID)"
+                                                value={item.productionBatchId}
+                                                onChange={(e) => updateShipmentItem(index, 'productionBatchId', e.target.value)}
+                                            />
+                                            <Input
+                                                placeholder="ID unidad serial (opcional)"
+                                                value={item.productionBatchUnitId}
+                                                onChange={(e) => updateShipmentItem(index, 'productionBatchUnitId', e.target.value)}
+                                            />
+                                            <Input
+                                                type="number"
+                                                min={0.0001}
+                                                step={0.0001}
+                                                placeholder="Cantidad"
+                                                value={item.quantity}
+                                                onChange={(e) => updateShipmentItem(index, 'quantity', Number(e.target.value))}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() => removeShipmentItem(index)}
+                                                disabled={shipmentForm.items.length === 1}
+                                            >
+                                                Quitar
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex justify-end">
+                                    <Button type="submit" disabled={creatingShipment}>
+                                        {creatingShipment ? 'Guardando...' : 'Registrar despacho'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Despachos ({shipments.length})</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            {loadingShipments ? <div>Cargando...</div> : shipments.length === 0 ? <div className="text-sm text-slate-500">Sin despachos.</div> : shipments.map((shipment) => (
+                                <div key={shipment.id} className="border rounded-md p-3">
+                                    <div className="font-medium">{shipment.commercialDocument} | {shipment.customer?.name || shipment.customerId}</div>
+                                    <div className="text-xs text-slate-600 mt-1">
+                                        Fecha: {new Date(shipment.shippedAt).toLocaleString()} | Responsable: {shipment.dispatchedBy || 'N/A'}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                        Ítems: {shipment.items.map((item) => (
+                                            `${item.productionBatch?.code || shortId(item.productionBatchId)}${item.productionBatchUnit?.serialCode ? `/${item.productionBatchUnit.serialCode}` : ''} x ${item.quantity}`
+                                        )).join(' | ')}
                                     </div>
                                 </div>
                             ))}
