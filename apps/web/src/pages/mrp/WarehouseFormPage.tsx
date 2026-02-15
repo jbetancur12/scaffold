@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mrpApi } from '@/services/mrpApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,8 +15,7 @@ import {
 import { WarehouseType } from '@scaffold/types';
 import { WarehouseSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
-import { invalidateMrpQuery, useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useSaveWarehouseMutation, useWarehouseQuery } from '@/hooks/mrp/useWarehouses';
 
 export default function WarehouseFormPage() {
     const { id } = useParams();
@@ -32,28 +30,8 @@ export default function WarehouseFormPage() {
         type: WarehouseType.RAW_MATERIALS,
     });
 
-    const fetchWarehouse = useCallback(async () => {
-        if (!id) {
-            throw new Error('Warehouse ID is required');
-        }
-        try {
-            return await mrpApi.getWarehouse(id);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar el almacén'),
-                variant: 'destructive',
-            });
-            navigate('/mrp/warehouses');
-            throw error;
-        }
-    }, [id, navigate, toast]);
-
-    const { data: warehouse, loading: loadingWarehouse } = useMrpQuery(
-        fetchWarehouse,
-        isEditing,
-        id ? mrpQueryKeys.warehouse(id) : undefined
-    );
+    const { data: warehouse, loading: loadingWarehouse, error: warehouseError } = useWarehouseQuery(isEditing ? id : undefined);
+    const { execute: saveWarehouse } = useSaveWarehouseMutation();
 
     useEffect(() => {
         if (warehouse) {
@@ -65,25 +43,30 @@ export default function WarehouseFormPage() {
         }
     }, [warehouse]);
 
+    useEffect(() => {
+        if (!warehouseError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(warehouseError, 'No se pudo cargar el almacén'),
+            variant: 'destructive',
+        });
+        navigate('/mrp/warehouses');
+    }, [navigate, toast, warehouseError]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             setLoading(true);
             WarehouseSchema.parse(formData);
 
-            if (isEditing) {
-                await mrpApi.updateWarehouse(id!, formData);
-                if (id) {
-                    invalidateMrpQuery(mrpQueryKeys.warehouse(id));
-                }
-                invalidateMrpQuery(mrpQueryKeys.warehouses);
+            if (isEditing && id) {
+                await saveWarehouse({ id, payload: formData });
                 toast({
                     title: 'Éxito',
                     description: 'Almacén actualizado correctamente',
                 });
             } else {
-                await mrpApi.createWarehouse(formData);
-                invalidateMrpQuery(mrpQueryKeys.warehouses);
+                await saveWarehouse({ payload: formData });
                 toast({
                     title: 'Éxito',
                     description: 'Almacén creado correctamente',

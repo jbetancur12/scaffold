@@ -24,6 +24,13 @@ export class SupplierService {
         return this.supplierRepo.findOne({ id });
     }
 
+    async updateSupplier(id: string, data: Partial<Supplier>): Promise<Supplier> {
+        const supplier = await this.supplierRepo.findOneOrFail({ id });
+        this.supplierRepo.assign(supplier, data);
+        await this.em.persistAndFlush(supplier);
+        return supplier;
+    }
+
     async listSuppliers(page = 1, limit = 10): Promise<{ suppliers: Supplier[]; total: number }> {
         const [suppliers, total] = await this.supplierRepo.findAndCount(
             {},

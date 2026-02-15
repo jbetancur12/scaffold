@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-import { mrpApi } from '@/services/mrpApi';
-import { RawMaterial } from '@scaffold/types';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -22,12 +20,8 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
-
-interface Material {
-    rawMaterial: RawMaterial;
-    lastPurchasePrice: number;
-    lastPurchaseDate: string;
-}
+import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
+import { useLinkSupplierMaterialMutation, useSupplierMaterialsQuery, useUnlinkSupplierMaterialMutation } from '@/hooks/mrp/useSuppliers';
 
 interface SupplierMaterialsTabProps {
     supplierId: string;
@@ -35,57 +29,34 @@ interface SupplierMaterialsTabProps {
 
 export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) {
     const { toast } = useToast();
-    const [materials, setMaterials] = useState<Material[]>([]);
-    const [loading, setLoading] = useState(true);
     const [isAddOpen, setIsAddOpen] = useState(false);
 
     // Add Material State
-    const [allMaterials, setAllMaterials] = useState<RawMaterial[]>([]);
     const [selectedMaterial, setSelectedMaterial] = useState<string>('');
     const [price, setPrice] = useState<string>('');
-    const [adding, setAdding] = useState(false);
-
-    const loadMaterials = useCallback(async () => {
-        try {
-            setLoading(true);
-            const data = await mrpApi.getSupplierMaterials(supplierId);
-            setMaterials(data);
-        } catch (error) {
-            console.error('Failed to load supplier materials', error);
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudieron cargar los materiales del proveedor'),
-                variant: 'destructive',
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [supplierId, toast]);
-
-    const loadAllMaterials = useCallback(async () => {
-        try {
-            const data = await mrpApi.getRawMaterials(1, 1000); // Load all for dropdown
-            setAllMaterials(data.materials);
-        } catch (error) {
-            console.error('Failed to load raw materials list', error);
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar la lista de materias primas'),
-                variant: 'destructive',
-            });
-        }
-    }, [toast]);
+    const { data: supplierMaterialsData, loading, error } = useSupplierMaterialsQuery(supplierId);
+    const { materials: allMaterials, error: rawMaterialsError } = useRawMaterialsQuery(1, 1000, '');
+    const { execute: linkSupplierMaterial, loading: adding } = useLinkSupplierMaterialMutation();
+    const { execute: unlinkSupplierMaterial } = useUnlinkSupplierMaterialMutation();
+    const materials = supplierMaterialsData ?? [];
 
     useEffect(() => {
-        loadMaterials();
-    }, [loadMaterials]);
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(error, 'No se pudieron cargar los materiales del proveedor'),
+            variant: 'destructive',
+        });
+    }, [error, toast]);
 
-    // Load dropdown options when dialog opens
     useEffect(() => {
-        if (isAddOpen && allMaterials.length === 0) {
-            loadAllMaterials();
-        }
-    }, [isAddOpen, allMaterials.length, loadAllMaterials]);
+        if (!rawMaterialsError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(rawMaterialsError, 'No se pudo cargar la lista de materias primas'),
+            variant: 'destructive',
+        });
+    }, [rawMaterialsError, toast]);
 
     const handleAddMaterial = async () => {
         if (!selectedMaterial) {
@@ -98,10 +69,10 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
         }
 
         try {
-            setAdding(true);
-            await mrpApi.addSupplierMaterial(supplierId, {
+            await linkSupplierMaterial({
+                supplierId,
                 rawMaterialId: selectedMaterial,
-                price: parseFloat(price?.toString() || '0') || 0
+                price: parseFloat(price?.toString() || '0') || 0,
             });
 
             toast({
@@ -112,15 +83,12 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
             setIsAddOpen(false);
             setSelectedMaterial('');
             setPrice('');
-            loadMaterials();
         } catch (error) {
             toast({
                 title: "Error",
                 description: getErrorMessage(error, 'No se pudo vincular el material'),
                 variant: "destructive"
             });
-        } finally {
-            setAdding(false);
         }
     };
 
@@ -130,12 +98,11 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
         }
 
         try {
-            await mrpApi.removeSupplierMaterial(supplierId, materialId);
+            await unlinkSupplierMaterial({ supplierId, materialId });
             toast({
                 title: "Éxito",
                 description: "Material desvinculado correctamente",
             });
-            loadMaterials();
         } catch (error) {
             toast({
                 title: "Error",

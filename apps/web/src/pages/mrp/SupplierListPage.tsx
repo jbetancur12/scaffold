@@ -1,6 +1,4 @@
-import { useCallback } from 'react';
-import { mrpApi } from '@/services/mrpApi';
-import { Supplier } from '@scaffold/types';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -14,29 +12,23 @@ import { Truck, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
-import { useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
 
 export default function SupplierListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const fetchSuppliers = useCallback(async () => {
-        try {
-            const response = await mrpApi.getSuppliers();
-            return response.suppliers;
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudieron cargar los proveedores'),
-                variant: 'destructive',
-            });
-            throw error;
-        }
-    }, [toast]);
+    const { data: suppliersResponse, loading, error } = useSuppliersQuery();
+    const suppliers = suppliersResponse?.suppliers ?? [];
 
-    const { data: suppliersData, loading } = useMrpQuery<Supplier[]>(fetchSuppliers, true, mrpQueryKeys.suppliers);
-    const suppliers = suppliersData ?? [];
+    useEffect(() => {
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(error, 'No se pudieron cargar los proveedores'),
+            variant: 'destructive',
+        });
+    }, [error, toast]);
 
     return (
         <div className="space-y-8">

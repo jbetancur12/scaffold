@@ -1,6 +1,4 @@
-import { useCallback } from 'react';
-import { mrpApi } from '@/services/mrpApi';
-import { Warehouse } from '@scaffold/types';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -15,33 +13,24 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { getErrorMessage } from '@/lib/api-error';
-import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useDeleteWarehouseMutation, useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
 
 export default function WarehouseListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const fetchWarehouses = useCallback(async () => {
-        try {
-            const data = await mrpApi.getWarehouses();
-            return data;
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudieron cargar los almacenes'),
-                variant: 'destructive',
-            });
-            throw error;
-        }
-    }, [toast]);
-
-    const { data: warehousesData, loading, invalidate } = useMrpQuery<Warehouse[]>(fetchWarehouses, true, mrpQueryKeys.warehouses);
+    const { data: warehousesData, loading, error } = useWarehousesQuery();
     const warehouses = warehousesData ?? [];
-    const { execute: deleteWarehouse } = useMrpMutation<string, void>(
-        async (id) => mrpApi.deleteWarehouse(id),
-        { onSuccess: async () => { await invalidate(); } }
-    );
+    const { execute: deleteWarehouse } = useDeleteWarehouseMutation();
+
+    useEffect(() => {
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(error, 'No se pudieron cargar los almacenes'),
+            variant: 'destructive',
+        });
+    }, [error, toast]);
 
     const handleDelete = async (id: string) => {
         if (!confirm('¿Estás seguro de que deseas eliminar este almacén?')) return;

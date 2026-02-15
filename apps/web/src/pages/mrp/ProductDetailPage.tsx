@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mrpApi } from '@/services/mrpApi';
 import { generateVariantSku } from '@/utils/skuGenerator';
-import { Product, ProductVariant, OperationalConfig } from '@scaffold/types';
+import { ProductVariant } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,8 +26,8 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { invalidateMrpQuery, useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
+import { useDeleteProductMutation, useDeleteVariantMutation, useProductQuery, useSaveVariantMutation } from '@/hooks/mrp/useProducts';
 
 interface VariantFormData {
     id?: string;
@@ -55,46 +54,21 @@ export default function ProductDetailPage() {
         targetMargin: 0.4,
     });
 
-    // Global Config for Real-time Estimation
-    const fetchOperationalConfig = useCallback(async () => {
-        try {
-            return await mrpApi.getOperationalConfig();
-        } catch (err) {
-            console.error('Failed to load operational config', err);
-            throw err;
-        }
-    }, []);
-    const { data: operationalConfig } = useMrpQuery<OperationalConfig>(
-        fetchOperationalConfig,
-        true,
-        mrpQueryKeys.operationalConfig
-    );
+    const { data: operationalConfig } = useOperationalConfigQuery();
+    const { data: product, loading, error, execute: reloadProduct } = useProductQuery(id);
+    const { execute: deleteProduct } = useDeleteProductMutation();
+    const { execute: saveVariant } = useSaveVariantMutation();
+    const { execute: deleteVariant } = useDeleteVariantMutation();
 
-    const fetchProduct = useCallback(async () => {
-        if (!id) {
-            throw new Error('Product ID is required');
-        }
-        try {
-            return await mrpApi.getProduct(id);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar el producto'),
-                variant: 'destructive',
-            });
-            navigate('/mrp/products');
-            throw error;
-        }
-    }, [id, navigate, toast]);
-    const {
-        data: product,
-        loading,
-        invalidate: reloadProduct
-    } = useMrpQuery<Product>(
-        fetchProduct,
-        Boolean(id),
-        id ? mrpQueryKeys.product(id) : undefined
-    );
+    useEffect(() => {
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(error, 'No se pudo cargar el producto'),
+            variant: 'destructive',
+        });
+        navigate('/mrp/products');
+    }, [error, navigate, toast]);
 
     // Variant SKU generation listener
     useEffect(() => {
@@ -126,8 +100,8 @@ export default function ProductDetailPage() {
     const handleDeleteProduct = async () => {
         if (!confirm('¿Estás seguro de eliminar este producto y todas sus variantes? Esta acción no se puede deshacer.')) return;
         try {
-            await mrpApi.deleteProduct(id!);
-            invalidateMrpQuery(mrpQueryKeys.products);
+            if (!id) return;
+            await deleteProduct(id);
             toast({ title: 'Éxito', description: 'Producto eliminado' });
             navigate('/mrp/products');
         } catch (error) {
@@ -137,19 +111,19 @@ export default function ProductDetailPage() {
 
     const handleSaveVariant = async () => {
         try {
+            if (!id) return;
             if (editingVariant?.id) {
                 const validatedData = UpdateProductVariantSchema.parse(variantFormData);
-                await mrpApi.updateVariant(editingVariant.id, validatedData);
+                await saveVariant({ productId: id, variantId: editingVariant.id, payload: validatedData });
                 toast({ title: 'Éxito', description: 'Variante actualizada exitosamente' });
             } else {
                 const validatedData = CreateProductVariantSchema.parse(variantFormData);
-                await mrpApi.createVariant(id!, validatedData);
+                await saveVariant({ productId: id, payload: validatedData });
                 toast({ title: 'Éxito', description: 'Variante creada exitosamente' });
             }
 
             setShowVariantDialog(false);
-            await reloadProduct();
-            invalidateMrpQuery(mrpQueryKeys.products);
+            await reloadProduct({ force: true });
         } catch (error) {
             toast({
                 title: 'Error',
@@ -162,10 +136,9 @@ export default function ProductDetailPage() {
     const handleDeleteVariant = async (variantId: string) => {
         if (!confirm('¿Estás seguro de eliminar esta variante?')) return;
         try {
-            await mrpApi.deleteVariant(variantId);
+            await deleteVariant(variantId);
             toast({ title: 'Éxito', description: 'Variante eliminada exitosamente' });
-            await reloadProduct();
-            invalidateMrpQuery(mrpQueryKeys.products);
+            await reloadProduct({ force: true });
         } catch (error) {
             toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo eliminar la variante'), variant: 'destructive' });
         }

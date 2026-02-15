@@ -1,6 +1,4 @@
-import { useCallback } from 'react';
-import { mrpApi } from '@/services/mrpApi';
-import { Product } from '@scaffold/types';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -15,33 +13,24 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
-import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useDeleteProductMutation, useProductsQuery } from '@/hooks/mrp/useProducts';
 
 export default function ProductListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const fetchProducts = useCallback(async () => {
-        try {
-            const response = await mrpApi.getProducts();
-            return response.products;
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudieron cargar los productos'),
-                variant: 'destructive',
-            });
-            throw error;
-        }
-    }, [toast]);
+    const { data: productsResponse, loading, error } = useProductsQuery();
+    const products = productsResponse?.products ?? [];
+    const { execute: deleteProduct } = useDeleteProductMutation();
 
-    const { data: productsData, loading, invalidate } = useMrpQuery<Product[]>(fetchProducts, true, mrpQueryKeys.products);
-    const products = productsData ?? [];
-    const { execute: deleteProduct } = useMrpMutation<string, void>(
-        async (id) => mrpApi.deleteProduct(id),
-        { onSuccess: async () => { await invalidate(); } }
-    );
+    useEffect(() => {
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(error, 'No se pudieron cargar los productos'),
+            variant: 'destructive',
+        });
+    }, [error, toast]);
 
     const handleDeleteProduct = async (id: string) => {
         if (!confirm('¿Estás seguro de eliminar este producto? Esta acción no se puede deshacer.')) return;

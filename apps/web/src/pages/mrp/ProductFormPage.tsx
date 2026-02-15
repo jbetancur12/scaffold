@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mrpApi } from '@/services/mrpApi';
 import { generateProductSku } from '@/utils/skuGenerator';
-import { Product } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,8 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { ProductSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
-import { invalidateMrpQuery, useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useProductQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
 
 export default function ProductFormPage() {
     const { id } = useParams();
@@ -38,28 +35,8 @@ export default function ProductFormPage() {
     }, [formData.name, isEditing, skuManuallyEdited]);
 
 
-    const fetchProduct = useCallback(async () => {
-        if (!id) {
-            throw new Error('Product ID is required');
-        }
-        try {
-            return await mrpApi.getProduct(id);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar el producto'),
-                variant: 'destructive',
-            });
-            navigate('/mrp/products');
-            throw error;
-        }
-    }, [id, navigate, toast]);
-
-    const { data: product, loading: loadingProduct } = useMrpQuery<Product>(
-        fetchProduct,
-        isEditing,
-        id ? mrpQueryKeys.product(id) : undefined
-    );
+    const { data: product, loading: loadingProduct, error: productError } = useProductQuery(isEditing ? id : undefined);
+    const { execute: saveProduct } = useSaveProductMutation();
 
     useEffect(() => {
         if (product) {
@@ -72,27 +49,31 @@ export default function ProductFormPage() {
         }
     }, [product]);
 
+    useEffect(() => {
+        if (!productError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(productError, 'No se pudo cargar el producto'),
+            variant: 'destructive',
+        });
+        navigate('/mrp/products');
+    }, [navigate, productError, toast]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             setLoading(true);
             ProductSchema.parse(formData);
 
-            if (isEditing) {
-                await mrpApi.updateProduct(id!, formData);
-                if (id) {
-                    invalidateMrpQuery(mrpQueryKeys.product(id));
-                }
-                invalidateMrpQuery(mrpQueryKeys.products);
+            if (isEditing && id) {
+                await saveProduct({ id, payload: formData });
                 toast({
                     title: 'Éxito',
                     description: 'Producto actualizado exitosamente',
                 });
                 navigate(`/mrp/products/${id}`);
             } else {
-                const newProduct = await mrpApi.createProduct(formData);
-                invalidateMrpQuery(mrpQueryKeys.products);
-                invalidateMrpQuery(mrpQueryKeys.product(newProduct.id));
+                const newProduct = await saveProduct({ payload: formData });
                 toast({
                     title: 'Éxito',
                     description: 'Producto creado exitosamente',

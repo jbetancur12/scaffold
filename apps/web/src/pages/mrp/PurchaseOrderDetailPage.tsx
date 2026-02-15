@@ -1,6 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mrpApi, PurchaseOrder } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
 import { ArrowLeft, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -21,9 +20,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Warehouse } from '@scaffold/types';
-import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
+import { useCancelPurchaseOrderMutation, usePurchaseOrderQuery, useReceivePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
 
 const statusLabels = {
     PENDING: 'Pendiente',
@@ -46,60 +44,30 @@ export default function PurchaseOrderDetailPage() {
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
 
-    const fetchOrder = useCallback(async () => {
-        if (!id) {
-            throw new Error('Purchase order ID is required');
-        }
-        try {
-            return await mrpApi.getPurchaseOrder(id);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar la orden de compra'),
-                variant: 'destructive',
-            });
-            navigate('/mrp/purchase-orders');
-            throw error;
-        }
-    }, [id, toast, navigate]);
-
-    const fetchWarehouses = useCallback(async () => {
-        try {
-            return await mrpApi.getWarehouses();
-        } catch (error) {
-            console.error('Error loading warehouses', error);
-            throw error;
-        }
-    }, []);
-
-    const { data: order, loading, invalidate: reloadOrder } = useMrpQuery<PurchaseOrder>(
-        fetchOrder,
-        Boolean(id),
-        id ? mrpQueryKeys.purchaseOrder(id) : undefined
-    );
-    const { data: warehousesData } = useMrpQuery<Warehouse[]>(
-        fetchWarehouses,
-        true,
-        mrpQueryKeys.warehouses
-    );
+    const { data: order, loading, error, execute: reloadOrder } = usePurchaseOrderQuery(id);
+    const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
+    const { execute: receiveOrder, loading: submitting } = useReceivePurchaseOrderMutation();
+    const { execute: cancelOrder } = useCancelPurchaseOrderMutation();
     const warehouses = warehousesData ?? [];
 
-    const { execute: receiveOrder, loading: submitting } = useMrpMutation<{ id: string; warehouseId?: string }, PurchaseOrder>(
-        async ({ id: orderId, warehouseId }) => mrpApi.receivePurchaseOrder(orderId, warehouseId),
-        {
-            invalidateKeys: id
-                ? [mrpQueryKeys.purchaseOrder(id), mrpQueryKeys.purchaseOrders, mrpQueryKeys.rawMaterials]
-                : [mrpQueryKeys.purchaseOrders, mrpQueryKeys.rawMaterials],
-        }
-    );
-    const { execute: cancelOrder } = useMrpMutation<string, void>(
-        async (orderId) => mrpApi.cancelPurchaseOrder(orderId),
-        {
-            invalidateKeys: id
-                ? [mrpQueryKeys.purchaseOrder(id), mrpQueryKeys.purchaseOrders]
-                : [mrpQueryKeys.purchaseOrders],
-        }
-    );
+    useEffect(() => {
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(error, 'No se pudo cargar la orden de compra'),
+            variant: 'destructive',
+        });
+        navigate('/mrp/purchase-orders');
+    }, [error, navigate, toast]);
+
+    useEffect(() => {
+        if (!warehousesError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(warehousesError, 'No se pudieron cargar los almacenes'),
+            variant: 'destructive',
+        });
+    }, [toast, warehousesError]);
 
     const handleReceive = async () => {
         if (!id) return;
@@ -110,7 +78,7 @@ export default function PurchaseOrderDetailPage() {
                 description: 'Orden recibida e inventario actualizado',
             });
             setIsReceiveDialogOpen(false);
-            await reloadOrder();
+            await reloadOrder({ force: true });
         } catch (error) {
             toast({
                 title: 'Error',

@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { mrpApi } from '@/services/mrpApi';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,12 +8,13 @@ import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save } from 'lucide-react';
 import { SupplierSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
+import { useSaveSupplierMutation, useSupplierQuery } from '@/hooks/mrp/useSuppliers';
 
 export default function SupplierFormPage() {
+    const { id } = useParams();
     const navigate = useNavigate();
     const { toast } = useToast();
-    // Assuming create only for now as edit needs ID fetching which is similar to Product
-    // I can add edit support later or if user requests.
+    const isEditing = Boolean(id);
 
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
@@ -29,6 +29,34 @@ export default function SupplierFormPage() {
         paymentConditions: '',
         notes: '',
     });
+    const { data: supplier, loading: loadingSupplier, error: supplierError } = useSupplierQuery(isEditing ? id : undefined);
+    const { execute: saveSupplier } = useSaveSupplierMutation();
+
+    useEffect(() => {
+        if (!supplier) return;
+        setFormData({
+            name: supplier.name || '',
+            email: supplier.email || '',
+            contactName: supplier.contactName || '',
+            phone: supplier.phone || '',
+            address: supplier.address || '',
+            city: supplier.city || '',
+            department: supplier.department || '',
+            bankDetails: supplier.bankDetails || '',
+            paymentConditions: supplier.paymentConditions || '',
+            notes: supplier.notes || '',
+        });
+    }, [supplier]);
+
+    useEffect(() => {
+        if (!supplierError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(supplierError, 'No se pudo cargar el proveedor'),
+            variant: 'destructive',
+        });
+        navigate('/mrp/suppliers');
+    }, [navigate, supplierError, toast]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,13 +64,13 @@ export default function SupplierFormPage() {
             setLoading(true);
             SupplierSchema.parse(formData);
 
-            await mrpApi.createSupplier(formData);
+            await saveSupplier({ id: isEditing ? id : undefined, payload: formData });
 
             toast({
                 title: 'Éxito',
-                description: 'Proveedor creado exitosamente',
+                description: isEditing ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente',
             });
-            navigate('/mrp/suppliers');
+            navigate(isEditing && id ? `/mrp/suppliers/${id}` : '/mrp/suppliers');
         } catch (error: unknown) {
             toast({
                 title: 'Error',
@@ -56,16 +84,19 @@ export default function SupplierFormPage() {
 
     return (
         <div className="space-y-8 max-w-4xl mx-auto">
+            {loadingSupplier && isEditing ? (
+                <div className="text-sm text-slate-500">Cargando proveedor...</div>
+            ) : null}
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/suppliers')}>
                     <ArrowLeft className="h-4 w-4" />
                 </Button>
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                        Nuevo Proveedor
+                        {isEditing ? 'Editar Proveedor' : 'Nuevo Proveedor'}
                     </h1>
                     <p className="text-slate-500">
-                        Ingresa la información del proveedor.
+                        {isEditing ? 'Actualiza la información del proveedor.' : 'Ingresa la información del proveedor.'}
                     </p>
                 </div>
             </div>
@@ -182,7 +213,7 @@ export default function SupplierFormPage() {
                         {loading ? 'Guardando...' : (
                             <>
                                 <Save className="mr-2 h-4 w-4" />
-                                Crear Proveedor
+                                {isEditing ? 'Actualizar Proveedor' : 'Crear Proveedor'}
                             </>
                         )}
                     </Button>

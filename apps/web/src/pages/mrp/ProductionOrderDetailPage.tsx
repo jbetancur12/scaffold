@@ -1,7 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mrpApi, MaterialRequirement } from '@/services/mrpApi';
-import { ProductionOrder, ProductionOrderStatus, ProductionOrderItem, ProductVariant, Product, Warehouse } from '@scaffold/types';
+import { ProductionOrderStatus, ProductionOrderItem, ProductVariant, Product } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -26,8 +25,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { getErrorMessage } from '@/lib/api-error';
-import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
+import { useProductionOrderQuery, useProductionRequirementsQuery, useUpdateProductionOrderStatusMutation } from '@/hooks/mrp/useProductionOrders';
 
 export default function ProductionOrderDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -38,94 +37,40 @@ export default function ProductionOrderDetailPage() {
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
 
-    const fetchOrder = useCallback(async () => {
-        if (!id) {
-            throw new Error('Production order ID is required');
-        }
-        try {
-            return await mrpApi.getProductionOrder(id);
-        } catch (error) {
-            console.error('Error loading production order:', error);
-            toast({
-                title: "Error",
-                description: getErrorMessage(error, 'No se pudo cargar la orden de producción'),
-                variant: "destructive"
-            });
-            throw error;
-        }
-    }, [id, toast]);
-
-    const fetchRequirements = useCallback(async () => {
-        if (!id) {
-            throw new Error('Production order ID is required');
-        }
-        try {
-            return await mrpApi.getMaterialRequirements(id);
-        } catch (error) {
-            console.error('Error loading requirements:', error);
-            toast({
-                title: "Error",
-                description: getErrorMessage(error, 'No se pudieron calcular los requerimientos'),
-                variant: "destructive"
-            });
-            throw error;
-        }
-    }, [id, toast]);
-
-    const fetchWarehouses = useCallback(async () => {
-        try {
-            return await mrpApi.getWarehouses();
-        } catch (error) {
-            console.error('Error loading warehouses', error);
-            throw error;
-        }
-    }, []);
-
-    const { data: order, loading, invalidate: reloadOrder } = useMrpQuery<ProductionOrder>(
-        fetchOrder,
-        Boolean(id),
-        id ? mrpQueryKeys.productionOrder(id) : undefined
-    );
-    const { data: requirementsData, loading: loadingReqs } = useMrpQuery<MaterialRequirement[]>(
-        fetchRequirements,
-        Boolean(id),
-        id ? mrpQueryKeys.productionRequirements(id) : undefined
-    );
-    const { data: warehousesData } = useMrpQuery<Warehouse[]>(
-        fetchWarehouses,
-        true,
-        mrpQueryKeys.warehouses
-    );
+    const { data: order, loading, error, execute: reloadOrder } = useProductionOrderQuery(id);
+    const { data: requirementsData, loading: loadingReqs, error: requirementsError } = useProductionRequirementsQuery(id);
+    const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
     const requirements = requirementsData ?? [];
     const warehouses = warehousesData ?? [];
+    const { execute: updateOrderStatus, loading: submitting } = useUpdateProductionOrderStatusMutation();
 
-    const { execute: updateOrderStatus } = useMrpMutation<
-        { orderId: string; status: ProductionOrderStatus; warehouseId?: string },
-        ProductionOrder
-    >(
-        async ({ orderId, status, warehouseId }) => mrpApi.updateProductionOrderStatus(orderId, status, warehouseId),
-        {
-            invalidateKeys: id
-                ? [mrpQueryKeys.productionOrder(id), mrpQueryKeys.productionOrders, mrpQueryKeys.productionRequirements(id)]
-                : [mrpQueryKeys.productionOrders],
-        }
-    );
-    const { execute: completeOrder, loading: submitting } = useMrpMutation<
-        { orderId: string; warehouseId?: string },
-        ProductionOrder
-    >(
-        async ({ orderId, warehouseId }) => mrpApi.updateProductionOrderStatus(orderId, ProductionOrderStatus.COMPLETED, warehouseId),
-        {
-            invalidateKeys: id
-                ? [
-                    mrpQueryKeys.productionOrder(id),
-                    mrpQueryKeys.productionOrders,
-                    mrpQueryKeys.productionRequirements(id),
-                    mrpQueryKeys.rawMaterials,
-                ]
-                : [mrpQueryKeys.productionOrders, mrpQueryKeys.rawMaterials],
-        }
-    );
+    useEffect(() => {
+        if (!error) return;
+        toast({
+            title: "Error",
+            description: getErrorMessage(error, 'No se pudo cargar la orden de producción'),
+            variant: "destructive"
+        });
+        navigate('/mrp/production-orders');
+    }, [error, navigate, toast]);
+
+    useEffect(() => {
+        if (!requirementsError) return;
+        toast({
+            title: "Error",
+            description: getErrorMessage(requirementsError, 'No se pudieron calcular los requerimientos'),
+            variant: "destructive"
+        });
+    }, [requirementsError, toast]);
+
+    useEffect(() => {
+        if (!warehousesError) return;
+        toast({
+            title: "Error",
+            description: getErrorMessage(warehousesError, 'No se pudieron cargar los almacenes'),
+            variant: "destructive"
+        });
+    }, [warehousesError, toast]);
 
     const handleStatusChange = async (newStatus: ProductionOrderStatus) => {
         if (!order) return;
@@ -138,7 +83,7 @@ export default function ProductionOrderDetailPage() {
         try {
             await updateOrderStatus({ orderId: order.id, status: newStatus });
             toast({ title: "Estado actualizado", description: `La orden ahora está: ${newStatus}` });
-            await reloadOrder();
+            await reloadOrder({ force: true });
         } catch (error) {
             toast({
                 title: "Error al actualizar",
@@ -151,10 +96,14 @@ export default function ProductionOrderDetailPage() {
     const handleComplete = async () => {
         if (!order) return;
         try {
-            await completeOrder({ orderId: order.id, warehouseId: selectedWarehouseId || undefined });
+            await updateOrderStatus({
+                orderId: order.id,
+                status: ProductionOrderStatus.COMPLETED,
+                warehouseId: selectedWarehouseId || undefined,
+            });
             toast({ title: "Orden completada", description: "El producto terminado ha sido agregado al inventario." });
             setIsCompleteDialogOpen(false);
-            await reloadOrder();
+            await reloadOrder({ force: true });
         } catch (error) {
             toast({
                 title: "Error",

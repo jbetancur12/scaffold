@@ -182,6 +182,10 @@ export const mrpApi = {
         const response = await api.post('/mrp/suppliers', data);
         return response.data;
     },
+    updateSupplier: async (id: string, data: Partial<Supplier>): Promise<Supplier> => {
+        const response = await api.put(`/mrp/suppliers/${id}`, data);
+        return response.data;
+    },
     getSupplierMaterials: async (id: string): Promise<{ rawMaterial: RawMaterial; lastPurchasePrice: number; lastPurchaseDate: string }[]> => {
         const response = await api.get<{ rawMaterial: RawMaterial; lastPurchasePrice: number; lastPurchaseDate: string }[]>(`/mrp/suppliers/${id}/materials`);
         return response.data;

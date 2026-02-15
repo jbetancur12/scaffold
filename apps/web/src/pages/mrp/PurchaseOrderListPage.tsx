@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mrpApi, PurchaseOrder } from '../../services/mrpApi';
+import { PurchaseOrder } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
 import { Plus, Eye, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -21,9 +21,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Warehouse } from '@scaffold/types';
-import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
-import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
+import { useCancelPurchaseOrderMutation, usePurchaseOrdersQuery, useReceivePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
 
 const statusLabels = {
     PENDING: 'Pendiente',
@@ -42,69 +41,42 @@ const statusColors = {
 export default function PurchaseOrderListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const [orders, setOrders] = useState<PurchaseOrder[]>([]);
-    const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
-    const [total, setTotal] = useState(0);
     const limit = 10;
 
     // Warehouse selection
-    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
     const [orderToReceive, setOrderToReceive] = useState<string | null>(null);
-    const [submitting, setSubmitting] = useState(false);
-
-    const fetchOrders = useCallback(async () => {
-        try {
-            const response = await mrpApi.listPurchaseOrders(page, limit);
-            return response;
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudieron cargar las órdenes de compra'),
-                variant: 'destructive',
-            });
-            throw error;
-        }
-    }, [page, limit, toast]);
-
-    const fetchWarehouses = useCallback(async () => {
-        try {
-            return await mrpApi.getWarehouses();
-        } catch (error) {
-            console.error('Error loading warehouses', error);
-            throw error;
-        }
-    }, []);
-
-    const { data: ordersResponse, loading: ordersLoading, invalidate } = useMrpQuery(fetchOrders, true, mrpQueryKeys.purchaseOrders);
-    const { data: warehousesData } = useMrpQuery(fetchWarehouses, true, mrpQueryKeys.warehouses);
+    const {
+        data: ordersResponse,
+        loading,
+        error: ordersError,
+    } = usePurchaseOrdersQuery(page, limit);
+    const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
+    const { execute: receiveOrder, loading: submitting } = useReceivePurchaseOrderMutation();
+    const { execute: cancelOrder } = useCancelPurchaseOrderMutation();
+    const orders: PurchaseOrder[] = ordersResponse?.data || [];
+    const total = ordersResponse?.total || 0;
+    const warehouses = warehousesData ?? [];
 
     useEffect(() => {
-        setLoading(ordersLoading);
-        setOrders(ordersResponse?.data || []);
-        setTotal(ordersResponse?.total || 0);
-    }, [ordersLoading, ordersResponse]);
+        if (!ordersError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(ordersError, 'No se pudieron cargar las órdenes de compra'),
+            variant: 'destructive',
+        });
+    }, [ordersError, toast]);
 
     useEffect(() => {
-        setWarehouses(warehousesData || []);
-    }, [warehousesData]);
-
-    const { execute: receiveOrder } = useMrpMutation<{ id: string; warehouseId?: string }, PurchaseOrder>(
-        async ({ id, warehouseId }) => mrpApi.receivePurchaseOrder(id, warehouseId),
-        {
-            onSuccess: async () => { await invalidate(); },
-            invalidateKeys: [mrpQueryKeys.rawMaterials, mrpQueryKeys.purchaseOrders],
-        }
-    );
-    const { execute: cancelOrder } = useMrpMutation<string, void>(
-        async (id) => mrpApi.cancelPurchaseOrder(id),
-        {
-            onSuccess: async () => { await invalidate(); },
-            invalidateKeys: [mrpQueryKeys.purchaseOrders],
-        }
-    );
+        if (!warehousesError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(warehousesError, 'No se pudieron cargar los almacenes'),
+            variant: 'destructive',
+        });
+    }, [warehousesError, toast]);
 
 
     const handleReceiveClick = (id: string) => {
@@ -116,7 +88,6 @@ export default function PurchaseOrderListPage() {
         if (!orderToReceive) return;
 
         try {
-            setSubmitting(true);
             await receiveOrder({ id: orderToReceive, warehouseId: selectedWarehouseId || undefined });
             toast({
                 title: 'Éxito',
@@ -130,8 +101,6 @@ export default function PurchaseOrderListPage() {
                 description: getErrorMessage(error, 'No se pudo recibir la orden'),
                 variant: 'destructive',
             });
-        } finally {
-            setSubmitting(false);
         }
     };
 

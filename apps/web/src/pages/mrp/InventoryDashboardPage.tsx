@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-
-import { mrpApi } from '@/services/mrpApi';
+import { useEffect, useState } from 'react';
 import { InventoryItem, ProductVariant, RawMaterial, Warehouse, Product } from '@scaffold/types';
 import {
     Table,
@@ -35,6 +33,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatQuantity } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
+import { useInventoryQuery, useManualStockMutation } from '@/hooks/mrp/useInventory';
+import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
+import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
 
 interface PopulatedInventoryItem extends InventoryItem {
     variant?: ProductVariant & { product?: Product };
@@ -44,59 +45,36 @@ interface PopulatedInventoryItem extends InventoryItem {
 
 export default function InventoryDashboardPage() {
     const { toast } = useToast();
-    const [inventory, setInventory] = useState<PopulatedInventoryItem[]>([]);
-    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
     // Manual Add State
     const [isManualAddOpen, setIsManualAddOpen] = useState(false);
-    const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
-    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
     const [selectedFilterWarehouseId, setSelectedFilterWarehouseId] = useState<string>('all');
     const [selectedMaterialId, setSelectedMaterialId] = useState('');
     const [manualQuantity, setManualQuantity] = useState('');
     const [manualCost, setManualCost] = useState('');
-    const [submittingManual, setSubmittingManual] = useState(false);
-
-    const loadInventory = useCallback(async () => {
-        try {
-            setLoading(true);
-            const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
-            const data = await mrpApi.getInventory(1, 100, warehouseId); // Fetch mostly all for now
-            setInventory(data.items as PopulatedInventoryItem[]);
-        } catch (err) {
-            console.error(err);
-            setError(getErrorMessage(err, 'Error al cargar el inventario'));
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedFilterWarehouseId]);
-
-    const loadWarehouses = useCallback(async () => {
-        try {
-            const data = await mrpApi.getWarehouses();
-            setWarehouses(data);
-        } catch (err) {
-            console.error('Error loading warehouses', err);
-        }
-    }, []);
-
-    const loadRawMaterials = useCallback(async () => {
-        try {
-            const data = await mrpApi.getRawMaterials(1, 100);
-
-            setRawMaterials(data.materials || []);
-        } catch (err) {
-            console.error('Error loading raw materials', err);
-        }
-    }, []);
+    const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
+    const { data: inventoryData, loading, error: inventoryError, execute: refetchInventory } = useInventoryQuery(1, 100, warehouseId);
+    const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
+    const { materials: rawMaterials, error: rawMaterialsError } = useRawMaterialsQuery(1, 100, '');
+    const { execute: addManualStock, loading: submittingManual } = useManualStockMutation();
+    const inventory = (inventoryData?.items as PopulatedInventoryItem[]) ?? [];
+    const warehouses: Warehouse[] = warehousesData ?? [];
 
     useEffect(() => {
-        loadInventory();
-        loadRawMaterials();
-        loadWarehouses();
-    }, [loadInventory, loadRawMaterials, loadWarehouses]);
+        if (!inventoryError) return;
+        setError(getErrorMessage(inventoryError, 'Error al cargar el inventario'));
+    }, [inventoryError]);
+
+    useEffect(() => {
+        if (!rawMaterialsError && !warehousesError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(rawMaterialsError || warehousesError, 'No se pudo cargar información auxiliar'),
+            variant: 'destructive',
+        });
+    }, [rawMaterialsError, toast, warehousesError]);
 
     const handleManualAdd = async () => {
         if (!selectedMaterialId || !manualQuantity || !manualCost) {
@@ -109,8 +87,7 @@ export default function InventoryDashboardPage() {
         }
 
         try {
-            setSubmittingManual(true);
-            await mrpApi.addManualStock({
+            await addManualStock({
                 rawMaterialId: selectedMaterialId,
                 quantity: Number(manualQuantity),
                 unitCost: Number(manualCost),
@@ -126,7 +103,7 @@ export default function InventoryDashboardPage() {
             setSelectedMaterialId('');
             setManualQuantity('');
             setManualCost('');
-            loadInventory(); // Reload to see changes
+            await refetchInventory({ force: true });
         } catch (err) {
             console.error(err);
             toast({
@@ -134,8 +111,6 @@ export default function InventoryDashboardPage() {
                 description: getErrorMessage(err, 'No se pudo agregar el stock manual.'),
                 variant: 'destructive',
             });
-        } finally {
-            setSubmittingManual(false);
         }
     };
 

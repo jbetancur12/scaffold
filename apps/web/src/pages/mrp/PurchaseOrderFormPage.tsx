@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { mrpApi } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -10,8 +9,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '../../components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { CreatePurchaseOrderSchema } from '@scaffold/schemas';
-import type { Supplier, RawMaterial } from '@scaffold/types';
 import { getErrorMessage } from '@/lib/api-error';
+import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
+import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
+import { useCreatePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
 
 interface OrderItem {
     rawMaterialId: string;
@@ -29,9 +30,6 @@ export default function PurchaseOrderFormPage() {
     const [activeCalcIdx, setActiveCalcIdx] = useState<number | null>(null);
     const [calcBulkPrice, setCalcBulkPrice] = useState<number>(0);
     const [calcBulkQty, setCalcBulkQty] = useState<number>(0);
-    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-    const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
-
     const [formData, setFormData] = useState({
         supplierId: '',
         expectedDeliveryDate: '',
@@ -42,26 +40,19 @@ export default function PurchaseOrderFormPage() {
         { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false }
     ]);
 
-    const loadData = useCallback(async () => {
-        try {
-            const [suppliersRes, materialsRes] = await Promise.all([
-                mrpApi.getSuppliers(1, 100),
-                mrpApi.getRawMaterials(1, 100),
-            ]);
-            setSuppliers(suppliersRes.suppliers);
-            setRawMaterials(materialsRes.materials);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar la información inicial'),
-                variant: 'destructive',
-            });
-        }
-    }, [toast]);
+    const { data: suppliersResponse, error: suppliersError } = useSuppliersQuery(1, 100);
+    const { materials: rawMaterials, error: rawMaterialsError } = useRawMaterialsQuery(1, 100, '');
+    const { execute: createPurchaseOrder } = useCreatePurchaseOrderMutation();
+    const suppliers = suppliersResponse?.suppliers ?? [];
 
     useEffect(() => {
-        loadData();
-    }, [loadData]);
+        if (!suppliersError && !rawMaterialsError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(suppliersError || rawMaterialsError, 'No se pudo cargar la información inicial'),
+            variant: 'destructive',
+        });
+    }, [rawMaterialsError, suppliersError, toast]);
 
     const addItem = () => {
         setItems([...items, { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false }]);
@@ -135,7 +126,7 @@ export default function PurchaseOrderFormPage() {
                 })),
             };
             const validatedData = CreatePurchaseOrderSchema.parse(submitData);
-            await mrpApi.createPurchaseOrder(validatedData);
+            await createPurchaseOrder(validatedData);
             toast({
                 title: 'Éxito',
                 description: 'Orden de compra creada exitosamente',

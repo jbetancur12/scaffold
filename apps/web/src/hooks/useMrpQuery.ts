@@ -225,8 +225,8 @@ export function useMrpQuery<T>(
 export function useMrpMutation<TInput, TResult>(
     mutation: (input: TInput) => Promise<TResult>,
     options?: {
-        onSuccess?: (result: TResult) => void | Promise<void>;
-        onError?: (error: unknown) => void | Promise<void>;
+        onSuccess?: (result: TResult, input: TInput) => void | Promise<void>;
+        onError?: (error: unknown, input: TInput) => void | Promise<void>;
         invalidateKeys?: string[];
     }
 ) {
@@ -238,14 +238,14 @@ export function useMrpMutation<TInput, TResult>(
         setError(null);
         try {
             const result = await mutation(input);
-            await options?.onSuccess?.(result);
+            await options?.onSuccess?.(result, input);
             if (options?.invalidateKeys?.length) {
                 invalidateMrpQueries(options.invalidateKeys);
             }
             return result;
         } catch (err) {
             setError(err);
-            await options?.onError?.(err);
+            await options?.onError?.(err, input);
             throw err;
         } finally {
             setLoading(false);

@@ -1,8 +1,11 @@
 export const mrpQueryKeys = {
     products: 'mrp.products',
+    productsList: (page: number, limit: number) => `mrp.products.${page}.${limit}`,
     product: (id: string) => `mrp.product.${id}`,
     suppliers: 'mrp.suppliers',
+    suppliersList: (page: number, limit: number) => `mrp.suppliers.${page}.${limit}`,
     supplier: (id: string) => `mrp.supplier.${id}`,
+    supplierMaterials: (id: string) => `mrp.supplier.materials.${id}`,
     rawMaterials: 'mrp.raw-materials',
     rawMaterialsList: (page: number, limit: number, search: string) => `mrp.raw-materials.${page}.${limit}.${search || ''}`,
     rawMaterial: (id: string) => `mrp.raw-material.${id}`,
@@ -10,8 +13,11 @@ export const mrpQueryKeys = {
     warehouses: 'mrp.warehouses',
     warehouse: (id: string) => `mrp.warehouse.${id}`,
     purchaseOrders: 'mrp.purchase-orders',
+    purchaseOrdersList: (page: number, limit: number, status?: string, supplierId?: string) =>
+        `mrp.purchase-orders.${page}.${limit}.${status || ''}.${supplierId || ''}`,
     purchaseOrder: (id: string) => `mrp.purchase-order.${id}`,
     productionOrders: 'mrp.production-orders',
+    productionOrdersList: (page: number, limit: number) => `mrp.production-orders.${page}.${limit}`,
     productionOrder: (id: string) => `mrp.production-order.${id}`,
     productionRequirements: (id: string) => `mrp.production-requirements.${id}`,
     operationalConfig: 'mrp.operational-config',

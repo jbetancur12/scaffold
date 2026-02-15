@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mrpApi } from '@/services/mrpApi';
 import { Product, RawMaterial } from '@scaffold/types';
 import BOMEditor from '@/components/mrp/BOMEditor';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,9 @@ import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getErrorMessage } from '@/lib/api-error';
+import { useProductQuery } from '@/hooks/mrp/useProducts';
+import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
+import { useCopyBomFromVariantMutation } from '@/hooks/mrp/useBom';
 
 export default function ProductBOMPage() {
     const { id } = useParams();
@@ -17,33 +19,27 @@ export default function ProductBOMPage() {
     const [product, setProduct] = useState<Product | null>(null);
     const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
     const [loading, setLoading] = useState(true);
-
-    const loadData = useCallback(async () => {
-        try {
-            setLoading(true);
-            const [productData, materialsData] = await Promise.all([
-                mrpApi.getProduct(id!),
-                mrpApi.getRawMaterials(1, 1000) // Load all for now
-            ]);
-            setProduct(productData);
-            setRawMaterials(materialsData.materials || []);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar la información del producto'),
-                variant: 'destructive',
-            });
-            navigate('/mrp/products');
-        } finally {
-            setLoading(false);
-        }
-    }, [id, navigate, toast]);
+    const { data: productData, error: productError } = useProductQuery(id);
+    const { materials, error: materialsError } = useRawMaterialsQuery(1, 1000, '');
+    const { execute: copyBomFromVariant } = useCopyBomFromVariantMutation();
 
     useEffect(() => {
-        if (id) {
-            loadData();
+        if (productData) {
+            setProduct(productData);
         }
-    }, [id, loadData]);
+        setRawMaterials(materials || []);
+        setLoading(false);
+    }, [materials, productData]);
+
+    useEffect(() => {
+        if (!productError && !materialsError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(productError || materialsError, 'No se pudo cargar la información del producto'),
+            variant: 'destructive',
+        });
+        navigate('/mrp/products');
+    }, [materialsError, navigate, productError, toast]);
 
     if (loading) return <div>Cargando...</div>;
     if (!product) return <div>Producto no encontrado</div>;
@@ -56,23 +52,13 @@ export default function ProductBOMPage() {
 
         try {
             setLoading(true);
-            const sourceBOM = await mrpApi.getBOM(sourceVariantId);
+            const sourceBOM = await copyBomFromVariant({ sourceVariantId, targetVariantId });
 
             if (sourceBOM.length === 0) {
                 toast({ title: 'Aviso', description: 'La variante origen no tiene materiales.' });
                 setLoading(false);
                 return;
             }
-
-            // Copy each item
-            const promises = sourceBOM.map(item => mrpApi.addBOMItem({
-                variantId: targetVariantId,
-                rawMaterialId: item.rawMaterialId,
-                quantity: item.quantity,
-                fabricationParams: item.fabricationParams || undefined
-            }));
-
-            await Promise.all(promises);
             toast({ title: 'Éxito', description: 'Materiales copiados correctamente' });
 
             // Trigger refresh by reloading data (though BOMEditor manages its own state, we might need a key change or context refresh)

@@ -24,6 +24,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/suppliers', (req, res, next) => mrpController.createSupplier(req, res, next));
     router.get('/suppliers', (req, res, next) => mrpController.listSuppliers(req, res, next));
     router.get('/suppliers/:id', (req, res, next) => mrpController.getSupplier(req, res, next));
+    router.put('/suppliers/:id', (req, res, next) => mrpController.updateSupplier(req, res, next));
     router.get('/suppliers/:id/materials', (req, res, next) => mrpController.getSupplierMaterials(req, res, next));
     router.post('/suppliers/:id/materials', (req, res, next) => mrpController.addSupplierMaterial(req, res, next));
     router.delete('/suppliers/:id/materials/:materialId', (req, res, next) => mrpController.removeSupplierMaterial(req, res, next));

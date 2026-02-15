@@ -1,42 +1,28 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mrpApi } from '@/services/mrpApi';
-import { Supplier } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Edit2, Factory, MapPin, Phone, Mail, Building, CreditCard, FileText } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { SupplierMaterialsTab } from './components/SupplierMaterialsTab';
 import { getErrorMessage } from '@/lib/api-error';
+import { useSupplierQuery } from '@/hooks/mrp/useSuppliers';
 
 export default function SupplierDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
-    const [supplier, setSupplier] = useState<Supplier | null>(null);
-    const [loading, setLoading] = useState(true);
-
-    const loadData = useCallback(async () => {
-        if (!id) return;
-        try {
-            setLoading(true);
-            const data = await mrpApi.getSupplier(id);
-            setSupplier(data);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar la información del proveedor'),
-                variant: 'destructive',
-            });
-            navigate('/mrp/suppliers');
-        } finally {
-            setLoading(false);
-        }
-    }, [id, navigate, toast]);
+    const { data: supplier, loading, error } = useSupplierQuery(id);
 
     useEffect(() => {
-        loadData();
-    }, [loadData]);
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(error, 'No se pudo cargar la información del proveedor'),
+            variant: 'destructive',
+        });
+        navigate('/mrp/suppliers');
+    }, [error, navigate, toast]);
 
     if (loading) {
         return (

@@ -165,6 +165,17 @@ export class MrpController {
         }
     }
 
+    async updateSupplier(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const data = SupplierSchema.partial().parse(req.body);
+            const supplier = await this.supplierService.updateSupplier(id, data);
+            return ApiResponse.success(res, supplier, 'Proveedor actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async getSupplierMaterials(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;

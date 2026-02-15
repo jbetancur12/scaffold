@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { mrpApi } from '@/services/mrpApi';
 import { OperationalConfig } from '@scaffold/types';
 import { Save, Calculator, Clock, Users, Building, Percent } from 'lucide-react';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
+import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/hooks/mrp/useOperationalConfig';
 
 export default function OperationalSettingsPage() {
     const { toast } = useToast();
@@ -29,32 +29,28 @@ export default function OperationalSettingsPage() {
         createdAt: new Date(),
         updatedAt: new Date()
     });
-
-    const loadConfig = useCallback(async () => {
-        try {
-            setLoading(true);
-            const data = await mrpApi.getOperationalConfig();
-            setConfig(data);
-        } catch (error) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'No se pudo cargar la configuración operativa.'),
-                variant: 'destructive',
-            });
-        } finally {
-            setLoading(false);
-        }
-    }, [toast]);
+    const { data: currentConfig, error } = useOperationalConfigQuery();
+    const { execute: saveOperationalConfig } = useSaveOperationalConfigMutation();
 
     useEffect(() => {
-        loadConfig();
-    }, [loadConfig]);
+        if (!currentConfig) return;
+        setConfig(currentConfig);
+    }, [currentConfig]);
+
+    useEffect(() => {
+        if (!error) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(error, 'No se pudo cargar la configuración operativa.'),
+            variant: 'destructive',
+        });
+    }, [error, toast]);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             setLoading(true);
-            const updated = await mrpApi.updateOperationalConfig(config);
+            const updated = await saveOperationalConfig(config);
             setConfig(updated);
             toast({
                 title: 'Configuración actualizada',

@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mrpApi, MaterialRequirement } from '@/services/mrpApi';
+import { MaterialRequirement } from '@/services/mrpApi';
 import { Product, ProductionOrder, ProductionOrderStatus } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,8 @@ import {
 import { ArrowLeft, Plus, Save, Trash2, ClipboardList } from 'lucide-react';
 import { CreateProductionOrderSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
-import { useMrpQuery } from '@/hooks/useMrpQuery';
+import { useProductsQuery } from '@/hooks/mrp/useProducts';
+import { useCreateProductionOrderMutation, useProductionOrderQuery, useProductionRequirementsQuery, useUpdateProductionOrderStatusMutation } from '@/hooks/mrp/useProductionOrders';
 
 interface OrderItem {
     id: string; // temp id for UI
@@ -60,54 +61,38 @@ export default function ProductionOrderFormPage() {
         notes: '',
     });
 
-    const loadProducts = useCallback(async () => {
-        try {
-            const data = await mrpApi.getProducts(1, 1000);
-            setProducts(data.products);
-            return data;
-        } catch (error) {
-            console.error('Error loading products:', error);
-            throw error;
-        }
-    }, []);
-
-    const { execute: refreshProducts } = useMrpQuery(loadProducts, true);
-
-    const loadRequirements = useCallback(async (orderId: string) => {
-        try {
-            const reqs = await mrpApi.getMaterialRequirements(orderId);
-            setRequirements(reqs);
-        } catch (error) {
-            console.error('Error loading requirements:', error);
-        }
-    }, []);
-
-    const loadOrder = useCallback(async () => {
-        try {
-            setLoading(true);
-            const data = await mrpApi.getProductionOrder(id!);
-            setOrder(data);
-            setFormData({
-                startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
-                endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
-                notes: data.notes || '',
-            });
-
-            // Load requirements if order exists
-            loadRequirements(id!);
-
-        } catch (error) {
-            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo cargar la orden'), variant: 'destructive' });
-        } finally {
-            setLoading(false);
-        }
-    }, [id, loadRequirements, toast]);
+    const { data: productsResponse, error: productsError } = useProductsQuery(1, 1000);
+    const { data: orderData, error: orderError } = useProductionOrderQuery(isEditing ? id : undefined);
+    const { data: requirementsData, error: requirementsError } = useProductionRequirementsQuery(isEditing ? id : undefined);
+    const { execute: createProductionOrder } = useCreateProductionOrderMutation();
+    const { execute: updateOrderStatus } = useUpdateProductionOrderStatusMutation();
 
     useEffect(() => {
-        if (id) {
-            loadOrder();
-        }
-    }, [id, loadOrder]);
+        setProducts(productsResponse?.products ?? []);
+    }, [productsResponse]);
+
+    useEffect(() => {
+        if (!orderData) return;
+        setOrder(orderData);
+        setFormData({
+            startDate: orderData.startDate ? new Date(orderData.startDate).toISOString().split('T')[0] : '',
+            endDate: orderData.endDate ? new Date(orderData.endDate).toISOString().split('T')[0] : '',
+            notes: orderData.notes || '',
+        });
+    }, [orderData]);
+
+    useEffect(() => {
+        setRequirements(requirementsData ?? []);
+    }, [requirementsData]);
+
+    useEffect(() => {
+        if (!productsError && !orderError && !requirementsError) return;
+        toast({
+            title: 'Error',
+            description: getErrorMessage(productsError || orderError || requirementsError, 'No se pudo cargar la información'),
+            variant: 'destructive',
+        });
+    }, [orderError, productsError, requirementsError, toast]);
 
     const handleAddItem = () => {
         setItems([
@@ -158,11 +143,10 @@ export default function ProductionOrderFormPage() {
             if (isEditing) {
                 toast({ title: 'Info', description: 'Edición en construcción' });
             } else {
-                const newOrder = await mrpApi.createProductionOrder(payload);
+                const newOrder = await createProductionOrder(payload);
                 toast({ title: 'Éxito', description: 'Orden creada exitosamente' });
                 // Instead of navigating away, maybe go to view mode?
                 navigate(`/mrp/production-orders/${newOrder.id}`);
-                await refreshProducts();
             }
         } catch (error: unknown) {
             toast({ title: 'Error', description: getErrorMessage(error, 'Error al guardar'), variant: 'destructive' });
@@ -175,7 +159,7 @@ export default function ProductionOrderFormPage() {
         if (!order) return;
         try {
             setLoading(true);
-            const updatedOrder = await mrpApi.updateProductionOrderStatus(order.id, newStatus);
+            const updatedOrder = await updateOrderStatus({ orderId: order.id, status: newStatus });
             setOrder(updatedOrder);
             toast({ title: 'Estado actualizado', description: `La orden ahora está en estado: ${newStatus}` });
 
