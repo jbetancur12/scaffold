@@ -19,8 +19,18 @@ import {
     QualitySeverity,
     CapaStatus,
     ControlledDocument,
+    DocumentApprovalMethod,
     DocumentProcess,
     DocumentStatus,
+    TechnovigilanceCase,
+    TechnovigilanceCaseType,
+    TechnovigilanceCausality,
+    TechnovigilanceSeverity,
+    TechnovigilanceStatus,
+    TechnovigilanceReportChannel,
+    PurchaseOrderStatus,
+    PurchaseOrder,
+    PurchaseOrderListResponse,
 } from '@scaffold/types';
 import type {
     CreatePurchaseOrderDto,
@@ -55,43 +65,6 @@ export interface RawMaterialSupplier {
 export interface ListResponse<T> {
     [key: string]: T[] | number; // Dynamic key based on return type (products, materials, etc)
     total: number;
-}
-
-export type PurchaseOrderStatus = 'PENDING' | 'CONFIRMED' | 'RECEIVED' | 'CANCELLED';
-
-export interface PurchaseOrderItem {
-    id: string;
-    rawMaterial: {
-        id: string;
-        name: string;
-        sku: string;
-        unit: string;
-    };
-    quantity: number;
-    unitPrice: number;
-    taxAmount: number;
-    subtotal: number;
-}
-
-export interface PurchaseOrder {
-    id: string;
-    supplier: { id: string; name: string };
-    orderDate: string;
-    expectedDeliveryDate?: string;
-    receivedDate?: string;
-    status: PurchaseOrderStatus;
-    totalAmount: number;
-    taxTotal: number;
-    subtotalBase: number;
-    notes?: string;
-    items?: PurchaseOrderItem[];
-}
-
-export interface PurchaseOrderListResponse {
-    data: PurchaseOrder[];
-    total: number;
-    page: number;
-    limit: number;
 }
 
 export interface CreateProductionBatchPayload {
@@ -155,6 +128,38 @@ export interface ListControlledDocumentsFilters {
     status?: DocumentStatus;
 }
 
+export interface CreateTechnovigilanceCasePayload {
+    title: string;
+    description: string;
+    type?: TechnovigilanceCaseType;
+    severity?: TechnovigilanceSeverity;
+    causality?: TechnovigilanceCausality;
+    productionOrderId?: string;
+    productionBatchId?: string;
+    productionBatchUnitId?: string;
+    lotCode?: string;
+    serialCode?: string;
+    createdBy?: string;
+}
+
+export interface UpdateTechnovigilanceCasePayload {
+    status?: TechnovigilanceStatus;
+    severity?: TechnovigilanceSeverity;
+    causality?: TechnovigilanceCausality;
+    investigationSummary?: string;
+    resolution?: string;
+    actor?: string;
+}
+
+export interface ReportTechnovigilanceCasePayload {
+    reportNumber: string;
+    reportChannel: TechnovigilanceReportChannel;
+    reportPayloadRef?: string;
+    reportedAt?: string | Date;
+    ackAt?: string | Date;
+    actor?: string;
+}
+
 export const mrpApi = {
     // Products
     getProducts: async (page = 1, limit = 10) => {
@@ -196,7 +201,11 @@ export const mrpApi = {
         return response.data;
     },
 
-    listPurchaseOrders: async (page: number = 1, limit: number = 10, filters?: { status?: string; supplierId?: string }): Promise<PurchaseOrderListResponse> => {
+    listPurchaseOrders: async (
+        page: number = 1,
+        limit: number = 10,
+        filters?: { status?: PurchaseOrderStatus; supplierId?: string }
+    ): Promise<PurchaseOrderListResponse> => {
         const response = await api.get<PurchaseOrderListResponse>('/mrp/purchase-orders', { params: { page, limit, ...filters } });
         return response.data;
     },
@@ -385,6 +394,28 @@ export const mrpApi = {
         const response = await api.get<AuditEvent[]>('/mrp/quality/audit-events', { params: filters });
         return response.data;
     },
+    createTechnovigilanceCase: async (data: CreateTechnovigilanceCasePayload): Promise<TechnovigilanceCase> => {
+        const response = await api.post<TechnovigilanceCase>('/mrp/quality/technovigilance-cases', data);
+        return response.data;
+    },
+    listTechnovigilanceCases: async (filters?: {
+        status?: TechnovigilanceStatus;
+        type?: TechnovigilanceCaseType;
+        severity?: TechnovigilanceSeverity;
+        causality?: TechnovigilanceCausality;
+        reportedToInvima?: boolean;
+    }): Promise<TechnovigilanceCase[]> => {
+        const response = await api.get<TechnovigilanceCase[]>('/mrp/quality/technovigilance-cases', { params: filters });
+        return response.data;
+    },
+    updateTechnovigilanceCase: async (id: string, data: UpdateTechnovigilanceCasePayload): Promise<TechnovigilanceCase> => {
+        const response = await api.patch<TechnovigilanceCase>(`/mrp/quality/technovigilance-cases/${id}`, data);
+        return response.data;
+    },
+    reportTechnovigilanceCase: async (id: string, data: ReportTechnovigilanceCasePayload): Promise<TechnovigilanceCase> => {
+        const response = await api.post<TechnovigilanceCase>(`/mrp/quality/technovigilance-cases/${id}/report-invima`, data);
+        return response.data;
+    },
     createControlledDocument: async (data: CreateControlledDocumentPayload): Promise<ControlledDocument> => {
         const response = await api.post<ControlledDocument>('/mrp/quality/documents', data);
         return response.data;
@@ -397,8 +428,11 @@ export const mrpApi = {
         const response = await api.post<ControlledDocument>(`/mrp/quality/documents/${id}/submit-review`, { actor });
         return response.data;
     },
-    approveControlledDocument: async (id: string, actor?: string): Promise<ControlledDocument> => {
-        const response = await api.post<ControlledDocument>(`/mrp/quality/documents/${id}/approve`, { actor });
+    approveControlledDocument: async (
+        id: string,
+        payload: { actor: string; approvalMethod: DocumentApprovalMethod; approvalSignature: string }
+    ): Promise<ControlledDocument> => {
+        const response = await api.post<ControlledDocument>(`/mrp/quality/documents/${id}/approve`, payload);
         return response.data;
     },
     listActiveControlledDocumentsByProcess: async (process: DocumentProcess): Promise<ControlledDocument[]> => {

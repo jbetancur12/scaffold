@@ -1,5 +1,16 @@
 import { useState } from 'react';
-import { CapaStatus, DocumentProcess, NonConformityStatus, QualitySeverity } from '@scaffold/types';
+import {
+    CapaStatus,
+    DocumentApprovalMethod,
+    DocumentProcess,
+    NonConformityStatus,
+    QualitySeverity,
+    TechnovigilanceCaseType,
+    TechnovigilanceCausality,
+    TechnovigilanceSeverity,
+    TechnovigilanceStatus,
+    TechnovigilanceReportChannel,
+} from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import {
@@ -8,12 +19,16 @@ import {
     useCreateControlledDocumentMutation,
     useCreateCapaMutation,
     useCreateNonConformityMutation,
+    useCreateTechnovigilanceCaseMutation,
     useNonConformitiesQuery,
     useQualityAuditQuery,
+    useTechnovigilanceCasesQuery,
     useSubmitControlledDocumentMutation,
     useApproveControlledDocumentMutation,
     useUpdateCapaMutation,
     useUpdateNonConformityMutation,
+    useUpdateTechnovigilanceCaseMutation,
+    useReportTechnovigilanceCaseMutation,
 } from '@/hooks/mrp/useQuality';
 
 export const useQualityCompliance = () => {
@@ -21,6 +36,7 @@ export const useQualityCompliance = () => {
     const { data: nonConformitiesData, loading: loadingNc } = useNonConformitiesQuery();
     const { data: capasData, loading: loadingCapas } = useCapasQuery();
     const { data: auditData, loading: loadingAudit } = useQualityAuditQuery();
+    const { data: technovigilanceData, loading: loadingTechno } = useTechnovigilanceCasesQuery();
     const { data: documentsData, loading: loadingDocuments } = useControlledDocumentsQuery();
     const { execute: createNc, loading: creatingNc } = useCreateNonConformityMutation();
     const { execute: updateNc } = useUpdateNonConformityMutation();
@@ -29,6 +45,9 @@ export const useQualityCompliance = () => {
     const { execute: createDocument, loading: creatingDocument } = useCreateControlledDocumentMutation();
     const { execute: submitDocument, loading: submittingDocument } = useSubmitControlledDocumentMutation();
     const { execute: approveDocument, loading: approvingDocument } = useApproveControlledDocumentMutation();
+    const { execute: createTechnoCase, loading: creatingTechnoCase } = useCreateTechnovigilanceCaseMutation();
+    const { execute: updateTechnoCase } = useUpdateTechnovigilanceCaseMutation();
+    const { execute: reportTechnoCase } = useReportTechnovigilanceCaseMutation();
 
     const [ncForm, setNcForm] = useState({
         title: '',
@@ -51,10 +70,20 @@ export const useQualityCompliance = () => {
         effectiveDate: '',
         expiresAt: '',
     });
+    const [technoForm, setTechnoForm] = useState({
+        title: '',
+        description: '',
+        type: TechnovigilanceCaseType.QUEJA,
+        severity: TechnovigilanceSeverity.MODERADA,
+        causality: '' as '' | TechnovigilanceCausality,
+        lotCode: '',
+        serialCode: '',
+    });
 
     const nonConformities = nonConformitiesData ?? [];
     const capas = capasData ?? [];
     const audits = auditData ?? [];
+    const technovigilanceCases = technovigilanceData ?? [];
     const documents = documentsData ?? [];
     const openNc = nonConformities.filter((n) => n.status !== NonConformityStatus.CERRADA);
 
@@ -139,10 +168,95 @@ export const useQualityCompliance = () => {
 
     const handleApproveDocument = async (id: string) => {
         try {
-            await approveDocument({ id, actor: 'sistema-web' });
+            const approvalSignature = window.prompt('Firma de aprobación (nombre completo o identificador)');
+            if (!approvalSignature) return;
+
+            const methodRaw = window.prompt(
+                'Método de firma (firma_manual, firma_digital)',
+                DocumentApprovalMethod.FIRMA_MANUAL
+            );
+            if (!methodRaw) return;
+
+            if (!Object.values(DocumentApprovalMethod).includes(methodRaw as DocumentApprovalMethod)) {
+                toast({ title: 'Error', description: 'Método de firma inválido', variant: 'destructive' });
+                return;
+            }
+
+            await approveDocument({
+                id,
+                actor: 'sistema-web',
+                approvalMethod: methodRaw as DocumentApprovalMethod,
+                approvalSignature,
+            });
             toast({ title: 'Documento aprobado', description: 'Ya quedó vigente para su proceso.' });
         } catch (err) {
             toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo aprobar el documento'), variant: 'destructive' });
+        }
+    };
+
+    const handleCreateTechnoCase = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await createTechnoCase({
+                title: technoForm.title,
+                description: technoForm.description,
+                type: technoForm.type,
+                severity: technoForm.severity,
+                causality: technoForm.causality || undefined,
+                lotCode: technoForm.lotCode || undefined,
+                serialCode: technoForm.serialCode || undefined,
+                createdBy: 'sistema-web',
+            });
+            setTechnoForm({
+                title: '',
+                description: '',
+                type: TechnovigilanceCaseType.QUEJA,
+                severity: TechnovigilanceSeverity.MODERADA,
+                causality: '',
+                lotCode: '',
+                serialCode: '',
+            });
+            toast({ title: 'Caso registrado', description: 'Caso de tecnovigilancia creado correctamente.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear el caso'), variant: 'destructive' });
+        }
+    };
+
+    const quickSetTechnoStatus = async (id: string, status: TechnovigilanceStatus) => {
+        try {
+            await updateTechnoCase({ id, status, actor: 'sistema-web' });
+            toast({ title: 'Caso actualizado', description: `Estado cambiado a ${status}.` });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo actualizar el caso'), variant: 'destructive' });
+        }
+    };
+
+    const quickReportTechno = async (id: string) => {
+        try {
+            const reportNumber = window.prompt('Número de radicado INVIMA');
+            if (!reportNumber) return;
+
+            const channelRaw = window.prompt('Canal (invima_portal, email_oficial, otro)', TechnovigilanceReportChannel.INVIMA_PORTAL);
+            if (!channelRaw) return;
+
+            if (!Object.values(TechnovigilanceReportChannel).includes(channelRaw as TechnovigilanceReportChannel)) {
+                toast({ title: 'Error', description: 'Canal de reporte inválido', variant: 'destructive' });
+                return;
+            }
+
+            const reportPayloadRef = window.prompt('Referencia de soporte (opcional)') || undefined;
+
+            await reportTechnoCase({
+                id,
+                reportNumber,
+                reportChannel: channelRaw as TechnovigilanceReportChannel,
+                reportPayloadRef,
+                reportedAt: new Date().toISOString(),
+                actor: 'sistema-web',
+            });
+            toast({ title: 'Reporte actualizado', description: 'Caso reportado a INVIMA con trazabilidad.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo reportar el caso a INVIMA'), variant: 'destructive' });
         }
     };
 
@@ -150,21 +264,26 @@ export const useQualityCompliance = () => {
         nonConformities,
         capas,
         audits,
+        technovigilanceCases,
         documents,
         openNc,
         ncForm,
         capaForm,
         documentForm,
+        technoForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
+        setTechnoForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
+        loadingTechno,
         loadingDocuments,
         creatingNc,
         creatingCapa,
         creatingDocument,
+        creatingTechnoCase,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -174,6 +293,8 @@ export const useQualityCompliance = () => {
         handleCreateDocument,
         handleSubmitDocument,
         handleApproveDocument,
+        handleCreateTechnoCase,
+        quickSetTechnoStatus,
+        quickReportTechno,
     };
 };
-

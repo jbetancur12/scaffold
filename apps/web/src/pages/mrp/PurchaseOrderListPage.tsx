@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PurchaseOrder } from '../../services/mrpApi';
+import { PurchaseOrder } from '@scaffold/types';
 import { Button } from '../../components/ui/button';
 import { Plus, Eye, Check, X, Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';

@@ -64,6 +64,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/capa-actions', (req, res, next) => mrpController.listCapas(req, res, next));
     router.patch('/quality/capa-actions/:id', (req, res, next) => mrpController.updateCapa(req, res, next));
     router.get('/quality/audit-events', (req, res, next) => mrpController.listQualityAudit(req, res, next));
+    router.post('/quality/technovigilance-cases', (req, res, next) => mrpController.createTechnovigilanceCase(req, res, next));
+    router.get('/quality/technovigilance-cases', (req, res, next) => mrpController.listTechnovigilanceCases(req, res, next));
+    router.patch('/quality/technovigilance-cases/:id', (req, res, next) => mrpController.updateTechnovigilanceCase(req, res, next));
+    router.post('/quality/technovigilance-cases/:id/report-invima', (req, res, next) => mrpController.reportTechnovigilanceCase(req, res, next));
     router.post('/quality/documents', (req, res, next) => mrpController.createControlledDocument(req, res, next));
     router.get('/quality/documents', (req, res, next) => mrpController.listControlledDocuments(req, res, next));
     router.post('/quality/documents/:id/submit-review', (req, res, next) => mrpController.submitControlledDocument(req, res, next));

@@ -1,14 +1,14 @@
 import { useCallback } from 'react';
-import { PurchaseOrder, PurchaseOrderListResponse } from '@/services/mrpApi';
 import { mrpApi } from '@/services/mrpApi';
 import { CreatePurchaseOrderDto } from '@scaffold/schemas';
+import { PurchaseOrder, PurchaseOrderListResponse, PurchaseOrderStatus } from '@scaffold/types';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 import { invalidateMrpQueriesByPrefix, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
 export const usePurchaseOrdersQuery = (
     page: number,
     limit: number,
-    filters?: { status?: string; supplierId?: string }
+    filters?: { status?: PurchaseOrderStatus; supplierId?: string }
 ) => {
     const queryKey = mrpQueryKeys.purchaseOrdersList(page, limit, filters?.status, filters?.supplierId);
 

@@ -1,5 +1,10 @@
 import { Entity, Enum, Property, Unique } from '@mikro-orm/core';
-import { ControlledDocument as IControlledDocument, DocumentProcess, DocumentStatus } from '@scaffold/types';
+import {
+    ControlledDocument as IControlledDocument,
+    DocumentApprovalMethod,
+    DocumentProcess,
+    DocumentStatus,
+} from '@scaffold/types';
 import { BaseEntity } from '../../../shared/entities/base.entity';
 
 @Entity()
@@ -34,4 +39,10 @@ export class ControlledDocument extends BaseEntity implements IControlledDocumen
 
     @Property({ nullable: true })
     approvedAt?: Date;
+
+    @Enum({ items: () => DocumentApprovalMethod, nullable: true })
+    approvalMethod?: DocumentApprovalMethod;
+
+    @Property({ nullable: true, type: 'text' })
+    approvalSignature?: string;
 }

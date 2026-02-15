@@ -1,5 +1,22 @@
 import { useCallback } from 'react';
-import { AuditEvent, CapaAction, CapaStatus, ControlledDocument, DocumentProcess, DocumentStatus, NonConformity, NonConformityStatus, QualitySeverity } from '@scaffold/types';
+import {
+    AuditEvent,
+    CapaAction,
+    CapaStatus,
+    ControlledDocument,
+    DocumentApprovalMethod,
+    DocumentProcess,
+    DocumentStatus,
+    NonConformity,
+    NonConformityStatus,
+    QualitySeverity,
+    TechnovigilanceCase,
+    TechnovigilanceCaseType,
+    TechnovigilanceCausality,
+    TechnovigilanceSeverity,
+    TechnovigilanceStatus,
+    TechnovigilanceReportChannel,
+} from '@scaffold/types';
 import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 import { invalidateMrpQueries, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
@@ -77,6 +94,84 @@ export const useQualityAuditQuery = (filters?: { entityType?: string; entityId?:
     return useMrpQuery(fetcher, true, mrpQueryKeys.qualityAuditEvents);
 };
 
+export const useTechnovigilanceCasesQuery = (filters?: {
+    status?: TechnovigilanceStatus;
+    type?: TechnovigilanceCaseType;
+    severity?: TechnovigilanceSeverity;
+    causality?: TechnovigilanceCausality;
+    reportedToInvima?: boolean;
+}) => {
+    const fetcher = useCallback(async (): Promise<TechnovigilanceCase[]> => {
+        return mrpApi.listTechnovigilanceCases(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityTechnovigilanceCases);
+};
+
+export const useCreateTechnovigilanceCaseMutation = () => {
+    return useMrpMutation<{
+        title: string;
+        description: string;
+        type?: TechnovigilanceCaseType;
+        severity?: TechnovigilanceSeverity;
+        causality?: TechnovigilanceCausality;
+        productionOrderId?: string;
+        productionBatchId?: string;
+        productionBatchUnitId?: string;
+        lotCode?: string;
+        serialCode?: string;
+        createdBy?: string;
+    }, TechnovigilanceCase>(
+        async (payload) => mrpApi.createTechnovigilanceCase(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityTechnovigilanceCases);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useUpdateTechnovigilanceCaseMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        status?: TechnovigilanceStatus;
+        severity?: TechnovigilanceSeverity;
+        causality?: TechnovigilanceCausality;
+        investigationSummary?: string;
+        resolution?: string;
+        actor?: string;
+    }, TechnovigilanceCase>(
+        async ({ id, ...payload }) => mrpApi.updateTechnovigilanceCase(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityTechnovigilanceCases);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useReportTechnovigilanceCaseMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        reportNumber: string;
+        reportChannel: TechnovigilanceReportChannel;
+        reportPayloadRef?: string;
+        reportedAt?: string;
+        ackAt?: string;
+        actor?: string;
+    }, TechnovigilanceCase>(
+        async ({ id, ...payload }) => mrpApi.reportTechnovigilanceCase(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityTechnovigilanceCases);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
 export const useControlledDocumentsQuery = (filters?: { process?: DocumentProcess; status?: DocumentStatus }) => {
     const fetcher = useCallback(async (): Promise<ControlledDocument[]> => {
         return mrpApi.listControlledDocuments(filters);
@@ -125,8 +220,8 @@ export const useSubmitControlledDocumentMutation = () => {
 };
 
 export const useApproveControlledDocumentMutation = () => {
-    return useMrpMutation<{ id: string; actor?: string }, ControlledDocument>(
-        async ({ id, actor }) => mrpApi.approveControlledDocument(id, actor),
+    return useMrpMutation<{ id: string; actor: string; approvalMethod: DocumentApprovalMethod; approvalSignature: string }, ControlledDocument>(
+        async ({ id, ...payload }) => mrpApi.approveControlledDocument(id, payload),
         {
             onSuccess: async (_result, _input) => {
                 invalidateMrpQuery(mrpQueryKeys.qualityDocuments);

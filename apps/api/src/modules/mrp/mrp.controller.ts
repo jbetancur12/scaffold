@@ -20,11 +20,38 @@ import {
     CreateProductionOrderSchema,
     CreateProductVariantSchema,
     UpdateProductVariantSchema,
+    PaginationQuerySchema,
+    ListRawMaterialsQuerySchema,
+    AddSupplierMaterialSchema,
+    UpdateProductionOrderStatusSchema,
+    InventoryQuerySchema,
+    ListPurchaseOrdersQuerySchema,
+    UpdatePurchaseOrderStatusSchema,
+    ReceivePurchaseOrderSchema,
+    CreateNonConformitySchema,
+    ListNonConformitiesQuerySchema,
+    UpdateNonConformitySchema,
+    CreateCapaSchema,
+    ListCapasQuerySchema,
+    UpdateCapaSchema,
+    ListQualityAuditQuerySchema,
+    CreateTechnovigilanceCaseSchema,
+    ListTechnovigilanceCasesQuerySchema,
+    UpdateTechnovigilanceCaseSchema,
+    ReportTechnovigilanceCaseSchema,
+    CreateControlledDocumentSchema,
+    ListControlledDocumentsQuerySchema,
+    ActorPayloadSchema,
+    ApproveControlledDocumentSchema,
+    ActiveControlledDocumentsByProcessParamsSchema,
+    CreateProductionBatchSchema,
+    AddProductionBatchUnitsSchema,
+    UpdateProductionBatchQcSchema,
+    UpdateProductionBatchPackagingSchema,
+    UpdateProductionBatchUnitQcSchema,
+    UpdateProductionBatchUnitPackagingSchema,
 } from '@scaffold/schemas';
-import { z } from 'zod';
-import { PurchaseOrderStatus } from './entities/purchase-order.entity';
 import { ApiResponse, AppError } from '../../shared/utils/response';
-import { CapaStatus, DocumentProcess, DocumentStatus, NonConformityStatus, QualitySeverity } from '@scaffold/types';
 
 export class MrpController {
     // ...
@@ -62,8 +89,8 @@ export class MrpController {
 
     async listProducts(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit } = req.query;
-            const result = await this.productService.listProducts(Number(page) || 1, Number(limit) || 10);
+            const { page, limit } = PaginationQuerySchema.parse(req.query);
+            const result = await this.productService.listProducts(page || 1, limit || 10);
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
@@ -150,8 +177,8 @@ export class MrpController {
 
     async listSuppliers(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit } = req.query;
-            const result = await this.supplierService.listSuppliers(Number(page) || 1, Number(limit) || 10);
+            const { page, limit } = PaginationQuerySchema.parse(req.query);
+            const result = await this.supplierService.listSuppliers(page || 1, limit || 10);
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
@@ -195,7 +222,7 @@ export class MrpController {
     async addSupplierMaterial(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { rawMaterialId, price } = req.body;
+            const { rawMaterialId, price } = AddSupplierMaterialSchema.parse(req.body);
             const link = await this.supplierService.addSupplierMaterial(id, rawMaterialId, price);
             return ApiResponse.success(res, link, 'Material vinculado al proveedor', 201);
         } catch (error) {
@@ -236,8 +263,8 @@ export class MrpController {
 
     async listRawMaterials(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit, search } = req.query;
-            const result = await this.mrpService.listRawMaterials(Number(page) || 1, Number(limit) || 10, search as string);
+            const { page, limit, search } = ListRawMaterialsQuerySchema.parse(req.query);
+            const result = await this.mrpService.listRawMaterials(page || 1, limit || 10, search);
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
@@ -309,10 +336,10 @@ export class MrpController {
     // --- Production & Inventory ---
     async listProductionOrders(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page = 1, limit = 10 } = req.query;
+            const { page, limit } = PaginationQuerySchema.parse(req.query);
             const orders = await this.productionService.listOrders(
-                Number(page),
-                Number(limit)
+                page || 1,
+                limit || 10
             );
             return ApiResponse.success(res, orders);
         } catch (error) {
@@ -359,7 +386,7 @@ export class MrpController {
     async updateProductionOrderStatus(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { status, warehouseId } = req.body;
+            const { status, warehouseId } = UpdateProductionOrderStatusSchema.parse(req.body);
             const order = await this.productionService.updateStatus(id, status, warehouseId);
             return ApiResponse.success(res, order, 'Estado de orden actualizado');
         } catch (error) {
@@ -390,12 +417,7 @@ export class MrpController {
     async createProductionBatch(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const payload = z.object({
-                variantId: z.string().uuid(),
-                plannedQty: z.number().int().positive(),
-                code: z.string().min(3).optional(),
-                notes: z.string().optional(),
-            }).parse(req.body);
+            const payload = CreateProductionBatchSchema.parse(req.body);
 
             const batch = await this.productionService.createBatch(id, payload);
             return ApiResponse.success(res, batch, 'Lote creado', 201);
@@ -407,7 +429,7 @@ export class MrpController {
     async addProductionBatchUnits(req: Request, res: Response, next: NextFunction) {
         try {
             const { batchId } = req.params;
-            const payload = z.object({ quantity: z.number().int().positive() }).parse(req.body);
+            const payload = AddProductionBatchUnitsSchema.parse(req.body);
             const batch = await this.productionService.addBatchUnits(batchId, payload.quantity);
             return ApiResponse.success(res, batch, 'Unidades generadas');
         } catch (error) {
@@ -418,7 +440,7 @@ export class MrpController {
     async updateProductionBatchQc(req: Request, res: Response, next: NextFunction) {
         try {
             const { batchId } = req.params;
-            const payload = z.object({ passed: z.boolean() }).parse(req.body);
+            const payload = UpdateProductionBatchQcSchema.parse(req.body);
             const batch = await this.productionService.setBatchQc(batchId, payload.passed);
             return ApiResponse.success(res, batch, 'QC de lote actualizado');
         } catch (error) {
@@ -429,7 +451,7 @@ export class MrpController {
     async updateProductionBatchPackaging(req: Request, res: Response, next: NextFunction) {
         try {
             const { batchId } = req.params;
-            const payload = z.object({ packed: z.boolean() }).parse(req.body);
+            const payload = UpdateProductionBatchPackagingSchema.parse(req.body);
             const batch = await this.productionService.setBatchPackaging(batchId, payload.packed);
             return ApiResponse.success(res, batch, 'Empaque de lote actualizado');
         } catch (error) {
@@ -440,7 +462,7 @@ export class MrpController {
     async updateProductionBatchUnitQc(req: Request, res: Response, next: NextFunction) {
         try {
             const { unitId } = req.params;
-            const payload = z.object({ passed: z.boolean() }).parse(req.body);
+            const payload = UpdateProductionBatchUnitQcSchema.parse(req.body);
             const unit = await this.productionService.setBatchUnitQc(unitId, payload.passed);
             return ApiResponse.success(res, unit, 'QC de unidad actualizado');
         } catch (error) {
@@ -451,7 +473,7 @@ export class MrpController {
     async updateProductionBatchUnitPackaging(req: Request, res: Response, next: NextFunction) {
         try {
             const { unitId } = req.params;
-            const payload = z.object({ packaged: z.boolean() }).parse(req.body);
+            const payload = UpdateProductionBatchUnitPackagingSchema.parse(req.body);
             const unit = await this.productionService.setBatchUnitPackaging(unitId, payload.packaged);
             return ApiResponse.success(res, unit, 'Empaque de unidad actualizado');
         } catch (error) {
@@ -462,16 +484,7 @@ export class MrpController {
     // --- Quality / INVIMA ---
     async createNonConformity(req: Request, res: Response, next: NextFunction) {
         try {
-            const payload = z.object({
-                title: z.string().min(3),
-                description: z.string().min(5),
-                severity: z.nativeEnum(QualitySeverity).optional(),
-                source: z.string().optional(),
-                productionOrderId: z.string().uuid().optional(),
-                productionBatchId: z.string().uuid().optional(),
-                productionBatchUnitId: z.string().uuid().optional(),
-                createdBy: z.string().optional(),
-            }).parse(req.body);
+            const payload = CreateNonConformitySchema.parse(req.body);
             const nc = await this.qualityService.createNonConformity(payload);
             return ApiResponse.success(res, nc, 'No conformidad creada', 201);
         } catch (error) {
@@ -481,11 +494,7 @@ export class MrpController {
 
     async listNonConformities(req: Request, res: Response, next: NextFunction) {
         try {
-            const filters = z.object({
-                status: z.nativeEnum(NonConformityStatus).optional(),
-                severity: z.nativeEnum(QualitySeverity).optional(),
-                source: z.string().optional(),
-            }).parse(req.query);
+            const filters = ListNonConformitiesQuerySchema.parse(req.query);
             const rows = await this.qualityService.listNonConformities(filters);
             return ApiResponse.success(res, rows);
         } catch (error) {
@@ -496,15 +505,7 @@ export class MrpController {
     async updateNonConformity(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const payload = z.object({
-                status: z.nativeEnum(NonConformityStatus).optional(),
-                rootCause: z.string().optional(),
-                correctiveAction: z.string().optional(),
-                severity: z.nativeEnum(QualitySeverity).optional(),
-                description: z.string().optional(),
-                title: z.string().optional(),
-                actor: z.string().optional(),
-            }).parse(req.body);
+            const payload = UpdateNonConformitySchema.parse(req.body);
             const row = await this.qualityService.updateNonConformity(id, payload, payload.actor);
             return ApiResponse.success(res, row, 'No conformidad actualizada');
         } catch (error) {
@@ -514,13 +515,7 @@ export class MrpController {
 
     async createCapa(req: Request, res: Response, next: NextFunction) {
         try {
-            const payload = z.object({
-                nonConformityId: z.string().uuid(),
-                actionPlan: z.string().min(5),
-                owner: z.string().optional(),
-                dueDate: z.coerce.date().optional(),
-                actor: z.string().optional(),
-            }).parse(req.body);
+            const payload = CreateCapaSchema.parse(req.body);
             const row = await this.qualityService.createCapa(payload, payload.actor);
             return ApiResponse.success(res, row, 'CAPA creada', 201);
         } catch (error) {
@@ -530,10 +525,7 @@ export class MrpController {
 
     async listCapas(req: Request, res: Response, next: NextFunction) {
         try {
-            const filters = z.object({
-                status: z.nativeEnum(CapaStatus).optional(),
-                nonConformityId: z.string().uuid().optional(),
-            }).parse(req.query);
+            const filters = ListCapasQuerySchema.parse(req.query);
             const rows = await this.qualityService.listCapas(filters);
             return ApiResponse.success(res, rows);
         } catch (error) {
@@ -544,14 +536,7 @@ export class MrpController {
     async updateCapa(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const payload = z.object({
-                actionPlan: z.string().optional(),
-                owner: z.string().optional(),
-                dueDate: z.coerce.date().optional(),
-                verificationNotes: z.string().optional(),
-                status: z.nativeEnum(CapaStatus).optional(),
-                actor: z.string().optional(),
-            }).parse(req.body);
+            const payload = UpdateCapaSchema.parse(req.body);
             const row = await this.qualityService.updateCapa(id, payload, payload.actor);
             return ApiResponse.success(res, row, 'CAPA actualizada');
         } catch (error) {
@@ -561,10 +546,7 @@ export class MrpController {
 
     async listQualityAudit(req: Request, res: Response, next: NextFunction) {
         try {
-            const q = z.object({
-                entityType: z.string().optional(),
-                entityId: z.string().optional(),
-            }).parse(req.query);
+            const q = ListQualityAuditQuerySchema.parse(req.query);
             const rows = await this.qualityService.listAuditEvents(q.entityType, q.entityId);
             return ApiResponse.success(res, rows);
         } catch (error) {
@@ -572,18 +554,57 @@ export class MrpController {
         }
     }
 
+    async createTechnovigilanceCase(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateTechnovigilanceCaseSchema.parse(req.body);
+            const row = await this.qualityService.createTechnovigilanceCase(payload);
+            return ApiResponse.success(res, row, 'Caso de tecnovigilancia creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listTechnovigilanceCases(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListTechnovigilanceCasesQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listTechnovigilanceCases(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateTechnovigilanceCase(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateTechnovigilanceCaseSchema.parse(req.body);
+            const row = await this.qualityService.updateTechnovigilanceCase(id, payload, payload.actor);
+            return ApiResponse.success(res, row, 'Caso de tecnovigilancia actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async reportTechnovigilanceCase(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = ReportTechnovigilanceCaseSchema.parse(req.body);
+            const row = await this.qualityService.reportTechnovigilanceCase(id, {
+                reportNumber: payload.reportNumber,
+                reportChannel: payload.reportChannel,
+                reportPayloadRef: payload.reportPayloadRef,
+                reportedAt: payload.reportedAt,
+                ackAt: payload.ackAt,
+            }, payload.actor);
+            return ApiResponse.success(res, row, 'Caso reportado a INVIMA');
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async createControlledDocument(req: Request, res: Response, next: NextFunction) {
         try {
-            const payload = z.object({
-                code: z.string().min(2),
-                title: z.string().min(3),
-                process: z.nativeEnum(DocumentProcess),
-                version: z.number().int().positive().optional(),
-                content: z.string().optional(),
-                effectiveDate: z.coerce.date().optional(),
-                expiresAt: z.coerce.date().optional(),
-                actor: z.string().optional(),
-            }).parse(req.body);
+            const payload = CreateControlledDocumentSchema.parse(req.body);
             const row = await this.documentControlService.create(payload, payload.actor);
             return ApiResponse.success(res, row, 'Documento controlado creado', 201);
         } catch (error) {
@@ -593,10 +614,7 @@ export class MrpController {
 
     async listControlledDocuments(req: Request, res: Response, next: NextFunction) {
         try {
-            const filters = z.object({
-                process: z.nativeEnum(DocumentProcess).optional(),
-                status: z.nativeEnum(DocumentStatus).optional(),
-            }).parse(req.query);
+            const filters = ListControlledDocumentsQuerySchema.parse(req.query);
             const rows = await this.documentControlService.list(filters);
             return ApiResponse.success(res, rows);
         } catch (error) {
@@ -607,9 +625,7 @@ export class MrpController {
     async submitControlledDocument(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const payload = z.object({
-                actor: z.string().optional(),
-            }).parse(req.body ?? {});
+            const payload = ActorPayloadSchema.parse(req.body ?? {});
             const row = await this.documentControlService.submitForReview(id, payload.actor);
             return ApiResponse.success(res, row, 'Documento enviado a revisión');
         } catch (error) {
@@ -620,10 +636,8 @@ export class MrpController {
     async approveControlledDocument(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const payload = z.object({
-                actor: z.string().optional(),
-            }).parse(req.body ?? {});
-            const row = await this.documentControlService.approve(id, payload.actor);
+            const payload = ApproveControlledDocumentSchema.parse(req.body ?? {});
+            const row = await this.documentControlService.approve(id, payload);
             return ApiResponse.success(res, row, 'Documento aprobado');
         } catch (error) {
             next(error);
@@ -632,9 +646,7 @@ export class MrpController {
 
     async listActiveControlledDocumentsByProcess(req: Request, res: Response, next: NextFunction) {
         try {
-            const { process } = z.object({
-                process: z.nativeEnum(DocumentProcess),
-            }).parse(req.params);
+            const { process } = ActiveControlledDocumentsByProcessParamsSchema.parse(req.params);
             const rows = await this.documentControlService.getActiveByProcess(process);
             return ApiResponse.success(res, rows);
         } catch (error) {
@@ -645,8 +657,8 @@ export class MrpController {
     // --- Inventory ---
     async getInventory(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit, warehouseId } = req.query;
-            const result = await this.inventoryService.getInventoryItems(Number(page) || 1, Number(limit) || 100, warehouseId as string);
+            const { page, limit, warehouseId } = InventoryQuerySchema.parse(req.query);
+            const result = await this.inventoryService.getInventoryItems(page || 1, limit || 100, warehouseId);
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
@@ -689,11 +701,11 @@ export class MrpController {
 
     async listPurchaseOrders(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit, status, supplierId } = req.query;
+            const { page, limit, status, supplierId } = ListPurchaseOrdersQuerySchema.parse(req.query);
             const result = await this.purchaseOrderService.listPurchaseOrders(
-                Number(page) || 1,
-                Number(limit) || 10,
-                { status: status as PurchaseOrderStatus, supplierId: supplierId as string }
+                page || 1,
+                limit || 10,
+                { status, supplierId }
             );
             return ApiResponse.success(res, result);
         } catch (error) {
@@ -704,7 +716,7 @@ export class MrpController {
     async updatePurchaseOrderStatus(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { status } = req.body;
+            const { status } = UpdatePurchaseOrderStatusSchema.parse(req.body);
             const purchaseOrder = await this.purchaseOrderService.updateStatus(id, status);
             return ApiResponse.success(res, purchaseOrder, 'Estado de orden de compra actualizado');
         } catch (error) {
@@ -715,7 +727,7 @@ export class MrpController {
     async receivePurchaseOrder(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { warehouseId } = req.body;
+            const { warehouseId } = ReceivePurchaseOrderSchema.parse(req.body ?? {});
             const purchaseOrder = await this.purchaseOrderService.receivePurchaseOrder(id, warehouseId);
             return ApiResponse.success(res, purchaseOrder, 'Orden de compra recibida');
         } catch (error) {

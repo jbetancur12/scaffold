@@ -1,5 +1,22 @@
 import { z } from 'zod';
-import { UserRole, UnitType, WarehouseType, ProductionOrderStatus } from '@scaffold/types';
+import {
+    UserRole,
+    UnitType,
+    WarehouseType,
+    ProductionOrderStatus,
+    PurchaseOrderStatus,
+    CapaStatus,
+    DocumentProcess,
+    DocumentStatus,
+    DocumentApprovalMethod,
+    NonConformityStatus,
+    QualitySeverity,
+    TechnovigilanceCaseType,
+    TechnovigilanceCausality,
+    TechnovigilanceSeverity,
+    TechnovigilanceStatus,
+    TechnovigilanceReportChannel,
+} from '@scaffold/types';
 
 export const LoginSchema = z.object({
     email: z.string().email('Correo electrónico inválido'),
@@ -159,6 +176,197 @@ export const CreateProductionOrderSchema = z.object({
     endDate: z.string().or(z.date()).optional(),
     notes: z.string().optional(),
     items: z.array(ProductionOrderItemCreateSchema).min(1, 'Debe agregar al menos un item'),
+});
+
+export const CreateProductionBatchSchema = z.object({
+    variantId: z.string().uuid(),
+    plannedQty: z.number().int().positive(),
+    code: z.string().min(3).optional(),
+    notes: z.string().optional(),
+});
+
+export const AddProductionBatchUnitsSchema = z.object({
+    quantity: z.number().int().positive(),
+});
+
+export const UpdateProductionBatchQcSchema = z.object({
+    passed: z.boolean(),
+});
+
+export const UpdateProductionBatchPackagingSchema = z.object({
+    packed: z.boolean(),
+});
+
+export const UpdateProductionBatchUnitQcSchema = z.object({
+    passed: z.boolean(),
+});
+
+export const UpdateProductionBatchUnitPackagingSchema = z.object({
+    packaged: z.boolean(),
+});
+
+export const PaginationQuerySchema = z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+});
+
+export const ListRawMaterialsQuerySchema = PaginationQuerySchema.extend({
+    search: z.string().optional(),
+});
+
+export const AddSupplierMaterialSchema = z.object({
+    rawMaterialId: z.string().uuid(),
+    price: z.number().min(0).optional(),
+});
+
+export const UpdateProductionOrderStatusSchema = z.object({
+    status: z.nativeEnum(ProductionOrderStatus),
+    warehouseId: z.string().uuid().optional(),
+});
+
+export const InventoryQuerySchema = z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    warehouseId: z.string().uuid().optional(),
+});
+
+export const ListPurchaseOrdersQuerySchema = z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    status: z.nativeEnum(PurchaseOrderStatus).optional(),
+    supplierId: z.string().uuid().optional(),
+});
+
+export const UpdatePurchaseOrderStatusSchema = z.object({
+    status: z.nativeEnum(PurchaseOrderStatus),
+});
+
+export const ReceivePurchaseOrderSchema = z.object({
+    warehouseId: z.string().uuid().optional(),
+});
+
+export const CreateNonConformitySchema = z.object({
+    title: z.string().min(3),
+    description: z.string().min(5),
+    severity: z.nativeEnum(QualitySeverity).optional(),
+    source: z.string().optional(),
+    productionOrderId: z.string().uuid().optional(),
+    productionBatchId: z.string().uuid().optional(),
+    productionBatchUnitId: z.string().uuid().optional(),
+    createdBy: z.string().optional(),
+});
+
+export const ListNonConformitiesQuerySchema = z.object({
+    status: z.nativeEnum(NonConformityStatus).optional(),
+    severity: z.nativeEnum(QualitySeverity).optional(),
+    source: z.string().optional(),
+});
+
+export const UpdateNonConformitySchema = z.object({
+    status: z.nativeEnum(NonConformityStatus).optional(),
+    rootCause: z.string().optional(),
+    correctiveAction: z.string().optional(),
+    severity: z.nativeEnum(QualitySeverity).optional(),
+    description: z.string().optional(),
+    title: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const CreateCapaSchema = z.object({
+    nonConformityId: z.string().uuid(),
+    actionPlan: z.string().min(5),
+    owner: z.string().optional(),
+    dueDate: z.coerce.date().optional(),
+    actor: z.string().optional(),
+});
+
+export const ListCapasQuerySchema = z.object({
+    status: z.nativeEnum(CapaStatus).optional(),
+    nonConformityId: z.string().uuid().optional(),
+});
+
+export const UpdateCapaSchema = z.object({
+    actionPlan: z.string().optional(),
+    owner: z.string().optional(),
+    dueDate: z.coerce.date().optional(),
+    verificationNotes: z.string().optional(),
+    status: z.nativeEnum(CapaStatus).optional(),
+    actor: z.string().optional(),
+});
+
+export const ListQualityAuditQuerySchema = z.object({
+    entityType: z.string().optional(),
+    entityId: z.string().optional(),
+});
+
+export const CreateTechnovigilanceCaseSchema = z.object({
+    title: z.string().min(3),
+    description: z.string().min(5),
+    type: z.nativeEnum(TechnovigilanceCaseType).optional(),
+    severity: z.nativeEnum(TechnovigilanceSeverity).optional(),
+    causality: z.nativeEnum(TechnovigilanceCausality).optional(),
+    productionOrderId: z.string().uuid().optional(),
+    productionBatchId: z.string().uuid().optional(),
+    productionBatchUnitId: z.string().uuid().optional(),
+    lotCode: z.string().optional(),
+    serialCode: z.string().optional(),
+    createdBy: z.string().optional(),
+});
+
+export const ListTechnovigilanceCasesQuerySchema = z.object({
+    status: z.nativeEnum(TechnovigilanceStatus).optional(),
+    type: z.nativeEnum(TechnovigilanceCaseType).optional(),
+    severity: z.nativeEnum(TechnovigilanceSeverity).optional(),
+    causality: z.nativeEnum(TechnovigilanceCausality).optional(),
+    reportedToInvima: z.coerce.boolean().optional(),
+});
+
+export const UpdateTechnovigilanceCaseSchema = z.object({
+    status: z.nativeEnum(TechnovigilanceStatus).optional(),
+    severity: z.nativeEnum(TechnovigilanceSeverity).optional(),
+    causality: z.nativeEnum(TechnovigilanceCausality).optional(),
+    investigationSummary: z.string().optional(),
+    resolution: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const ReportTechnovigilanceCaseSchema = z.object({
+    reportNumber: z.string().min(3),
+    reportChannel: z.nativeEnum(TechnovigilanceReportChannel),
+    reportPayloadRef: z.string().optional(),
+    reportedAt: z.coerce.date().optional(),
+    ackAt: z.coerce.date().optional(),
+    actor: z.string().optional(),
+});
+
+export const CreateControlledDocumentSchema = z.object({
+    code: z.string().min(2),
+    title: z.string().min(3),
+    process: z.nativeEnum(DocumentProcess),
+    version: z.number().int().positive().optional(),
+    content: z.string().optional(),
+    effectiveDate: z.coerce.date().optional(),
+    expiresAt: z.coerce.date().optional(),
+    actor: z.string().optional(),
+});
+
+export const ListControlledDocumentsQuerySchema = z.object({
+    process: z.nativeEnum(DocumentProcess).optional(),
+    status: z.nativeEnum(DocumentStatus).optional(),
+});
+
+export const ActorPayloadSchema = z.object({
+    actor: z.string().optional(),
+});
+
+export const ApproveControlledDocumentSchema = z.object({
+    actor: z.string().min(2),
+    approvalMethod: z.nativeEnum(DocumentApprovalMethod),
+    approvalSignature: z.string().min(4),
+});
+
+export const ActiveControlledDocumentsByProcessParamsSchema = z.object({
+    process: z.nativeEnum(DocumentProcess),
 });
 
 export const OperationalConfigSchema = z.object({

@@ -35,6 +35,13 @@ export enum ProductionOrderStatus {
     CANCELLED = 'cancelled',
 }
 
+export enum PurchaseOrderStatus {
+    PENDING = 'PENDING',
+    CONFIRMED = 'CONFIRMED',
+    RECEIVED = 'RECEIVED',
+    CANCELLED = 'CANCELLED',
+}
+
 export enum ProductionBatchQcStatus {
     PENDING = 'pending',
     PASSED = 'passed',
@@ -88,6 +95,43 @@ export enum DocumentStatus {
     OBSOLETO = 'obsoleto',
 }
 
+export enum DocumentApprovalMethod {
+    FIRMA_MANUAL = 'firma_manual',
+    FIRMA_DIGITAL = 'firma_digital',
+}
+
+export enum TechnovigilanceCaseType {
+    QUEJA = 'queja',
+    EVENTO_ADVERSO = 'evento_adverso',
+}
+
+export enum TechnovigilanceSeverity {
+    LEVE = 'leve',
+    MODERADA = 'moderada',
+    SEVERA = 'severa',
+    CRITICA = 'critica',
+}
+
+export enum TechnovigilanceCausality {
+    NO_RELACIONADO = 'no_relacionado',
+    POSIBLE = 'posible',
+    PROBABLE = 'probable',
+    CONFIRMADO = 'confirmado',
+}
+
+export enum TechnovigilanceStatus {
+    ABIERTO = 'abierto',
+    EN_INVESTIGACION = 'en_investigacion',
+    REPORTADO = 'reportado',
+    CERRADO = 'cerrado',
+}
+
+export enum TechnovigilanceReportChannel {
+    INVIMA_PORTAL = 'invima_portal',
+    EMAIL_OFICIAL = 'email_oficial',
+    OTRO = 'otro',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -139,6 +183,36 @@ export interface PurchaseRecord {
     date: string | Date;
     createdAt: string | Date;
     updatedAt: string | Date;
+}
+
+export interface PurchaseOrderItem {
+    id: string;
+    rawMaterial: Pick<RawMaterial, 'id' | 'name' | 'sku' | 'unit'>;
+    quantity: number;
+    unitPrice: number;
+    taxAmount: number;
+    subtotal: number;
+}
+
+export interface PurchaseOrder {
+    id: string;
+    supplier: Pick<Supplier, 'id' | 'name'>;
+    orderDate: string | Date;
+    expectedDeliveryDate?: string | Date;
+    receivedDate?: string | Date;
+    status: PurchaseOrderStatus;
+    totalAmount: number;
+    taxTotal: number;
+    subtotalBase: number;
+    notes?: string;
+    items?: PurchaseOrderItem[];
+}
+
+export interface PurchaseOrderListResponse {
+    data: PurchaseOrder[];
+    total: number;
+    page: number;
+    limit: number;
 }
 
 export interface Product {
@@ -311,6 +385,35 @@ export interface ControlledDocument {
     expiresAt?: string | Date;
     approvedBy?: string;
     approvedAt?: string | Date;
+    approvalMethod?: DocumentApprovalMethod;
+    approvalSignature?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface TechnovigilanceCase {
+    id: string;
+    title: string;
+    description: string;
+    type: TechnovigilanceCaseType;
+    severity: TechnovigilanceSeverity;
+    causality?: TechnovigilanceCausality;
+    status: TechnovigilanceStatus;
+    reportedToInvima: boolean;
+    reportedAt?: string | Date;
+    invimaReportNumber?: string;
+    invimaReportChannel?: TechnovigilanceReportChannel;
+    invimaReportPayloadRef?: string;
+    invimaAckAt?: string | Date;
+    reportedBy?: string;
+    investigationSummary?: string;
+    resolution?: string;
+    productionOrderId?: string;
+    productionBatchId?: string;
+    productionBatchUnitId?: string;
+    lotCode?: string;
+    serialCode?: string;
+    createdBy?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

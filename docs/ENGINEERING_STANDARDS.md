@@ -73,6 +73,7 @@ Nota: en web ya existe un interceptor que desempaqueta `data`. No romper ese flu
 
 - Toda entrada de controller se valida con `zod` desde `@scaffold/schemas` o schema local temporal justificado.
 - No usar `req.body`/`req.query` sin parseo.
+- En módulos compartidos (ej: MRP), no definir `z.object(...)` inline en controllers; crear/reutilizar schemas en `packages/schemas`.
 
 ## 3. Reglas backend (`apps/api`)
 
@@ -86,6 +87,7 @@ Nota: en web ya existe un interceptor que desempaqueta `data`. No romper ese flu
 Checklist backend por PR:
 
 - [ ] Inputs validados.
+- [ ] Controllers sin schemas inline no justificados.
 - [ ] Errores con status correcto.
 - [ ] Respuesta con `ApiResponse`.
 - [ ] Migración incluida si cambia DB.

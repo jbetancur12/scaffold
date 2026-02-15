@@ -1,12 +1,12 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
-import { PurchaseOrder, PurchaseOrderStatus } from '../entities/purchase-order.entity';
+import { PurchaseOrder } from '../entities/purchase-order.entity';
 import { PurchaseOrderItem } from '../entities/purchase-order-item.entity';
 import { Supplier } from '../entities/supplier.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Warehouse } from '../entities/warehouse.entity';
-import { WarehouseType } from '@scaffold/types';
+import { PurchaseOrderStatus, WarehouseType } from '@scaffold/types';
 import type { CreatePurchaseOrderDto } from '@scaffold/schemas';
 import { MrpService } from './mrp.service';
 import { AppError } from '../../../shared/utils/response';

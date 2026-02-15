@@ -1,4 +1,14 @@
-import { CapaStatus, DocumentProcess, DocumentStatus, NonConformityStatus, QualitySeverity } from '@scaffold/types';
+import {
+    CapaStatus,
+    DocumentProcess,
+    DocumentStatus,
+    NonConformityStatus,
+    QualitySeverity,
+    TechnovigilanceCaseType,
+    TechnovigilanceCausality,
+    TechnovigilanceSeverity,
+    TechnovigilanceStatus,
+} from '@scaffold/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,21 +24,26 @@ export default function QualityCompliancePage() {
         nonConformities,
         capas,
         audits,
+        technovigilanceCases,
         documents,
         openNc,
         ncForm,
         capaForm,
         documentForm,
+        technoForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
+        setTechnoForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
+        loadingTechno,
         loadingDocuments,
         creatingNc,
         creatingCapa,
         creatingDocument,
+        creatingTechnoCase,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -38,6 +53,9 @@ export default function QualityCompliancePage() {
         handleCreateDocument,
         handleSubmitDocument,
         handleApproveDocument,
+        handleCreateTechnoCase,
+        quickSetTechnoStatus,
+        quickReportTechno,
     } = useQualityCompliance();
 
     return (
@@ -53,6 +71,7 @@ export default function QualityCompliancePage() {
                 <TabsList>
                     <TabsTrigger value="nc">No Conformidades</TabsTrigger>
                     <TabsTrigger value="capa">CAPA</TabsTrigger>
+                    <TabsTrigger value="techno">Tecnovigilancia</TabsTrigger>
                     <TabsTrigger value="docs">Control documental</TabsTrigger>
                     <TabsTrigger value="audit">Auditoría</TabsTrigger>
                 </TabsList>
@@ -166,6 +185,130 @@ export default function QualityCompliancePage() {
                                     {c.status !== CapaStatus.CERRADA ? (
                                         <Button size="sm" variant="outline" onClick={() => quickCloseCapa(c.id)}>Cerrar</Button>
                                     ) : null}
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="techno" className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Registrar Caso de Tecnovigilancia</CardTitle></CardHeader>
+                        <CardContent>
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={handleCreateTechnoCase}>
+                                <div className="space-y-1">
+                                    <Label>Título</Label>
+                                    <Input
+                                        value={technoForm.title}
+                                        onChange={(e) => setTechnoForm((p) => ({ ...p, title: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Tipo</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={technoForm.type}
+                                        onChange={(e) => setTechnoForm((p) => ({ ...p, type: e.target.value as TechnovigilanceCaseType }))}
+                                    >
+                                        <option value={TechnovigilanceCaseType.QUEJA}>Queja</option>
+                                        <option value={TechnovigilanceCaseType.EVENTO_ADVERSO}>Evento adverso</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Severidad</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={technoForm.severity}
+                                        onChange={(e) => setTechnoForm((p) => ({ ...p, severity: e.target.value as TechnovigilanceSeverity }))}
+                                    >
+                                        {Object.values(TechnovigilanceSeverity).map((s) => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Causalidad (opcional)</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={technoForm.causality}
+                                        onChange={(e) => setTechnoForm((p) => ({ ...p, causality: e.target.value as '' | TechnovigilanceCausality }))}
+                                    >
+                                        <option value="">Sin definir</option>
+                                        {Object.values(TechnovigilanceCausality).map((c) => (
+                                            <option key={c} value={c}>{c}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Descripción</Label>
+                                    <Textarea
+                                        value={technoForm.description}
+                                        onChange={(e) => setTechnoForm((p) => ({ ...p, description: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Código de lote (opcional)</Label>
+                                    <Input
+                                        value={technoForm.lotCode}
+                                        onChange={(e) => setTechnoForm((p) => ({ ...p, lotCode: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Serial (opcional)</Label>
+                                    <Input
+                                        value={technoForm.serialCode}
+                                        onChange={(e) => setTechnoForm((p) => ({ ...p, serialCode: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="md:col-span-2 flex justify-end">
+                                    <Button type="submit" disabled={creatingTechnoCase}>
+                                        {creatingTechnoCase ? 'Guardando...' : 'Crear caso'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Casos ({technovigilanceCases.length})</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            {loadingTechno ? <div>Cargando...</div> : technovigilanceCases.length === 0 ? <div className="text-sm text-slate-500">Sin casos registrados.</div> : technovigilanceCases.map((c) => (
+                                <div key={c.id} className="border rounded-md p-3 flex items-start justify-between gap-4">
+                                    <div>
+                                        <div className="font-medium">{c.title}</div>
+                                        <div className="text-sm text-slate-600">{c.description}</div>
+                                        <div className="text-xs text-slate-500 mt-1">
+                                            Tipo: {c.type} | Severidad: {c.severity} | Causalidad: {c.causality || 'sin definir'}
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1">
+                                            Lote: {c.lotCode || 'N/A'} | Serial: {c.serialCode || 'N/A'} | INVIMA: {c.reportedToInvima ? 'Reportado' : 'Pendiente'}
+                                        </div>
+                                        {c.reportedToInvima ? (
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                Radicado: {c.invimaReportNumber || 'N/A'} | Canal: {c.invimaReportChannel || 'N/A'}
+                                            </div>
+                                        ) : null}
+                                        <Badge variant="outline" className="mt-2">{c.status}</Badge>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 justify-end">
+                                        {c.status !== TechnovigilanceStatus.EN_INVESTIGACION ? (
+                                            <Button size="sm" variant="outline" onClick={() => quickSetTechnoStatus(c.id, TechnovigilanceStatus.EN_INVESTIGACION)}>
+                                                Investigar
+                                            </Button>
+                                        ) : null}
+                                        {c.status !== TechnovigilanceStatus.CERRADO ? (
+                                            <Button size="sm" variant="outline" onClick={() => quickSetTechnoStatus(c.id, TechnovigilanceStatus.CERRADO)}>
+                                                Cerrar
+                                            </Button>
+                                        ) : null}
+                                        {!c.reportedToInvima ? (
+                                            <Button size="sm" onClick={() => quickReportTechno(c.id)}>
+                                                Reportar a INVIMA
+                                            </Button>
+                                        ) : null}
+                                    </div>
                                 </div>
                             ))}
                         </CardContent>

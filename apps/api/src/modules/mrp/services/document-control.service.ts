@@ -1,7 +1,7 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { ControlledDocument } from '../entities/controlled-document.entity';
 import { AppError } from '../../../shared/utils/response';
-import { DocumentProcess, DocumentStatus } from '@scaffold/types';
+import { DocumentApprovalMethod, DocumentProcess, DocumentStatus } from '@scaffold/types';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 
 export class DocumentControlService {
@@ -52,16 +52,22 @@ export class DocumentControlService {
         return doc;
     }
 
-    async approve(id: string, actor?: string) {
+    async approve(id: string, payload: {
+        actor: string;
+        approvalMethod: DocumentApprovalMethod;
+        approvalSignature: string;
+    }) {
         const doc = await this.repo.findOneOrFail({ id });
-        if (doc.status !== DocumentStatus.EN_REVISION && doc.status !== DocumentStatus.BORRADOR) {
+        if (doc.status !== DocumentStatus.EN_REVISION) {
             throw new AppError('El documento no está en estado aprobable', 400);
         }
 
         const now = new Date();
         doc.status = DocumentStatus.APROBADO;
-        doc.approvedBy = actor;
+        doc.approvedBy = payload.actor;
         doc.approvedAt = now;
+        doc.approvalMethod = payload.approvalMethod;
+        doc.approvalSignature = payload.approvalSignature;
         doc.effectiveDate = doc.effectiveDate ?? now;
         await this.em.persistAndFlush(doc);
 
@@ -77,7 +83,12 @@ export class DocumentControlService {
         }
         await this.em.flush();
 
-        await this.log('controlled_document', doc.id, 'approved', actor, { code: doc.code, version: doc.version });
+        await this.log('controlled_document', doc.id, 'approved', payload.actor, {
+            code: doc.code,
+            version: doc.version,
+            approvalMethod: doc.approvalMethod,
+            hasSignature: Boolean(doc.approvalSignature),
+        });
         return doc;
     }
 

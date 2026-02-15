@@ -9,15 +9,15 @@
 
 ## Fase 2 - Control documental y liberacion formal (en progreso)
 - [x] Versionado de documentos (SOP, instructivos, formatos).
-- [ ] Flujo de aprobacion de documentos con firma.
+- [x] Flujo de aprobacion de documentos con firma.
 - [x] Vincular documento vigente a cada proceso (produccion, QC, empaque).
 - [x] Bloquear ejecucion si no existe documento aprobado vigente.
 
 ## Fase 3 - Tecnovigilancia y postmercado
-- [ ] Registro de quejas y eventos adversos.
-- [ ] Clasificacion de severidad y causalidad.
-- [ ] Flujo de investigacion y cierre.
-- [ ] Reportabilidad y trazabilidad para INVIMA.
+- [x] Registro de quejas y eventos adversos.
+- [x] Clasificacion de severidad y causalidad.
+- [x] Flujo de investigacion y cierre.
+- [x] Reportabilidad y trazabilidad para INVIMA.
 
 ## Fase 4 - Recall y gestion de campo
 - [ ] Flujo de retiro por lote/serial.

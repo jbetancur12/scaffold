@@ -25,6 +25,7 @@ export const mrpQueryKeys = {
     qualityNonConformities: 'mrp.quality.non-conformities',
     qualityCapas: 'mrp.quality.capa-actions',
     qualityAuditEvents: 'mrp.quality.audit-events',
+    qualityTechnovigilanceCases: 'mrp.quality.technovigilance-cases',
     qualityDocuments: 'mrp.quality.documents',
     qualityActiveDocuments: (process: string) => `mrp.quality.documents.active.${process}`,
 };

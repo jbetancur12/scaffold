@@ -1,14 +1,8 @@
 import { Entity, PrimaryKey, Property, ManyToOne, OneToMany, Collection, Enum } from '@mikro-orm/core';
 import { v4 as uuid } from 'uuid';
+import { PurchaseOrderStatus } from '@scaffold/types';
 import { Supplier } from './supplier.entity';
 import { PurchaseOrderItem } from './purchase-order-item.entity';
-
-export enum PurchaseOrderStatus {
-    PENDING = 'PENDING',
-    CONFIRMED = 'CONFIRMED',
-    RECEIVED = 'RECEIVED',
-    CANCELLED = 'CANCELLED',
-}
 
 @Entity()
 export class PurchaseOrder {

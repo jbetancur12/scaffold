@@ -1,5 +1,14 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
-import { CapaStatus, NonConformityStatus, QualitySeverity } from '@scaffold/types';
+import {
+    CapaStatus,
+    NonConformityStatus,
+    QualitySeverity,
+    TechnovigilanceCaseType,
+    TechnovigilanceCausality,
+    TechnovigilanceSeverity,
+    TechnovigilanceStatus,
+    TechnovigilanceReportChannel,
+} from '@scaffold/types';
 import { AppError } from '../../../shared/utils/response';
 import { CapaAction } from '../entities/capa-action.entity';
 import { NonConformity } from '../entities/non-conformity.entity';
@@ -7,18 +16,21 @@ import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { ProductionOrder } from '../entities/production-order.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
+import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 
 export class QualityService {
     private readonly em: EntityManager;
     private readonly ncRepo: EntityRepository<NonConformity>;
     private readonly capaRepo: EntityRepository<CapaAction>;
     private readonly auditRepo: EntityRepository<QualityAuditEvent>;
+    private readonly technoRepo: EntityRepository<TechnovigilanceCase>;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.ncRepo = em.getRepository(NonConformity);
         this.capaRepo = em.getRepository(CapaAction);
         this.auditRepo = em.getRepository(QualityAuditEvent);
+        this.technoRepo = em.getRepository(TechnovigilanceCase);
     }
 
     async createNonConformity(payload: {
@@ -155,6 +167,132 @@ export class QualityService {
         if (entityType) query.entityType = entityType;
         if (entityId) query.entityId = entityId;
         return this.auditRepo.find(query, { orderBy: { createdAt: 'DESC' }, limit: 200 });
+    }
+
+    async createTechnovigilanceCase(payload: {
+        title: string;
+        description: string;
+        type?: TechnovigilanceCaseType;
+        severity?: TechnovigilanceSeverity;
+        causality?: TechnovigilanceCausality;
+        productionOrderId?: string;
+        productionBatchId?: string;
+        productionBatchUnitId?: string;
+        lotCode?: string;
+        serialCode?: string;
+        createdBy?: string;
+    }) {
+        const row = this.technoRepo.create({
+            title: payload.title,
+            description: payload.description,
+            type: payload.type ?? TechnovigilanceCaseType.QUEJA,
+            severity: payload.severity ?? TechnovigilanceSeverity.MODERADA,
+            causality: payload.causality,
+            status: TechnovigilanceStatus.ABIERTO,
+            reportedToInvima: false,
+            productionOrder: payload.productionOrderId ? this.em.getReference(ProductionOrder, payload.productionOrderId) : undefined,
+            productionBatch: payload.productionBatchId ? this.em.getReference(ProductionBatch, payload.productionBatchId) : undefined,
+            productionBatchUnit: payload.productionBatchUnitId ? this.em.getReference(ProductionBatchUnit, payload.productionBatchUnitId) : undefined,
+            lotCode: payload.lotCode,
+            serialCode: payload.serialCode,
+            createdBy: payload.createdBy,
+        } as unknown as TechnovigilanceCase);
+
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'technovigilance_case',
+            entityId: row.id,
+            action: 'created',
+            actor: payload.createdBy,
+            metadata: { type: row.type, severity: row.severity },
+        });
+
+        return this.technoRepo.findOneOrFail(
+            { id: row.id },
+            { populate: ['productionOrder', 'productionBatch', 'productionBatchUnit'] }
+        );
+    }
+
+    async listTechnovigilanceCases(filters: {
+        status?: TechnovigilanceStatus;
+        type?: TechnovigilanceCaseType;
+        severity?: TechnovigilanceSeverity;
+        causality?: TechnovigilanceCausality;
+        reportedToInvima?: boolean;
+    }) {
+        const query: FilterQuery<TechnovigilanceCase> = {};
+        if (filters.status) query.status = filters.status;
+        if (filters.type) query.type = filters.type;
+        if (filters.severity) query.severity = filters.severity;
+        if (filters.causality) query.causality = filters.causality;
+        if (typeof filters.reportedToInvima === 'boolean') query.reportedToInvima = filters.reportedToInvima;
+
+        return this.technoRepo.find(query, {
+            populate: ['productionOrder', 'productionBatch', 'productionBatchUnit'],
+            orderBy: { createdAt: 'DESC' },
+        });
+    }
+
+    async updateTechnovigilanceCase(id: string, payload: Partial<{
+        status: TechnovigilanceStatus;
+        severity: TechnovigilanceSeverity;
+        causality: TechnovigilanceCausality;
+        investigationSummary: string;
+        resolution: string;
+    }>, actor?: string) {
+        const row = await this.technoRepo.findOneOrFail({ id });
+        this.technoRepo.assign(row, payload);
+
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'technovigilance_case',
+            entityId: row.id,
+            action: 'updated',
+            actor,
+            metadata: payload as Record<string, unknown>,
+        });
+        return row;
+    }
+
+    async reportTechnovigilanceCase(id: string, payload: {
+        reportNumber: string;
+        reportChannel: TechnovigilanceReportChannel;
+        reportPayloadRef?: string;
+        reportedAt?: Date;
+        ackAt?: Date;
+    }, actor?: string) {
+        const row = await this.technoRepo.findOneOrFail({ id });
+
+        if (row.reportedToInvima || row.invimaReportNumber) {
+            throw new AppError('El caso ya fue reportado a INVIMA', 409);
+        }
+
+        row.reportedToInvima = true;
+        row.reportedAt = payload.reportedAt ?? new Date();
+        row.invimaReportNumber = payload.reportNumber;
+        row.invimaReportChannel = payload.reportChannel;
+        row.invimaReportPayloadRef = payload.reportPayloadRef;
+        row.invimaAckAt = payload.ackAt;
+        row.reportedBy = actor;
+        row.status = row.status === TechnovigilanceStatus.CERRADO
+            ? TechnovigilanceStatus.CERRADO
+            : TechnovigilanceStatus.REPORTADO;
+
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'technovigilance_case',
+            entityId: row.id,
+            action: 'reported_invima',
+            actor,
+            metadata: {
+                reportNumber: row.invimaReportNumber,
+                reportChannel: row.invimaReportChannel,
+                reportPayloadRef: row.invimaReportPayloadRef,
+                reportedAt: row.reportedAt,
+                ackAt: row.invimaAckAt,
+            },
+        });
+        return row;
     }
 
     async logEvent(payload: {
