@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import { mrpApi } from '@/services/mrpApi';
 import { InventoryItem, ProductVariant, RawMaterial, Warehouse, Product } from '@scaffold/types';
@@ -59,13 +59,7 @@ export default function InventoryDashboardPage() {
     const [manualCost, setManualCost] = useState('');
     const [submittingManual, setSubmittingManual] = useState(false);
 
-    useEffect(() => {
-        loadInventory();
-        loadRawMaterials();
-        loadWarehouses();
-    }, [selectedFilterWarehouseId]);
-
-    const loadInventory = async () => {
+    const loadInventory = useCallback(async () => {
         try {
             setLoading(true);
             const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
@@ -77,18 +71,18 @@ export default function InventoryDashboardPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [selectedFilterWarehouseId]);
 
-    const loadWarehouses = async () => {
+    const loadWarehouses = useCallback(async () => {
         try {
             const data = await mrpApi.getWarehouses();
             setWarehouses(data);
         } catch (err) {
             console.error('Error loading warehouses', err);
         }
-    };
+    }, []);
 
-    const loadRawMaterials = async () => {
+    const loadRawMaterials = useCallback(async () => {
         try {
             const data = await mrpApi.getRawMaterials(1, 100);
 
@@ -96,7 +90,13 @@ export default function InventoryDashboardPage() {
         } catch (err) {
             console.error('Error loading raw materials', err);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        loadInventory();
+        loadRawMaterials();
+        loadWarehouses();
+    }, [loadInventory, loadRawMaterials, loadWarehouses]);
 
     const handleManualAdd = async () => {
         if (!selectedMaterialId || !manualQuantity || !manualCost) {

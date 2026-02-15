@@ -384,7 +384,7 @@ export default function PurchaseOrderFormPage() {
                                                     id={`iva-${index}`}
                                                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
                                                     checked={item.hasIva}
-                                                    onChange={(e) => updateItem(index, 'hasIva' as any, e.target.checked)}
+                                                    onChange={(e) => updateItem(index, 'hasIva', e.target.checked)}
                                                 />
                                             </div>
                                         </div>

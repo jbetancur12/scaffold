@@ -48,7 +48,7 @@ export class OperationalConfigService {
     }
 
     async updateConfig(data: Partial<OperationalConfig>): Promise<OperationalConfig> {
-        let config = await this.getConfig();
+        const config = await this.getConfig();
 
         // Update fields if present in data, otherwise keep existing
         if (data.operatorSalary !== undefined) config.operatorSalary = data.operatorSalary;

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { mrpApi } from '@/services/mrpApi';
 import { generateVariantSku } from '@/utils/skuGenerator';
-import { Product } from '@scaffold/types';
+import { Product, ProductVariant, OperationalConfig } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,7 +57,7 @@ export default function ProductDetailPage() {
     });
 
     // Global Config for Real-time Estimation
-    const [operationalConfig, setOperationalConfig] = useState<any | null>(null);
+    const [operationalConfig, setOperationalConfig] = useState<OperationalConfig | null>(null);
 
     useEffect(() => {
         mrpApi.getOperationalConfig().then(config => setOperationalConfig(config)).catch(err => console.error("Failed to load operational config", err));
@@ -101,8 +101,7 @@ export default function ProductDetailPage() {
         setShowVariantDialog(true);
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleEditVariant = (variant: any) => {
+    const handleEditVariant = (variant: ProductVariant) => {
         setEditingVariant(variant);
         setVariantFormData({
             name: variant.name,

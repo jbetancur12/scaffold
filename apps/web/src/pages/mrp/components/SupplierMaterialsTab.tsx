@@ -60,7 +60,7 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
         } finally {
             setLoading(false);
         }
-    }, [supplierId]);
+    }, [supplierId, toast]);
 
     const loadAllMaterials = useCallback(async () => {
         try {
@@ -74,7 +74,7 @@ export function SupplierMaterialsTab({ supplierId }: SupplierMaterialsTabProps) 
                 variant: 'destructive',
             });
         }
-    }, []);
+    }, [toast]);
 
     useEffect(() => {
         loadMaterials();

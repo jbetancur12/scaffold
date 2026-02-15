@@ -9,14 +9,13 @@ import { Warehouse } from '../entities/warehouse.entity';
 import { WarehouseType } from '@scaffold/types';
 import type { CreatePurchaseOrderDto } from '@scaffold/schemas';
 import { MrpService } from './mrp.service';
+import { AppError } from '../../../shared/utils/response';
 
 export class PurchaseOrderService {
     private purchaseOrderRepo: EntityRepository<PurchaseOrder>;
     private purchaseOrderItemRepo: EntityRepository<PurchaseOrderItem>;
     private supplierRepo: EntityRepository<Supplier>;
     private rawMaterialRepo: EntityRepository<RawMaterial>;
-    private inventoryRepo: EntityRepository<InventoryItem>;
-    private supplierMaterialRepo: EntityRepository<SupplierMaterial>;
 
     constructor(
         private em: EntityManager,
@@ -26,8 +25,6 @@ export class PurchaseOrderService {
         this.purchaseOrderItemRepo = em.getRepository(PurchaseOrderItem);
         this.supplierRepo = em.getRepository(Supplier);
         this.rawMaterialRepo = em.getRepository(RawMaterial);
-        this.inventoryRepo = em.getRepository(InventoryItem);
-        this.supplierMaterialRepo = em.getRepository(SupplierMaterial);
     }
 
     async createPurchaseOrder(data: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
@@ -122,34 +119,35 @@ export class PurchaseOrderService {
     }
 
     async receivePurchaseOrder(id: string, warehouseId?: string): Promise<PurchaseOrder> {
-        const purchaseOrder = await this.purchaseOrderRepo.findOneOrFail(
-            { id },
-            { populate: ['items', 'items.rawMaterial'] }
-        );
+        return this.em.transactional(async (tx) => {
+            const purchaseOrderRepo = tx.getRepository(PurchaseOrder);
+            const purchaseOrder = await purchaseOrderRepo.findOneOrFail(
+                { id },
+                { populate: ['supplier', 'items', 'items.rawMaterial'] }
+            );
 
-        if (purchaseOrder.status === PurchaseOrderStatus.RECEIVED) {
-            throw new Error('Purchase order already received');
-        }
+            if (purchaseOrder.status === PurchaseOrderStatus.RECEIVED) {
+                throw new AppError('La orden de compra ya fue recibida', 409);
+            }
 
-        if (purchaseOrder.status === PurchaseOrderStatus.CANCELLED) {
-            throw new Error('Cannot receive a cancelled purchase order');
-        }
+            if (purchaseOrder.status === PurchaseOrderStatus.CANCELLED) {
+                throw new AppError('No se puede recibir una orden de compra cancelada', 400);
+            }
 
-        // Update inventory for each item
-        for (const item of purchaseOrder.items) {
-            await this.updateInventory(item, warehouseId);
-            await this.updateLastPurchaseInfo(purchaseOrder.supplier, item);
-        }
+            for (const item of purchaseOrder.items) {
+                await this.updateInventory(tx, item, warehouseId);
+                await this.updateLastPurchaseInfo(tx, purchaseOrder.supplier, item);
+            }
 
-        // Update purchase order status
-        purchaseOrder.status = PurchaseOrderStatus.RECEIVED;
-        purchaseOrder.receivedDate = new Date();
+            purchaseOrder.status = PurchaseOrderStatus.RECEIVED;
+            purchaseOrder.receivedDate = new Date();
 
-        await this.em.persistAndFlush(purchaseOrder);
-        return purchaseOrder;
+            await tx.persistAndFlush(purchaseOrder);
+            return purchaseOrder;
+        });
     }
 
-    private async updateLastPurchaseInfo(supplier: Supplier, item: PurchaseOrderItem): Promise<void> {
+    private async updateLastPurchaseInfo(em: EntityManager, supplier: Supplier, item: PurchaseOrderItem): Promise<void> {
         // Price with tax = (Base Price * Qty + Tax) / Qty
         // Note: item.subtotal already includes taxAmount (see createPurchaseOrder)
         const purchasePriceWithTax = item.quantity > 0 ? Number(item.subtotal) / Number(item.quantity) : Number(item.unitPrice);
@@ -159,13 +157,14 @@ export class PurchaseOrderService {
         item.rawMaterial.lastPurchaseDate = new Date();
 
         // Upsert SupplierMaterial link
-        let supplierMaterial = await this.supplierMaterialRepo.findOne({
+        const supplierMaterialRepo = em.getRepository(SupplierMaterial);
+        let supplierMaterial = await supplierMaterialRepo.findOne({
             supplier: { id: supplier.id },
             rawMaterial: { id: item.rawMaterial.id },
         });
 
         if (!supplierMaterial) {
-            supplierMaterial = this.supplierMaterialRepo.create({
+            supplierMaterial = supplierMaterialRepo.create({
                 supplier,
                 rawMaterial: item.rawMaterial,
                 lastPurchasePrice: purchasePriceWithTax,
@@ -176,12 +175,13 @@ export class PurchaseOrderService {
             supplierMaterial.lastPurchaseDate = new Date();
         }
 
-        await this.em.persistAndFlush([item.rawMaterial, supplierMaterial]);
+        await em.persistAndFlush([item.rawMaterial, supplierMaterial]);
     }
 
-    private async updateInventory(item: PurchaseOrderItem, warehouseId?: string): Promise<void> {
+    private async updateInventory(em: EntityManager, item: PurchaseOrderItem, warehouseId?: string): Promise<void> {
         // Get or create warehouse
-        const warehouseRepo = this.em.getRepository(Warehouse);
+        const warehouseRepo = em.getRepository(Warehouse);
+        const inventoryRepo = em.getRepository(InventoryItem);
         let warehouse: Warehouse | null = null;
 
         if (warehouseId) {
@@ -199,18 +199,18 @@ export class PurchaseOrderService {
                 location: 'Default Location',
                 type: WarehouseType.RAW_MATERIALS,
             } as Warehouse);
-            await this.em.persistAndFlush(warehouse);
+            await em.persistAndFlush(warehouse);
         }
 
         // Find or create inventory record for this raw material
-        let inventory = await this.inventoryRepo.findOne({
+        let inventory = await inventoryRepo.findOne({
             rawMaterial: { id: item.rawMaterial.id },
             warehouse: { id: warehouse.id },
         });
 
         if (!inventory) {
             // Create new inventory record
-            inventory = this.inventoryRepo.create({
+            inventory = inventoryRepo.create({
                 warehouse,
                 rawMaterial: item.rawMaterial,
                 quantity: item.quantity,
@@ -238,7 +238,7 @@ export class PurchaseOrderService {
             item.rawMaterial.averageCost = purchasePriceWithTax;
         }
 
-        await this.em.persistAndFlush([inventory, item.rawMaterial]);
+        await em.persistAndFlush([inventory, item.rawMaterial]);
 
         // Recalculate variants cost that use this material
         await this.mrpService.recalculateVariantsByMaterial(item.rawMaterial.id);
@@ -248,7 +248,7 @@ export class PurchaseOrderService {
         const purchaseOrder = await this.purchaseOrderRepo.findOneOrFail({ id });
 
         if (purchaseOrder.status === PurchaseOrderStatus.RECEIVED) {
-            throw new Error('Cannot cancel a received purchase order');
+            throw new AppError('No se puede cancelar una orden de compra ya recibida', 400);
         }
 
         purchaseOrder.status = PurchaseOrderStatus.CANCELLED;

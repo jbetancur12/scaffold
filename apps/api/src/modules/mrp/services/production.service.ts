@@ -1,5 +1,5 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
-import { ProductionOrderStatus } from '@scaffold/types';
+import { ProductionOrderStatus, WarehouseType } from '@scaffold/types';
 import { ProductionOrder } from '../entities/production-order.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { ProductionOrderItem } from '../entities/production-order-item.entity';
@@ -10,18 +10,17 @@ import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Supplier } from '../entities/supplier.entity';
 import { ProductionOrderSchema, ProductionOrderItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
+import { AppError } from '../../../shared/utils/response';
 
 export class ProductionService {
     private readonly em: EntityManager;
     private readonly productionOrderRepo: EntityRepository<ProductionOrder>;
     private readonly inventoryRepo: EntityRepository<InventoryItem>;
-    private readonly warehouseRepo: EntityRepository<Warehouse>;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.productionOrderRepo = em.getRepository(ProductionOrder);
         this.inventoryRepo = em.getRepository(InventoryItem);
-        this.warehouseRepo = em.getRepository(Warehouse);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemSchema>[]): Promise<ProductionOrder> {
@@ -36,7 +35,7 @@ export class ProductionService {
             } else {
                 // Should throw or handle error, but let's try to default or leave as is (which will fail later)
                 // Actually throwing a specific error is better
-                throw new Error(`Invalid startDate: ${orderData.startDate}`);
+                throw new AppError(`Fecha de inicio inválida: ${orderData.startDate}`, 400);
             }
         }
 
@@ -45,7 +44,7 @@ export class ProductionService {
             if (!isNaN(date.getTime())) {
                 orderData.endDate = date;
             } else {
-                throw new Error(`Invalid endDate: ${orderData.endDate}`);
+                throw new AppError(`Fecha de fin inválida: ${orderData.endDate}`, 400);
             }
         }
 
@@ -169,60 +168,62 @@ export class ProductionService {
     }
 
     async updateStatus(id: string, status: ProductionOrderStatus, warehouseId?: string): Promise<ProductionOrder> {
-        const order = await this.productionOrderRepo.findOneOrFail({ id }, { populate: ['items', 'items.variant'] });
+        return this.em.transactional(async (tx) => {
+            const productionOrderRepo = tx.getRepository(ProductionOrder);
+            const inventoryRepo = tx.getRepository(InventoryItem);
+            const warehouseRepo = tx.getRepository(Warehouse);
+            const order = await productionOrderRepo.findOneOrFail({ id }, { populate: ['items', 'items.variant'] });
 
-        // Basic transition validation
-        if (order.status === ProductionOrderStatus.COMPLETED || order.status === ProductionOrderStatus.CANCELLED) {
-            throw new Error(`Cannot change status of an order that is already ${order.status}`);
-        }
-
-        order.status = status;
-
-        // If status is changed to COMPLETED, update finished goods inventory
-        if (status === ProductionOrderStatus.COMPLETED) {
-            // Get or create warehouse for finished goods
-            let warehouse: Warehouse | null = null;
-            if (warehouseId) {
-                warehouse = await this.warehouseRepo.findOne({ id: warehouseId });
+            // Basic transition validation
+            if (order.status === ProductionOrderStatus.COMPLETED || order.status === ProductionOrderStatus.CANCELLED) {
+                throw new AppError(`No se puede cambiar el estado de una orden que ya está ${order.status}`, 400);
             }
 
-            if (!warehouse) {
-                warehouse = await this.warehouseRepo.findOne({ name: 'Main Warehouse' });
-            }
+            order.status = status;
 
-            if (!warehouse) {
-                // If not exists (unlikely if setup correctly, but handle it), create one
-                warehouse = this.warehouseRepo.create({
-                    name: 'Main Warehouse',
-                    location: 'Default',
-                    type: 'FINISHED_GOODS'
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                } as any);
-                this.em.persist(warehouse);
-            }
-
-            for (const item of order.items) {
-                let inventoryItem = await this.inventoryRepo.findOne({
-                    variant: item.variant,
-                    warehouse
-                });
-
-                if (inventoryItem) {
-                    inventoryItem.quantity = Number(inventoryItem.quantity) + Number(item.quantity);
-                } else {
-                    inventoryItem = this.inventoryRepo.create({
-                        variant: item.variant,
-                        warehouse,
-                        quantity: item.quantity,
-                        lastUpdated: new Date()
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    } as any);
+            // If status is changed to COMPLETED, update finished goods inventory
+            if (status === ProductionOrderStatus.COMPLETED) {
+                // Get or create warehouse for finished goods
+                let warehouse: Warehouse | null = null;
+                if (warehouseId) {
+                    warehouse = await warehouseRepo.findOne({ id: warehouseId });
                 }
-                this.em.persist(inventoryItem);
-            }
-        }
 
-        await this.em.flush();
-        return order;
+                if (!warehouse) {
+                    warehouse = await warehouseRepo.findOne({ name: 'Main Warehouse' });
+                }
+
+                if (!warehouse) {
+                    warehouse = warehouseRepo.create({
+                        name: 'Main Warehouse',
+                        location: 'Default',
+                        type: WarehouseType.FINISHED_GOODS
+                    } as Warehouse);
+                    tx.persist(warehouse);
+                }
+
+                for (const item of order.items) {
+                    let inventoryItem = await inventoryRepo.findOne({
+                        variant: item.variant,
+                        warehouse
+                    });
+
+                    if (inventoryItem) {
+                        inventoryItem.quantity = Number(inventoryItem.quantity) + Number(item.quantity);
+                    } else {
+                        inventoryItem = inventoryRepo.create({
+                            variant: item.variant,
+                            warehouse,
+                            quantity: item.quantity,
+                            lastUpdated: new Date()
+                        } as InventoryItem);
+                    }
+                    tx.persist(inventoryItem);
+                }
+            }
+
+            await tx.flush();
+            return order;
+        });
     }
 }

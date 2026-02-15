@@ -4,6 +4,7 @@ import { UserService } from '../user/user.service';
 import { User } from '../user/user.entity';
 import { RequiredEntityData } from '@mikro-orm/core';
 import type { LoginDto, RegisterDto } from '@scaffold/schemas';
+import { AppError } from '../../shared/utils/response';
 
 export class AuthService {
     constructor(
@@ -13,7 +14,7 @@ export class AuthService {
     async register(dto: RegisterDto): Promise<User> {
         const existing = await this.userService.findByEmail(dto.email);
         if (existing) {
-            throw new Error('User already exists');
+            throw new AppError('Ya existe un usuario con ese email', 409);
         }
         return this.userService.create(dto as unknown as RequiredEntityData<User>);
     }

@@ -3,6 +3,7 @@ import { User } from './user.entity';
 import type { CreateUserDto, UpdateUserDto } from '@scaffold/schemas';
 import argon2 from 'argon2';
 import { winstonLogger } from '../../config/logger';
+import { AppError } from '../../shared/utils/response';
 
 export class UserService {
     private readonly em: EntityManager;
@@ -39,7 +40,7 @@ export class UserService {
         try {
             const existingUser = await this.findByEmail(data.email);
             if (existingUser) {
-                throw new Error('User with this email already exists');
+                throw new AppError('Ya existe un usuario con este email', 409);
             }
 
             const hashedPassword = await argon2.hash(data.password);
@@ -60,13 +61,13 @@ export class UserService {
         try {
             const user = await this.findById(id);
             if (!user) {
-                throw new Error('User not found');
+                throw new AppError('Usuario no encontrado', 404);
             }
 
             if (data.email) {
                 const existingUser = await this.findByEmail(data.email);
                 if (existingUser && existingUser.id !== id) {
-                    throw new Error('User with this email already exists');
+                    throw new AppError('Ya existe un usuario con este email', 409);
                 }
                 user.email = data.email;
             }
@@ -91,7 +92,7 @@ export class UserService {
         try {
             const user = await this.findById(id);
             if (!user) {
-                throw new Error('User not found');
+                throw new AppError('Usuario no encontrado', 404);
             }
 
             await this.em.removeAndFlush(user);
