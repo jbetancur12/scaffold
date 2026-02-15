@@ -26,10 +26,10 @@
 - [x] Evidencia de cierre de recall.
 
 ## Fase 5 - Etiquetado y codificacion regulatoria
-- [ ] Modelo de etiqueta por lote/serial.
-- [ ] Campos regulatorios obligatorios por tipo de dispositivo.
-- [ ] Integracion con estandar de codificacion aplicable.
-- [ ] Validaciones previas a despacho.
+- [x] Modelo de etiqueta por lote/serial.
+- [x] Campos regulatorios obligatorios por tipo de dispositivo.
+- [x] Integracion con estandar de codificacion aplicable.
+- [x] Validaciones previas a despacho.
 
 ## Fase 6 - Evidencia de cumplimiento y auditorias
 - [ ] Tablero de cumplimiento (KPIs de NC, CAPA, eventos, recall).

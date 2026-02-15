@@ -34,6 +34,12 @@ import {
     RecallNotificationStatus,
     RecallScopeType,
     RecallStatus,
+    RegulatoryCodingStandard,
+    RegulatoryDeviceType,
+    RegulatoryLabel,
+    RegulatoryLabelScopeType,
+    RegulatoryLabelStatus,
+    DispatchValidationResult,
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
@@ -203,6 +209,31 @@ export interface CloseRecallCasePayload {
     closureEvidence: string;
     endedAt?: string | Date;
     actualResponseMinutes?: number;
+    actor?: string;
+}
+
+export interface UpsertRegulatoryLabelPayload {
+    productionBatchId: string;
+    productionBatchUnitId?: string;
+    scopeType: RegulatoryLabelScopeType;
+    deviceType: RegulatoryDeviceType;
+    codingStandard: RegulatoryCodingStandard;
+    productName: string;
+    manufacturerName: string;
+    invimaRegistration: string;
+    lotCode: string;
+    serialCode?: string;
+    manufactureDate: string | Date;
+    expirationDate?: string | Date;
+    gtin?: string;
+    udiDi?: string;
+    udiPi?: string;
+    internalCode?: string;
+    actor?: string;
+}
+
+export interface ValidateDispatchReadinessPayload {
+    productionBatchId: string;
     actor?: string;
 }
 
@@ -484,6 +515,22 @@ export const mrpApi = {
     },
     closeRecallCase: async (id: string, data: CloseRecallCasePayload): Promise<RecallCase> => {
         const response = await api.post<RecallCase>(`/mrp/quality/recalls/${id}/close`, data);
+        return response.data;
+    },
+    upsertRegulatoryLabel: async (data: UpsertRegulatoryLabelPayload): Promise<RegulatoryLabel> => {
+        const response = await api.post<RegulatoryLabel>('/mrp/quality/regulatory-labels', data);
+        return response.data;
+    },
+    listRegulatoryLabels: async (filters?: {
+        productionBatchId?: string;
+        scopeType?: RegulatoryLabelScopeType;
+        status?: RegulatoryLabelStatus;
+    }): Promise<RegulatoryLabel[]> => {
+        const response = await api.get<RegulatoryLabel[]>('/mrp/quality/regulatory-labels', { params: filters });
+        return response.data;
+    },
+    validateDispatchReadiness: async (data: ValidateDispatchReadinessPayload): Promise<DispatchValidationResult> => {
+        const response = await api.post<DispatchValidationResult>('/mrp/quality/regulatory-labels/validate-dispatch', data);
         return response.data;
     },
     createControlledDocument: async (data: CreateControlledDocumentPayload): Promise<ControlledDocument> => {

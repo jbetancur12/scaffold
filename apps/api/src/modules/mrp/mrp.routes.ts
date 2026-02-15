@@ -74,6 +74,9 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/quality/recalls/:id/notifications', (req, res, next) => mrpController.createRecallNotification(req, res, next));
     router.patch('/quality/recall-notifications/:notificationId', (req, res, next) => mrpController.updateRecallNotification(req, res, next));
     router.post('/quality/recalls/:id/close', (req, res, next) => mrpController.closeRecallCase(req, res, next));
+    router.post('/quality/regulatory-labels', (req, res, next) => mrpController.upsertRegulatoryLabel(req, res, next));
+    router.get('/quality/regulatory-labels', (req, res, next) => mrpController.listRegulatoryLabels(req, res, next));
+    router.post('/quality/regulatory-labels/validate-dispatch', (req, res, next) => mrpController.validateDispatchReadiness(req, res, next));
     router.post('/quality/documents', (req, res, next) => mrpController.createControlledDocument(req, res, next));
     router.get('/quality/documents', (req, res, next) => mrpController.listControlledDocuments(req, res, next));
     router.post('/quality/documents/:id/submit-review', (req, res, next) => mrpController.submitControlledDocument(req, res, next));

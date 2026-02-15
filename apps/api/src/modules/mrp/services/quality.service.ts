@@ -1,12 +1,17 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import {
     CapaStatus,
+    DispatchValidationResult,
     NonConformityStatus,
     QualitySeverity,
     RecallNotificationChannel,
     RecallNotificationStatus,
     RecallScopeType,
     RecallStatus,
+    RegulatoryCodingStandard,
+    RegulatoryDeviceType,
+    RegulatoryLabelScopeType,
+    RegulatoryLabelStatus,
     TechnovigilanceCaseType,
     TechnovigilanceCausality,
     TechnovigilanceSeverity,
@@ -22,6 +27,7 @@ import { ProductionOrder } from '../entities/production-order.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RecallCase } from '../entities/recall-case.entity';
 import { RecallNotification } from '../entities/recall-notification.entity';
+import { RegulatoryLabel } from '../entities/regulatory-label.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 
 export class QualityService {
@@ -32,6 +38,7 @@ export class QualityService {
     private readonly technoRepo: EntityRepository<TechnovigilanceCase>;
     private readonly recallRepo: EntityRepository<RecallCase>;
     private readonly recallNotificationRepo: EntityRepository<RecallNotification>;
+    private readonly regulatoryLabelRepo: EntityRepository<RegulatoryLabel>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -41,6 +48,7 @@ export class QualityService {
         this.technoRepo = em.getRepository(TechnovigilanceCase);
         this.recallRepo = em.getRepository(RecallCase);
         this.recallNotificationRepo = em.getRepository(RecallNotification);
+        this.regulatoryLabelRepo = em.getRepository(RegulatoryLabel);
     }
 
     async createNonConformity(payload: {
@@ -494,6 +502,194 @@ export class QualityService {
         return row;
     }
 
+    async upsertRegulatoryLabel(payload: {
+        productionBatchId: string;
+        productionBatchUnitId?: string;
+        scopeType: RegulatoryLabelScopeType;
+        deviceType: RegulatoryDeviceType;
+        codingStandard: RegulatoryCodingStandard;
+        productName: string;
+        manufacturerName: string;
+        invimaRegistration: string;
+        lotCode: string;
+        serialCode?: string;
+        manufactureDate: Date;
+        expirationDate?: Date;
+        gtin?: string;
+        udiDi?: string;
+        udiPi?: string;
+        internalCode?: string;
+        actor?: string;
+    }) {
+        const batch = await this.em.findOneOrFail(ProductionBatch, { id: payload.productionBatchId }, { populate: ['units'] });
+        let unit: ProductionBatchUnit | undefined;
+
+        if (payload.productionBatchUnitId) {
+            unit = await this.em.findOneOrFail(ProductionBatchUnit, { id: payload.productionBatchUnitId }, { populate: ['batch'] });
+            if (unit.batch.id !== batch.id) {
+                throw new AppError('La unidad serial no pertenece al lote indicado', 400);
+            }
+        }
+
+        if (payload.scopeType === RegulatoryLabelScopeType.SERIAL && !unit) {
+            throw new AppError('Para etiqueta serial debes indicar productionBatchUnitId', 400);
+        }
+        if (payload.scopeType === RegulatoryLabelScopeType.LOTE && unit) {
+            throw new AppError('Una etiqueta de lote no puede amarrarse a una unidad serial', 400);
+        }
+
+        const serialCode = payload.scopeType === RegulatoryLabelScopeType.SERIAL
+            ? (unit?.serialCode ?? payload.serialCode)
+            : undefined;
+
+        let row: RegulatoryLabel | null = null;
+        if (payload.scopeType === RegulatoryLabelScopeType.SERIAL && unit) {
+            row = await this.regulatoryLabelRepo.findOne({ productionBatchUnit: unit.id });
+        } else if (payload.scopeType === RegulatoryLabelScopeType.LOTE) {
+            row = await this.regulatoryLabelRepo.findOne({
+                productionBatch: batch.id,
+                scopeType: RegulatoryLabelScopeType.LOTE,
+                productionBatchUnit: null,
+            });
+        }
+
+        if (!row) {
+            row = this.regulatoryLabelRepo.create({
+                productionBatch: batch,
+                productionBatchUnit: unit,
+                scopeType: payload.scopeType,
+                createdBy: payload.actor,
+            } as unknown as RegulatoryLabel);
+        }
+
+        this.regulatoryLabelRepo.assign(row, {
+            productionBatch: batch,
+            productionBatchUnit: unit,
+            scopeType: payload.scopeType,
+            deviceType: payload.deviceType,
+            codingStandard: payload.codingStandard,
+            productName: payload.productName,
+            manufacturerName: payload.manufacturerName,
+            invimaRegistration: payload.invimaRegistration,
+            lotCode: payload.lotCode,
+            serialCode,
+            manufactureDate: payload.manufactureDate,
+            expirationDate: payload.expirationDate,
+            gtin: payload.gtin,
+            udiDi: payload.udiDi,
+            udiPi: payload.udiPi,
+            internalCode: payload.internalCode,
+            codingValue: this.buildCodingValue({
+                codingStandard: payload.codingStandard,
+                gtin: payload.gtin,
+                lotCode: payload.lotCode,
+                serialCode,
+                expirationDate: payload.expirationDate,
+                udiDi: payload.udiDi,
+                udiPi: payload.udiPi,
+                internalCode: payload.internalCode,
+            }),
+        });
+
+        const errors = this.validateRegulatoryLabel({
+            scopeType: payload.scopeType,
+            deviceType: payload.deviceType,
+            codingStandard: payload.codingStandard,
+            lotCode: payload.lotCode,
+            serialCode,
+            manufactureDate: payload.manufactureDate,
+            expirationDate: payload.expirationDate,
+            gtin: payload.gtin,
+            udiDi: payload.udiDi,
+            internalCode: payload.internalCode,
+        });
+
+        row.validationErrors = errors;
+        row.status = errors.length === 0 ? RegulatoryLabelStatus.VALIDADA : RegulatoryLabelStatus.BLOQUEADA;
+
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'regulatory_label',
+            entityId: row.id,
+            action: 'upserted',
+            actor: payload.actor,
+            metadata: {
+                batchId: batch.id,
+                batchUnitId: unit?.id,
+                scopeType: row.scopeType,
+                status: row.status,
+                errors,
+            },
+        });
+        return row;
+    }
+
+    async listRegulatoryLabels(filters: {
+        productionBatchId?: string;
+        scopeType?: RegulatoryLabelScopeType;
+        status?: RegulatoryLabelStatus;
+    }) {
+        const query: FilterQuery<RegulatoryLabel> = {};
+        if (filters.productionBatchId) query.productionBatch = filters.productionBatchId;
+        if (filters.scopeType) query.scopeType = filters.scopeType;
+        if (filters.status) query.status = filters.status;
+        return this.regulatoryLabelRepo.find(query, {
+            populate: ['productionBatch', 'productionBatchUnit'],
+            orderBy: { createdAt: 'DESC' },
+        });
+    }
+
+    async validateDispatchReadiness(productionBatchId: string, actor?: string): Promise<DispatchValidationResult> {
+        const batch = await this.em.findOneOrFail(ProductionBatch, { id: productionBatchId }, { populate: ['units'] });
+        const labels = await this.regulatoryLabelRepo.find({ productionBatch: productionBatchId }, { populate: ['productionBatchUnit'] });
+        const errors: string[] = [];
+
+        const lotLabel = labels.find((label) =>
+            label.scopeType === RegulatoryLabelScopeType.LOTE &&
+            !label.productionBatchUnit &&
+            label.status === RegulatoryLabelStatus.VALIDADA
+        );
+        if (!lotLabel) {
+            errors.push('Falta etiqueta regulatoria de lote en estado validada');
+        }
+
+        const unitsRequiringLabel = batch.units
+            .getItems()
+            .filter((unit) => !unit.rejected && unit.qcPassed && unit.packaged);
+        const validSerialLabelUnitIds = new Set(
+            labels
+                .filter((label) =>
+                    label.scopeType === RegulatoryLabelScopeType.SERIAL &&
+                    label.status === RegulatoryLabelStatus.VALIDADA &&
+                    !!label.productionBatchUnit
+                )
+                .map((label) => label.productionBatchUnit!.id)
+        );
+        const missingUnits = unitsRequiringLabel.filter((unit) => !validSerialLabelUnitIds.has(unit.id));
+        if (missingUnits.length > 0) {
+            errors.push(`Faltan etiquetas seriales validadas para ${missingUnits.length} unidad(es) empacada(s)`);
+        }
+
+        const result: DispatchValidationResult = {
+            batchId: productionBatchId,
+            eligible: errors.length === 0,
+            validatedAt: new Date(),
+            errors,
+            requiredSerialLabels: unitsRequiringLabel.length,
+            validatedSerialLabels: unitsRequiringLabel.length - missingUnits.length,
+        };
+
+        await this.logEvent({
+            entityType: 'production_batch',
+            entityId: productionBatchId,
+            action: 'dispatch_validated',
+            actor,
+            metadata: result as unknown as Record<string, unknown>,
+        });
+
+        return result;
+    }
+
     private calculateCoverage(affectedQuantity: number, retrievedQuantity: number) {
         if (affectedQuantity <= 0) return 0;
         const value = (retrievedQuantity / affectedQuantity) * 100;
@@ -503,6 +699,62 @@ export class QualityService {
     private calculateMinutes(startedAt: Date, endedAt?: Date) {
         const end = endedAt ?? new Date();
         return Math.max(1, Math.round((end.getTime() - startedAt.getTime()) / 60000));
+    }
+
+    private validateRegulatoryLabel(payload: {
+        scopeType: RegulatoryLabelScopeType;
+        deviceType: RegulatoryDeviceType;
+        codingStandard: RegulatoryCodingStandard;
+        lotCode: string;
+        serialCode?: string;
+        manufactureDate: Date;
+        expirationDate?: Date;
+        gtin?: string;
+        udiDi?: string;
+        internalCode?: string;
+    }) {
+        const errors: string[] = [];
+
+        if (!payload.lotCode) errors.push('lotCode es obligatorio');
+        if (!payload.manufactureDate) errors.push('manufactureDate es obligatorio');
+        if (payload.scopeType === RegulatoryLabelScopeType.SERIAL && !payload.serialCode) {
+            errors.push('serialCode es obligatorio para alcance serial');
+        }
+        if (payload.deviceType !== RegulatoryDeviceType.CLASE_I && !payload.expirationDate) {
+            errors.push('expirationDate es obligatorio para dispositivos clase II y III');
+        }
+
+        if (payload.codingStandard === RegulatoryCodingStandard.GS1 && !payload.gtin) {
+            errors.push('gtin es obligatorio para estándar GS1');
+        }
+        if (payload.codingStandard === RegulatoryCodingStandard.HIBCC && !payload.udiDi) {
+            errors.push('udiDi es obligatorio para estándar HIBCC');
+        }
+        if (payload.codingStandard === RegulatoryCodingStandard.INTERNO && !payload.internalCode) {
+            errors.push('internalCode es obligatorio para estándar interno');
+        }
+
+        return errors;
+    }
+
+    private buildCodingValue(payload: {
+        codingStandard: RegulatoryCodingStandard;
+        gtin?: string;
+        lotCode: string;
+        serialCode?: string;
+        expirationDate?: Date;
+        udiDi?: string;
+        udiPi?: string;
+        internalCode?: string;
+    }) {
+        if (payload.codingStandard === RegulatoryCodingStandard.GS1) {
+            const exp = payload.expirationDate ? payload.expirationDate.toISOString().slice(2, 10).replace(/-/g, '') : '';
+            return `(01)${payload.gtin || ''}(10)${payload.lotCode}${exp ? `(17)${exp}` : ''}${payload.serialCode ? `(21)${payload.serialCode}` : ''}`;
+        }
+        if (payload.codingStandard === RegulatoryCodingStandard.HIBCC) {
+            return `HIBCC-${payload.udiDi || ''}-${payload.lotCode}${payload.serialCode ? `-${payload.serialCode}` : ''}${payload.udiPi ? `-${payload.udiPi}` : ''}`;
+        }
+        return payload.internalCode || '';
     }
 
     async logEvent(payload: {

@@ -157,6 +157,30 @@ export enum RecallNotificationStatus {
     FALLIDA = 'fallida',
 }
 
+export enum RegulatoryLabelScopeType {
+    LOTE = 'lote',
+    SERIAL = 'serial',
+}
+
+export enum RegulatoryDeviceType {
+    CLASE_I = 'clase_i',
+    CLASE_IIA = 'clase_iia',
+    CLASE_IIB = 'clase_iib',
+    CLASE_III = 'clase_iii',
+}
+
+export enum RegulatoryCodingStandard {
+    GS1 = 'gs1',
+    HIBCC = 'hibcc',
+    INTERNO = 'interno',
+}
+
+export enum RegulatoryLabelStatus {
+    BORRADOR = 'borrador',
+    VALIDADA = 'validada',
+    BLOQUEADA = 'bloqueada',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -480,6 +504,41 @@ export interface RecallCase {
     notifications?: RecallNotification[];
     createdAt: string | Date;
     updatedAt: string | Date;
+}
+
+export interface RegulatoryLabel {
+    id: string;
+    productionBatchId: string;
+    productionBatchUnitId?: string;
+    scopeType: RegulatoryLabelScopeType;
+    status: RegulatoryLabelStatus;
+    deviceType: RegulatoryDeviceType;
+    codingStandard: RegulatoryCodingStandard;
+    productName: string;
+    manufacturerName: string;
+    invimaRegistration: string;
+    lotCode: string;
+    serialCode?: string;
+    manufactureDate: string | Date;
+    expirationDate?: string | Date;
+    gtin?: string;
+    udiDi?: string;
+    udiPi?: string;
+    internalCode?: string;
+    codingValue?: string;
+    validationErrors?: string[];
+    createdBy?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface DispatchValidationResult {
+    batchId: string;
+    eligible: boolean;
+    validatedAt: string | Date;
+    errors: string[];
+    requiredSerialLabels: number;
+    validatedSerialLabels: number;
 }
 
 export interface OperationalConfig {

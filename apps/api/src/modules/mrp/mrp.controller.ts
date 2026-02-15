@@ -45,6 +45,9 @@ import {
     CreateRecallNotificationSchema,
     UpdateRecallNotificationSchema,
     CloseRecallCaseSchema,
+    UpsertRegulatoryLabelSchema,
+    ListRegulatoryLabelsQuerySchema,
+    ValidateDispatchReadinessSchema,
     CreateControlledDocumentSchema,
     ListControlledDocumentsQuerySchema,
     ActorPayloadSchema,
@@ -667,6 +670,36 @@ export class MrpController {
             const payload = CloseRecallCaseSchema.parse(req.body);
             const row = await this.qualityService.closeRecallCase(id, payload);
             return ApiResponse.success(res, row, 'Recall cerrado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async upsertRegulatoryLabel(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = UpsertRegulatoryLabelSchema.parse(req.body);
+            const row = await this.qualityService.upsertRegulatoryLabel(payload);
+            return ApiResponse.success(res, row, 'Etiqueta regulatoria registrada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listRegulatoryLabels(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListRegulatoryLabelsQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listRegulatoryLabels(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async validateDispatchReadiness(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = ValidateDispatchReadinessSchema.parse(req.body);
+            const result = await this.qualityService.validateDispatchReadiness(payload.productionBatchId, payload.actor);
+            return ApiResponse.success(res, result, result.eligible ? 'Despacho habilitado' : 'Despacho bloqueado');
         } catch (error) {
             next(error);
         }

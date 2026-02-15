@@ -22,6 +22,12 @@ import {
     RecallNotificationStatus,
     RecallScopeType,
     RecallStatus,
+    RegulatoryCodingStandard,
+    RegulatoryDeviceType,
+    RegulatoryLabel,
+    RegulatoryLabelScopeType,
+    RegulatoryLabelStatus,
+    DispatchValidationResult,
 } from '@scaffold/types';
 import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
@@ -270,6 +276,59 @@ export const useCloseRecallCaseMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useRegulatoryLabelsQuery = (filters?: {
+    productionBatchId?: string;
+    scopeType?: RegulatoryLabelScopeType;
+    status?: RegulatoryLabelStatus;
+}) => {
+    const fetcher = useCallback(async (): Promise<RegulatoryLabel[]> => {
+        return mrpApi.listRegulatoryLabels(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityRegulatoryLabels);
+};
+
+export const useUpsertRegulatoryLabelMutation = () => {
+    return useMrpMutation<{
+        productionBatchId: string;
+        productionBatchUnitId?: string;
+        scopeType: RegulatoryLabelScopeType;
+        deviceType: RegulatoryDeviceType;
+        codingStandard: RegulatoryCodingStandard;
+        productName: string;
+        manufacturerName: string;
+        invimaRegistration: string;
+        lotCode: string;
+        serialCode?: string;
+        manufactureDate: string;
+        expirationDate?: string;
+        gtin?: string;
+        udiDi?: string;
+        udiPi?: string;
+        internalCode?: string;
+        actor?: string;
+    }, RegulatoryLabel>(
+        async (payload) => mrpApi.upsertRegulatoryLabel(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityRegulatoryLabels);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useValidateDispatchReadinessMutation = () => {
+    return useMrpMutation<{ productionBatchId: string; actor?: string }, DispatchValidationResult>(
+        async (payload) => mrpApi.validateDispatchReadiness(payload),
+        {
+            onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
             },
         }

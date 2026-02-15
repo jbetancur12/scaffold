@@ -20,6 +20,10 @@ import {
     RecallStatus,
     RecallNotificationChannel,
     RecallNotificationStatus,
+    RegulatoryLabelScopeType,
+    RegulatoryDeviceType,
+    RegulatoryCodingStandard,
+    RegulatoryLabelStatus,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -422,6 +426,45 @@ export const CloseRecallCaseSchema = z.object({
     closureEvidence: z.string().min(10),
     endedAt: z.coerce.date().optional(),
     actualResponseMinutes: z.number().int().positive().optional(),
+    actor: z.string().optional(),
+});
+
+export const UpsertRegulatoryLabelSchema = z.object({
+    productionBatchId: z.string().uuid(),
+    productionBatchUnitId: z.string().uuid().optional(),
+    scopeType: z.nativeEnum(RegulatoryLabelScopeType),
+    deviceType: z.nativeEnum(RegulatoryDeviceType),
+    codingStandard: z.nativeEnum(RegulatoryCodingStandard),
+    productName: z.string().min(3),
+    manufacturerName: z.string().min(3),
+    invimaRegistration: z.string().min(3),
+    lotCode: z.string().min(2),
+    serialCode: z.string().optional(),
+    manufactureDate: z.coerce.date(),
+    expirationDate: z.coerce.date().optional(),
+    gtin: z.string().optional(),
+    udiDi: z.string().optional(),
+    udiPi: z.string().optional(),
+    internalCode: z.string().optional(),
+    actor: z.string().optional(),
+}).superRefine((data, ctx) => {
+    if (data.scopeType === RegulatoryLabelScopeType.SERIAL && !data.productionBatchUnitId) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['productionBatchUnitId'],
+            message: 'Para etiqueta serial debes enviar productionBatchUnitId',
+        });
+    }
+});
+
+export const ListRegulatoryLabelsQuerySchema = z.object({
+    productionBatchId: z.string().uuid().optional(),
+    scopeType: z.nativeEnum(RegulatoryLabelScopeType).optional(),
+    status: z.nativeEnum(RegulatoryLabelStatus).optional(),
+});
+
+export const ValidateDispatchReadinessSchema = z.object({
+    productionBatchId: z.string().uuid(),
     actor: z.string().optional(),
 });
 

@@ -13,6 +13,9 @@ import {
     RecallScopeType,
     RecallNotificationChannel,
     RecallNotificationStatus,
+    RegulatoryLabelScopeType,
+    RegulatoryDeviceType,
+    RegulatoryCodingStandard,
 } from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -38,6 +41,9 @@ import {
     useCreateRecallNotificationMutation,
     useUpdateRecallNotificationMutation,
     useCloseRecallCaseMutation,
+    useRegulatoryLabelsQuery,
+    useUpsertRegulatoryLabelMutation,
+    useValidateDispatchReadinessMutation,
 } from '@/hooks/mrp/useQuality';
 
 export const useQualityCompliance = () => {
@@ -47,6 +53,7 @@ export const useQualityCompliance = () => {
     const { data: auditData, loading: loadingAudit } = useQualityAuditQuery();
     const { data: technovigilanceData, loading: loadingTechno } = useTechnovigilanceCasesQuery();
     const { data: recallsData, loading: loadingRecalls } = useRecallCasesQuery();
+    const { data: regulatoryLabelsData, loading: loadingRegulatoryLabels } = useRegulatoryLabelsQuery();
     const { data: documentsData, loading: loadingDocuments } = useControlledDocumentsQuery();
     const { execute: createNc, loading: creatingNc } = useCreateNonConformityMutation();
     const { execute: updateNc } = useUpdateNonConformityMutation();
@@ -63,6 +70,8 @@ export const useQualityCompliance = () => {
     const { execute: createRecallNotification } = useCreateRecallNotificationMutation();
     const { execute: updateRecallNotification } = useUpdateRecallNotificationMutation();
     const { execute: closeRecallCase } = useCloseRecallCaseMutation();
+    const { execute: upsertRegulatoryLabel, loading: savingRegulatoryLabel } = useUpsertRegulatoryLabelMutation();
+    const { execute: validateDispatchReadiness, loading: validatingDispatch } = useValidateDispatchReadinessMutation();
 
     const [ncForm, setNcForm] = useState({
         title: '',
@@ -104,12 +113,31 @@ export const useQualityCompliance = () => {
         isMock: false,
         targetResponseMinutes: '',
     });
+    const [regulatoryLabelForm, setRegulatoryLabelForm] = useState({
+        productionBatchId: '',
+        productionBatchUnitId: '',
+        scopeType: RegulatoryLabelScopeType.LOTE,
+        deviceType: RegulatoryDeviceType.CLASE_I,
+        codingStandard: RegulatoryCodingStandard.GS1,
+        productName: '',
+        manufacturerName: '',
+        invimaRegistration: '',
+        lotCode: '',
+        serialCode: '',
+        manufactureDate: '',
+        expirationDate: '',
+        gtin: '',
+        udiDi: '',
+        udiPi: '',
+        internalCode: '',
+    });
 
     const nonConformities = nonConformitiesData ?? [];
     const capas = capasData ?? [];
     const audits = auditData ?? [];
     const technovigilanceCases = technovigilanceData ?? [];
     const recalls = recallsData ?? [];
+    const regulatoryLabels = regulatoryLabelsData ?? [];
     const documents = documentsData ?? [];
     const openNc = nonConformities.filter((n) => n.status !== NonConformityStatus.CERRADA);
 
@@ -398,12 +426,61 @@ export const useQualityCompliance = () => {
         }
     };
 
+    const handleUpsertRegulatoryLabel = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await upsertRegulatoryLabel({
+                productionBatchId: regulatoryLabelForm.productionBatchId,
+                productionBatchUnitId: regulatoryLabelForm.productionBatchUnitId || undefined,
+                scopeType: regulatoryLabelForm.scopeType,
+                deviceType: regulatoryLabelForm.deviceType,
+                codingStandard: regulatoryLabelForm.codingStandard,
+                productName: regulatoryLabelForm.productName,
+                manufacturerName: regulatoryLabelForm.manufacturerName,
+                invimaRegistration: regulatoryLabelForm.invimaRegistration,
+                lotCode: regulatoryLabelForm.lotCode,
+                serialCode: regulatoryLabelForm.serialCode || undefined,
+                manufactureDate: regulatoryLabelForm.manufactureDate,
+                expirationDate: regulatoryLabelForm.expirationDate || undefined,
+                gtin: regulatoryLabelForm.gtin || undefined,
+                udiDi: regulatoryLabelForm.udiDi || undefined,
+                udiPi: regulatoryLabelForm.udiPi || undefined,
+                internalCode: regulatoryLabelForm.internalCode || undefined,
+                actor: 'sistema-web',
+            });
+            toast({ title: 'Etiqueta registrada', description: 'Etiqueta regulatoria guardada y validada.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo registrar la etiqueta'), variant: 'destructive' });
+        }
+    };
+
+    const quickValidateDispatch = async () => {
+        try {
+            const productionBatchId = window.prompt('ID del lote a validar para despacho');
+            if (!productionBatchId) return;
+
+            const result = await validateDispatchReadiness({ productionBatchId, actor: 'sistema-web' });
+            if (result.eligible) {
+                toast({ title: 'Despacho habilitado', description: 'El lote cumple con etiquetado regulatorio.' });
+                return;
+            }
+            toast({
+                title: 'Despacho bloqueado',
+                description: result.errors.join(' | ') || 'El lote no cumple validaciones de etiquetado.',
+                variant: 'destructive',
+            });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo validar el despacho'), variant: 'destructive' });
+        }
+    };
+
     return {
         nonConformities,
         capas,
         audits,
         technovigilanceCases,
         recalls,
+        regulatoryLabels,
         documents,
         openNc,
         ncForm,
@@ -411,22 +488,27 @@ export const useQualityCompliance = () => {
         documentForm,
         technoForm,
         recallForm,
+        regulatoryLabelForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
         setTechnoForm,
         setRecallForm,
+        setRegulatoryLabelForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
         loadingTechno,
         loadingRecalls,
+        loadingRegulatoryLabels,
         loadingDocuments,
         creatingNc,
         creatingCapa,
         creatingDocument,
         creatingTechnoCase,
         creatingRecall,
+        savingRegulatoryLabel,
+        validatingDispatch,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -444,5 +526,7 @@ export const useQualityCompliance = () => {
         quickCreateRecallNotification,
         quickUpdateRecallNotificationStatus,
         quickCloseRecall,
+        handleUpsertRegulatoryLabel,
+        quickValidateDispatch,
     };
 };

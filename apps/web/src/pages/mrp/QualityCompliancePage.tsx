@@ -7,6 +7,10 @@ import {
     RecallNotificationStatus,
     RecallScopeType,
     RecallStatus,
+    RegulatoryCodingStandard,
+    RegulatoryDeviceType,
+    RegulatoryLabelScopeType,
+    RegulatoryLabelStatus,
     TechnovigilanceCaseType,
     TechnovigilanceCausality,
     TechnovigilanceSeverity,
@@ -29,6 +33,7 @@ export default function QualityCompliancePage() {
         audits,
         technovigilanceCases,
         recalls,
+        regulatoryLabels,
         documents,
         openNc,
         ncForm,
@@ -36,22 +41,27 @@ export default function QualityCompliancePage() {
         documentForm,
         technoForm,
         recallForm,
+        regulatoryLabelForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
         setTechnoForm,
         setRecallForm,
+        setRegulatoryLabelForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
         loadingTechno,
         loadingRecalls,
+        loadingRegulatoryLabels,
         loadingDocuments,
         creatingNc,
         creatingCapa,
         creatingDocument,
         creatingTechnoCase,
         creatingRecall,
+        savingRegulatoryLabel,
+        validatingDispatch,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -69,6 +79,8 @@ export default function QualityCompliancePage() {
         quickCreateRecallNotification,
         quickUpdateRecallNotificationStatus,
         quickCloseRecall,
+        handleUpsertRegulatoryLabel,
+        quickValidateDispatch,
     } = useQualityCompliance();
 
     return (
@@ -86,6 +98,7 @@ export default function QualityCompliancePage() {
                     <TabsTrigger value="capa">CAPA</TabsTrigger>
                     <TabsTrigger value="techno">Tecnovigilancia</TabsTrigger>
                     <TabsTrigger value="recall">Recall</TabsTrigger>
+                    <TabsTrigger value="labeling">Etiquetado</TabsTrigger>
                     <TabsTrigger value="docs">Control documental</TabsTrigger>
                     <TabsTrigger value="audit">Auditoría</TabsTrigger>
                 </TabsList>
@@ -504,6 +517,190 @@ export default function QualityCompliancePage() {
                                             <div className="text-xs text-slate-500">Sin notificaciones registradas.</div>
                                         )}
                                     </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="labeling" className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Registrar Etiqueta Regulatoria</CardTitle></CardHeader>
+                        <CardContent>
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={handleUpsertRegulatoryLabel}>
+                                <div className="space-y-1">
+                                    <Label>ID Lote</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.productionBatchId}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, productionBatchId: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>ID Unidad Serial (opcional)</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.productionBatchUnitId}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, productionBatchUnitId: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Alcance</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={regulatoryLabelForm.scopeType}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, scopeType: e.target.value as RegulatoryLabelScopeType }))}
+                                    >
+                                        <option value={RegulatoryLabelScopeType.LOTE}>Lote</option>
+                                        <option value={RegulatoryLabelScopeType.SERIAL}>Serial</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Tipo de dispositivo</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={regulatoryLabelForm.deviceType}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, deviceType: e.target.value as RegulatoryDeviceType }))}
+                                    >
+                                        {Object.values(RegulatoryDeviceType).map((v) => (
+                                            <option key={v} value={v}>{v}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Estándar de codificación</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={regulatoryLabelForm.codingStandard}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, codingStandard: e.target.value as RegulatoryCodingStandard }))}
+                                    >
+                                        {Object.values(RegulatoryCodingStandard).map((v) => (
+                                            <option key={v} value={v}>{v}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Producto</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.productName}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, productName: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Fabricante</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.manufacturerName}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, manufacturerName: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Registro INVIMA</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.invimaRegistration}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, invimaRegistration: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Lote</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.lotCode}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, lotCode: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Serial</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.serialCode}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, serialCode: e.target.value }))}
+                                        required={regulatoryLabelForm.scopeType === RegulatoryLabelScopeType.SERIAL}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Fecha de fabricación</Label>
+                                    <Input
+                                        type="date"
+                                        value={regulatoryLabelForm.manufactureDate}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, manufactureDate: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Fecha de vencimiento</Label>
+                                    <Input
+                                        type="date"
+                                        value={regulatoryLabelForm.expirationDate}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, expirationDate: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>GTIN</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.gtin}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, gtin: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>UDI-DI</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.udiDi}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, udiDi: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>UDI-PI</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.udiPi}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, udiPi: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Código interno</Label>
+                                    <Input
+                                        value={regulatoryLabelForm.internalCode}
+                                        onChange={(e) => setRegulatoryLabelForm((p) => ({ ...p, internalCode: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="md:col-span-2 flex justify-end gap-2">
+                                    <Button type="button" variant="outline" disabled={validatingDispatch} onClick={quickValidateDispatch}>
+                                        {validatingDispatch ? 'Validando...' : 'Validar despacho'}
+                                    </Button>
+                                    <Button type="submit" disabled={savingRegulatoryLabel}>
+                                        {savingRegulatoryLabel ? 'Guardando...' : 'Guardar etiqueta'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Etiquetas regulatorias ({regulatoryLabels.length})</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            {loadingRegulatoryLabels ? <div>Cargando...</div> : regulatoryLabels.length === 0 ? <div className="text-sm text-slate-500">Sin etiquetas.</div> : regulatoryLabels.map((label) => (
+                                <div key={label.id} className="border rounded-md p-3">
+                                    <div className="font-medium">{label.productName} | {label.scopeType}</div>
+                                    <div className="text-xs text-slate-600 mt-1">
+                                        Lote: {label.lotCode} | Serial: {label.serialCode || 'N/A'} | Tipo: {label.deviceType}
+                                    </div>
+                                    <div className="text-xs text-slate-600 mt-1">
+                                        Estándar: {label.codingStandard} | Código: {label.codingValue || 'N/A'}
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">
+                                        Registro INVIMA: {label.invimaRegistration} | Fabricación: {new Date(label.manufactureDate).toLocaleDateString()}
+                                    </div>
+                                    {label.validationErrors && label.validationErrors.length > 0 ? (
+                                        <div className="text-xs text-red-600 mt-1">
+                                            Errores: {label.validationErrors.join(' | ')}
+                                        </div>
+                                    ) : null}
+                                    <Badge
+                                        variant="outline"
+                                        className="mt-2"
+                                    >
+                                        {label.status === RegulatoryLabelStatus.VALIDADA ? 'validada' : label.status}
+                                    </Badge>
                                 </div>
                             ))}
                         </CardContent>

@@ -5,6 +5,8 @@ import {
     ProductionBatchQcStatus,
     ProductionBatchStatus,
     ProductionOrderStatus,
+    RegulatoryLabelScopeType,
+    RegulatoryLabelStatus,
     WarehouseType,
 } from '@scaffold/types';
 import { ProductionOrder } from '../entities/production-order.entity';
@@ -18,6 +20,7 @@ import { Supplier } from '../entities/supplier.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
+import { RegulatoryLabel } from '../entities/regulatory-label.entity';
 import { DocumentControlService } from './document-control.service';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema } from '@scaffold/schemas';
 import { z } from 'zod';
@@ -30,6 +33,7 @@ export class ProductionService {
     private readonly batchRepo: EntityRepository<ProductionBatch>;
     private readonly batchUnitRepo: EntityRepository<ProductionBatchUnit>;
     private readonly auditRepo: EntityRepository<QualityAuditEvent>;
+    private readonly regulatoryLabelRepo: EntityRepository<RegulatoryLabel>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -38,6 +42,7 @@ export class ProductionService {
         this.batchRepo = em.getRepository(ProductionBatch);
         this.batchUnitRepo = em.getRepository(ProductionBatchUnit);
         this.auditRepo = em.getRepository(QualityAuditEvent);
+        this.regulatoryLabelRepo = em.getRepository(RegulatoryLabel);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
@@ -210,12 +215,43 @@ export class ProductionService {
                 throw new AppError('Todas las unidades deben estar aprobadas y empacadas', 400);
             }
         }
+        if (packed) {
+            await this.assertRegulatoryLabelingReady(batch);
+        }
 
         batch.packagingStatus = packed ? ProductionBatchPackagingStatus.PACKED : ProductionBatchPackagingStatus.PENDING;
         batch.status = packed ? ProductionBatchStatus.READY : ProductionBatchStatus.PACKING;
         await this.em.persistAndFlush(batch);
         await this.logAudit('production_batch', batch.id, 'packaging_updated', { packed });
         return batch;
+    }
+
+    private async assertRegulatoryLabelingReady(batch: ProductionBatch) {
+        const labels = await this.regulatoryLabelRepo.find({ productionBatch: batch.id }, { populate: ['productionBatchUnit'] });
+
+        const lotLabel = labels.find((label) =>
+            label.scopeType === RegulatoryLabelScopeType.LOTE &&
+            !label.productionBatchUnit &&
+            label.status === RegulatoryLabelStatus.VALIDADA
+        );
+        if (!lotLabel) {
+            throw new AppError('No puedes despachar: falta etiqueta regulatoria de lote validada', 400);
+        }
+
+        const unitsRequiringLabel = batch.units.getItems().filter((unit) => !unit.rejected && unit.qcPassed && unit.packaged);
+        const labeledUnitIds = new Set(
+            labels
+                .filter((label) =>
+                    label.scopeType === RegulatoryLabelScopeType.SERIAL &&
+                    label.status === RegulatoryLabelStatus.VALIDADA &&
+                    !!label.productionBatchUnit
+                )
+                .map((label) => label.productionBatchUnit!.id)
+        );
+        const missing = unitsRequiringLabel.filter((unit) => !labeledUnitIds.has(unit.id));
+        if (missing.length > 0) {
+            throw new AppError(`No puedes despachar: faltan ${missing.length} etiqueta(s) serial(es) validadas`, 400);
+        }
     }
 
     async setBatchUnitQc(unitId: string, passed: boolean) {
