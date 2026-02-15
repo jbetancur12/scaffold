@@ -13,6 +13,10 @@ import {
     ProcessDeviationStatus,
     OosCaseStatus,
     OosDisposition,
+    ChangeControlStatus,
+    ChangeControlType,
+    ChangeImpactLevel,
+    ChangeApprovalDecision,
     NonConformityStatus,
     QualitySeverity,
     QualityRiskControlStatus,
@@ -44,12 +48,14 @@ import { QualityTrainingEvidence } from '../entities/quality-training-evidence.e
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 import { ProcessDeviation } from '../entities/process-deviation.entity';
 import { OosCase } from '../entities/oos-case.entity';
+import { ChangeControl } from '../entities/change-control.entity';
 import { QualityDhrService } from './quality-dhr.service';
 import { QualityPostmarketService } from './quality-postmarket.service';
 import { QualityLabelingService } from './quality-labeling.service';
 import { QualityIncomingService } from './quality-incoming.service';
 import { QualityBatchReleaseService } from './quality-batch-release.service';
 import { QualityDeviationOosService } from './quality-deviation-oos.service';
+import { QualityChangeControlService } from './quality-change-control.service';
 
 export class QualityService {
     private readonly em: EntityManager;
@@ -63,12 +69,14 @@ export class QualityService {
     private readonly controlledDocumentRepo: EntityRepository<ControlledDocument>;
     private readonly processDeviationRepo: EntityRepository<ProcessDeviation>;
     private readonly oosRepo: EntityRepository<OosCase>;
+    private readonly changeControlRepo: EntityRepository<ChangeControl>;
     private readonly dhrService: QualityDhrService;
     private readonly postmarketService: QualityPostmarketService;
     private readonly labelingService: QualityLabelingService;
     private readonly incomingService: QualityIncomingService;
     private readonly batchReleaseService: QualityBatchReleaseService;
     private readonly deviationOosService: QualityDeviationOosService;
+    private readonly changeControlService: QualityChangeControlService;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -82,10 +90,12 @@ export class QualityService {
         this.controlledDocumentRepo = em.getRepository(ControlledDocument);
         this.processDeviationRepo = em.getRepository(ProcessDeviation);
         this.oosRepo = em.getRepository(OosCase);
+        this.changeControlRepo = em.getRepository(ChangeControl);
         this.dhrService = new QualityDhrService(em, this.logEvent.bind(this));
         this.labelingService = new QualityLabelingService(em, this.logEvent.bind(this));
         this.incomingService = new QualityIncomingService(em, this.logEvent.bind(this));
         this.deviationOosService = new QualityDeviationOosService(em, this.logEvent.bind(this));
+        this.changeControlService = new QualityChangeControlService(em, this.logEvent.bind(this));
         this.batchReleaseService = new QualityBatchReleaseService(
             em,
             this.logEvent.bind(this),
@@ -416,13 +426,14 @@ export class QualityService {
     }
 
     async getComplianceDashboard(): Promise<ComplianceKpiDashboard> {
-        const [nonConformitiesOpen, capasOpen, technovigilanceOpen, recallsOpen, deviationsOpen, oosOpen] = await Promise.all([
+        const [nonConformitiesOpen, capasOpen, technovigilanceOpen, recallsOpen, deviationsOpen, oosOpen, changeControlsPending] = await Promise.all([
             this.ncRepo.count({ status: { $ne: NonConformityStatus.CERRADA } }),
             this.capaRepo.count({ status: { $ne: CapaStatus.CERRADA } }),
             this.technoRepo.count({ status: { $ne: TechnovigilanceStatus.CERRADO } }),
             this.recallRepo.count({ status: { $ne: RecallStatus.CERRADO } }),
             this.processDeviationRepo.count({ status: { $ne: ProcessDeviationStatus.CERRADA } }),
             this.oosRepo.count({ status: { $ne: OosCaseStatus.CERRADO } }),
+            this.changeControlRepo.count({ status: { $in: [ChangeControlStatus.BORRADOR, ChangeControlStatus.EN_EVALUACION] } }),
         ]);
 
         const recalls = await this.recallRepo.findAll();
@@ -447,6 +458,7 @@ export class QualityService {
             recallsOpen,
             deviationsOpen,
             oosOpen,
+            changeControlsPending,
             recallCoverageAverage,
             auditEventsLast30Days,
             documentApprovalRate,
@@ -718,6 +730,63 @@ export class QualityService {
         capaActionId: string;
     }>, actor?: string) {
         return this.deviationOosService.updateOosCase(id, payload, actor);
+    }
+
+    async createChangeControl(payload: {
+        title: string;
+        description: string;
+        type: ChangeControlType;
+        impactLevel?: ChangeImpactLevel;
+        evaluationSummary?: string;
+        requestedBy?: string;
+        effectiveDate?: Date;
+        linkedDocumentId?: string;
+        affectedProductionOrderId?: string;
+        affectedProductionBatchId?: string;
+        beforeChangeBatchCode?: string;
+        afterChangeBatchCode?: string;
+        actor?: string;
+    }) {
+        return this.changeControlService.createChangeControl(payload);
+    }
+
+    async listChangeControls(filters: {
+        status?: ChangeControlStatus;
+        type?: ChangeControlType;
+        impactLevel?: ChangeImpactLevel;
+        affectedProductionBatchId?: string;
+        affectedProductionOrderId?: string;
+    }) {
+        return this.changeControlService.listChangeControls(filters);
+    }
+
+    async updateChangeControl(id: string, payload: Partial<{
+        title: string;
+        description: string;
+        type: ChangeControlType;
+        impactLevel: ChangeImpactLevel;
+        status: ChangeControlStatus;
+        evaluationSummary: string;
+        requestedBy: string;
+        effectiveDate: Date;
+        linkedDocumentId: string;
+        affectedProductionOrderId: string;
+        affectedProductionBatchId: string;
+        beforeChangeBatchCode: string;
+        afterChangeBatchCode: string;
+    }>, actor?: string) {
+        return this.changeControlService.updateChangeControl(id, payload, actor);
+    }
+
+    async createChangeControlApproval(payload: {
+        changeControlId: string;
+        role: string;
+        approver?: string;
+        decision: ChangeApprovalDecision;
+        decisionNotes?: string;
+        actor?: string;
+    }) {
+        return this.changeControlService.createChangeControlApproval(payload);
     }
 
     async logEvent(payload: {

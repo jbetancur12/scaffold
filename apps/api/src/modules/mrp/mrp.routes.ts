@@ -72,6 +72,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/quality/oos-cases', (req, res, next) => mrpController.createOosCase(req, res, next));
     router.get('/quality/oos-cases', (req, res, next) => mrpController.listOosCases(req, res, next));
     router.patch('/quality/oos-cases/:id', (req, res, next) => mrpController.updateOosCase(req, res, next));
+    router.post('/quality/change-controls', (req, res, next) => mrpController.createChangeControl(req, res, next));
+    router.get('/quality/change-controls', (req, res, next) => mrpController.listChangeControls(req, res, next));
+    router.patch('/quality/change-controls/:id', (req, res, next) => mrpController.updateChangeControl(req, res, next));
+    router.post('/quality/change-controls/approvals', (req, res, next) => mrpController.createChangeControlApproval(req, res, next));
     router.get('/quality/audit-events', (req, res, next) => mrpController.listQualityAudit(req, res, next));
     router.post('/quality/technovigilance-cases', (req, res, next) => mrpController.createTechnovigilanceCase(req, res, next));
     router.get('/quality/technovigilance-cases', (req, res, next) => mrpController.listTechnovigilanceCases(req, res, next));

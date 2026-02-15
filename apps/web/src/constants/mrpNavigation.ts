@@ -11,6 +11,7 @@ export type QualitySection =
     | 'batch-release'
     | 'invima'
     | 'compliance'
+    | 'change-control'
     | 'docs'
     | 'audit';
 
@@ -39,6 +40,7 @@ export const qualitySections: Array<{
     { value: 'batch-release', label: 'Liberación QA', domain: 'quality', path: '/quality/batch-release', category: 'regulatorio' },
     { value: 'invima', label: 'Registros INVIMA', domain: 'quality', path: '/quality/invima', category: 'regulatorio' },
     { value: 'compliance', label: 'Cumplimiento', domain: 'quality', path: '/quality/compliance', category: 'gobierno' },
+    { value: 'change-control', label: 'Control de cambios', domain: 'quality', path: '/quality/change-control', category: 'gobierno' },
     { value: 'docs', label: 'Control documental', domain: 'quality', path: '/quality/docs', category: 'gobierno' },
     { value: 'audit', label: 'Auditoría', domain: 'quality', path: '/quality/audit', category: 'gobierno' },
     { value: 'techno', label: 'Tecnovigilancia', domain: 'postmarket', path: '/postmarket/techno', category: 'operacion' },

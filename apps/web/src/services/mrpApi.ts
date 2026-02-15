@@ -20,6 +20,11 @@ import {
     CapaStatus,
     ProcessDeviation,
     OosCase,
+    ChangeControl,
+    ChangeControlType,
+    ChangeControlStatus,
+    ChangeImpactLevel,
+    ChangeApprovalDecision,
     ControlledDocument,
     DocumentProcess,
     TechnovigilanceCase,
@@ -71,6 +76,10 @@ import type {
     CreateOosCasePayload,
     UpdateOosCasePayload,
     ListOosCasesFilters,
+    CreateChangeControlPayload,
+    UpdateChangeControlPayload,
+    ListChangeControlsFilters,
+    CreateChangeControlApprovalPayload,
     CreateControlledDocumentPayload,
     ListControlledDocumentsFilters,
     CreateTechnovigilanceCasePayload,
@@ -388,6 +397,28 @@ export const mrpApi = {
     },
     updateOosCase: async (id: string, data: UpdateOosCasePayload): Promise<OosCase> => {
         const response = await api.patch<OosCase>(`/mrp/quality/oos-cases/${id}`, data);
+        return response.data;
+    },
+    createChangeControl: async (data: CreateChangeControlPayload): Promise<ChangeControl> => {
+        const response = await api.post<ChangeControl>('/mrp/quality/change-controls', data);
+        return response.data;
+    },
+    listChangeControls: async (filters?: ListChangeControlsFilters & {
+        status?: ChangeControlStatus;
+        type?: ChangeControlType;
+        impactLevel?: ChangeImpactLevel;
+    }): Promise<ChangeControl[]> => {
+        const response = await api.get<ChangeControl[]>('/mrp/quality/change-controls', { params: filters });
+        return response.data;
+    },
+    updateChangeControl: async (id: string, data: UpdateChangeControlPayload): Promise<ChangeControl> => {
+        const response = await api.patch<ChangeControl>(`/mrp/quality/change-controls/${id}`, data);
+        return response.data;
+    },
+    createChangeControlApproval: async (
+        data: CreateChangeControlApprovalPayload & { decision?: ChangeApprovalDecision }
+    ): Promise<ChangeControl> => {
+        const response = await api.post<ChangeControl>('/mrp/quality/change-controls/approvals', data);
         return response.data;
     },
     listQualityAuditEvents: async (filters?: { entityType?: string; entityId?: string }): Promise<AuditEvent[]> => {

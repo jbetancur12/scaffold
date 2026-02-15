@@ -19,6 +19,7 @@ import { Shipment } from '../entities/shipment.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 import { ProcessDeviation } from '../entities/process-deviation.entity';
 import { OosCase } from '../entities/oos-case.entity';
+import { ChangeControl } from '../entities/change-control.entity';
 
 type QualityAuditLogger = (payload: {
     entityType: string;
@@ -43,6 +44,7 @@ export class QualityDhrService {
     private readonly recallRepo: EntityRepository<RecallCase>;
     private readonly processDeviationRepo: EntityRepository<ProcessDeviation>;
     private readonly oosRepo: EntityRepository<OosCase>;
+    private readonly changeControlRepo: EntityRepository<ChangeControl>;
     private readonly incomingInspectionRepo: EntityRepository<IncomingInspection>;
 
     constructor(em: EntityManager, private readonly logEvent: QualityAuditLogger) {
@@ -59,6 +61,7 @@ export class QualityDhrService {
         this.recallRepo = em.getRepository(RecallCase);
         this.processDeviationRepo = em.getRepository(ProcessDeviation);
         this.oosRepo = em.getRepository(OosCase);
+        this.changeControlRepo = em.getRepository(ChangeControl);
         this.incomingInspectionRepo = em.getRepository(IncomingInspection);
     }
 
@@ -161,6 +164,10 @@ export class QualityDhrService {
         );
         const oosCases = await this.oosRepo.find(
             { productionBatch: batch.id },
+            { orderBy: { createdAt: 'DESC' } }
+        );
+        const changeControls = await this.changeControlRepo.find(
+            { affectedProductionBatch: batch.id },
             { orderBy: { createdAt: 'DESC' } }
         );
         const incomingInspections = bomItems.length > 0
@@ -336,6 +343,7 @@ export class QualityDhrService {
                 recalls,
                 processDeviations,
                 oosCases,
+                changeControls,
             },
         };
 
@@ -405,6 +413,7 @@ export class QualityDhrService {
         lines.push(toCsvRow(['counts', 'recalls', data.incidents.recalls.length]));
         lines.push(toCsvRow(['counts', 'processDeviations', data.incidents.processDeviations.length]));
         lines.push(toCsvRow(['counts', 'oosCases', data.incidents.oosCases.length]));
+        lines.push(toCsvRow(['counts', 'changeControls', data.incidents.changeControls.length]));
 
         return {
             generatedAt,

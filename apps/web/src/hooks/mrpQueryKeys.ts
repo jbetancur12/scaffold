@@ -27,6 +27,7 @@ export const mrpQueryKeys = {
     qualityCapas: 'mrp.quality.capa-actions',
     qualityProcessDeviations: 'mrp.quality.process-deviations',
     qualityOosCases: 'mrp.quality.oos-cases',
+    qualityChangeControls: 'mrp.quality.change-controls',
     qualityAuditEvents: 'mrp.quality.audit-events',
     qualityTechnovigilanceCases: 'mrp.quality.technovigilance-cases',
     qualityRecalls: 'mrp.quality.recalls',

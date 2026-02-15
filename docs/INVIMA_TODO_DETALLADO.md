@@ -146,6 +146,12 @@ Estado actual (implementación base):
 
 ## Epic 6 - Control de Cambios
 
+Estado actual (implementación base):
+- Flujo API/UI para `change_control` y `change_control_approval` disponible.
+- Regla de aprobación: cambio crítico requiere al menos 2 aprobaciones para pasar a `aprobado`.
+- KPI de cumplimiento incluye cambios pendientes (`borrador`/`en_evaluacion`).
+- Guía de verificación manual: `docs/EPIC6_CHANGE_CONTROL_SMOKE.md`.
+
 ### Alcance funcional
 
 - Solicitudes de cambio (material/proceso/documento/parámetro).

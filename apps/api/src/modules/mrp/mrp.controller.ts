@@ -44,6 +44,10 @@ import {
     CreateOosCaseSchema,
     UpdateOosCaseSchema,
     ListOosCasesQuerySchema,
+    CreateChangeControlSchema,
+    UpdateChangeControlSchema,
+    ListChangeControlsQuerySchema,
+    CreateChangeControlApprovalSchema,
     ListQualityAuditQuerySchema,
     CreateTechnovigilanceCaseSchema,
     ListTechnovigilanceCasesQuerySchema,
@@ -668,6 +672,47 @@ export class MrpController {
             const payload = UpdateOosCaseSchema.parse(req.body);
             const row = await this.qualityService.updateOosCase(id, payload, payload.actor);
             return ApiResponse.success(res, row, 'Caso OOS actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createChangeControl(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateChangeControlSchema.parse(req.body);
+            const row = await this.qualityService.createChangeControl(payload);
+            return ApiResponse.success(res, row, 'Control de cambio creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listChangeControls(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListChangeControlsQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listChangeControls(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateChangeControl(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateChangeControlSchema.parse(req.body);
+            const row = await this.qualityService.updateChangeControl(id, payload, payload.actor);
+            return ApiResponse.success(res, row, 'Control de cambio actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createChangeControlApproval(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateChangeControlApprovalSchema.parse(req.body);
+            const row = await this.qualityService.createChangeControlApproval(payload);
+            return ApiResponse.success(res, row, 'Aprobación de cambio registrada', 201);
         } catch (error) {
             next(error);
         }

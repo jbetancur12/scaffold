@@ -32,6 +32,10 @@ import {
     ProcessDeviationStatus,
     OosCaseStatus,
     OosDisposition,
+    ChangeControlType,
+    ChangeControlStatus,
+    ChangeImpactLevel,
+    ChangeApprovalDecision,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -415,6 +419,56 @@ export const ListOosCasesQuerySchema = z.object({
     productionOrderId: z.string().uuid().optional(),
 });
 
+export const CreateChangeControlSchema = z.object({
+    title: z.string().min(3),
+    description: z.string().min(5),
+    type: z.nativeEnum(ChangeControlType),
+    impactLevel: z.nativeEnum(ChangeImpactLevel).optional(),
+    evaluationSummary: z.string().optional(),
+    requestedBy: z.string().optional(),
+    effectiveDate: z.coerce.date().optional(),
+    linkedDocumentId: z.string().uuid().optional(),
+    affectedProductionOrderId: z.string().uuid().optional(),
+    affectedProductionBatchId: z.string().uuid().optional(),
+    beforeChangeBatchCode: z.string().optional(),
+    afterChangeBatchCode: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const UpdateChangeControlSchema = z.object({
+    title: z.string().min(3).optional(),
+    description: z.string().min(5).optional(),
+    type: z.nativeEnum(ChangeControlType).optional(),
+    impactLevel: z.nativeEnum(ChangeImpactLevel).optional(),
+    status: z.nativeEnum(ChangeControlStatus).optional(),
+    evaluationSummary: z.string().optional(),
+    requestedBy: z.string().optional(),
+    effectiveDate: z.coerce.date().optional(),
+    linkedDocumentId: z.string().uuid().optional(),
+    affectedProductionOrderId: z.string().uuid().optional(),
+    affectedProductionBatchId: z.string().uuid().optional(),
+    beforeChangeBatchCode: z.string().optional(),
+    afterChangeBatchCode: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const ListChangeControlsQuerySchema = z.object({
+    status: z.nativeEnum(ChangeControlStatus).optional(),
+    type: z.nativeEnum(ChangeControlType).optional(),
+    impactLevel: z.nativeEnum(ChangeImpactLevel).optional(),
+    affectedProductionBatchId: z.string().uuid().optional(),
+    affectedProductionOrderId: z.string().uuid().optional(),
+});
+
+export const CreateChangeControlApprovalSchema = z.object({
+    changeControlId: z.string().uuid(),
+    role: z.string().min(2),
+    approver: z.string().optional(),
+    decision: z.nativeEnum(ChangeApprovalDecision),
+    decisionNotes: z.string().optional(),
+    actor: z.string().optional(),
+});
+
 export const ListQualityAuditQuerySchema = z.object({
     entityType: z.string().optional(),
     entityId: z.string().optional(),
@@ -764,6 +818,10 @@ export type ListProcessDeviationsFilters = DateInputValue<z.input<typeof ListPro
 export type CreateOosCasePayload = DateInputValue<z.input<typeof CreateOosCaseSchema>>;
 export type UpdateOosCasePayload = DateInputValue<z.input<typeof UpdateOosCaseSchema>>;
 export type ListOosCasesFilters = DateInputValue<z.input<typeof ListOosCasesQuerySchema>>;
+export type CreateChangeControlPayload = DateInputValue<z.input<typeof CreateChangeControlSchema>>;
+export type UpdateChangeControlPayload = DateInputValue<z.input<typeof UpdateChangeControlSchema>>;
+export type ListChangeControlsFilters = DateInputValue<z.input<typeof ListChangeControlsQuerySchema>>;
+export type CreateChangeControlApprovalPayload = DateInputValue<z.input<typeof CreateChangeControlApprovalSchema>>;
 export type CreateControlledDocumentPayload = DateInputValue<z.input<typeof CreateControlledDocumentSchema>>;
 export type ListControlledDocumentsFilters = DateInputValue<z.input<typeof ListControlledDocumentsQuerySchema>>;
 export type CreateTechnovigilanceCasePayload = DateInputValue<z.input<typeof CreateTechnovigilanceCaseSchema>>;

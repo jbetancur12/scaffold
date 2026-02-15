@@ -16,6 +16,7 @@ export const QualityIncomingPage = createSectionPage('incoming');
 export const QualityBatchReleasePage = createSectionPage('batch-release');
 export const QualityInvimaPage = createSectionPage('invima');
 export const QualityComplianceDashboardPage = createSectionPage('compliance');
+export const QualityChangeControlPage = createSectionPage('change-control');
 export const QualityDocsPage = createSectionPage('docs');
 export const QualityAuditPage = createSectionPage('audit');
 

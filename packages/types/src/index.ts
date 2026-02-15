@@ -232,6 +232,35 @@ export enum OosDisposition {
     LIBERAR = 'liberar',
 }
 
+export enum ChangeControlType {
+    MATERIAL = 'material',
+    PROCESO = 'proceso',
+    DOCUMENTO = 'documento',
+    PARAMETRO = 'parametro',
+}
+
+export enum ChangeControlStatus {
+    BORRADOR = 'borrador',
+    EN_EVALUACION = 'en_evaluacion',
+    APROBADO = 'aprobado',
+    RECHAZADO = 'rechazado',
+    IMPLEMENTADO = 'implementado',
+    CANCELADO = 'cancelado',
+}
+
+export enum ChangeImpactLevel {
+    BAJO = 'bajo',
+    MEDIO = 'medio',
+    ALTO = 'alto',
+    CRITICO = 'critico',
+}
+
+export enum ChangeApprovalDecision {
+    PENDIENTE = 'pendiente',
+    APROBADO = 'aprobado',
+    RECHAZADO = 'rechazado',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -521,6 +550,39 @@ export interface OosCase {
     updatedAt: string | Date;
 }
 
+export interface ChangeControl {
+    id: string;
+    code: string;
+    title: string;
+    description: string;
+    type: ChangeControlType;
+    impactLevel: ChangeImpactLevel;
+    status: ChangeControlStatus;
+    evaluationSummary?: string;
+    requestedBy?: string;
+    effectiveDate?: string | Date;
+    linkedDocumentId?: string;
+    affectedProductionOrderId?: string;
+    affectedProductionBatchId?: string;
+    beforeChangeBatchCode?: string;
+    afterChangeBatchCode?: string;
+    approvals?: ChangeControlApproval[];
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface ChangeControlApproval {
+    id: string;
+    changeControlId: string;
+    role: string;
+    approver?: string;
+    decision: ChangeApprovalDecision;
+    decisionNotes?: string;
+    decidedAt?: string | Date;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
 export interface AuditEvent {
     id: string;
     entityType: string;
@@ -660,6 +722,7 @@ export interface ComplianceKpiDashboard {
     recallsOpen: number;
     deviationsOpen: number;
     oosOpen: number;
+    changeControlsPending: number;
     recallCoverageAverage: number;
     auditEventsLast30Days: number;
     documentApprovalRate: number;
@@ -885,6 +948,7 @@ export interface BatchDhrExpedient {
         recalls: RecallCase[];
         processDeviations: ProcessDeviation[];
         oosCases: OosCase[];
+        changeControls: ChangeControl[];
     };
 }
 
@@ -981,6 +1045,48 @@ export interface UpdateOosCasePayload {
     disposition?: OosDisposition;
     decisionNotes?: string;
     capaActionId?: string;
+    actor?: string;
+}
+
+export interface CreateChangeControlPayload {
+    title: string;
+    description: string;
+    type: ChangeControlType;
+    impactLevel?: ChangeImpactLevel;
+    evaluationSummary?: string;
+    requestedBy?: string;
+    effectiveDate?: string | Date;
+    linkedDocumentId?: string;
+    affectedProductionOrderId?: string;
+    affectedProductionBatchId?: string;
+    beforeChangeBatchCode?: string;
+    afterChangeBatchCode?: string;
+    actor?: string;
+}
+
+export interface UpdateChangeControlPayload {
+    title?: string;
+    description?: string;
+    type?: ChangeControlType;
+    impactLevel?: ChangeImpactLevel;
+    status?: ChangeControlStatus;
+    evaluationSummary?: string;
+    requestedBy?: string;
+    effectiveDate?: string | Date;
+    linkedDocumentId?: string;
+    affectedProductionOrderId?: string;
+    affectedProductionBatchId?: string;
+    beforeChangeBatchCode?: string;
+    afterChangeBatchCode?: string;
+    actor?: string;
+}
+
+export interface CreateChangeControlApprovalPayload {
+    changeControlId: string;
+    role: string;
+    approver?: string;
+    decision: ChangeApprovalDecision;
+    decisionNotes?: string;
     actor?: string;
 }
 

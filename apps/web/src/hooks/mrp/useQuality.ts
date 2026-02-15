@@ -8,6 +8,11 @@ import {
     OosCase,
     OosCaseStatus,
     OosDisposition,
+    ChangeControl,
+    ChangeControlType,
+    ChangeControlStatus,
+    ChangeImpactLevel,
+    ChangeApprovalDecision,
     ControlledDocument,
     DocumentApprovalMethod,
     DocumentProcess,
@@ -235,6 +240,102 @@ export const useUpdateOosCaseMutation = () => {
                     mrpQueryKeys.qualityOosCases,
                     mrpQueryKeys.qualityAuditEvents,
                     mrpQueryKeys.qualityBatchReleases,
+                ]);
+            },
+        }
+    );
+};
+
+export const useChangeControlsQuery = (filters?: {
+    status?: ChangeControlStatus;
+    type?: ChangeControlType;
+    impactLevel?: ChangeImpactLevel;
+    affectedProductionBatchId?: string;
+    affectedProductionOrderId?: string;
+}) => {
+    const fetcher = useCallback(async (): Promise<ChangeControl[]> => {
+        return mrpApi.listChangeControls(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityChangeControls);
+};
+
+export const useCreateChangeControlMutation = () => {
+    return useMrpMutation<{
+        title: string;
+        description: string;
+        type: ChangeControlType;
+        impactLevel?: ChangeImpactLevel;
+        evaluationSummary?: string;
+        requestedBy?: string;
+        effectiveDate?: string;
+        linkedDocumentId?: string;
+        affectedProductionOrderId?: string;
+        affectedProductionBatchId?: string;
+        beforeChangeBatchCode?: string;
+        afterChangeBatchCode?: string;
+        actor?: string;
+    }, ChangeControl>(
+        async (payload) => mrpApi.createChangeControl(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityChangeControls,
+                    mrpQueryKeys.qualityAuditEvents,
+                    mrpQueryKeys.qualityComplianceDashboard,
+                ]);
+            },
+        }
+    );
+};
+
+export const useUpdateChangeControlMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        title?: string;
+        description?: string;
+        type?: ChangeControlType;
+        impactLevel?: ChangeImpactLevel;
+        status?: ChangeControlStatus;
+        evaluationSummary?: string;
+        requestedBy?: string;
+        effectiveDate?: string;
+        linkedDocumentId?: string;
+        affectedProductionOrderId?: string;
+        affectedProductionBatchId?: string;
+        beforeChangeBatchCode?: string;
+        afterChangeBatchCode?: string;
+        actor?: string;
+    }, ChangeControl>(
+        async ({ id, ...payload }) => mrpApi.updateChangeControl(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityChangeControls,
+                    mrpQueryKeys.qualityAuditEvents,
+                    mrpQueryKeys.qualityComplianceDashboard,
+                ]);
+            },
+        }
+    );
+};
+
+export const useCreateChangeControlApprovalMutation = () => {
+    return useMrpMutation<{
+        changeControlId: string;
+        role: string;
+        approver?: string;
+        decision: ChangeApprovalDecision;
+        decisionNotes?: string;
+        actor?: string;
+    }, ChangeControl>(
+        async (payload) => mrpApi.createChangeControlApproval(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityChangeControls,
+                    mrpQueryKeys.qualityAuditEvents,
+                    mrpQueryKeys.qualityComplianceDashboard,
                 ]);
             },
         }
