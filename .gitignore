@@ -11,4 +11,5 @@ build
 coverage
 .turbo
 .next
-.env.production.local 
+.env.production.local
+apps/api/temp/
