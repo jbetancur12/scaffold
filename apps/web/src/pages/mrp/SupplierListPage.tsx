@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 export default function SupplierListPage() {
     const navigate = useNavigate();
@@ -34,7 +35,7 @@ export default function SupplierListPage() {
         }
     }, [toast]);
 
-    const { data: suppliersData, loading } = useMrpQuery<Supplier[]>(fetchSuppliers, true);
+    const { data: suppliersData, loading } = useMrpQuery<Supplier[]>(fetchSuppliers, true, mrpQueryKeys.suppliers);
     const suppliers = suppliersData ?? [];
 
     return (

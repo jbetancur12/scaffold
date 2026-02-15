@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
 import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 export default function ProductListPage() {
     const navigate = useNavigate();
@@ -35,7 +36,7 @@ export default function ProductListPage() {
         }
     }, [toast]);
 
-    const { data: productsData, loading, invalidate } = useMrpQuery<Product[]>(fetchProducts, true);
+    const { data: productsData, loading, invalidate } = useMrpQuery<Product[]>(fetchProducts, true, mrpQueryKeys.products);
     const products = productsData ?? [];
     const { execute: deleteProduct } = useMrpMutation<string, void>(
         async (id) => mrpApi.deleteProduct(id),

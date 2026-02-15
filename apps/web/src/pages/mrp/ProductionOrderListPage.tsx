@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 export default function ProductionOrderListPage() {
     const navigate = useNavigate();
@@ -35,7 +36,7 @@ export default function ProductionOrderListPage() {
         }
     }, [toast]);
 
-    const { data: ordersData, loading } = useMrpQuery<ProductionOrder[]>(fetchOrders, true);
+    const { data: ordersData, loading } = useMrpQuery<ProductionOrder[]>(fetchOrders, true, mrpQueryKeys.productionOrders);
     const orders = ordersData ?? [];
 
     const getStatusColor = (status: ProductionOrderStatus) => {

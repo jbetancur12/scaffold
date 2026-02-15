@@ -11,6 +11,8 @@ import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { ProductSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
+import { invalidateMrpQuery, useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 export default function ProductFormPage() {
     const { id } = useParams();
@@ -19,7 +21,6 @@ export default function ProductFormPage() {
     const isEditing = !!id;
 
     const [loading, setLoading] = useState(false);
-    const [product, setProduct] = useState<Product | null>(null);
     const [formData, setFormData] = useState({
         name: '',
         sku: '',
@@ -37,18 +38,12 @@ export default function ProductFormPage() {
     }, [formData.name, isEditing, skuManuallyEdited]);
 
 
-    const loadProduct = useCallback(async () => {
+    const fetchProduct = useCallback(async () => {
+        if (!id) {
+            throw new Error('Product ID is required');
+        }
         try {
-            setLoading(true);
-            const productData = await mrpApi.getProduct(id!);
-            setProduct(productData);
-            setFormData({
-                name: productData.name,
-                sku: productData.sku,
-                description: productData.description || '',
-            });
-            // Reset manual edit flag when loading new product
-            setSkuManuallyEdited(true);
+            return await mrpApi.getProduct(id);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -56,16 +51,26 @@ export default function ProductFormPage() {
                 variant: 'destructive',
             });
             navigate('/mrp/products');
-        } finally {
-            setLoading(false);
+            throw error;
         }
     }, [id, navigate, toast]);
 
+    const { data: product, loading: loadingProduct } = useMrpQuery<Product>(
+        fetchProduct,
+        isEditing,
+        id ? mrpQueryKeys.product(id) : undefined
+    );
+
     useEffect(() => {
-        if (id) {
-            loadProduct();
+        if (product) {
+            setFormData({
+                name: product.name,
+                sku: product.sku,
+                description: product.description || '',
+            });
+            setSkuManuallyEdited(true);
         }
-    }, [id, loadProduct]);
+    }, [product]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -75,6 +80,10 @@ export default function ProductFormPage() {
 
             if (isEditing) {
                 await mrpApi.updateProduct(id!, formData);
+                if (id) {
+                    invalidateMrpQuery(mrpQueryKeys.product(id));
+                }
+                invalidateMrpQuery(mrpQueryKeys.products);
                 toast({
                     title: 'Éxito',
                     description: 'Producto actualizado exitosamente',
@@ -82,6 +91,8 @@ export default function ProductFormPage() {
                 navigate(`/mrp/products/${id}`);
             } else {
                 const newProduct = await mrpApi.createProduct(formData);
+                invalidateMrpQuery(mrpQueryKeys.products);
+                invalidateMrpQuery(mrpQueryKeys.product(newProduct.id));
                 toast({
                     title: 'Éxito',
                     description: 'Producto creado exitosamente',
@@ -99,7 +110,7 @@ export default function ProductFormPage() {
         }
     };
 
-    if (loading && !product && isEditing) {
+    if (loadingProduct && isEditing) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <div className="text-lg text-slate-500">Cargando...</div>

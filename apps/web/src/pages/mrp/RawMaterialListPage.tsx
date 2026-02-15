@@ -17,6 +17,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
 import { useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 export default function RawMaterialListPage() {
     const navigate = useNavigate();
@@ -41,7 +42,7 @@ export default function RawMaterialListPage() {
         }
     }, [page, search, toast]);
 
-    const { execute, data, loading: queryLoading } = useMrpQuery(fetchMaterials, false);
+    const { execute, data, loading: queryLoading } = useMrpQuery(fetchMaterials, false, mrpQueryKeys.rawMaterials);
 
     useEffect(() => {
         const timer = setTimeout(() => {

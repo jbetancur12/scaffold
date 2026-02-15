@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { mrpApi, PurchaseOrder } from '../../services/mrpApi';
 import { Button } from '../../components/ui/button';
@@ -22,6 +22,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Warehouse } from '@scaffold/types';
+import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 const statusLabels = {
     PENDING: 'Pendiente',
@@ -41,18 +43,15 @@ export default function PurchaseOrderDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
-    const [order, setOrder] = useState<PurchaseOrder | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
-    const [submitting, setSubmitting] = useState(false);
 
-    const loadOrder = useCallback(async () => {
+    const fetchOrder = useCallback(async () => {
+        if (!id) {
+            throw new Error('Purchase order ID is required');
+        }
         try {
-            setLoading(true);
-            const purchaseOrder = await mrpApi.getPurchaseOrder(id!);
-            setOrder(purchaseOrder);
+            return await mrpApi.getPurchaseOrder(id);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -60,53 +59,73 @@ export default function PurchaseOrderDetailPage() {
                 variant: 'destructive',
             });
             navigate('/mrp/purchase-orders');
-        } finally {
-            setLoading(false);
+            throw error;
         }
     }, [id, toast, navigate]);
 
-    const loadWarehouses = useCallback(async () => {
+    const fetchWarehouses = useCallback(async () => {
         try {
-            const data = await mrpApi.getWarehouses();
-            setWarehouses(data);
+            return await mrpApi.getWarehouses();
         } catch (error) {
             console.error('Error loading warehouses', error);
+            throw error;
         }
     }, []);
 
-    useEffect(() => {
-        if (id) {
-            loadOrder();
-            loadWarehouses();
+    const { data: order, loading, invalidate: reloadOrder } = useMrpQuery<PurchaseOrder>(
+        fetchOrder,
+        Boolean(id),
+        id ? mrpQueryKeys.purchaseOrder(id) : undefined
+    );
+    const { data: warehousesData } = useMrpQuery<Warehouse[]>(
+        fetchWarehouses,
+        true,
+        mrpQueryKeys.warehouses
+    );
+    const warehouses = warehousesData ?? [];
+
+    const { execute: receiveOrder, loading: submitting } = useMrpMutation<{ id: string; warehouseId?: string }, PurchaseOrder>(
+        async ({ id: orderId, warehouseId }) => mrpApi.receivePurchaseOrder(orderId, warehouseId),
+        {
+            invalidateKeys: id
+                ? [mrpQueryKeys.purchaseOrder(id), mrpQueryKeys.purchaseOrders, mrpQueryKeys.rawMaterials]
+                : [mrpQueryKeys.purchaseOrders, mrpQueryKeys.rawMaterials],
         }
-    }, [id, loadOrder, loadWarehouses]);
+    );
+    const { execute: cancelOrder } = useMrpMutation<string, void>(
+        async (orderId) => mrpApi.cancelPurchaseOrder(orderId),
+        {
+            invalidateKeys: id
+                ? [mrpQueryKeys.purchaseOrder(id), mrpQueryKeys.purchaseOrders]
+                : [mrpQueryKeys.purchaseOrders],
+        }
+    );
 
     const handleReceive = async () => {
+        if (!id) return;
         try {
-            setSubmitting(true);
-            await mrpApi.receivePurchaseOrder(id!, selectedWarehouseId || undefined);
+            await receiveOrder({ id, warehouseId: selectedWarehouseId || undefined });
             toast({
                 title: 'Éxito',
                 description: 'Orden recibida e inventario actualizado',
             });
             setIsReceiveDialogOpen(false);
-            loadOrder();
+            await reloadOrder();
         } catch (error) {
             toast({
                 title: 'Error',
                 description: getErrorMessage(error, 'No se pudo recibir la orden'),
                 variant: 'destructive',
             });
-        } finally {
-            setSubmitting(false);
         }
     };
 
     const handleCancel = async () => {
         if (!confirm('¿Estás seguro de cancelar esta orden?')) return;
+        if (!id) return;
 
         try {
-            await mrpApi.cancelPurchaseOrder(id!);
+            await cancelOrder(id);
             toast({
                 title: 'Éxito',
                 description: 'Orden cancelada',

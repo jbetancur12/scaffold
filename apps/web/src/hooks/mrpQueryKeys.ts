@@ -1,0 +1,17 @@
+export const mrpQueryKeys = {
+    products: 'mrp.products',
+    product: (id: string) => `mrp.product.${id}`,
+    suppliers: 'mrp.suppliers',
+    supplier: (id: string) => `mrp.supplier.${id}`,
+    rawMaterials: 'mrp.raw-materials',
+    rawMaterial: (id: string) => `mrp.raw-material.${id}`,
+    rawMaterialSuppliers: (id: string) => `mrp.raw-material.suppliers.${id}`,
+    warehouses: 'mrp.warehouses',
+    warehouse: (id: string) => `mrp.warehouse.${id}`,
+    purchaseOrders: 'mrp.purchase-orders',
+    purchaseOrder: (id: string) => `mrp.purchase-order.${id}`,
+    productionOrders: 'mrp.production-orders',
+    productionOrder: (id: string) => `mrp.production-order.${id}`,
+    productionRequirements: (id: string) => `mrp.production-requirements.${id}`,
+    operationalConfig: 'mrp.operational-config',
+};

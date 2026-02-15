@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { getErrorMessage } from '@/lib/api-error';
 import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 export default function WarehouseListPage() {
     const navigate = useNavigate();
@@ -35,7 +36,7 @@ export default function WarehouseListPage() {
         }
     }, [toast]);
 
-    const { data: warehousesData, loading, invalidate } = useMrpQuery<Warehouse[]>(fetchWarehouses, true);
+    const { data: warehousesData, loading, invalidate } = useMrpQuery<Warehouse[]>(fetchWarehouses, true, mrpQueryKeys.warehouses);
     const warehouses = warehousesData ?? [];
     const { execute: deleteWarehouse } = useMrpMutation<string, void>(
         async (id) => mrpApi.deleteWarehouse(id),

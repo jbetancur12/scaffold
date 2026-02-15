@@ -27,6 +27,8 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { invalidateMrpQuery, useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 interface VariantFormData {
     id?: string;
@@ -43,9 +45,6 @@ export default function ProductDetailPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const [loading, setLoading] = useState(true);
-    const [product, setProduct] = useState<Product | null>(null);
-
     // Variant management state
     const [showVariantDialog, setShowVariantDialog] = useState(false);
     const [editingVariant, setEditingVariant] = useState<VariantFormData | null>(null);
@@ -57,17 +56,26 @@ export default function ProductDetailPage() {
     });
 
     // Global Config for Real-time Estimation
-    const [operationalConfig, setOperationalConfig] = useState<OperationalConfig | null>(null);
-
-    useEffect(() => {
-        mrpApi.getOperationalConfig().then(config => setOperationalConfig(config)).catch(err => console.error("Failed to load operational config", err));
-    }, []);
-
-    const loadProduct = useCallback(async () => {
+    const fetchOperationalConfig = useCallback(async () => {
         try {
-            setLoading(true);
-            const productData = await mrpApi.getProduct(id!);
-            setProduct(productData);
+            return await mrpApi.getOperationalConfig();
+        } catch (err) {
+            console.error('Failed to load operational config', err);
+            throw err;
+        }
+    }, []);
+    const { data: operationalConfig } = useMrpQuery<OperationalConfig>(
+        fetchOperationalConfig,
+        true,
+        mrpQueryKeys.operationalConfig
+    );
+
+    const fetchProduct = useCallback(async () => {
+        if (!id) {
+            throw new Error('Product ID is required');
+        }
+        try {
+            return await mrpApi.getProduct(id);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -75,16 +83,18 @@ export default function ProductDetailPage() {
                 variant: 'destructive',
             });
             navigate('/mrp/products');
-        } finally {
-            setLoading(false);
+            throw error;
         }
     }, [id, navigate, toast]);
-
-    useEffect(() => {
-        if (id) {
-            loadProduct();
-        }
-    }, [id, loadProduct]);
+    const {
+        data: product,
+        loading,
+        invalidate: reloadProduct
+    } = useMrpQuery<Product>(
+        fetchProduct,
+        Boolean(id),
+        id ? mrpQueryKeys.product(id) : undefined
+    );
 
     // Variant SKU generation listener
     useEffect(() => {
@@ -117,6 +127,7 @@ export default function ProductDetailPage() {
         if (!confirm('¿Estás seguro de eliminar este producto y todas sus variantes? Esta acción no se puede deshacer.')) return;
         try {
             await mrpApi.deleteProduct(id!);
+            invalidateMrpQuery(mrpQueryKeys.products);
             toast({ title: 'Éxito', description: 'Producto eliminado' });
             navigate('/mrp/products');
         } catch (error) {
@@ -137,7 +148,8 @@ export default function ProductDetailPage() {
             }
 
             setShowVariantDialog(false);
-            loadProduct();
+            await reloadProduct();
+            invalidateMrpQuery(mrpQueryKeys.products);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -152,7 +164,8 @@ export default function ProductDetailPage() {
         try {
             await mrpApi.deleteVariant(variantId);
             toast({ title: 'Éxito', description: 'Variante eliminada exitosamente' });
-            loadProduct();
+            await reloadProduct();
+            invalidateMrpQuery(mrpQueryKeys.products);
         } catch (error) {
             toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo eliminar la variante'), variant: 'destructive' });
         }

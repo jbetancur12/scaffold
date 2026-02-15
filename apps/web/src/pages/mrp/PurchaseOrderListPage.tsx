@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Warehouse } from '@scaffold/types';
 import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 const statusLabels = {
     PENDING: 'Pendiente',
@@ -68,16 +69,17 @@ export default function PurchaseOrderListPage() {
         }
     }, [page, limit, toast]);
 
-    const loadWarehouses = useCallback(async () => {
+    const fetchWarehouses = useCallback(async () => {
         try {
-            const data = await mrpApi.getWarehouses();
-            setWarehouses(data);
+            return await mrpApi.getWarehouses();
         } catch (error) {
             console.error('Error loading warehouses', error);
+            throw error;
         }
     }, []);
 
-    const { data: ordersResponse, loading: ordersLoading, invalidate } = useMrpQuery(fetchOrders, true);
+    const { data: ordersResponse, loading: ordersLoading, invalidate } = useMrpQuery(fetchOrders, true, mrpQueryKeys.purchaseOrders);
+    const { data: warehousesData } = useMrpQuery(fetchWarehouses, true, mrpQueryKeys.warehouses);
 
     useEffect(() => {
         setLoading(ordersLoading);
@@ -86,16 +88,22 @@ export default function PurchaseOrderListPage() {
     }, [ordersLoading, ordersResponse]);
 
     useEffect(() => {
-        loadWarehouses();
-    }, [loadWarehouses]);
+        setWarehouses(warehousesData || []);
+    }, [warehousesData]);
 
     const { execute: receiveOrder } = useMrpMutation<{ id: string; warehouseId?: string }, PurchaseOrder>(
         async ({ id, warehouseId }) => mrpApi.receivePurchaseOrder(id, warehouseId),
-        { onSuccess: async () => { await invalidate(); } }
+        {
+            onSuccess: async () => { await invalidate(); },
+            invalidateKeys: [mrpQueryKeys.rawMaterials, mrpQueryKeys.purchaseOrders],
+        }
     );
     const { execute: cancelOrder } = useMrpMutation<string, void>(
         async (id) => mrpApi.cancelPurchaseOrder(id),
-        { onSuccess: async () => { await invalidate(); } }
+        {
+            onSuccess: async () => { await invalidate(); },
+            invalidateKeys: [mrpQueryKeys.purchaseOrders],
+        }
     );
 
 

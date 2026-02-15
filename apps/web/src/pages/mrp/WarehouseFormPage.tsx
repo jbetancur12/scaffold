@@ -16,6 +16,8 @@ import {
 import { WarehouseType } from '@scaffold/types';
 import { WarehouseSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
+import { invalidateMrpQuery, useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 export default function WarehouseFormPage() {
     const { id } = useParams();
@@ -30,16 +32,12 @@ export default function WarehouseFormPage() {
         type: WarehouseType.RAW_MATERIALS,
     });
 
-    const loadWarehouse = useCallback(async () => {
-        if (!id) return;
+    const fetchWarehouse = useCallback(async () => {
+        if (!id) {
+            throw new Error('Warehouse ID is required');
+        }
         try {
-            setLoading(true);
-            const warehouse = await mrpApi.getWarehouse(id);
-            setFormData({
-                name: warehouse.name,
-                location: warehouse.location || '',
-                type: warehouse.type as WarehouseType,
-            });
+            return await mrpApi.getWarehouse(id);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -47,16 +45,25 @@ export default function WarehouseFormPage() {
                 variant: 'destructive',
             });
             navigate('/mrp/warehouses');
-        } finally {
-            setLoading(false);
+            throw error;
         }
     }, [id, navigate, toast]);
 
+    const { data: warehouse, loading: loadingWarehouse } = useMrpQuery(
+        fetchWarehouse,
+        isEditing,
+        id ? mrpQueryKeys.warehouse(id) : undefined
+    );
+
     useEffect(() => {
-        if (isEditing) {
-            loadWarehouse();
+        if (warehouse) {
+            setFormData({
+                name: warehouse.name,
+                location: warehouse.location || '',
+                type: warehouse.type as WarehouseType,
+            });
         }
-    }, [isEditing, loadWarehouse]);
+    }, [warehouse]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -66,12 +73,17 @@ export default function WarehouseFormPage() {
 
             if (isEditing) {
                 await mrpApi.updateWarehouse(id!, formData);
+                if (id) {
+                    invalidateMrpQuery(mrpQueryKeys.warehouse(id));
+                }
+                invalidateMrpQuery(mrpQueryKeys.warehouses);
                 toast({
                     title: 'Éxito',
                     description: 'Almacén actualizado correctamente',
                 });
             } else {
                 await mrpApi.createWarehouse(formData);
+                invalidateMrpQuery(mrpQueryKeys.warehouses);
                 toast({
                     title: 'Éxito',
                     description: 'Almacén creado correctamente',
@@ -91,6 +103,9 @@ export default function WarehouseFormPage() {
 
     return (
         <div className="space-y-8 max-w-2xl mx-auto">
+            {loadingWarehouse && isEditing && (
+                <div className="text-sm text-slate-500">Cargando almacén...</div>
+            )}
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/warehouses')}>
                     <ArrowLeft className="h-4 w-4" />

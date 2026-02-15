@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { mrpApi, RawMaterialSupplier } from '@/services/mrpApi';
 import { RawMaterial } from '@scaffold/types';
@@ -9,25 +9,20 @@ import { ArrowLeft, Edit2, Package } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
+import { useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 export default function RawMaterialDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
-    const [material, setMaterial] = useState<RawMaterial | null>(null);
-    const [suppliers, setSuppliers] = useState<RawMaterialSupplier[]>([]);
-    const [loading, setLoading] = useState(true);
 
-    const loadData = useCallback(async () => {
-        if (!id) return;
+    const fetchMaterial = useCallback(async () => {
+        if (!id) {
+            throw new Error('Raw material ID is required');
+        }
         try {
-            setLoading(true);
-            const [materialData, suppliersData] = await Promise.all([
-                mrpApi.getRawMaterial(id),
-                mrpApi.getRawMaterialSuppliers(id)
-            ]);
-            setMaterial(materialData);
-            setSuppliers(suppliersData);
+            return await mrpApi.getRawMaterial(id);
         } catch (error) {
             toast({
                 title: 'Error',
@@ -35,14 +30,28 @@ export default function RawMaterialDetailPage() {
                 variant: 'destructive',
             });
             navigate('/mrp/raw-materials');
-        } finally {
-            setLoading(false);
+            throw error;
         }
     }, [id, navigate, toast]);
 
-    useEffect(() => {
-        loadData();
-    }, [loadData]);
+    const fetchSuppliers = useCallback(async () => {
+        if (!id) {
+            throw new Error('Raw material ID is required');
+        }
+        return mrpApi.getRawMaterialSuppliers(id);
+    }, [id]);
+
+    const { data: material, loading } = useMrpQuery<RawMaterial>(
+        fetchMaterial,
+        Boolean(id),
+        id ? mrpQueryKeys.rawMaterial(id) : undefined
+    );
+    const { data: suppliersData } = useMrpQuery<RawMaterialSupplier[]>(
+        fetchSuppliers,
+        Boolean(id),
+        id ? mrpQueryKeys.rawMaterialSuppliers(id) : undefined
+    );
+    const suppliers = suppliersData ?? [];
 
     if (loading) {
         return (
