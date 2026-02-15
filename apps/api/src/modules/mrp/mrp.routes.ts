@@ -56,6 +56,20 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.patch('/production-batch-units/:unitId/qc', (req, res, next) => mrpController.updateProductionBatchUnitQc(req, res, next));
     router.patch('/production-batch-units/:unitId/packaging', (req, res, next) => mrpController.updateProductionBatchUnitPackaging(req, res, next));
 
+    // Quality / INVIMA
+    router.post('/quality/non-conformities', (req, res, next) => mrpController.createNonConformity(req, res, next));
+    router.get('/quality/non-conformities', (req, res, next) => mrpController.listNonConformities(req, res, next));
+    router.patch('/quality/non-conformities/:id', (req, res, next) => mrpController.updateNonConformity(req, res, next));
+    router.post('/quality/capa-actions', (req, res, next) => mrpController.createCapa(req, res, next));
+    router.get('/quality/capa-actions', (req, res, next) => mrpController.listCapas(req, res, next));
+    router.patch('/quality/capa-actions/:id', (req, res, next) => mrpController.updateCapa(req, res, next));
+    router.get('/quality/audit-events', (req, res, next) => mrpController.listQualityAudit(req, res, next));
+    router.post('/quality/documents', (req, res, next) => mrpController.createControlledDocument(req, res, next));
+    router.get('/quality/documents', (req, res, next) => mrpController.listControlledDocuments(req, res, next));
+    router.post('/quality/documents/:id/submit-review', (req, res, next) => mrpController.submitControlledDocument(req, res, next));
+    router.post('/quality/documents/:id/approve', (req, res, next) => mrpController.approveControlledDocument(req, res, next));
+    router.get('/quality/documents/active/:process', (req, res, next) => mrpController.listActiveControlledDocumentsByProcess(req, res, next));
+
 
     // Purchase Orders
     router.post('/purchase-orders', (req, res, next) => mrpController.createPurchaseOrder(req, res, next));

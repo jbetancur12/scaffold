@@ -6,6 +6,8 @@ import { MrpService } from './services/mrp.service';
 import { InventoryService } from './services/inventory.service';
 import { ProductionService } from './services/production.service';
 import { PurchaseOrderService } from './services/purchase-order.service';
+import { QualityService } from './services/quality.service';
+import { DocumentControlService } from './services/document-control.service';
 import {
     ProductSchema,
     ProductionOrderSchema,
@@ -22,6 +24,7 @@ import {
 import { z } from 'zod';
 import { PurchaseOrderStatus } from './entities/purchase-order.entity';
 import { ApiResponse, AppError } from '../../shared/utils/response';
+import { CapaStatus, DocumentProcess, DocumentStatus, NonConformityStatus, QualitySeverity } from '@scaffold/types';
 
 export class MrpController {
     // ...
@@ -43,6 +46,8 @@ export class MrpController {
     private get inventoryService() { return new InventoryService(this.em); }
     private get productionService() { return new ProductionService(this.em); }
     private get purchaseOrderService() { return new PurchaseOrderService(this.em, this.mrpService); }
+    private get qualityService() { return new QualityService(this.em); }
+    private get documentControlService() { return new DocumentControlService(this.em); }
 
     // --- Products ---
     async createProduct(req: Request, res: Response, next: NextFunction) {
@@ -449,6 +454,189 @@ export class MrpController {
             const payload = z.object({ packaged: z.boolean() }).parse(req.body);
             const unit = await this.productionService.setBatchUnitPackaging(unitId, payload.packaged);
             return ApiResponse.success(res, unit, 'Empaque de unidad actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // --- Quality / INVIMA ---
+    async createNonConformity(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = z.object({
+                title: z.string().min(3),
+                description: z.string().min(5),
+                severity: z.nativeEnum(QualitySeverity).optional(),
+                source: z.string().optional(),
+                productionOrderId: z.string().uuid().optional(),
+                productionBatchId: z.string().uuid().optional(),
+                productionBatchUnitId: z.string().uuid().optional(),
+                createdBy: z.string().optional(),
+            }).parse(req.body);
+            const nc = await this.qualityService.createNonConformity(payload);
+            return ApiResponse.success(res, nc, 'No conformidad creada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listNonConformities(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = z.object({
+                status: z.nativeEnum(NonConformityStatus).optional(),
+                severity: z.nativeEnum(QualitySeverity).optional(),
+                source: z.string().optional(),
+            }).parse(req.query);
+            const rows = await this.qualityService.listNonConformities(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateNonConformity(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = z.object({
+                status: z.nativeEnum(NonConformityStatus).optional(),
+                rootCause: z.string().optional(),
+                correctiveAction: z.string().optional(),
+                severity: z.nativeEnum(QualitySeverity).optional(),
+                description: z.string().optional(),
+                title: z.string().optional(),
+                actor: z.string().optional(),
+            }).parse(req.body);
+            const row = await this.qualityService.updateNonConformity(id, payload, payload.actor);
+            return ApiResponse.success(res, row, 'No conformidad actualizada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createCapa(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = z.object({
+                nonConformityId: z.string().uuid(),
+                actionPlan: z.string().min(5),
+                owner: z.string().optional(),
+                dueDate: z.coerce.date().optional(),
+                actor: z.string().optional(),
+            }).parse(req.body);
+            const row = await this.qualityService.createCapa(payload, payload.actor);
+            return ApiResponse.success(res, row, 'CAPA creada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listCapas(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = z.object({
+                status: z.nativeEnum(CapaStatus).optional(),
+                nonConformityId: z.string().uuid().optional(),
+            }).parse(req.query);
+            const rows = await this.qualityService.listCapas(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateCapa(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = z.object({
+                actionPlan: z.string().optional(),
+                owner: z.string().optional(),
+                dueDate: z.coerce.date().optional(),
+                verificationNotes: z.string().optional(),
+                status: z.nativeEnum(CapaStatus).optional(),
+                actor: z.string().optional(),
+            }).parse(req.body);
+            const row = await this.qualityService.updateCapa(id, payload, payload.actor);
+            return ApiResponse.success(res, row, 'CAPA actualizada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listQualityAudit(req: Request, res: Response, next: NextFunction) {
+        try {
+            const q = z.object({
+                entityType: z.string().optional(),
+                entityId: z.string().optional(),
+            }).parse(req.query);
+            const rows = await this.qualityService.listAuditEvents(q.entityType, q.entityId);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createControlledDocument(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = z.object({
+                code: z.string().min(2),
+                title: z.string().min(3),
+                process: z.nativeEnum(DocumentProcess),
+                version: z.number().int().positive().optional(),
+                content: z.string().optional(),
+                effectiveDate: z.coerce.date().optional(),
+                expiresAt: z.coerce.date().optional(),
+                actor: z.string().optional(),
+            }).parse(req.body);
+            const row = await this.documentControlService.create(payload, payload.actor);
+            return ApiResponse.success(res, row, 'Documento controlado creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listControlledDocuments(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = z.object({
+                process: z.nativeEnum(DocumentProcess).optional(),
+                status: z.nativeEnum(DocumentStatus).optional(),
+            }).parse(req.query);
+            const rows = await this.documentControlService.list(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async submitControlledDocument(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = z.object({
+                actor: z.string().optional(),
+            }).parse(req.body ?? {});
+            const row = await this.documentControlService.submitForReview(id, payload.actor);
+            return ApiResponse.success(res, row, 'Documento enviado a revisión');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async approveControlledDocument(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = z.object({
+                actor: z.string().optional(),
+            }).parse(req.body ?? {});
+            const row = await this.documentControlService.approve(id, payload.actor);
+            return ApiResponse.success(res, row, 'Documento aprobado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listActiveControlledDocumentsByProcess(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { process } = z.object({
+                process: z.nativeEnum(DocumentProcess),
+            }).parse(req.params);
+            const rows = await this.documentControlService.getActiveByProcess(process);
+            return ApiResponse.success(res, rows);
         } catch (error) {
             next(error);
         }

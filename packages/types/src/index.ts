@@ -54,6 +54,40 @@ export enum ProductionBatchStatus {
     READY = 'ready',
 }
 
+export enum QualitySeverity {
+    BAJA = 'baja',
+    MEDIA = 'media',
+    ALTA = 'alta',
+    CRITICA = 'critica',
+}
+
+export enum NonConformityStatus {
+    ABIERTA = 'abierta',
+    EN_ANALISIS = 'en_analisis',
+    EN_CORRECCION = 'en_correccion',
+    CERRADA = 'cerrada',
+}
+
+export enum CapaStatus {
+    ABIERTA = 'abierta',
+    EN_PROGRESO = 'en_progreso',
+    VERIFICACION = 'verificacion',
+    CERRADA = 'cerrada',
+}
+
+export enum DocumentProcess {
+    PRODUCCION = 'produccion',
+    CONTROL_CALIDAD = 'control_calidad',
+    EMPAQUE = 'empaque',
+}
+
+export enum DocumentStatus {
+    BORRADOR = 'borrador',
+    EN_REVISION = 'en_revision',
+    APROBADO = 'aprobado',
+    OBSOLETO = 'obsoleto',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -220,6 +254,63 @@ export interface ProductionBatchUnit {
     qcPassed: boolean;
     packaged: boolean;
     rejected: boolean;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface NonConformity {
+    id: string;
+    title: string;
+    description: string;
+    severity: QualitySeverity;
+    status: NonConformityStatus;
+    source: string;
+    productionOrderId?: string;
+    productionBatchId?: string;
+    productionBatchUnitId?: string;
+    rootCause?: string;
+    correctiveAction?: string;
+    createdBy?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface CapaAction {
+    id: string;
+    nonConformityId: string;
+    actionPlan: string;
+    owner?: string;
+    dueDate?: string | Date;
+    verificationNotes?: string;
+    status: CapaStatus;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface AuditEvent {
+    id: string;
+    entityType: string;
+    entityId: string;
+    action: string;
+    actor?: string;
+    notes?: string;
+    metadata?: Record<string, unknown>;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface ControlledDocument {
+    id: string;
+    code: string;
+    title: string;
+    process: DocumentProcess;
+    version: number;
+    status: DocumentStatus;
+    content?: string;
+    effectiveDate?: string | Date;
+    expiresAt?: string | Date;
+    approvedBy?: string;
+    approvedAt?: string | Date;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

@@ -1,5 +1,6 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import {
+    DocumentProcess,
     ProductionBatchPackagingStatus,
     ProductionBatchQcStatus,
     ProductionBatchStatus,
@@ -16,6 +17,8 @@ import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Supplier } from '../entities/supplier.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
+import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
+import { DocumentControlService } from './document-control.service';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { AppError } from '../../../shared/utils/response';
@@ -26,6 +29,7 @@ export class ProductionService {
     private readonly inventoryRepo: EntityRepository<InventoryItem>;
     private readonly batchRepo: EntityRepository<ProductionBatch>;
     private readonly batchUnitRepo: EntityRepository<ProductionBatchUnit>;
+    private readonly auditRepo: EntityRepository<QualityAuditEvent>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -33,6 +37,7 @@ export class ProductionService {
         this.inventoryRepo = em.getRepository(InventoryItem);
         this.batchRepo = em.getRepository(ProductionBatch);
         this.batchUnitRepo = em.getRepository(ProductionBatchUnit);
+        this.auditRepo = em.getRepository(QualityAuditEvent);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
@@ -105,6 +110,7 @@ export class ProductionService {
     }
 
     async createBatch(orderId: string, payload: { variantId: string; plannedQty: number; code?: string; notes?: string }) {
+        await this.assertProcessDocument(DocumentProcess.PRODUCCION);
         const order = await this.productionOrderRepo.findOneOrFail(
             { id: orderId },
             { populate: ['items', 'items.variant'] }
@@ -138,6 +144,11 @@ export class ProductionService {
         } as unknown as ProductionBatch);
 
         await this.em.persistAndFlush(batch);
+        await this.logAudit('production_batch', batch.id, 'created', {
+            orderId: orderId,
+            code: batch.code,
+            plannedQty: batch.plannedQty,
+        });
         return this.batchRepo.findOneOrFail(
             { id: batch.id },
             { populate: ['variant', 'variant.product', 'units'] }
@@ -172,18 +183,22 @@ export class ProductionService {
 
         batch.producedQty = Math.max(batch.producedQty, batch.units.length);
         await this.em.persistAndFlush(batch);
+        await this.logAudit('production_batch', batch.id, 'units_added', { quantity });
         return this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['variant', 'units'] });
     }
 
     async setBatchQc(batchId: string, passed: boolean) {
+        await this.assertProcessDocument(DocumentProcess.CONTROL_CALIDAD);
         const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units'] });
         batch.qcStatus = passed ? ProductionBatchQcStatus.PASSED : ProductionBatchQcStatus.FAILED;
         batch.status = passed ? ProductionBatchStatus.QC_PASSED : ProductionBatchStatus.QC_PENDING;
         await this.em.persistAndFlush(batch);
+        await this.logAudit('production_batch', batch.id, 'qc_updated', { passed });
         return batch;
     }
 
     async setBatchPackaging(batchId: string, packed: boolean) {
+        await this.assertProcessDocument(DocumentProcess.EMPAQUE);
         const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units'] });
         if (batch.qcStatus !== ProductionBatchQcStatus.PASSED) {
             throw new AppError('Debes aprobar QC antes de empacar', 400);
@@ -199,26 +214,31 @@ export class ProductionService {
         batch.packagingStatus = packed ? ProductionBatchPackagingStatus.PACKED : ProductionBatchPackagingStatus.PENDING;
         batch.status = packed ? ProductionBatchStatus.READY : ProductionBatchStatus.PACKING;
         await this.em.persistAndFlush(batch);
+        await this.logAudit('production_batch', batch.id, 'packaging_updated', { packed });
         return batch;
     }
 
     async setBatchUnitQc(unitId: string, passed: boolean) {
+        await this.assertProcessDocument(DocumentProcess.CONTROL_CALIDAD);
         const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch'] });
         unit.qcPassed = passed;
         if (!passed) {
             unit.packaged = false;
         }
         await this.em.persistAndFlush(unit);
+        await this.logAudit('production_batch_unit', unit.id, 'qc_updated', { passed });
         return unit;
     }
 
     async setBatchUnitPackaging(unitId: string, packaged: boolean) {
+        await this.assertProcessDocument(DocumentProcess.EMPAQUE);
         const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch'] });
         if (!unit.qcPassed && !unit.rejected) {
             throw new AppError('La unidad debe pasar QC antes de empacar', 400);
         }
         unit.packaged = packaged;
         await this.em.persistAndFlush(unit);
+        await this.logAudit('production_batch_unit', unit.id, 'packaging_updated', { packaged });
         return unit;
     }
 
@@ -323,6 +343,11 @@ export class ProductionService {
             order.status = status;
 
             // If status is changed to COMPLETED, update finished goods inventory
+            if (status === ProductionOrderStatus.IN_PROGRESS) {
+                await this.assertProcessDocument(DocumentProcess.PRODUCCION);
+            }
+
+            // If status is changed to COMPLETED, update finished goods inventory
             if (status === ProductionOrderStatus.COMPLETED) {
                 const batches = order.batches.getItems();
                 const itemVariantIds = order.items.getItems().map((i) => i.variant.id);
@@ -395,7 +420,23 @@ export class ProductionService {
             }
 
             await tx.flush();
+            await this.logAudit('production_order', order.id, 'status_updated', { status });
             return order;
         });
+    }
+
+    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>) {
+        const event = this.auditRepo.create({
+            entityType,
+            entityId,
+            action,
+            metadata,
+        } as unknown as QualityAuditEvent);
+        await this.em.persistAndFlush(event);
+    }
+
+    private async assertProcessDocument(process: DocumentProcess) {
+        const service = new DocumentControlService(this.em);
+        await service.assertActiveProcessDocument(process);
     }
 }
