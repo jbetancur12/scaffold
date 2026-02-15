@@ -117,7 +117,8 @@ export default function App() {
                         <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
 
                         <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
-                        <Route path="/mrp/quality" element={<QualityCompliancePage />} />
+                        <Route path="/mrp/quality" element={<Navigate to="/mrp/quality/nc" replace />} />
+                        <Route path="/mrp/quality/:section" element={<QualityCompliancePage />} />
 
                         <Route path="/mrp/inventory" element={<InventoryDashboardPage />} />
                         <Route path="/mrp/warehouses" element={<WarehouseListPage />} />

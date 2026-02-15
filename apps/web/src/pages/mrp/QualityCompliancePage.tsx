@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     BatchReleaseStatus,
     CapaStatus,
@@ -22,13 +22,14 @@ import {
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
 } from '@scaffold/types';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { qualityDocumentStatusLabels, qualityProcessLabels } from '@/constants/mrpQuality';
 import { useQualityCompliance } from '@/hooks/mrp/useQualityCompliance';
 
@@ -68,6 +69,43 @@ const auditActionLabels: Record<string, string> = {
     signed: 'Liberación firmada',
     reopened: 'Liberación reabierta',
     generated: 'Generado',
+};
+
+const qualityModuleOptions = [
+    { value: 'nc', label: 'No Conformidades' },
+    { value: 'capa', label: 'CAPA' },
+    { value: 'techno', label: 'Tecnovigilancia' },
+    { value: 'recall', label: 'Recall' },
+    { value: 'shipment', label: 'Despachos' },
+    { value: 'dhr-dmr', label: 'DHR/DMR' },
+    { value: 'labeling', label: 'Etiquetado' },
+    { value: 'incoming', label: 'Recepción' },
+    { value: 'batch-release', label: 'Liberación QA' },
+    { value: 'invima', label: 'Registros INVIMA' },
+    { value: 'compliance', label: 'Cumplimiento' },
+    { value: 'docs', label: 'Control documental' },
+    { value: 'audit', label: 'Auditoría' },
+] as const;
+
+const qualityModuleGroups = [
+    {
+        title: 'Operación',
+        items: ['nc', 'capa', 'techno', 'recall', 'shipment'] as const,
+    },
+    {
+        title: 'Regulatorio',
+        items: ['dhr-dmr', 'labeling', 'incoming', 'batch-release', 'invima'] as const,
+    },
+    {
+        title: 'Gobierno',
+        items: ['compliance', 'docs', 'audit'] as const,
+    },
+] as const;
+
+const getQualityTabFromPath = (pathname: string): (typeof qualityModuleOptions)[number]['value'] => {
+    const section = pathname.split('/')[3];
+    const found = qualityModuleOptions.find((option) => option.value === section);
+    return found?.value ?? 'nc';
 };
 
 const shortId = (value?: string) => {
@@ -142,6 +180,8 @@ const formatAuditMetadata = (
 
 export default function QualityCompliancePage() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState<(typeof qualityModuleOptions)[number]['value']>(() => getQualityTabFromPath(location.pathname));
     const [expandedIncomingInspectionId, setExpandedIncomingInspectionId] = useState<string | null>(null);
 
     const {
@@ -270,6 +310,21 @@ export default function QualityCompliancePage() {
         return acc;
     }, {});
 
+    useEffect(() => {
+        const nextTab = getQualityTabFromPath(location.pathname);
+        if (nextTab !== activeTab) {
+            setActiveTab(nextTab);
+        }
+    }, [location.pathname, activeTab]);
+
+    const handleTabChange = (value: (typeof qualityModuleOptions)[number]['value']) => {
+        setActiveTab(value);
+        const nextPath = `/mrp/quality/${value}`;
+        if (location.pathname !== nextPath) {
+            navigate(nextPath);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div>
@@ -279,22 +334,55 @@ export default function QualityCompliancePage() {
                 </p>
             </div>
 
-            <Tabs defaultValue="nc" className="w-full">
-                <TabsList>
-                    <TabsTrigger value="nc">No Conformidades</TabsTrigger>
-                    <TabsTrigger value="capa">CAPA</TabsTrigger>
-                    <TabsTrigger value="techno">Tecnovigilancia</TabsTrigger>
-                    <TabsTrigger value="recall">Recall</TabsTrigger>
-                    <TabsTrigger value="shipment">Despachos</TabsTrigger>
-                    <TabsTrigger value="dhr-dmr">DHR/DMR</TabsTrigger>
-                    <TabsTrigger value="labeling">Etiquetado</TabsTrigger>
-                    <TabsTrigger value="incoming">Recepción</TabsTrigger>
-                    <TabsTrigger value="batch-release">Liberación QA</TabsTrigger>
-                    <TabsTrigger value="invima">Registros INVIMA</TabsTrigger>
-                    <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
-                    <TabsTrigger value="docs">Control documental</TabsTrigger>
-                    <TabsTrigger value="audit">Auditoría</TabsTrigger>
-                </TabsList>
+            <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as (typeof qualityModuleOptions)[number]['value'])} className="w-full">
+                <div className="md:hidden mb-3">
+                    <Select value={activeTab} onValueChange={(value) => handleTabChange(value as (typeof qualityModuleOptions)[number]['value'])}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Selecciona un módulo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {qualityModuleOptions.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="hidden md:block mb-4">
+                    <Card>
+                        <CardContent className="p-3">
+                            <div className="grid grid-cols-3 gap-3">
+                                {qualityModuleGroups.map((group) => (
+                                    <div key={group.title} className="space-y-2">
+                                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.title}</div>
+                                        <div className="space-y-1">
+                                            {group.items.map((itemValue) => {
+                                                const option = qualityModuleOptions.find((optionItem) => optionItem.value === itemValue);
+                                                if (!option) return null;
+                                                const isActive = activeTab === itemValue;
+                                                return (
+                                                    <button
+                                                        key={itemValue}
+                                                        type="button"
+                                                        onClick={() => handleTabChange(itemValue)}
+                                                        className={`w-full rounded-md border px-3 py-2 text-left text-sm transition-colors ${
+                                                            isActive
+                                                                ? 'border-slate-900 bg-slate-900 text-white'
+                                                                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                                                        }`}
+                                                        aria-current={isActive ? 'page' : undefined}
+                                                    >
+                                                        {option.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
                 <TabsContent value="nc" className="space-y-4">
                     <Card>

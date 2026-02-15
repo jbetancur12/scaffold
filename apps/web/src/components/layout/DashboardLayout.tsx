@@ -56,6 +56,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isMrpOpen, setIsMrpOpen] = useState(true);
+    const [isQualityOpen, setIsQualityOpen] = useState(true);
 
     const roleLabels: Record<string, string> = {
         [UserRole.SUPERADMIN]: 'Super Administrador',
@@ -72,7 +73,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: Warehouse, label: 'Inventario', path: '/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Almacenes', path: '/mrp/warehouses', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Settings, label: 'Configuración Operativa', path: '/mrp/operational-settings', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
-        { icon: ShieldCheck, label: 'Calidad e INVIMA', path: '/mrp/quality', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+    ];
+
+    const qualityItems = [
+        { label: 'No Conformidades', path: '/mrp/quality/nc' },
+        { label: 'CAPA', path: '/mrp/quality/capa' },
+        { label: 'Tecnovigilancia', path: '/mrp/quality/techno' },
+        { label: 'Recall', path: '/mrp/quality/recall' },
+        { label: 'Despachos', path: '/mrp/quality/shipment' },
+        { label: 'DHR/DMR', path: '/mrp/quality/dhr-dmr' },
+        { label: 'Etiquetado', path: '/mrp/quality/labeling' },
+        { label: 'Recepción', path: '/mrp/quality/incoming' },
+        { label: 'Liberación QA', path: '/mrp/quality/batch-release' },
+        { label: 'Registros INVIMA', path: '/mrp/quality/invima' },
+        { label: 'Cumplimiento', path: '/mrp/quality/compliance' },
+        { label: 'Control documental', path: '/mrp/quality/docs' },
+        { label: 'Auditoría', path: '/mrp/quality/audit' },
     ];
 
     const filteredMrpItems = mrpItems.filter(item =>
@@ -80,6 +96,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
 
     const isMrpActive = location.pathname.includes('/mrp/');
+    const isQualityActive = location.pathname.startsWith('/mrp/quality');
 
     const handleLogout = async () => {
         try {
@@ -132,6 +149,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                             <SidebarItem
                                 key={item.path}
                                 icon={item.icon}
+                                label={item.label}
+                                active={location.pathname === item.path}
+                                isChild={true}
+                                onClick={() => {
+                                    navigate(item.path);
+                                    onItemClick?.();
+                                }}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Quality Group */}
+            <div className="space-y-1">
+                <button
+                    onClick={() => setIsQualityOpen(!isQualityOpen)}
+                    className={cn(
+                        "sidebar-link w-full justify-between pr-4",
+                        isQualityActive && "text-primary font-medium bg-primary/5"
+                    )}
+                >
+                    <div className="flex items-center gap-3">
+                        <ShieldCheck className="h-5 w-5" />
+                        <span>Calidad e INVIMA</span>
+                    </div>
+                    {isQualityOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+
+                {isQualityOpen && (
+                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                        {qualityItems.map((item) => (
+                            <SidebarItem
+                                key={item.path}
+                                icon={ShieldCheck}
                                 label={item.label}
                                 active={location.pathname === item.path}
                                 isChild={true}
