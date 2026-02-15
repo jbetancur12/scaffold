@@ -1,6 +1,7 @@
 export type QualitySection =
     | 'nc'
     | 'capa'
+    | 'deviations-oos'
     | 'techno'
     | 'recall'
     | 'shipment'
@@ -31,6 +32,7 @@ export const qualitySections: Array<{
 }> = [
     { value: 'nc', label: 'No Conformidades', domain: 'quality', path: '/quality/nc', category: 'operacion' },
     { value: 'capa', label: 'CAPA', domain: 'quality', path: '/quality/capa', category: 'operacion' },
+    { value: 'deviations-oos', label: 'Desviaciones/OOS', domain: 'quality', path: '/quality/deviations-oos', category: 'operacion' },
     { value: 'dhr-dmr', label: 'DHR/DMR', domain: 'quality', path: '/quality/dhr-dmr', category: 'regulatorio' },
     { value: 'labeling', label: 'Etiquetado', domain: 'quality', path: '/quality/labeling', category: 'regulatorio' },
     { value: 'incoming', label: 'Recepción', domain: 'quality', path: '/quality/incoming', category: 'regulatorio' },

@@ -29,6 +29,9 @@ import {
     IncomingInspectionResult,
     IncomingInspectionStatus,
     BatchReleaseStatus,
+    ProcessDeviationStatus,
+    OosCaseStatus,
+    OosDisposition,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -346,6 +349,70 @@ export const UpdateCapaSchema = z.object({
     verificationNotes: z.string().optional(),
     status: z.nativeEnum(CapaStatus).optional(),
     actor: z.string().optional(),
+});
+
+export const CreateProcessDeviationSchema = z.object({
+    title: z.string().min(3),
+    description: z.string().min(5),
+    classification: z.string().min(2).optional(),
+    productionOrderId: z.string().uuid().optional(),
+    productionBatchId: z.string().uuid().optional(),
+    productionBatchUnitId: z.string().uuid().optional(),
+    containmentAction: z.string().optional(),
+    investigationSummary: z.string().optional(),
+    closureEvidence: z.string().optional(),
+    capaActionId: z.string().uuid().optional(),
+    actor: z.string().optional(),
+});
+
+export const UpdateProcessDeviationSchema = z.object({
+    title: z.string().min(3).optional(),
+    description: z.string().min(5).optional(),
+    classification: z.string().min(2).optional(),
+    status: z.nativeEnum(ProcessDeviationStatus).optional(),
+    containmentAction: z.string().optional(),
+    investigationSummary: z.string().optional(),
+    closureEvidence: z.string().optional(),
+    capaActionId: z.string().uuid().optional(),
+    actor: z.string().optional(),
+});
+
+export const ListProcessDeviationsQuerySchema = z.object({
+    status: z.nativeEnum(ProcessDeviationStatus).optional(),
+    productionBatchId: z.string().uuid().optional(),
+    productionOrderId: z.string().uuid().optional(),
+});
+
+export const CreateOosCaseSchema = z.object({
+    testName: z.string().min(2),
+    resultValue: z.string().min(1),
+    specification: z.string().min(2),
+    productionOrderId: z.string().uuid().optional(),
+    productionBatchId: z.string().uuid().optional(),
+    productionBatchUnitId: z.string().uuid().optional(),
+    investigationSummary: z.string().optional(),
+    disposition: z.nativeEnum(OosDisposition).optional(),
+    decisionNotes: z.string().optional(),
+    capaActionId: z.string().uuid().optional(),
+    actor: z.string().optional(),
+});
+
+export const UpdateOosCaseSchema = z.object({
+    testName: z.string().min(2).optional(),
+    resultValue: z.string().min(1).optional(),
+    specification: z.string().min(2).optional(),
+    status: z.nativeEnum(OosCaseStatus).optional(),
+    investigationSummary: z.string().optional(),
+    disposition: z.nativeEnum(OosDisposition).optional(),
+    decisionNotes: z.string().optional(),
+    capaActionId: z.string().uuid().optional(),
+    actor: z.string().optional(),
+});
+
+export const ListOosCasesQuerySchema = z.object({
+    status: z.nativeEnum(OosCaseStatus).optional(),
+    productionBatchId: z.string().uuid().optional(),
+    productionOrderId: z.string().uuid().optional(),
 });
 
 export const ListQualityAuditQuerySchema = z.object({
@@ -691,6 +758,12 @@ export type CreateNonConformityPayload = DateInputValue<z.input<typeof CreateNon
 export type UpdateNonConformityPayload = DateInputValue<z.input<typeof UpdateNonConformitySchema>>;
 export type CreateCapaPayload = DateInputValue<z.input<typeof CreateCapaSchema>>;
 export type UpdateCapaPayload = DateInputValue<z.input<typeof UpdateCapaSchema>>;
+export type CreateProcessDeviationPayload = DateInputValue<z.input<typeof CreateProcessDeviationSchema>>;
+export type UpdateProcessDeviationPayload = DateInputValue<z.input<typeof UpdateProcessDeviationSchema>>;
+export type ListProcessDeviationsFilters = DateInputValue<z.input<typeof ListProcessDeviationsQuerySchema>>;
+export type CreateOosCasePayload = DateInputValue<z.input<typeof CreateOosCaseSchema>>;
+export type UpdateOosCasePayload = DateInputValue<z.input<typeof UpdateOosCaseSchema>>;
+export type ListOosCasesFilters = DateInputValue<z.input<typeof ListOosCasesQuerySchema>>;
 export type CreateControlledDocumentPayload = DateInputValue<z.input<typeof CreateControlledDocumentSchema>>;
 export type ListControlledDocumentsFilters = DateInputValue<z.input<typeof ListControlledDocumentsQuerySchema>>;
 export type CreateTechnovigilanceCasePayload = DateInputValue<z.input<typeof CreateTechnovigilanceCaseSchema>>;

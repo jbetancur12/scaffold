@@ -9,6 +9,7 @@ const createSectionPage = (section: QualitySection) => {
 
 export const QualityNcPage = createSectionPage('nc');
 export const QualityCapaPage = createSectionPage('capa');
+export const QualityDeviationsOosPage = createSectionPage('deviations-oos');
 export const QualityDhrDmrPage = createSectionPage('dhr-dmr');
 export const QualityLabelingPage = createSectionPage('labeling');
 export const QualityIncomingPage = createSectionPage('incoming');

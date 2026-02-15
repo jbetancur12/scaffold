@@ -34,6 +34,7 @@ type QualityAuditLogger = (payload: {
 }) => Promise<unknown>;
 
 type DispatchValidator = (productionBatchId: string, actor?: string) => Promise<DispatchValidationResult>;
+type BatchBlockingValidator = (productionBatchId: string) => Promise<string[]>;
 
 export class QualityPostmarketService {
     private readonly em: EntityManager;
@@ -46,11 +47,18 @@ export class QualityPostmarketService {
     private readonly batchReleaseRepo: EntityRepository<BatchRelease>;
     private readonly logEvent: QualityAuditLogger;
     private readonly validateDispatchReadiness: DispatchValidator;
+    private readonly getBatchBlockingIssues: BatchBlockingValidator;
 
-    constructor(em: EntityManager, logEvent: QualityAuditLogger, validateDispatchReadiness: DispatchValidator) {
+    constructor(
+        em: EntityManager,
+        logEvent: QualityAuditLogger,
+        validateDispatchReadiness: DispatchValidator,
+        getBatchBlockingIssues: BatchBlockingValidator
+    ) {
         this.em = em;
         this.logEvent = logEvent;
         this.validateDispatchReadiness = validateDispatchReadiness;
+        this.getBatchBlockingIssues = getBatchBlockingIssues;
         this.technoRepo = em.getRepository(TechnovigilanceCase);
         this.recallRepo = em.getRepository(RecallCase);
         this.recallNotificationRepo = em.getRepository(RecallNotification);
@@ -441,6 +449,10 @@ export class QualityPostmarketService {
             const dispatchValidation = await this.validateDispatchReadiness(batch.id, actor);
             if (!dispatchValidation.eligible) {
                 throw new AppError(`No puedes despachar lote ${batch.code}: ${dispatchValidation.errors.join(' | ')}`, 400);
+            }
+            const blockingIssues = await this.getBatchBlockingIssues(batch.id);
+            if (blockingIssues.length > 0) {
+                throw new AppError(`No puedes despachar lote ${batch.code}: ${blockingIssues.join(' | ')}`, 400);
             }
 
             let batchUnit: ProductionBatchUnit | undefined;

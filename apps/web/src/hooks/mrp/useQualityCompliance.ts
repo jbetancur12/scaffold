@@ -3,6 +3,7 @@ import { useQualityReceptionReleaseFlow } from '@/hooks/mrp/useQualityReceptionR
 import { useQualityNcCapaDocsFlow } from '@/hooks/mrp/useQualityNcCapaDocsFlow';
 import { useQualityPostmarketFlow } from '@/hooks/mrp/useQualityPostmarketFlow';
 import { useQualityDhrComplianceFlow } from '@/hooks/mrp/useQualityDhrComplianceFlow';
+import { useQualityDeviationOosFlow } from '@/hooks/mrp/useQualityDeviationOosFlow';
 
 export const useQualityCompliance = () => {
     const ncCapaDocsFlow = useQualityNcCapaDocsFlow();
@@ -10,11 +11,13 @@ export const useQualityCompliance = () => {
     const dhrComplianceFlow = useQualityDhrComplianceFlow();
     const regulatoryFlow = useQualityRegulatoryFlow();
     const receptionReleaseFlow = useQualityReceptionReleaseFlow();
+    const deviationOosFlow = useQualityDeviationOosFlow();
 
     return {
         ...ncCapaDocsFlow,
         ...postmarketFlow,
         ...dhrComplianceFlow,
+        ...deviationOosFlow,
         regulatoryLabels: regulatoryFlow.regulatoryLabels,
         incomingInspections: receptionReleaseFlow.incomingInspections,
         batchReleases: receptionReleaseFlow.batchReleases,

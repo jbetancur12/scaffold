@@ -38,6 +38,12 @@ import {
     CreateCapaSchema,
     ListCapasQuerySchema,
     UpdateCapaSchema,
+    CreateProcessDeviationSchema,
+    UpdateProcessDeviationSchema,
+    ListProcessDeviationsQuerySchema,
+    CreateOosCaseSchema,
+    UpdateOosCaseSchema,
+    ListOosCasesQuerySchema,
     ListQualityAuditQuerySchema,
     CreateTechnovigilanceCaseSchema,
     ListTechnovigilanceCasesQuerySchema,
@@ -600,6 +606,68 @@ export class MrpController {
             const payload = UpdateCapaSchema.parse(req.body);
             const row = await this.qualityService.updateCapa(id, payload, payload.actor);
             return ApiResponse.success(res, row, 'CAPA actualizada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createProcessDeviation(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateProcessDeviationSchema.parse(req.body);
+            const row = await this.qualityService.createProcessDeviation(payload);
+            return ApiResponse.success(res, row, 'Desviación registrada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listProcessDeviations(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListProcessDeviationsQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listProcessDeviations(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateProcessDeviation(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateProcessDeviationSchema.parse(req.body);
+            const row = await this.qualityService.updateProcessDeviation(id, payload, payload.actor);
+            return ApiResponse.success(res, row, 'Desviación actualizada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createOosCase(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateOosCaseSchema.parse(req.body);
+            const row = await this.qualityService.createOosCase(payload);
+            return ApiResponse.success(res, row, 'Caso OOS registrado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listOosCases(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListOosCasesQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listOosCases(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateOosCase(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateOosCaseSchema.parse(req.body);
+            const row = await this.qualityService.updateOosCase(id, payload, payload.actor);
+            return ApiResponse.success(res, row, 'Caso OOS actualizado');
         } catch (error) {
             next(error);
         }

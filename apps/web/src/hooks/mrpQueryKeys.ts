@@ -25,6 +25,8 @@ export const mrpQueryKeys = {
     operationalConfig: 'mrp.operational-config',
     qualityNonConformities: 'mrp.quality.non-conformities',
     qualityCapas: 'mrp.quality.capa-actions',
+    qualityProcessDeviations: 'mrp.quality.process-deviations',
+    qualityOosCases: 'mrp.quality.oos-cases',
     qualityAuditEvents: 'mrp.quality.audit-events',
     qualityTechnovigilanceCases: 'mrp.quality.technovigilance-cases',
     qualityRecalls: 'mrp.quality.recalls',

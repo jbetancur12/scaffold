@@ -15,7 +15,7 @@ export function QualityComplianceDashboardTab({ model }: { model: QualityComplia
                         <CardHeader><CardTitle>Tablero de Cumplimiento</CardTitle></CardHeader>
                         <CardContent className="space-y-3">
                             {model.loadingComplianceDashboard ? <div>Cargando...</div> : !model.complianceDashboard ? <div className="text-sm text-slate-500">Sin datos.</div> : (
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                                     <div className="border rounded-md p-3">
                                         <div className="text-xs text-slate-500">NC abiertas</div>
                                         <div className="text-2xl font-semibold">{model.complianceDashboard.nonConformitiesOpen}</div>
@@ -31,6 +31,14 @@ export function QualityComplianceDashboardTab({ model }: { model: QualityComplia
                                     <div className="border rounded-md p-3">
                                         <div className="text-xs text-slate-500">Recalls abiertos</div>
                                         <div className="text-2xl font-semibold">{model.complianceDashboard.recallsOpen}</div>
+                                    </div>
+                                    <div className="border rounded-md p-3">
+                                        <div className="text-xs text-slate-500">Desviaciones abiertas</div>
+                                        <div className="text-2xl font-semibold">{model.complianceDashboard.deviationsOpen}</div>
+                                    </div>
+                                    <div className="border rounded-md p-3">
+                                        <div className="text-xs text-slate-500">Casos OOS abiertos</div>
+                                        <div className="text-2xl font-semibold">{model.complianceDashboard.oosOpen}</div>
                                     </div>
                                     <div className="border rounded-md p-3">
                                         <div className="text-xs text-slate-500">Cobertura recall promedio</div>

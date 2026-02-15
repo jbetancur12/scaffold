@@ -34,6 +34,7 @@ import {
     QualityBatchReleasePage,
     QualityCapaPage,
     QualityComplianceDashboardPage,
+    QualityDeviationsOosPage,
     QualityDhrDmrPage,
     QualityDocsPage,
     QualityIncomingPage,
@@ -147,6 +148,7 @@ export default function App() {
                         <Route path="/quality" element={<Navigate to="/quality/nc" replace />} />
                         <Route path="/quality/nc" element={<QualityNcPage />} />
                         <Route path="/quality/capa" element={<QualityCapaPage />} />
+                        <Route path="/quality/deviations-oos" element={<QualityDeviationsOosPage />} />
                         <Route path="/quality/dhr-dmr" element={<QualityDhrDmrPage />} />
                         <Route path="/quality/labeling" element={<QualityLabelingPage />} />
                         <Route path="/quality/incoming" element={<QualityIncomingPage />} />

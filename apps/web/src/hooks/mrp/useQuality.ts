@@ -3,6 +3,11 @@ import {
     AuditEvent,
     CapaAction,
     CapaStatus,
+    ProcessDeviation,
+    ProcessDeviationStatus,
+    OosCase,
+    OosCaseStatus,
+    OosDisposition,
     ControlledDocument,
     DocumentApprovalMethod,
     DocumentProcess,
@@ -109,6 +114,128 @@ export const useUpdateCapaMutation = () => {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityCapas);
                 invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useProcessDeviationsQuery = (filters?: { status?: ProcessDeviationStatus; productionBatchId?: string; productionOrderId?: string }) => {
+    const fetcher = useCallback(async (): Promise<ProcessDeviation[]> => {
+        return mrpApi.listProcessDeviations(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityProcessDeviations);
+};
+
+export const useCreateProcessDeviationMutation = () => {
+    return useMrpMutation<{
+        title: string;
+        description: string;
+        classification?: string;
+        productionOrderId?: string;
+        productionBatchId?: string;
+        productionBatchUnitId?: string;
+        containmentAction?: string;
+        investigationSummary?: string;
+        closureEvidence?: string;
+        capaActionId?: string;
+        actor?: string;
+    }, ProcessDeviation>(
+        async (payload) => mrpApi.createProcessDeviation(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityProcessDeviations,
+                    mrpQueryKeys.qualityAuditEvents,
+                    mrpQueryKeys.qualityBatchReleases,
+                ]);
+            },
+        }
+    );
+};
+
+export const useUpdateProcessDeviationMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        title?: string;
+        description?: string;
+        classification?: string;
+        status?: ProcessDeviationStatus;
+        containmentAction?: string;
+        investigationSummary?: string;
+        closureEvidence?: string;
+        capaActionId?: string;
+        actor?: string;
+    }, ProcessDeviation>(
+        async ({ id, ...payload }) => mrpApi.updateProcessDeviation(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityProcessDeviations,
+                    mrpQueryKeys.qualityAuditEvents,
+                    mrpQueryKeys.qualityBatchReleases,
+                ]);
+            },
+        }
+    );
+};
+
+export const useOosCasesQuery = (filters?: { status?: OosCaseStatus; productionBatchId?: string; productionOrderId?: string }) => {
+    const fetcher = useCallback(async (): Promise<OosCase[]> => {
+        return mrpApi.listOosCases(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityOosCases);
+};
+
+export const useCreateOosCaseMutation = () => {
+    return useMrpMutation<{
+        testName: string;
+        resultValue: string;
+        specification: string;
+        productionOrderId?: string;
+        productionBatchId?: string;
+        productionBatchUnitId?: string;
+        investigationSummary?: string;
+        disposition?: OosDisposition;
+        decisionNotes?: string;
+        capaActionId?: string;
+        actor?: string;
+    }, OosCase>(
+        async (payload) => mrpApi.createOosCase(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityOosCases,
+                    mrpQueryKeys.qualityAuditEvents,
+                    mrpQueryKeys.qualityBatchReleases,
+                ]);
+            },
+        }
+    );
+};
+
+export const useUpdateOosCaseMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        testName?: string;
+        resultValue?: string;
+        specification?: string;
+        status?: OosCaseStatus;
+        investigationSummary?: string;
+        disposition?: OosDisposition;
+        decisionNotes?: string;
+        capaActionId?: string;
+        actor?: string;
+    }, OosCase>(
+        async ({ id, ...payload }) => mrpApi.updateOosCase(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityOosCases,
+                    mrpQueryKeys.qualityAuditEvents,
+                    mrpQueryKeys.qualityBatchReleases,
+                ]);
             },
         }
     );

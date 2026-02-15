@@ -22,17 +22,25 @@ type QualityAuditLogger = (payload: {
 }) => Promise<unknown>;
 
 type DispatchValidator = (productionBatchId: string, actor?: string) => Promise<DispatchValidationResult>;
+type BatchBlockingValidator = (productionBatchId: string) => Promise<string[]>;
 
 export class QualityBatchReleaseService {
     private readonly em: EntityManager;
     private readonly batchReleaseRepo: EntityRepository<BatchRelease>;
     private readonly logEvent: QualityAuditLogger;
     private readonly validateDispatchReadiness: DispatchValidator;
+    private readonly getBatchBlockingIssues: BatchBlockingValidator;
 
-    constructor(em: EntityManager, logEvent: QualityAuditLogger, validateDispatchReadiness: DispatchValidator) {
+    constructor(
+        em: EntityManager,
+        logEvent: QualityAuditLogger,
+        validateDispatchReadiness: DispatchValidator,
+        getBatchBlockingIssues: BatchBlockingValidator
+    ) {
         this.em = em;
         this.logEvent = logEvent;
         this.validateDispatchReadiness = validateDispatchReadiness;
+        this.getBatchBlockingIssues = getBatchBlockingIssues;
         this.batchReleaseRepo = em.getRepository(BatchRelease);
     }
 
@@ -113,6 +121,11 @@ export class QualityBatchReleaseService {
         const dispatchValidation = await this.validateDispatchReadiness(batch.id, payload.actor);
         if (!dispatchValidation.eligible) {
             throw new AppError(`No se puede liberar QA: ${dispatchValidation.errors.join(' | ')}`, 400);
+        }
+
+        const blockingIssues = await this.getBatchBlockingIssues(batch.id);
+        if (blockingIssues.length > 0) {
+            throw new AppError(`No se puede liberar QA: ${blockingIssues.join(' | ')}`, 400);
         }
 
         row.status = BatchReleaseStatus.LIBERADO_QA;

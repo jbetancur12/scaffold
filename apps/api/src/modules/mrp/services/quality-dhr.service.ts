@@ -17,6 +17,8 @@ import { RecallCase } from '../entities/recall-case.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
 import { Shipment } from '../entities/shipment.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
+import { ProcessDeviation } from '../entities/process-deviation.entity';
+import { OosCase } from '../entities/oos-case.entity';
 
 type QualityAuditLogger = (payload: {
     entityType: string;
@@ -39,6 +41,8 @@ export class QualityDhrService {
     private readonly capaRepo: EntityRepository<CapaAction>;
     private readonly technoRepo: EntityRepository<TechnovigilanceCase>;
     private readonly recallRepo: EntityRepository<RecallCase>;
+    private readonly processDeviationRepo: EntityRepository<ProcessDeviation>;
+    private readonly oosRepo: EntityRepository<OosCase>;
     private readonly incomingInspectionRepo: EntityRepository<IncomingInspection>;
 
     constructor(em: EntityManager, private readonly logEvent: QualityAuditLogger) {
@@ -53,6 +57,8 @@ export class QualityDhrService {
         this.capaRepo = em.getRepository(CapaAction);
         this.technoRepo = em.getRepository(TechnovigilanceCase);
         this.recallRepo = em.getRepository(RecallCase);
+        this.processDeviationRepo = em.getRepository(ProcessDeviation);
+        this.oosRepo = em.getRepository(OosCase);
         this.incomingInspectionRepo = em.getRepository(IncomingInspection);
     }
 
@@ -148,6 +154,14 @@ export class QualityDhrService {
         const recallRows = await this.recallRepo.find(
             { lotCode: batch.code },
             { populate: ['notifications'], orderBy: { createdAt: 'DESC' } }
+        );
+        const processDeviations = await this.processDeviationRepo.find(
+            { productionBatch: batch.id },
+            { orderBy: { createdAt: 'DESC' } }
+        );
+        const oosCases = await this.oosRepo.find(
+            { productionBatch: batch.id },
+            { orderBy: { createdAt: 'DESC' } }
         );
         const incomingInspections = bomItems.length > 0
             ? await this.incomingInspectionRepo.find(
@@ -320,6 +334,8 @@ export class QualityDhrService {
                 capas,
                 technovigilanceCases,
                 recalls,
+                processDeviations,
+                oosCases,
             },
         };
 
@@ -387,6 +403,8 @@ export class QualityDhrService {
         lines.push(toCsvRow(['counts', 'capas', data.incidents.capas.length]));
         lines.push(toCsvRow(['counts', 'technovigilanceCases', data.incidents.technovigilanceCases.length]));
         lines.push(toCsvRow(['counts', 'recalls', data.incidents.recalls.length]));
+        lines.push(toCsvRow(['counts', 'processDeviations', data.incidents.processDeviations.length]));
+        lines.push(toCsvRow(['counts', 'oosCases', data.incidents.oosCases.length]));
 
         return {
             generatedAt,

@@ -18,6 +18,8 @@ import {
     NonConformityStatus,
     QualitySeverity,
     CapaStatus,
+    ProcessDeviation,
+    OosCase,
     ControlledDocument,
     DocumentProcess,
     TechnovigilanceCase,
@@ -63,6 +65,12 @@ import type {
     UpdateNonConformityPayload,
     CreateCapaPayload,
     UpdateCapaPayload,
+    CreateProcessDeviationPayload,
+    UpdateProcessDeviationPayload,
+    ListProcessDeviationsFilters,
+    CreateOosCasePayload,
+    UpdateOosCasePayload,
+    ListOosCasesFilters,
     CreateControlledDocumentPayload,
     ListControlledDocumentsFilters,
     CreateTechnovigilanceCasePayload,
@@ -356,6 +364,30 @@ export const mrpApi = {
     },
     updateCapaAction: async (id: string, data: UpdateCapaPayload): Promise<CapaAction> => {
         const response = await api.patch<CapaAction>(`/mrp/quality/capa-actions/${id}`, data);
+        return response.data;
+    },
+    createProcessDeviation: async (data: CreateProcessDeviationPayload): Promise<ProcessDeviation> => {
+        const response = await api.post<ProcessDeviation>('/mrp/quality/process-deviations', data);
+        return response.data;
+    },
+    listProcessDeviations: async (filters?: ListProcessDeviationsFilters): Promise<ProcessDeviation[]> => {
+        const response = await api.get<ProcessDeviation[]>('/mrp/quality/process-deviations', { params: filters });
+        return response.data;
+    },
+    updateProcessDeviation: async (id: string, data: UpdateProcessDeviationPayload): Promise<ProcessDeviation> => {
+        const response = await api.patch<ProcessDeviation>(`/mrp/quality/process-deviations/${id}`, data);
+        return response.data;
+    },
+    createOosCase: async (data: CreateOosCasePayload): Promise<OosCase> => {
+        const response = await api.post<OosCase>('/mrp/quality/oos-cases', data);
+        return response.data;
+    },
+    listOosCases: async (filters?: ListOosCasesFilters): Promise<OosCase[]> => {
+        const response = await api.get<OosCase[]>('/mrp/quality/oos-cases', { params: filters });
+        return response.data;
+    },
+    updateOosCase: async (id: string, data: UpdateOosCasePayload): Promise<OosCase> => {
+        const response = await api.patch<OosCase>(`/mrp/quality/oos-cases/${id}`, data);
         return response.data;
     },
     listQualityAuditEvents: async (filters?: { entityType?: string; entityId?: string }): Promise<AuditEvent[]> => {

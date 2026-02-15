@@ -118,6 +118,12 @@ Llevar la app de "buen soporte de trazabilidad" a "operación robusta para audit
 
 ## Epic 5 - Desviaciones y OOS
 
+Estado actual (implementación base):
+- Flujo API/UI para `process_deviation` y `oos_case` ya disponible.
+- Bloqueo de liberación QA y despacho cuando existan desviaciones/OOS abiertos por lote.
+- Inclusión de métricas de desviaciones/OOS en tablero de cumplimiento.
+- Guía de verificación manual: `docs/EPIC5_DESVIACIONES_OOS_SMOKE.md`.
+
 ### Alcance funcional
 
 - Flujo dedicado para desviación en proceso:

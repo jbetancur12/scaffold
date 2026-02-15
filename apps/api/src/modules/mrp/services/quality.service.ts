@@ -10,6 +10,9 @@ import {
     IncomingInspectionResult,
     IncomingInspectionStatus,
     BatchReleaseStatus,
+    ProcessDeviationStatus,
+    OosCaseStatus,
+    OosDisposition,
     NonConformityStatus,
     QualitySeverity,
     QualityRiskControlStatus,
@@ -39,11 +42,14 @@ import { RecallCase } from '../entities/recall-case.entity';
 import { QualityRiskControl } from '../entities/quality-risk-control.entity';
 import { QualityTrainingEvidence } from '../entities/quality-training-evidence.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
+import { ProcessDeviation } from '../entities/process-deviation.entity';
+import { OosCase } from '../entities/oos-case.entity';
 import { QualityDhrService } from './quality-dhr.service';
 import { QualityPostmarketService } from './quality-postmarket.service';
 import { QualityLabelingService } from './quality-labeling.service';
 import { QualityIncomingService } from './quality-incoming.service';
 import { QualityBatchReleaseService } from './quality-batch-release.service';
+import { QualityDeviationOosService } from './quality-deviation-oos.service';
 
 export class QualityService {
     private readonly em: EntityManager;
@@ -55,11 +61,14 @@ export class QualityService {
     private readonly riskControlRepo: EntityRepository<QualityRiskControl>;
     private readonly trainingEvidenceRepo: EntityRepository<QualityTrainingEvidence>;
     private readonly controlledDocumentRepo: EntityRepository<ControlledDocument>;
+    private readonly processDeviationRepo: EntityRepository<ProcessDeviation>;
+    private readonly oosRepo: EntityRepository<OosCase>;
     private readonly dhrService: QualityDhrService;
     private readonly postmarketService: QualityPostmarketService;
     private readonly labelingService: QualityLabelingService;
     private readonly incomingService: QualityIncomingService;
     private readonly batchReleaseService: QualityBatchReleaseService;
+    private readonly deviationOosService: QualityDeviationOosService;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -71,18 +80,23 @@ export class QualityService {
         this.riskControlRepo = em.getRepository(QualityRiskControl);
         this.trainingEvidenceRepo = em.getRepository(QualityTrainingEvidence);
         this.controlledDocumentRepo = em.getRepository(ControlledDocument);
+        this.processDeviationRepo = em.getRepository(ProcessDeviation);
+        this.oosRepo = em.getRepository(OosCase);
         this.dhrService = new QualityDhrService(em, this.logEvent.bind(this));
         this.labelingService = new QualityLabelingService(em, this.logEvent.bind(this));
         this.incomingService = new QualityIncomingService(em, this.logEvent.bind(this));
+        this.deviationOosService = new QualityDeviationOosService(em, this.logEvent.bind(this));
         this.batchReleaseService = new QualityBatchReleaseService(
             em,
             this.logEvent.bind(this),
-            this.labelingService.validateDispatchReadiness.bind(this.labelingService)
+            this.labelingService.validateDispatchReadiness.bind(this.labelingService),
+            this.deviationOosService.getBatchBlockingIssues.bind(this.deviationOosService)
         );
         this.postmarketService = new QualityPostmarketService(
             em,
             this.logEvent.bind(this),
-            this.labelingService.validateDispatchReadiness.bind(this.labelingService)
+            this.labelingService.validateDispatchReadiness.bind(this.labelingService),
+            this.deviationOosService.getBatchBlockingIssues.bind(this.deviationOosService)
         );
     }
 
@@ -402,11 +416,13 @@ export class QualityService {
     }
 
     async getComplianceDashboard(): Promise<ComplianceKpiDashboard> {
-        const [nonConformitiesOpen, capasOpen, technovigilanceOpen, recallsOpen] = await Promise.all([
+        const [nonConformitiesOpen, capasOpen, technovigilanceOpen, recallsOpen, deviationsOpen, oosOpen] = await Promise.all([
             this.ncRepo.count({ status: { $ne: NonConformityStatus.CERRADA } }),
             this.capaRepo.count({ status: { $ne: CapaStatus.CERRADA } }),
             this.technoRepo.count({ status: { $ne: TechnovigilanceStatus.CERRADO } }),
             this.recallRepo.count({ status: { $ne: RecallStatus.CERRADO } }),
+            this.processDeviationRepo.count({ status: { $ne: ProcessDeviationStatus.CERRADA } }),
+            this.oosRepo.count({ status: { $ne: OosCaseStatus.CERRADO } }),
         ]);
 
         const recalls = await this.recallRepo.findAll();
@@ -429,6 +445,8 @@ export class QualityService {
             capasOpen,
             technovigilanceOpen,
             recallsOpen,
+            deviationsOpen,
+            oosOpen,
             recallCoverageAverage,
             auditEventsLast30Days,
             documentApprovalRate,
@@ -626,6 +644,80 @@ export class QualityService {
 
     async listBatchReleases(filters: { productionBatchId?: string; status?: BatchReleaseStatus }) {
         return this.batchReleaseService.listBatchReleases(filters);
+    }
+
+    async createProcessDeviation(payload: {
+        title: string;
+        description: string;
+        classification?: string;
+        productionOrderId?: string;
+        productionBatchId?: string;
+        productionBatchUnitId?: string;
+        containmentAction?: string;
+        investigationSummary?: string;
+        closureEvidence?: string;
+        capaActionId?: string;
+        actor?: string;
+    }) {
+        return this.deviationOosService.createProcessDeviation(payload);
+    }
+
+    async listProcessDeviations(filters: {
+        status?: ProcessDeviationStatus;
+        productionBatchId?: string;
+        productionOrderId?: string;
+    }) {
+        return this.deviationOosService.listProcessDeviations(filters);
+    }
+
+    async updateProcessDeviation(id: string, payload: Partial<{
+        title: string;
+        description: string;
+        classification: string;
+        status: ProcessDeviationStatus;
+        containmentAction: string;
+        investigationSummary: string;
+        closureEvidence: string;
+        capaActionId: string;
+    }>, actor?: string) {
+        return this.deviationOosService.updateProcessDeviation(id, payload, actor);
+    }
+
+    async createOosCase(payload: {
+        testName: string;
+        resultValue: string;
+        specification: string;
+        productionOrderId?: string;
+        productionBatchId?: string;
+        productionBatchUnitId?: string;
+        investigationSummary?: string;
+        disposition?: OosDisposition;
+        decisionNotes?: string;
+        capaActionId?: string;
+        actor?: string;
+    }) {
+        return this.deviationOosService.createOosCase(payload);
+    }
+
+    async listOosCases(filters: {
+        status?: OosCaseStatus;
+        productionBatchId?: string;
+        productionOrderId?: string;
+    }) {
+        return this.deviationOosService.listOosCases(filters);
+    }
+
+    async updateOosCase(id: string, payload: Partial<{
+        testName: string;
+        resultValue: string;
+        specification: string;
+        status: OosCaseStatus;
+        investigationSummary: string;
+        disposition: OosDisposition;
+        decisionNotes: string;
+        capaActionId: string;
+    }>, actor?: string) {
+        return this.deviationOosService.updateOosCase(id, payload, actor);
     }
 
     async logEvent(payload: {

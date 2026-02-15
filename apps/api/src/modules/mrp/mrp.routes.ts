@@ -66,6 +66,12 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/quality/capa-actions', (req, res, next) => mrpController.createCapa(req, res, next));
     router.get('/quality/capa-actions', (req, res, next) => mrpController.listCapas(req, res, next));
     router.patch('/quality/capa-actions/:id', (req, res, next) => mrpController.updateCapa(req, res, next));
+    router.post('/quality/process-deviations', (req, res, next) => mrpController.createProcessDeviation(req, res, next));
+    router.get('/quality/process-deviations', (req, res, next) => mrpController.listProcessDeviations(req, res, next));
+    router.patch('/quality/process-deviations/:id', (req, res, next) => mrpController.updateProcessDeviation(req, res, next));
+    router.post('/quality/oos-cases', (req, res, next) => mrpController.createOosCase(req, res, next));
+    router.get('/quality/oos-cases', (req, res, next) => mrpController.listOosCases(req, res, next));
+    router.patch('/quality/oos-cases/:id', (req, res, next) => mrpController.updateOosCase(req, res, next));
     router.get('/quality/audit-events', (req, res, next) => mrpController.listQualityAudit(req, res, next));
     router.post('/quality/technovigilance-cases', (req, res, next) => mrpController.createTechnovigilanceCase(req, res, next));
     router.get('/quality/technovigilance-cases', (req, res, next) => mrpController.listTechnovigilanceCases(req, res, next));

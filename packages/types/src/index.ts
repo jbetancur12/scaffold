@@ -211,6 +211,27 @@ export enum BatchReleaseStatus {
     RECHAZADO = 'rechazado',
 }
 
+export enum ProcessDeviationStatus {
+    ABIERTA = 'abierta',
+    EN_CONTENCION = 'en_contencion',
+    EN_INVESTIGACION = 'en_investigacion',
+    CERRADA = 'cerrada',
+}
+
+export enum OosCaseStatus {
+    ABIERTO = 'abierto',
+    EN_INVESTIGACION = 'en_investigacion',
+    DISPUESTO = 'dispuesto',
+    CERRADO = 'cerrado',
+}
+
+export enum OosDisposition {
+    REPROCESAR = 'reprocesar',
+    DESCARTAR = 'descartar',
+    USO_CONDICIONAL = 'uso_condicional',
+    LIBERAR = 'liberar',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -457,6 +478,49 @@ export interface CapaAction {
     updatedAt: string | Date;
 }
 
+export interface ProcessDeviation {
+    id: string;
+    code: string;
+    title: string;
+    description: string;
+    classification: string;
+    status: ProcessDeviationStatus;
+    containmentAction?: string;
+    investigationSummary?: string;
+    closureEvidence?: string;
+    productionOrderId?: string;
+    productionBatchId?: string;
+    productionBatchUnitId?: string;
+    capaActionId?: string;
+    openedBy?: string;
+    closedBy?: string;
+    closedAt?: string | Date;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface OosCase {
+    id: string;
+    code: string;
+    testName: string;
+    resultValue: string;
+    specification: string;
+    status: OosCaseStatus;
+    investigationSummary?: string;
+    disposition?: OosDisposition;
+    decisionNotes?: string;
+    productionOrderId?: string;
+    productionBatchId?: string;
+    productionBatchUnitId?: string;
+    capaActionId?: string;
+    blockedAt: string | Date;
+    releasedAt?: string | Date;
+    openedBy?: string;
+    closedBy?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
 export interface AuditEvent {
     id: string;
     entityType: string;
@@ -594,6 +658,8 @@ export interface ComplianceKpiDashboard {
     capasOpen: number;
     technovigilanceOpen: number;
     recallsOpen: number;
+    deviationsOpen: number;
+    oosOpen: number;
     recallCoverageAverage: number;
     auditEventsLast30Days: number;
     documentApprovalRate: number;
@@ -817,6 +883,8 @@ export interface BatchDhrExpedient {
         capas: CapaAction[];
         technovigilanceCases: TechnovigilanceCase[];
         recalls: RecallCase[];
+        processDeviations: ProcessDeviation[];
+        oosCases: OosCase[];
     };
 }
 
@@ -861,6 +929,58 @@ export interface CreateCapaPayload {
     actionPlan: string;
     owner?: string;
     dueDate?: string | Date;
+    actor?: string;
+}
+
+export interface CreateProcessDeviationPayload {
+    title: string;
+    description: string;
+    classification?: string;
+    productionOrderId?: string;
+    productionBatchId?: string;
+    productionBatchUnitId?: string;
+    containmentAction?: string;
+    investigationSummary?: string;
+    closureEvidence?: string;
+    capaActionId?: string;
+    actor?: string;
+}
+
+export interface UpdateProcessDeviationPayload {
+    title?: string;
+    description?: string;
+    classification?: string;
+    status?: ProcessDeviationStatus;
+    containmentAction?: string;
+    investigationSummary?: string;
+    closureEvidence?: string;
+    capaActionId?: string;
+    actor?: string;
+}
+
+export interface CreateOosCasePayload {
+    testName: string;
+    resultValue: string;
+    specification: string;
+    productionOrderId?: string;
+    productionBatchId?: string;
+    productionBatchUnitId?: string;
+    investigationSummary?: string;
+    disposition?: OosDisposition;
+    decisionNotes?: string;
+    capaActionId?: string;
+    actor?: string;
+}
+
+export interface UpdateOosCasePayload {
+    testName?: string;
+    resultValue?: string;
+    specification?: string;
+    status?: OosCaseStatus;
+    investigationSummary?: string;
+    disposition?: OosDisposition;
+    decisionNotes?: string;
+    capaActionId?: string;
     actor?: string;
 }
 
