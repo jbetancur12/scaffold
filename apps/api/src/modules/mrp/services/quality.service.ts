@@ -6,6 +6,8 @@ import {
     DispatchValidationResult,
     DocumentProcess,
     DocumentStatus,
+    IncomingInspectionResult,
+    IncomingInspectionStatus,
     NonConformityStatus,
     QualitySeverity,
     QualityRiskControlStatus,
@@ -22,6 +24,7 @@ import {
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
     TechnovigilanceReportChannel,
+    WarehouseType,
 } from '@scaffold/types';
 import { AppError } from '../../../shared/utils/response';
 import { CapaAction } from '../entities/capa-action.entity';
@@ -29,7 +32,9 @@ import { NonConformity } from '../entities/non-conformity.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { ProductionOrder } from '../entities/production-order.entity';
+import { IncomingInspection } from '../entities/incoming-inspection.entity';
 import { ControlledDocument } from '../entities/controlled-document.entity';
+import { InventoryItem } from '../entities/inventory-item.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RecallCase } from '../entities/recall-case.entity';
 import { RecallNotification } from '../entities/recall-notification.entity';
@@ -37,6 +42,8 @@ import { QualityRiskControl } from '../entities/quality-risk-control.entity';
 import { QualityTrainingEvidence } from '../entities/quality-training-evidence.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
+import { Warehouse } from '../entities/warehouse.entity';
+import { MrpService } from './mrp.service';
 
 export class QualityService {
     private readonly em: EntityManager;
@@ -50,6 +57,9 @@ export class QualityService {
     private readonly riskControlRepo: EntityRepository<QualityRiskControl>;
     private readonly trainingEvidenceRepo: EntityRepository<QualityTrainingEvidence>;
     private readonly controlledDocumentRepo: EntityRepository<ControlledDocument>;
+    private readonly incomingInspectionRepo: EntityRepository<IncomingInspection>;
+    private readonly inventoryRepo: EntityRepository<InventoryItem>;
+    private readonly warehouseRepo: EntityRepository<Warehouse>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -63,6 +73,9 @@ export class QualityService {
         this.riskControlRepo = em.getRepository(QualityRiskControl);
         this.trainingEvidenceRepo = em.getRepository(QualityTrainingEvidence);
         this.controlledDocumentRepo = em.getRepository(ControlledDocument);
+        this.incomingInspectionRepo = em.getRepository(IncomingInspection);
+        this.inventoryRepo = em.getRepository(InventoryItem);
+        this.warehouseRepo = em.getRepository(Warehouse);
     }
 
     async createNonConformity(payload: {
@@ -852,6 +865,122 @@ export class QualityService {
         const query: FilterQuery<QualityTrainingEvidence> = {};
         if (filters.role) query.role = { $ilike: `%${filters.role}%` };
         return this.trainingEvidenceRepo.find(query, { orderBy: { completedAt: 'DESC' } });
+    }
+
+    async listIncomingInspections(filters: {
+        status?: IncomingInspectionStatus;
+        rawMaterialId?: string;
+        purchaseOrderId?: string;
+    }) {
+        const query: FilterQuery<IncomingInspection> = {};
+        if (filters.status) query.status = filters.status;
+        if (filters.rawMaterialId) query.rawMaterial = filters.rawMaterialId;
+        if (filters.purchaseOrderId) query.purchaseOrder = filters.purchaseOrderId;
+        return this.incomingInspectionRepo.find(query, {
+            populate: ['rawMaterial', 'warehouse', 'purchaseOrder', 'purchaseOrderItem'],
+            orderBy: { createdAt: 'DESC' },
+        });
+    }
+
+    async resolveIncomingInspection(id: string, payload: {
+        inspectionResult: IncomingInspectionResult;
+        supplierLotCode?: string;
+        certificateRef?: string;
+        notes?: string;
+        quantityAccepted: number;
+        quantityRejected: number;
+        actor?: string;
+    }) {
+        const row = await this.incomingInspectionRepo.findOneOrFail(
+            { id },
+            { populate: ['rawMaterial', 'warehouse'] }
+        );
+        if (row.status !== IncomingInspectionStatus.PENDIENTE) {
+            throw new AppError('La inspección ya fue resuelta', 409);
+        }
+
+        const totalResolved = Number(payload.quantityAccepted) + Number(payload.quantityRejected);
+        if (totalResolved !== Number(row.quantityReceived)) {
+            throw new AppError('La suma aceptada/rechazada debe ser igual a la cantidad recibida', 400);
+        }
+
+        const quarantineInventory = await this.inventoryRepo.findOne({
+            rawMaterial: row.rawMaterial.id,
+            warehouse: row.warehouse.id,
+        });
+        if (!quarantineInventory || Number(quarantineInventory.quantity) < totalResolved) {
+            throw new AppError('No hay stock suficiente en cuarentena para resolver la inspección', 400);
+        }
+
+        row.inspectionResult = payload.inspectionResult;
+        row.supplierLotCode = payload.supplierLotCode;
+        row.certificateRef = payload.certificateRef;
+        row.notes = payload.notes;
+        row.quantityAccepted = payload.quantityAccepted;
+        row.quantityRejected = payload.quantityRejected;
+        row.inspectedBy = payload.actor;
+        row.inspectedAt = new Date();
+        row.releasedBy = payload.actor;
+        row.releasedAt = new Date();
+        row.status = payload.quantityAccepted > 0
+            ? IncomingInspectionStatus.LIBERADO
+            : IncomingInspectionStatus.RECHAZADO;
+
+        quarantineInventory.quantity = Number(quarantineInventory.quantity) - totalResolved;
+
+        if (payload.quantityAccepted > 0) {
+            let releasedWarehouse = await this.warehouseRepo.findOne({ type: WarehouseType.RAW_MATERIALS });
+            if (!releasedWarehouse) {
+                releasedWarehouse = this.warehouseRepo.create({
+                    name: 'Main Warehouse',
+                    location: 'Default Location',
+                    type: WarehouseType.RAW_MATERIALS,
+                } as Warehouse);
+                await this.em.persistAndFlush(releasedWarehouse);
+            }
+
+            let releasedInventory = await this.inventoryRepo.findOne({
+                rawMaterial: row.rawMaterial.id,
+                warehouse: releasedWarehouse.id,
+            });
+            if (!releasedInventory) {
+                releasedInventory = this.inventoryRepo.create({
+                    rawMaterial: row.rawMaterial,
+                    warehouse: releasedWarehouse,
+                    quantity: 0,
+                } as InventoryItem);
+            }
+
+            const currentStock = Number(releasedInventory.quantity);
+            const acceptedQty = Number(payload.quantityAccepted);
+            releasedInventory.quantity = currentStock + acceptedQty;
+
+            const purchasePrice = Number(row.rawMaterial.lastPurchasePrice || row.rawMaterial.averageCost || 0);
+            const currentAvg = Number(row.rawMaterial.averageCost || 0);
+            if (currentStock + acceptedQty > 0 && purchasePrice > 0) {
+                row.rawMaterial.averageCost = ((currentStock * currentAvg) + (acceptedQty * purchasePrice)) / (currentStock + acceptedQty);
+            }
+
+            await this.em.persistAndFlush([releasedInventory, row.rawMaterial]);
+            const mrpService = new MrpService(this.em);
+            await mrpService.recalculateVariantsByMaterial(row.rawMaterial.id);
+        }
+
+        await this.em.persistAndFlush([row, quarantineInventory]);
+        await this.logEvent({
+            entityType: 'incoming_inspection',
+            entityId: row.id,
+            action: 'resolved',
+            actor: payload.actor,
+            metadata: {
+                status: row.status,
+                inspectionResult: row.inspectionResult,
+                quantityAccepted: row.quantityAccepted,
+                quantityRejected: row.quantityRejected,
+                rawMaterialId: row.rawMaterial.id,
+            },
+        });
+        return row;
     }
 
     private calculateCoverage(affectedQuantity: number, retrievedQuantity: number) {

@@ -33,6 +33,9 @@ import {
     QualityRiskControl,
     QualityRiskControlStatus,
     QualityTrainingEvidence,
+    IncomingInspection,
+    IncomingInspectionResult,
+    IncomingInspectionStatus,
 } from '@scaffold/types';
 import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
@@ -405,6 +408,40 @@ export const useCreateTrainingEvidenceMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityTrainingEvidence);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useIncomingInspectionsQuery = (filters?: {
+    status?: IncomingInspectionStatus;
+    rawMaterialId?: string;
+    purchaseOrderId?: string;
+}) => {
+    const fetcher = useCallback(async (): Promise<IncomingInspection[]> => {
+        return mrpApi.listIncomingInspections(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityIncomingInspections);
+};
+
+export const useResolveIncomingInspectionMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        inspectionResult: IncomingInspectionResult;
+        supplierLotCode?: string;
+        certificateRef?: string;
+        notes?: string;
+        quantityAccepted: number;
+        quantityRejected: number;
+        actor?: string;
+    }, IncomingInspection>(
+        async ({ id, ...payload }) => mrpApi.resolveIncomingInspection(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityIncomingInspections);
+                invalidateMrpQuery(mrpQueryKeys.rawMaterials);
                 invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
             },
         }

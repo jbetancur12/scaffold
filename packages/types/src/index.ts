@@ -187,6 +187,18 @@ export enum QualityRiskControlStatus {
     OBSOLETO = 'obsoleto',
 }
 
+export enum IncomingInspectionStatus {
+    PENDIENTE = 'pendiente',
+    LIBERADO = 'liberado',
+    RECHAZADO = 'rechazado',
+}
+
+export enum IncomingInspectionResult {
+    APROBADO = 'aprobado',
+    CONDICIONAL = 'condicional',
+    RECHAZADO = 'rechazado',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -588,6 +600,28 @@ export interface QualityTrainingEvidence {
     trainerName?: string;
     evidenceRef?: string;
     createdBy?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface IncomingInspection {
+    id: string;
+    purchaseOrderId?: string;
+    purchaseOrderItemId?: string;
+    rawMaterialId: string;
+    warehouseId: string;
+    status: IncomingInspectionStatus;
+    inspectionResult?: IncomingInspectionResult;
+    supplierLotCode?: string;
+    certificateRef?: string;
+    notes?: string;
+    quantityReceived: number;
+    quantityAccepted: number;
+    quantityRejected: number;
+    inspectedBy?: string;
+    inspectedAt?: string | Date;
+    releasedBy?: string;
+    releasedAt?: string | Date;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

@@ -17,6 +17,7 @@ import {
     RegulatoryDeviceType,
     RegulatoryCodingStandard,
     QualityRiskControlStatus,
+    IncomingInspectionResult,
 } from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -51,6 +52,8 @@ import {
     useCreateRiskControlMutation,
     useTrainingEvidenceQuery,
     useCreateTrainingEvidenceMutation,
+    useIncomingInspectionsQuery,
+    useResolveIncomingInspectionMutation,
 } from '@/hooks/mrp/useQuality';
 
 export const useQualityCompliance = () => {
@@ -61,6 +64,7 @@ export const useQualityCompliance = () => {
     const { data: technovigilanceData, loading: loadingTechno } = useTechnovigilanceCasesQuery();
     const { data: recallsData, loading: loadingRecalls } = useRecallCasesQuery();
     const { data: regulatoryLabelsData, loading: loadingRegulatoryLabels } = useRegulatoryLabelsQuery();
+    const { data: incomingInspectionsData, loading: loadingIncomingInspections } = useIncomingInspectionsQuery();
     const { data: complianceDashboardData, loading: loadingComplianceDashboard } = useComplianceDashboardQuery();
     const { data: riskControlsData, loading: loadingRiskControls } = useRiskControlsQuery();
     const { data: trainingEvidenceData, loading: loadingTrainingEvidence } = useTrainingEvidenceQuery();
@@ -85,6 +89,7 @@ export const useQualityCompliance = () => {
     const { execute: exportCompliance, loading: exportingCompliance } = useExportComplianceMutation();
     const { execute: createRiskControl, loading: creatingRiskControl } = useCreateRiskControlMutation();
     const { execute: createTrainingEvidence, loading: creatingTrainingEvidence } = useCreateTrainingEvidenceMutation();
+    const { execute: resolveIncomingInspection } = useResolveIncomingInspectionMutation();
 
     const [ncForm, setNcForm] = useState({
         title: '',
@@ -168,6 +173,7 @@ export const useQualityCompliance = () => {
     const technovigilanceCases = technovigilanceData ?? [];
     const recalls = recallsData ?? [];
     const regulatoryLabels = regulatoryLabelsData ?? [];
+    const incomingInspections = incomingInspectionsData ?? [];
     const complianceDashboard = complianceDashboardData;
     const riskControls = riskControlsData ?? [];
     const trainingEvidence = trainingEvidenceData ?? [];
@@ -582,6 +588,51 @@ export const useQualityCompliance = () => {
         }
     };
 
+    const quickResolveIncomingInspection = async (id: string, quantityReceived: number) => {
+        try {
+            const resultRaw = window.prompt(
+                'Resultado de inspección (aprobado, condicional, rechazado)',
+                IncomingInspectionResult.APROBADO
+            );
+            if (!resultRaw) return;
+            if (!Object.values(IncomingInspectionResult).includes(resultRaw as IncomingInspectionResult)) {
+                toast({ title: 'Error', description: 'Resultado de inspección inválido', variant: 'destructive' });
+                return;
+            }
+
+            const acceptedRaw = window.prompt('Cantidad aceptada', String(quantityReceived));
+            if (acceptedRaw === null) return;
+            const quantityAccepted = Number(acceptedRaw);
+            if (Number.isNaN(quantityAccepted) || quantityAccepted < 0) {
+                toast({ title: 'Error', description: 'Cantidad aceptada inválida', variant: 'destructive' });
+                return;
+            }
+            const quantityRejected = Number((quantityReceived - quantityAccepted).toFixed(4));
+            if (quantityRejected < 0) {
+                toast({ title: 'Error', description: 'La cantidad aceptada no puede exceder la recibida', variant: 'destructive' });
+                return;
+            }
+
+            const supplierLotCode = window.prompt('Lote del proveedor (opcional)') || undefined;
+            const certificateRef = window.prompt('Referencia de certificado (opcional)') || undefined;
+            const notes = window.prompt('Notas de inspección (opcional)') || undefined;
+
+            await resolveIncomingInspection({
+                id,
+                inspectionResult: resultRaw as IncomingInspectionResult,
+                supplierLotCode,
+                certificateRef,
+                notes,
+                quantityAccepted,
+                quantityRejected,
+                actor: 'sistema-web',
+            });
+            toast({ title: 'Inspección resuelta', description: 'La recepción fue liberada/rechazada correctamente.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo resolver la inspección'), variant: 'destructive' });
+        }
+    };
+
     return {
         nonConformities,
         capas,
@@ -589,6 +640,7 @@ export const useQualityCompliance = () => {
         technovigilanceCases,
         recalls,
         regulatoryLabels,
+        incomingInspections,
         complianceDashboard,
         riskControls,
         trainingEvidence,
@@ -616,6 +668,7 @@ export const useQualityCompliance = () => {
         loadingTechno,
         loadingRecalls,
         loadingRegulatoryLabels,
+        loadingIncomingInspections,
         loadingComplianceDashboard,
         loadingRiskControls,
         loadingTrainingEvidence,
@@ -649,6 +702,7 @@ export const useQualityCompliance = () => {
         quickCloseRecall,
         handleUpsertRegulatoryLabel,
         quickValidateDispatch,
+        quickResolveIncomingInspection,
         handleExportCompliance,
         handleCreateRiskControl,
         handleCreateTrainingEvidence,

@@ -53,6 +53,8 @@ import {
     ListQualityRiskControlsQuerySchema,
     CreateQualityTrainingEvidenceSchema,
     ListQualityTrainingEvidenceQuerySchema,
+    ListIncomingInspectionsQuerySchema,
+    ResolveIncomingInspectionSchema,
     CreateControlledDocumentSchema,
     ListControlledDocumentsQuerySchema,
     ActorPayloadSchema,
@@ -86,7 +88,7 @@ export class MrpController {
     private get mrpService() { return new MrpService(this.em); }
     private get inventoryService() { return new InventoryService(this.em); }
     private get productionService() { return new ProductionService(this.em); }
-    private get purchaseOrderService() { return new PurchaseOrderService(this.em, this.mrpService); }
+    private get purchaseOrderService() { return new PurchaseOrderService(this.em); }
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
 
@@ -764,6 +766,27 @@ export class MrpController {
             const filters = ListQualityTrainingEvidenceQuerySchema.parse(req.query);
             const rows = await this.qualityService.listTrainingEvidence(filters);
             return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listIncomingInspections(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListIncomingInspectionsQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listIncomingInspections(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async resolveIncomingInspection(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = ResolveIncomingInspectionSchema.parse(req.body);
+            const row = await this.qualityService.resolveIncomingInspection(id, payload);
+            return ApiResponse.success(res, row, 'Inspección de recepción resuelta');
         } catch (error) {
             next(error);
         }

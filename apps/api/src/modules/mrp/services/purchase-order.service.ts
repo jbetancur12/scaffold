@@ -4,11 +4,11 @@ import { PurchaseOrderItem } from '../entities/purchase-order-item.entity';
 import { Supplier } from '../entities/supplier.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
+import { IncomingInspection } from '../entities/incoming-inspection.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { PurchaseOrderStatus, WarehouseType } from '@scaffold/types';
 import type { CreatePurchaseOrderDto } from '@scaffold/schemas';
-import { MrpService } from './mrp.service';
 import { AppError } from '../../../shared/utils/response';
 
 export class PurchaseOrderService {
@@ -16,15 +16,16 @@ export class PurchaseOrderService {
     private purchaseOrderItemRepo: EntityRepository<PurchaseOrderItem>;
     private supplierRepo: EntityRepository<Supplier>;
     private rawMaterialRepo: EntityRepository<RawMaterial>;
+    private incomingInspectionRepo: EntityRepository<IncomingInspection>;
 
     constructor(
-        private em: EntityManager,
-        private mrpService: MrpService
+        private em: EntityManager
     ) {
         this.purchaseOrderRepo = em.getRepository(PurchaseOrder);
         this.purchaseOrderItemRepo = em.getRepository(PurchaseOrderItem);
         this.supplierRepo = em.getRepository(Supplier);
         this.rawMaterialRepo = em.getRepository(RawMaterial);
+        this.incomingInspectionRepo = em.getRepository(IncomingInspection);
     }
 
     async createPurchaseOrder(data: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
@@ -135,7 +136,8 @@ export class PurchaseOrderService {
             }
 
             for (const item of purchaseOrder.items) {
-                await this.updateInventory(tx, item, warehouseId);
+                await this.updateQuarantineInventory(tx, item, warehouseId);
+                await this.createIncomingInspection(tx, purchaseOrder, item, warehouseId);
                 await this.updateLastPurchaseInfo(tx, purchaseOrder.supplier, item);
             }
 
@@ -178,8 +180,8 @@ export class PurchaseOrderService {
         await em.persistAndFlush([item.rawMaterial, supplierMaterial]);
     }
 
-    private async updateInventory(em: EntityManager, item: PurchaseOrderItem, warehouseId?: string): Promise<void> {
-        // Get or create warehouse
+    private async updateQuarantineInventory(em: EntityManager, item: PurchaseOrderItem, warehouseId?: string): Promise<void> {
+        // Get or create quarantine warehouse
         const warehouseRepo = em.getRepository(Warehouse);
         const inventoryRepo = em.getRepository(InventoryItem);
         let warehouse: Warehouse | null = null;
@@ -188,16 +190,15 @@ export class PurchaseOrderService {
             warehouse = await warehouseRepo.findOne({ id: warehouseId });
         }
 
-        if (!warehouse) {
-            warehouse = await warehouseRepo.findOne({ name: 'Main Warehouse' });
+        if (!warehouse || warehouse.type !== WarehouseType.QUARANTINE) {
+            warehouse = await warehouseRepo.findOne({ type: WarehouseType.QUARANTINE });
         }
 
         if (!warehouse) {
-            // Create default warehouse if it doesn't exist
             warehouse = warehouseRepo.create({
-                name: 'Main Warehouse',
-                location: 'Default Location',
-                type: WarehouseType.RAW_MATERIALS,
+                name: 'Cuarentena',
+                location: 'Zona de inspección',
+                type: WarehouseType.QUARANTINE,
             } as Warehouse);
             await em.persistAndFlush(warehouse);
         }
@@ -209,39 +210,46 @@ export class PurchaseOrderService {
         });
 
         if (!inventory) {
-            // Create new inventory record
             inventory = inventoryRepo.create({
                 warehouse,
                 rawMaterial: item.rawMaterial,
                 quantity: item.quantity,
             } as InventoryItem);
         } else {
-            // Update existing inventory
             inventory.quantity += item.quantity;
         }
 
-        // Update raw material average cost using weighted average
-        const currentStock = inventory.quantity - item.quantity; // Stock before this purchase
-        const currentAvgCost = item.rawMaterial.averageCost || 0;
-        const receivedQty = item.quantity;
+        await em.persistAndFlush(inventory);
+    }
 
-        // Use Gross Price (Total with tax) for inventory cost update
-        const purchasePriceWithTax = item.quantity > 0 ? Number(item.subtotal) / Number(item.quantity) : Number(item.unitPrice);
-
-        if (currentStock + receivedQty > 0) {
-            const newAvgCost =
-                (currentStock * currentAvgCost + receivedQty * purchasePriceWithTax) /
-                (currentStock + receivedQty);
-
-            item.rawMaterial.averageCost = newAvgCost;
-        } else {
-            item.rawMaterial.averageCost = purchasePriceWithTax;
+    private async createIncomingInspection(em: EntityManager, purchaseOrder: PurchaseOrder, item: PurchaseOrderItem, warehouseId?: string) {
+        const warehouseRepo = em.getRepository(Warehouse);
+        let warehouse: Warehouse | null = null;
+        if (warehouseId) {
+            warehouse = await warehouseRepo.findOne({ id: warehouseId });
+        }
+        if (!warehouse || warehouse.type !== WarehouseType.QUARANTINE) {
+            warehouse = await warehouseRepo.findOne({ type: WarehouseType.QUARANTINE });
+        }
+        if (!warehouse) {
+            warehouse = warehouseRepo.create({
+                name: 'Cuarentena',
+                location: 'Zona de inspección',
+                type: WarehouseType.QUARANTINE,
+            } as Warehouse);
+            await em.persistAndFlush(warehouse);
         }
 
-        await em.persistAndFlush([inventory, item.rawMaterial]);
-
-        // Recalculate variants cost that use this material
-        await this.mrpService.recalculateVariantsByMaterial(item.rawMaterial.id);
+        const inspection = this.incomingInspectionRepo.create({
+            purchaseOrder,
+            purchaseOrderItem: item,
+            rawMaterial: item.rawMaterial,
+            warehouse,
+            quantityReceived: item.quantity,
+            quantityAccepted: 0,
+            quantityRejected: 0,
+        } as unknown as IncomingInspection);
+        await em.persistAndFlush(inspection);
     }
 
     async cancelPurchaseOrder(id: string): Promise<void> {

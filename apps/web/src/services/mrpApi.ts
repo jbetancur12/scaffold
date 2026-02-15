@@ -45,6 +45,9 @@ import {
     QualityRiskControl,
     QualityRiskControlStatus,
     QualityTrainingEvidence,
+    IncomingInspection,
+    IncomingInspectionResult,
+    IncomingInspectionStatus,
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
@@ -260,6 +263,16 @@ export interface CreateQualityTrainingEvidencePayload {
     validUntil?: string | Date;
     trainerName?: string;
     evidenceRef?: string;
+    actor?: string;
+}
+
+export interface ResolveIncomingInspectionPayload {
+    inspectionResult: IncomingInspectionResult;
+    supplierLotCode?: string;
+    certificateRef?: string;
+    notes?: string;
+    quantityAccepted: number;
+    quantityRejected: number;
     actor?: string;
 }
 
@@ -584,6 +597,18 @@ export const mrpApi = {
     },
     listQualityTrainingEvidence: async (filters?: { role?: string }): Promise<QualityTrainingEvidence[]> => {
         const response = await api.get<QualityTrainingEvidence[]>('/mrp/quality/training-evidence', { params: filters });
+        return response.data;
+    },
+    listIncomingInspections: async (filters?: {
+        status?: IncomingInspectionStatus;
+        rawMaterialId?: string;
+        purchaseOrderId?: string;
+    }): Promise<IncomingInspection[]> => {
+        const response = await api.get<IncomingInspection[]>('/mrp/quality/incoming-inspections', { params: filters });
+        return response.data;
+    },
+    resolveIncomingInspection: async (id: string, data: ResolveIncomingInspectionPayload): Promise<IncomingInspection> => {
+        const response = await api.patch<IncomingInspection>(`/mrp/quality/incoming-inspections/${id}/resolve`, data);
         return response.data;
     },
     createControlledDocument: async (data: CreateControlledDocumentPayload): Promise<ControlledDocument> => {

@@ -12,6 +12,7 @@ import {
     RegulatoryLabelScopeType,
     RegulatoryLabelStatus,
     QualityRiskControlStatus,
+    IncomingInspectionStatus,
     TechnovigilanceCaseType,
     TechnovigilanceCausality,
     TechnovigilanceSeverity,
@@ -35,6 +36,7 @@ export default function QualityCompliancePage() {
         technovigilanceCases,
         recalls,
         regulatoryLabels,
+        incomingInspections,
         complianceDashboard,
         riskControls,
         trainingEvidence,
@@ -62,6 +64,7 @@ export default function QualityCompliancePage() {
         loadingTechno,
         loadingRecalls,
         loadingRegulatoryLabels,
+        loadingIncomingInspections,
         loadingComplianceDashboard,
         loadingRiskControls,
         loadingTrainingEvidence,
@@ -95,6 +98,7 @@ export default function QualityCompliancePage() {
         quickCloseRecall,
         handleUpsertRegulatoryLabel,
         quickValidateDispatch,
+        quickResolveIncomingInspection,
         handleExportCompliance,
         handleCreateRiskControl,
         handleCreateTrainingEvidence,
@@ -116,6 +120,7 @@ export default function QualityCompliancePage() {
                     <TabsTrigger value="techno">Tecnovigilancia</TabsTrigger>
                     <TabsTrigger value="recall">Recall</TabsTrigger>
                     <TabsTrigger value="labeling">Etiquetado</TabsTrigger>
+                    <TabsTrigger value="incoming">Recepción</TabsTrigger>
                     <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
                     <TabsTrigger value="docs">Control documental</TabsTrigger>
                     <TabsTrigger value="audit">Auditoría</TabsTrigger>
@@ -886,6 +891,36 @@ export default function QualityCompliancePage() {
                                     </div>
                                 ))}
                             </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="incoming" className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Inspecciones de Recepción</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            {loadingIncomingInspections ? <div>Cargando...</div> : incomingInspections.length === 0 ? <div className="text-sm text-slate-500">Sin inspecciones.</div> : incomingInspections.map((inspection) => (
+                                <div key={inspection.id} className="border rounded-md p-3 flex items-start justify-between gap-3">
+                                    <div>
+                                        <div className="font-medium">Materia prima: {inspection.rawMaterialId}</div>
+                                        <div className="text-xs text-slate-600 mt-1">
+                                            Recibido: {inspection.quantityReceived} | Aceptado: {inspection.quantityAccepted} | Rechazado: {inspection.quantityRejected}
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1">
+                                            OC: {inspection.purchaseOrderId || 'N/A'} | Certificado: {inspection.certificateRef || 'N/A'}
+                                        </div>
+                                        <Badge variant="outline" className="mt-2">{inspection.status}</Badge>
+                                    </div>
+                                    {inspection.status === IncomingInspectionStatus.PENDIENTE ? (
+                                        <Button
+                                            size="sm"
+                                            onClick={() => quickResolveIncomingInspection(inspection.id, Number(inspection.quantityReceived))}
+                                        >
+                                            Resolver QA
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            ))}
                         </CardContent>
                     </Card>
                 </TabsContent>

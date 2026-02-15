@@ -31,6 +31,7 @@ export const mrpQueryKeys = {
     qualityComplianceDashboard: 'mrp.quality.compliance-dashboard',
     qualityRiskControls: 'mrp.quality.risk-controls',
     qualityTrainingEvidence: 'mrp.quality.training-evidence',
+    qualityIncomingInspections: 'mrp.quality.incoming-inspections',
     qualityDocuments: 'mrp.quality.documents',
     qualityActiveDocuments: (process: string) => `mrp.quality.documents.active.${process}`,
 };

@@ -319,7 +319,10 @@ export class ProductionService {
         // 2. Check Available Stock
         const materialIds = Array.from(requirements.keys());
         if (materialIds.length > 0) {
-            const inventoryItems = await this.inventoryRepo.find({ rawMaterial: { $in: materialIds } });
+            const inventoryItems = await this.inventoryRepo.find({
+                rawMaterial: { $in: materialIds },
+                warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
+            });
 
             for (const invItem of inventoryItems) {
                 if (invItem.rawMaterial && requirements.has(invItem.rawMaterial.id)) {
@@ -381,6 +384,14 @@ export class ProductionService {
             // If status is changed to COMPLETED, update finished goods inventory
             if (status === ProductionOrderStatus.IN_PROGRESS) {
                 await this.assertProcessDocument(DocumentProcess.PRODUCCION);
+                const requirements = await this.calculateMaterialRequirements(order.id);
+                const missingMaterials = requirements.filter((req) => Number(req.available) < Number(req.required));
+                if (missingMaterials.length > 0) {
+                    throw new AppError(
+                        `No hay stock liberado suficiente. Revisa cuarentena para: ${missingMaterials.map((m) => m.material.name).join(', ')}`,
+                        400
+                    );
+                }
             }
 
             // If status is changed to COMPLETED, update finished goods inventory

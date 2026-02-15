@@ -25,6 +25,8 @@ import {
     RegulatoryCodingStandard,
     RegulatoryLabelStatus,
     QualityRiskControlStatus,
+    IncomingInspectionResult,
+    IncomingInspectionStatus,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -501,6 +503,26 @@ export const CreateQualityTrainingEvidenceSchema = z.object({
 
 export const ListQualityTrainingEvidenceQuerySchema = z.object({
     role: z.string().optional(),
+});
+
+export const ListIncomingInspectionsQuerySchema = z.object({
+    status: z.nativeEnum(IncomingInspectionStatus).optional(),
+    rawMaterialId: z.string().uuid().optional(),
+    purchaseOrderId: z.string().uuid().optional(),
+});
+
+export const ResolveIncomingInspectionSchema = z.object({
+    inspectionResult: z.nativeEnum(IncomingInspectionResult),
+    supplierLotCode: z.string().optional(),
+    certificateRef: z.string().optional(),
+    notes: z.string().optional(),
+    quantityAccepted: z.number().nonnegative(),
+    quantityRejected: z.number().nonnegative(),
+    actor: z.string().optional(),
+}).superRefine((data, ctx) => {
+    if (data.quantityAccepted === 0 && data.quantityRejected === 0) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['quantityAccepted'], message: 'Debes registrar cantidad aceptada o rechazada' });
+    }
 });
 
 export const OperationalConfigSchema = z.object({
