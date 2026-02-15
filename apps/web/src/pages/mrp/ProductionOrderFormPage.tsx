@@ -25,6 +25,7 @@ import {
 import { ArrowLeft, Plus, Save, Trash2, ClipboardList } from 'lucide-react';
 import { CreateProductionOrderSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
+import { useMrpQuery } from '@/hooks/useMrpQuery';
 
 interface OrderItem {
     id: string; // temp id for UI
@@ -32,6 +33,15 @@ interface OrderItem {
     variantId: string;
     quantity: number;
 }
+
+type PopulatedProductionOrderItem = NonNullable<ProductionOrder['items']>[number] & {
+    variant?: {
+        name?: string;
+        product?: {
+            name?: string;
+        };
+    };
+};
 
 export default function ProductionOrderFormPage() {
     const { id } = useParams();
@@ -54,10 +64,14 @@ export default function ProductionOrderFormPage() {
         try {
             const data = await mrpApi.getProducts(1, 1000);
             setProducts(data.products);
+            return data;
         } catch (error) {
             console.error('Error loading products:', error);
+            throw error;
         }
     }, []);
+
+    const { execute: refreshProducts } = useMrpQuery(loadProducts, true);
 
     const loadRequirements = useCallback(async (orderId: string) => {
         try {
@@ -90,11 +104,10 @@ export default function ProductionOrderFormPage() {
     }, [id, loadRequirements, toast]);
 
     useEffect(() => {
-        loadProducts();
         if (id) {
             loadOrder();
         }
-    }, [id, loadOrder, loadProducts]);
+    }, [id, loadOrder]);
 
     const handleAddItem = () => {
         setItems([
@@ -149,6 +162,7 @@ export default function ProductionOrderFormPage() {
                 toast({ title: 'Éxito', description: 'Orden creada exitosamente' });
                 // Instead of navigating away, maybe go to view mode?
                 navigate(`/mrp/production-orders/${newOrder.id}`);
+                await refreshProducts();
             }
         } catch (error: unknown) {
             toast({ title: 'Error', description: getErrorMessage(error, 'Error al guardar'), variant: 'destructive' });
@@ -268,21 +282,23 @@ export default function ProductionOrderFormPage() {
                     {/* If in view mode and items loaded from API */}
                     {isEditing && order?.items && items.length === 0 ? (
                         <div className="space-y-2">
-                            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                            {order.items.map((item: any) => (
+                            {order.items.map((item) => {
+                                const populatedItem = item as PopulatedProductionOrderItem;
+                                return (
                                 <div key={item.id} className="p-4 bg-slate-50 rounded-lg flex justify-between items-center">
                                     <div>
                                         <span className="font-semibold text-slate-900">
-                                            {item.variant?.product?.name || 'Producto sin nombre'}
+                                            {populatedItem.variant?.product?.name || 'Producto sin nombre'}
                                         </span>
                                         <span className="text-slate-600"> - </span>
                                         <span className="text-slate-700">
-                                            {item.variant?.name || 'Variante sin nombre'}
+                                            {populatedItem.variant?.name || 'Variante sin nombre'}
                                         </span>
                                     </div>
                                     <span className="font-bold text-slate-900">{item.quantity} un.</span>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <Table>

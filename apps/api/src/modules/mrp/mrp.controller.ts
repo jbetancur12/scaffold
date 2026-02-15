@@ -20,6 +20,7 @@ import {
     UpdateProductVariantSchema,
 } from '@scaffold/schemas';
 import { PurchaseOrderStatus } from './entities/purchase-order.entity';
+import { ApiResponse, AppError } from '../../shared/utils/response';
 
 export class MrpController {
     // ...
@@ -47,7 +48,7 @@ export class MrpController {
         try {
             const data = ProductSchema.parse(req.body);
             const product = await this.productService.createProduct(data);
-            res.status(201).json(product);
+            return ApiResponse.success(res, product, 'Producto creado', 201);
         } catch (error) {
             next(error);
         }
@@ -57,7 +58,7 @@ export class MrpController {
         try {
             const { page, limit } = req.query;
             const result = await this.productService.listProducts(Number(page) || 1, Number(limit) || 10);
-            res.json(result);
+            return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
         }
@@ -68,10 +69,9 @@ export class MrpController {
             const { id } = req.params;
             const product = await this.productService.getProduct(id);
             if (!product) {
-                res.status(404).json({ message: 'Product not found' });
-                return;
+                throw new AppError('Producto no encontrado', 404);
             }
-            res.json(product);
+            return ApiResponse.success(res, product);
         } catch (error) {
             next(error);
         }
@@ -82,7 +82,7 @@ export class MrpController {
             const { id } = req.params;
             const data = ProductSchema.partial().parse(req.body);
             const product = await this.productService.updateProduct(id, data);
-            res.json(product);
+            return ApiResponse.success(res, product, 'Producto actualizado');
         } catch (error) {
             next(error);
         }
@@ -92,7 +92,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             await this.productService.deleteProduct(id);
-            res.status(204).send();
+            return ApiResponse.success(res, null, 'Producto eliminado');
         } catch (error) {
             next(error);
         }
@@ -104,7 +104,7 @@ export class MrpController {
             const { productId } = req.params;
             const data = CreateProductVariantSchema.parse(req.body);
             const variant = await this.productService.createVariant(productId, data);
-            res.status(201).json(variant);
+            return ApiResponse.success(res, variant, 'Variante creada', 201);
         } catch (error) {
             next(error);
         }
@@ -115,7 +115,7 @@ export class MrpController {
             const { variantId } = req.params;
             const data = UpdateProductVariantSchema.parse(req.body);
             const variant = await this.productService.updateVariant(variantId, data);
-            res.json(variant);
+            return ApiResponse.success(res, variant, 'Variante actualizada');
         } catch (error) {
             next(error);
         }
@@ -125,7 +125,7 @@ export class MrpController {
         try {
             const { variantId } = req.params;
             await this.productService.deleteVariant(variantId);
-            res.status(204).send();
+            return ApiResponse.success(res, null, 'Variante eliminada');
         } catch (error) {
             next(error);
         }
@@ -136,7 +136,7 @@ export class MrpController {
         try {
             const data = SupplierSchema.parse(req.body);
             const supplier = await this.supplierService.createSupplier(data);
-            res.status(201).json(supplier);
+            return ApiResponse.success(res, supplier, 'Proveedor creado', 201);
         } catch (error) {
             next(error);
         }
@@ -146,7 +146,7 @@ export class MrpController {
         try {
             const { page, limit } = req.query;
             const result = await this.supplierService.listSuppliers(Number(page) || 1, Number(limit) || 10);
-            res.json(result);
+            return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
         }
@@ -157,10 +157,9 @@ export class MrpController {
             const { id } = req.params;
             const supplier = await this.supplierService.getSupplier(id);
             if (!supplier) {
-                res.status(404).json({ message: 'Supplier not found' });
-                return;
+                throw new AppError('Proveedor no encontrado', 404);
             }
-            res.json(supplier);
+            return ApiResponse.success(res, supplier);
         } catch (error) {
             next(error);
         }
@@ -170,7 +169,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             const materials = await this.supplierService.getSupplierMaterials(id);
-            res.json(materials);
+            return ApiResponse.success(res, materials);
         } catch (error) {
             next(error);
         }
@@ -181,7 +180,7 @@ export class MrpController {
             const { id } = req.params;
             const { rawMaterialId, price } = req.body;
             const link = await this.supplierService.addSupplierMaterial(id, rawMaterialId, price);
-            res.status(201).json(link);
+            return ApiResponse.success(res, link, 'Material vinculado al proveedor', 201);
         } catch (error) {
             next(error);
         }
@@ -191,7 +190,7 @@ export class MrpController {
         try {
             const { id, materialId } = req.params;
             await this.supplierService.removeSupplierMaterial(id, materialId);
-            res.status(204).send();
+            return ApiResponse.success(res, null, 'Material desvinculado del proveedor');
         } catch (error) {
             next(error);
         }
@@ -202,7 +201,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             const suppliers = await this.supplierService.getSuppliersForMaterial(id);
-            res.json(suppliers);
+            return ApiResponse.success(res, suppliers);
         } catch (error) {
             next(error);
         }
@@ -212,7 +211,7 @@ export class MrpController {
         try {
             const data = RawMaterialSchema.parse(req.body);
             const material = await this.mrpService.createRawMaterial(data);
-            res.status(201).json(material);
+            return ApiResponse.success(res, material, 'Materia prima creada', 201);
         } catch (error) {
             next(error);
         }
@@ -222,7 +221,7 @@ export class MrpController {
         try {
             const { page, limit, search } = req.query;
             const result = await this.mrpService.listRawMaterials(Number(page) || 1, Number(limit) || 10, search as string);
-            res.json(result);
+            return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
         }
@@ -232,7 +231,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             const material = await this.mrpService.getRawMaterial(id);
-            res.json(material);
+            return ApiResponse.success(res, material);
         } catch (error) {
             next(error);
         }
@@ -243,7 +242,7 @@ export class MrpController {
             const { id } = req.params;
             const data = RawMaterialSchema.partial().parse(req.body);
             const material = await this.mrpService.updateRawMaterial(id, data);
-            res.json(material);
+            return ApiResponse.success(res, material, 'Materia prima actualizada');
         } catch (error) {
             next(error);
         }
@@ -253,7 +252,7 @@ export class MrpController {
         try {
             const data = BOMItemSchema.parse(req.body);
             const bomItem = await this.mrpService.addBOMItem(data);
-            res.status(201).json(bomItem);
+            return ApiResponse.success(res, bomItem, 'Material agregado al BOM', 201);
         } catch (error) {
             next(error);
         }
@@ -264,7 +263,7 @@ export class MrpController {
             const { id } = req.params;
             const data = BOMItemSchema.partial().parse(req.body);
             const bomItem = await this.mrpService.updateBOMItem(id, data);
-            res.json(bomItem);
+            return ApiResponse.success(res, bomItem, 'Ítem BOM actualizado');
         } catch (error) {
             next(error);
         }
@@ -274,7 +273,7 @@ export class MrpController {
         try {
             const { variantId } = req.params;
             const bom = await this.mrpService.getBOM(variantId);
-            res.json(bom);
+            return ApiResponse.success(res, bom);
         } catch (error) {
             next(error);
         }
@@ -284,7 +283,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             await this.mrpService.deleteBOMItem(id);
-            res.status(204).send();
+            return ApiResponse.success(res, null, 'Ítem BOM eliminado');
         } catch (error) {
             next(error);
         }
@@ -298,7 +297,7 @@ export class MrpController {
                 Number(page),
                 Number(limit)
             );
-            res.json(orders);
+            return ApiResponse.success(res, orders);
         } catch (error) {
             next(error);
         }
@@ -308,7 +307,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             const order = await this.productionService.getOrder(id);
-            res.json(order);
+            return ApiResponse.success(res, order);
         } catch (error) {
             next(error);
         }
@@ -331,10 +330,8 @@ export class MrpController {
             }
 
             const validatedOrder = ProductionOrderSchema.parse(orderData);
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const order = await this.productionService.createOrder(validatedOrder, items as any);
-            res.status(201).json(order);
+            const order = await this.productionService.createOrder(validatedOrder, items);
+            return ApiResponse.success(res, order, 'Orden de producción creada', 201);
         } catch (error) {
             next(error);
         }
@@ -347,7 +344,7 @@ export class MrpController {
             const { id } = req.params;
             const { status, warehouseId } = req.body;
             const order = await this.productionService.updateStatus(id, status, warehouseId);
-            res.json(order);
+            return ApiResponse.success(res, order, 'Estado de orden actualizado');
         } catch (error) {
             next(error);
         }
@@ -357,7 +354,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             const requirements = await this.productionService.calculateMaterialRequirements(id);
-            res.json(requirements);
+            return ApiResponse.success(res, requirements);
         } catch (error) {
             next(error);
         }
@@ -368,7 +365,7 @@ export class MrpController {
         try {
             const { page, limit, warehouseId } = req.query;
             const result = await this.inventoryService.getInventoryItems(Number(page) || 1, Number(limit) || 100, warehouseId as string);
-            res.json(result);
+            return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
         }
@@ -378,8 +375,7 @@ export class MrpController {
         try {
             const data = ManualStockSchema.parse(req.body);
             const result = await this.inventoryService.addManualStock(data);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            res.status(200).json(result);
+            return ApiResponse.success(res, result, 'Stock agregado');
         } catch (error) {
             next(error);
         }
@@ -390,8 +386,7 @@ export class MrpController {
         try {
             const data = CreatePurchaseOrderSchema.parse(req.body);
             const purchaseOrder = await this.purchaseOrderService.createPurchaseOrder(data);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            res.status(201).json(purchaseOrder);
+            return ApiResponse.success(res, purchaseOrder, 'Orden de compra creada', 201);
         } catch (error) {
             next(error);
         }
@@ -402,10 +397,9 @@ export class MrpController {
             const { id } = req.params;
             const purchaseOrder = await this.purchaseOrderService.getPurchaseOrder(id);
             if (!purchaseOrder) {
-                res.status(404).json({ message: 'Purchase order not found' });
-                return;
+                throw new AppError('Orden de compra no encontrada', 404);
             }
-            res.json(purchaseOrder);
+            return ApiResponse.success(res, purchaseOrder);
         } catch (error) {
             next(error);
         }
@@ -419,7 +413,7 @@ export class MrpController {
                 Number(limit) || 10,
                 { status: status as PurchaseOrderStatus, supplierId: supplierId as string }
             );
-            res.json(result);
+            return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
         }
@@ -430,7 +424,7 @@ export class MrpController {
             const { id } = req.params;
             const { status } = req.body;
             const purchaseOrder = await this.purchaseOrderService.updateStatus(id, status);
-            res.json(purchaseOrder);
+            return ApiResponse.success(res, purchaseOrder, 'Estado de orden de compra actualizado');
         } catch (error) {
             next(error);
         }
@@ -441,7 +435,7 @@ export class MrpController {
             const { id } = req.params;
             const { warehouseId } = req.body;
             const purchaseOrder = await this.purchaseOrderService.receivePurchaseOrder(id, warehouseId);
-            res.json(purchaseOrder);
+            return ApiResponse.success(res, purchaseOrder, 'Orden de compra recibida');
         } catch (error) {
             next(error);
         }
@@ -452,7 +446,7 @@ export class MrpController {
         try {
             const data = WarehouseSchema.parse(req.body);
             const warehouse = await this.inventoryService.createWarehouse(data);
-            res.status(201).json(warehouse);
+            return ApiResponse.success(res, warehouse, 'Almacén creado', 201);
         } catch (error) {
             next(error);
         }
@@ -461,7 +455,7 @@ export class MrpController {
     async listWarehouses(_req: Request, res: Response, next: NextFunction) {
         try {
             const warehouses = await this.inventoryService.listWarehouses();
-            res.json(warehouses);
+            return ApiResponse.success(res, warehouses);
         } catch (error) {
             next(error);
         }
@@ -471,7 +465,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             const warehouse = await this.inventoryService.getWarehouse(id);
-            res.json(warehouse);
+            return ApiResponse.success(res, warehouse);
         } catch (error) {
             next(error);
         }
@@ -482,7 +476,7 @@ export class MrpController {
             const { id } = req.params;
             const data = WarehouseSchema.partial().parse(req.body);
             const warehouse = await this.inventoryService.updateWarehouse(id, data);
-            res.json(warehouse);
+            return ApiResponse.success(res, warehouse, 'Almacén actualizado');
         } catch (error) {
             next(error);
         }
@@ -492,7 +486,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             await this.inventoryService.deleteWarehouse(id);
-            res.status(204).send();
+            return ApiResponse.success(res, null, 'Almacén eliminado');
         } catch (error) {
             next(error);
         }
@@ -502,7 +496,7 @@ export class MrpController {
         try {
             const { id } = req.params;
             await this.purchaseOrderService.cancelPurchaseOrder(id);
-            res.status(204).send();
+            return ApiResponse.success(res, null, 'Orden de compra cancelada');
         } catch (error) {
             next(error);
         }

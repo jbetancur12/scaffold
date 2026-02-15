@@ -14,7 +14,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { UnitType } from '@scaffold/types';
+import { RawMaterial, UnitType } from '@scaffold/types';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { RawMaterialSchema } from '@scaffold/schemas';
@@ -48,6 +48,10 @@ export default function RawMaterialFormPage() {
     const [manualBasePrice, setManualBasePrice] = useState<number>(0);
 
     const [skuManuallyEdited, setSkuManuallyEdited] = useState(false);
+
+    type RawMaterialFormLocationState = {
+        initialData?: Partial<RawMaterial>;
+    };
 
     // Auto-generate SKU
     useEffect(() => {
@@ -86,14 +90,13 @@ export default function RawMaterialFormPage() {
             loadMaterial();
         } else {
             // Check for initial data from navigation state (Duplicate)
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const state = (location as any).state as { initialData?: any };
+            const state = location.state as RawMaterialFormLocationState | null;
             if (state?.initialData) {
                 setFormData({
-                    name: state.initialData.name,
+                    name: state.initialData.name || '',
                     sku: state.initialData.sku || '',
                     unit: state.initialData.unit as UnitType,
-                    cost: state.initialData.cost,
+                    cost: state.initialData.cost || 0,
                     minStockLevel: state.initialData.minStockLevel || 0,
                 });
                 if (state.initialData.sku) {

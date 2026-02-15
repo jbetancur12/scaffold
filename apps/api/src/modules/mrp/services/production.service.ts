@@ -8,7 +8,7 @@ import { InventoryItem } from '../entities/inventory-item.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Supplier } from '../entities/supplier.entity';
-import { ProductionOrderSchema, ProductionOrderItemSchema } from '@scaffold/schemas';
+import { ProductionOrderSchema, ProductionOrderItemCreateSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { AppError } from '../../../shared/utils/response';
 
@@ -23,7 +23,7 @@ export class ProductionService {
         this.inventoryRepo = em.getRepository(InventoryItem);
     }
 
-    async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemSchema>[]): Promise<ProductionOrder> {
+    async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
         // Ensure dates are properly instantiated as Date objects and handle potential string inputs
         const orderData = { ...data };
 

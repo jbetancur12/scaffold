@@ -10,6 +10,19 @@ interface FailedRequest {
     reject: (reason?: unknown) => void;
 }
 
+interface ApiEnvelope<T = unknown> {
+    success: boolean;
+    message?: string;
+    data?: T;
+}
+
+const isApiEnvelope = (value: unknown): value is ApiEnvelope => {
+    return typeof value === 'object'
+        && value !== null
+        && 'success' in value
+        && typeof (value as { success: unknown }).success === 'boolean';
+};
+
 // Avoid circular dependency by not importing AuthContext directly
 let isRefreshing = false;
 let failedQueue: FailedRequest[] = [];
@@ -37,7 +50,12 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        if (isApiEnvelope(response.data)) {
+            response.data = response.data.data;
+        }
+        return response;
+    },
     async (error) => {
         const originalRequest = error.config;
 

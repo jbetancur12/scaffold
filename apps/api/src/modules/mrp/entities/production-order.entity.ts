@@ -1,10 +1,10 @@
 import { Entity, Property, Enum, OneToMany, Collection } from '@mikro-orm/core';
 import { BaseEntity } from '../../../shared/entities/base.entity';
-import { ProductionOrder as IProductionOrder, ProductionOrderStatus } from '@scaffold/types';
+import { ProductionOrderStatus } from '@scaffold/types';
 import { ProductionOrderItem } from './production-order-item.entity';
 
 @Entity()
-export class ProductionOrder extends BaseEntity implements IProductionOrder {
+export class ProductionOrder extends BaseEntity {
     @Property({ unique: true })
     code!: string;
 
@@ -21,6 +21,5 @@ export class ProductionOrder extends BaseEntity implements IProductionOrder {
     notes?: string;
 
     @OneToMany(() => ProductionOrderItem, item => item.productionOrder)
-    // @ts-expect-error: Collection is compatible with array during serialization
     items = new Collection<ProductionOrderItem>(this);
 }

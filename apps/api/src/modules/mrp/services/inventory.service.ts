@@ -1,6 +1,7 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { RawMaterial } from '../entities/raw-material.entity';
 import { WarehouseSchema, InventoryItemSchema } from '@scaffold/schemas';
 import { WarehouseType } from '@scaffold/types';
 import { z } from 'zod';
@@ -77,13 +78,12 @@ export class InventoryService {
                 name: 'Main Warehouse',
                 location: 'Default Location',
                 type: WarehouseType.RAW_MATERIALS,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any);
+            } as Warehouse);
             await this.em.persist(warehouse);
         }
 
         // 2. Get Raw Material
-        const rawMaterialRepo = this.em.getRepository('RawMaterial');
+        const rawMaterialRepo = this.em.getRepository(RawMaterial);
         const rawMaterial = await rawMaterialRepo.findOneOrFail({ id: data.rawMaterialId });
 
         // 3. Get or Create Inventory Item
@@ -97,13 +97,11 @@ export class InventoryService {
                 warehouse,
                 rawMaterial,
                 quantity: 0,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any); // Cast to any to avoid strict type checks on relation creation if needed, or define proper partial
+            } as InventoryItem);
         }
 
         // 4. Calculate Weighted Average Cost
         const currentStock = inventory.quantity;
-        // @ts-expect-error - averageCost property exists but type might be missing in some contexts
         const currentAvgCost = Number(rawMaterial.averageCost || 0);
         const addedQty = data.quantity;
         const addedCost = data.unitCost;
@@ -117,7 +115,6 @@ export class InventoryService {
 
         // 5. Update values
         inventory.quantity += addedQty;
-        // @ts-expect-error - averageCost property exists but type might be missing in some contexts
         rawMaterial.averageCost = newAvgCost;
 
         // 6. Save

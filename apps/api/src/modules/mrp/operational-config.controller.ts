@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { OperationalConfigService } from './services/operational-config.service';
 import { OperationalConfigSchema } from '@scaffold/schemas';
+import { ApiResponse } from '../../shared/utils/response';
 
 export class OperationalConfigController {
     constructor(private readonly configService: OperationalConfigService) { }
@@ -8,7 +9,7 @@ export class OperationalConfigController {
     async getConfig(_req: Request, res: Response, next: NextFunction) {
         try {
             const config = await this.configService.getConfig();
-            res.json(config);
+            return ApiResponse.success(res, config);
         } catch (error) {
             next(error);
         }
@@ -18,7 +19,7 @@ export class OperationalConfigController {
         try {
             const data = OperationalConfigSchema.parse(req.body);
             const config = await this.configService.updateConfig(data);
-            res.json(config);
+            return ApiResponse.success(res, config, 'Configuración actualizada');
         } catch (error) {
             next(error);
         }

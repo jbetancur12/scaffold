@@ -150,6 +150,8 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
         return (m?.averageCost && m.averageCost > 0) ? m.averageCost : (m?.cost || 0);
     };
 
+    type BomItemWithMaterial = BOMItem & { rawMaterial?: RawMaterial };
+
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between bg-slate-50 p-4 rounded-lg">
@@ -172,9 +174,8 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                     <TableBody>
                         {bomItems.map((item) => {
                             // Backend populate might send rawMaterial object. If not, fallback to find in list.
-                            // ... (retaining prior context if needed, but here simple replace)
-                            // @ts-expect-error rawMaterial might not be in the type definition yet
-                            const material = item.rawMaterial || materials.find(m => m.id === item.rawMaterialId);
+                            const itemWithMaterial = item as BomItemWithMaterial;
+                            const material = itemWithMaterial.rawMaterial || materials.find(m => m.id === item.rawMaterialId);
                             const unitCost = (material?.averageCost && material.averageCost > 0) ? material.averageCost : (material?.cost || 0);
                             const subtotal = item.quantity * unitCost;
 
