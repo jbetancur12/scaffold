@@ -52,6 +52,12 @@ import {
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
+} from '@scaffold/types';
+import type {
+    CreatePurchaseOrderDto,
+    CreateProductionOrderDto,
+    CreateProductVariantDto,
+    UpdateProductVariantDto,
     CreateProductionBatchPayload,
     CreateNonConformityPayload,
     UpdateNonConformityPayload,
@@ -80,12 +86,6 @@ import {
     ApproveControlledDocumentPayload,
     CreateInvimaRegistrationPayload,
     UpdateInvimaRegistrationPayload,
-} from '@scaffold/types';
-import type {
-    CreatePurchaseOrderDto,
-    CreateProductionOrderDto,
-    CreateProductVariantDto,
-    UpdateProductVariantDto,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {

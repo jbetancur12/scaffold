@@ -676,3 +676,41 @@ export type LoginDto = z.infer<typeof LoginSchema>;
 export type RegisterDto = z.infer<typeof RegisterSchema>;
 export type CreateProductVariantDto = z.infer<typeof CreateProductVariantSchema>;
 export type UpdateProductVariantDto = z.infer<typeof UpdateProductVariantSchema>;
+
+type DateInputValue<T> = T extends Date
+    ? string | Date
+    : T extends (infer U)[]
+      ? DateInputValue<U>[]
+      : T extends object
+        ? { [K in keyof T]: DateInputValue<T[K]> }
+        : T;
+
+// MRP/Quality API input contracts (schema-driven)
+export type CreateProductionBatchPayload = DateInputValue<z.input<typeof CreateProductionBatchSchema>>;
+export type CreateNonConformityPayload = DateInputValue<z.input<typeof CreateNonConformitySchema>>;
+export type UpdateNonConformityPayload = DateInputValue<z.input<typeof UpdateNonConformitySchema>>;
+export type CreateCapaPayload = DateInputValue<z.input<typeof CreateCapaSchema>>;
+export type UpdateCapaPayload = DateInputValue<z.input<typeof UpdateCapaSchema>>;
+export type CreateControlledDocumentPayload = DateInputValue<z.input<typeof CreateControlledDocumentSchema>>;
+export type ListControlledDocumentsFilters = DateInputValue<z.input<typeof ListControlledDocumentsQuerySchema>>;
+export type CreateTechnovigilanceCasePayload = DateInputValue<z.input<typeof CreateTechnovigilanceCaseSchema>>;
+export type UpdateTechnovigilanceCasePayload = DateInputValue<z.input<typeof UpdateTechnovigilanceCaseSchema>>;
+export type ReportTechnovigilanceCasePayload = DateInputValue<z.input<typeof ReportTechnovigilanceCaseSchema>>;
+export type CreateRecallCasePayload = DateInputValue<z.input<typeof CreateRecallCaseSchema>>;
+export type UpdateRecallProgressPayload = DateInputValue<z.input<typeof UpdateRecallProgressSchema>>;
+export type CreateRecallNotificationPayload = DateInputValue<z.input<typeof CreateRecallNotificationSchema>>;
+export type UpdateRecallNotificationPayload = DateInputValue<z.input<typeof UpdateRecallNotificationSchema>>;
+export type CloseRecallCasePayload = DateInputValue<z.input<typeof CloseRecallCaseSchema>>;
+export type CreateCustomerPayload = DateInputValue<z.input<typeof CustomerSchema>>;
+export type CreateShipmentPayload = DateInputValue<z.input<typeof CreateShipmentSchema>>;
+export type CreateDmrTemplatePayload = DateInputValue<z.input<typeof CreateDmrTemplateSchema>>;
+export type UpsertRegulatoryLabelPayload = DateInputValue<z.input<typeof UpsertRegulatoryLabelSchema>>;
+export type ValidateDispatchReadinessPayload = DateInputValue<z.input<typeof ValidateDispatchReadinessSchema>>;
+export type CreateQualityRiskControlPayload = DateInputValue<z.input<typeof CreateQualityRiskControlSchema>>;
+export type CreateQualityTrainingEvidencePayload = DateInputValue<z.input<typeof CreateQualityTrainingEvidenceSchema>>;
+export type ResolveIncomingInspectionPayload = DateInputValue<z.input<typeof ResolveIncomingInspectionSchema>>;
+export type UpsertBatchReleaseChecklistPayload = DateInputValue<z.input<typeof UpsertBatchReleaseChecklistSchema>>;
+export type SignBatchReleasePayload = DateInputValue<z.input<typeof SignBatchReleaseSchema>>;
+export type ApproveControlledDocumentPayload = DateInputValue<z.input<typeof ApproveControlledDocumentSchema>>;
+export type CreateInvimaRegistrationPayload = DateInputValue<z.input<typeof CreateInvimaRegistrationSchema>>;
+export type UpdateInvimaRegistrationPayload = DateInputValue<z.input<typeof UpdateInvimaRegistrationSchema>>;
