@@ -9,6 +9,7 @@ export const errorHandler = (
     res: Response,
     _next: NextFunction
 ) => {
+    const requestId = res.locals.requestId || req.header('x-request-id');
     const isKnownNotFound = err instanceof Error && err.name === 'NotFoundError';
     const isKnownValidation = err instanceof ZodError
         || (err instanceof Error && (err.name === 'ValidationError' || err.name === 'SyntaxError'));
@@ -31,6 +32,7 @@ export const errorHandler = (
 
     // Log the error
     winstonLogger.error(`[${req.method}] ${req.path} >> ${statusCode} - ${message}`, {
+        requestId,
         stack,
         body: req.body,
         query: req.query
@@ -42,6 +44,7 @@ export const errorHandler = (
             ? 'Something went wrong on our end'
             : message,
         errorCode,
+        requestId,
         ...(process.env.NODE_ENV !== 'production' && { stack })
     });
 };

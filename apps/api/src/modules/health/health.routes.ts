@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { MikroORM } from '@mikro-orm/core';
 import redisClient from '../../config/redis';
 import { ApiResponse } from '../../shared/utils/response';
+import { observabilityService } from '../../shared/services/observability.service';
 
 export const createHealthRoutes = (orm: MikroORM) => {
     const router = Router();
@@ -36,6 +37,10 @@ export const createHealthRoutes = (orm: MikroORM) => {
         } catch (error) {
             return ApiResponse.error(res, 'Health check failed', 503);
         }
+    });
+
+    router.get('/metrics', (_req, res) => {
+        return ApiResponse.success(res, observabilityService.getSnapshot(), 'Metrics snapshot');
     });
 
     return router;

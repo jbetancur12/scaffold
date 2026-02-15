@@ -16,6 +16,7 @@ import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './shared/middleware/error.middleware';
 import { setupSwagger } from './config/swagger';
 import { ApiResponse } from './shared/utils/response';
+import { requestObservabilityMiddleware } from './shared/middleware/request-observability.middleware';
 
 const app = express();
 const PORT = env.PORT;
@@ -34,6 +35,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(requestObservabilityMiddleware);
 setupSwagger(app);
 
 // Rate limiting - only in production
