@@ -20,10 +20,10 @@
 - [x] Reportabilidad y trazabilidad para INVIMA.
 
 ## Fase 4 - Recall y gestion de campo
-- [ ] Flujo de retiro por lote/serial.
-- [ ] Simulacro de recall con tiempos y cobertura.
-- [ ] Notificaciones a clientes/usuarios.
-- [ ] Evidencia de cierre de recall.
+- [x] Flujo de retiro por lote/serial.
+- [x] Simulacro de recall con tiempos y cobertura.
+- [x] Notificaciones a clientes/usuarios.
+- [x] Evidencia de cierre de recall.
 
 ## Fase 5 - Etiquetado y codificacion regulatoria
 - [ ] Modelo de etiqueta por lote/serial.

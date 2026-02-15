@@ -16,6 +16,10 @@ import {
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
     TechnovigilanceReportChannel,
+    RecallScopeType,
+    RecallStatus,
+    RecallNotificationChannel,
+    RecallNotificationStatus,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -367,6 +371,58 @@ export const ApproveControlledDocumentSchema = z.object({
 
 export const ActiveControlledDocumentsByProcessParamsSchema = z.object({
     process: z.nativeEnum(DocumentProcess),
+});
+
+export const CreateRecallCaseSchema = z.object({
+    title: z.string().min(3),
+    reason: z.string().min(5),
+    scopeType: z.nativeEnum(RecallScopeType),
+    lotCode: z.string().optional(),
+    serialCode: z.string().optional(),
+    affectedQuantity: z.number().int().positive(),
+    isMock: z.boolean().optional(),
+    targetResponseMinutes: z.number().int().positive().optional(),
+    actor: z.string().optional(),
+}).superRefine((data, ctx) => {
+    if (data.scopeType === RecallScopeType.LOTE && !data.lotCode) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['lotCode'], message: 'El lote es obligatorio para retiro por lote' });
+    }
+    if (data.scopeType === RecallScopeType.SERIAL && !data.serialCode) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['serialCode'], message: 'El serial es obligatorio para retiro por serial' });
+    }
+});
+
+export const ListRecallCasesQuerySchema = z.object({
+    status: z.nativeEnum(RecallStatus).optional(),
+    isMock: z.coerce.boolean().optional(),
+});
+
+export const UpdateRecallProgressSchema = z.object({
+    retrievedQuantity: z.number().int().nonnegative(),
+    actor: z.string().optional(),
+});
+
+export const CreateRecallNotificationSchema = z.object({
+    recipientName: z.string().min(2),
+    recipientContact: z.string().min(3),
+    channel: z.nativeEnum(RecallNotificationChannel),
+    evidenceNotes: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const UpdateRecallNotificationSchema = z.object({
+    status: z.nativeEnum(RecallNotificationStatus),
+    sentAt: z.coerce.date().optional(),
+    acknowledgedAt: z.coerce.date().optional(),
+    evidenceNotes: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const CloseRecallCaseSchema = z.object({
+    closureEvidence: z.string().min(10),
+    endedAt: z.coerce.date().optional(),
+    actualResponseMinutes: z.number().int().positive().optional(),
+    actor: z.string().optional(),
 });
 
 export const OperationalConfigSchema = z.object({

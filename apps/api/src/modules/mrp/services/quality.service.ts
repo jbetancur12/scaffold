@@ -3,6 +3,10 @@ import {
     CapaStatus,
     NonConformityStatus,
     QualitySeverity,
+    RecallNotificationChannel,
+    RecallNotificationStatus,
+    RecallScopeType,
+    RecallStatus,
     TechnovigilanceCaseType,
     TechnovigilanceCausality,
     TechnovigilanceSeverity,
@@ -16,6 +20,8 @@ import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { ProductionOrder } from '../entities/production-order.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
+import { RecallCase } from '../entities/recall-case.entity';
+import { RecallNotification } from '../entities/recall-notification.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 
 export class QualityService {
@@ -24,6 +30,8 @@ export class QualityService {
     private readonly capaRepo: EntityRepository<CapaAction>;
     private readonly auditRepo: EntityRepository<QualityAuditEvent>;
     private readonly technoRepo: EntityRepository<TechnovigilanceCase>;
+    private readonly recallRepo: EntityRepository<RecallCase>;
+    private readonly recallNotificationRepo: EntityRepository<RecallNotification>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -31,6 +39,8 @@ export class QualityService {
         this.capaRepo = em.getRepository(CapaAction);
         this.auditRepo = em.getRepository(QualityAuditEvent);
         this.technoRepo = em.getRepository(TechnovigilanceCase);
+        this.recallRepo = em.getRepository(RecallCase);
+        this.recallNotificationRepo = em.getRepository(RecallNotification);
     }
 
     async createNonConformity(payload: {
@@ -293,6 +303,206 @@ export class QualityService {
             },
         });
         return row;
+    }
+
+    async createRecallCase(payload: {
+        title: string;
+        reason: string;
+        scopeType: RecallScopeType;
+        lotCode?: string;
+        serialCode?: string;
+        affectedQuantity: number;
+        isMock?: boolean;
+        targetResponseMinutes?: number;
+        actor?: string;
+    }) {
+        const code = `RCL-${Date.now().toString(36).toUpperCase()}`;
+        const row = this.recallRepo.create({
+            code,
+            title: payload.title,
+            reason: payload.reason,
+            scopeType: payload.scopeType,
+            lotCode: payload.lotCode,
+            serialCode: payload.serialCode,
+            affectedQuantity: payload.affectedQuantity,
+            retrievedQuantity: 0,
+            coveragePercent: 0,
+            status: RecallStatus.ABIERTO,
+            isMock: payload.isMock ?? false,
+            targetResponseMinutes: payload.targetResponseMinutes,
+            startedAt: new Date(),
+            createdBy: payload.actor,
+        } as unknown as RecallCase);
+
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'recall_case',
+            entityId: row.id,
+            action: 'created',
+            actor: payload.actor,
+            metadata: {
+                code: row.code,
+                scopeType: row.scopeType,
+                lotCode: row.lotCode,
+                serialCode: row.serialCode,
+                isMock: row.isMock,
+                affectedQuantity: row.affectedQuantity,
+            },
+        });
+        return this.recallRepo.findOneOrFail({ id: row.id }, { populate: ['notifications'] });
+    }
+
+    async listRecallCases(filters: { status?: RecallStatus; isMock?: boolean }) {
+        const query: FilterQuery<RecallCase> = {};
+        if (filters.status) query.status = filters.status;
+        if (typeof filters.isMock === 'boolean') query.isMock = filters.isMock;
+        return this.recallRepo.find(query, { populate: ['notifications'], orderBy: { createdAt: 'DESC' } });
+    }
+
+    async updateRecallProgress(id: string, payload: {
+        retrievedQuantity: number;
+        actor?: string;
+    }) {
+        const row = await this.recallRepo.findOneOrFail({ id });
+        if (row.status === RecallStatus.CERRADO) {
+            throw new AppError('No puedes actualizar un recall cerrado', 400);
+        }
+        if (payload.retrievedQuantity > row.affectedQuantity) {
+            throw new AppError('La cantidad recuperada no puede exceder la afectada', 400);
+        }
+
+        row.retrievedQuantity = payload.retrievedQuantity;
+        row.coveragePercent = this.calculateCoverage(row.affectedQuantity, row.retrievedQuantity);
+        if (row.status === RecallStatus.ABIERTO) {
+            row.status = RecallStatus.EN_EJECUCION;
+        }
+
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'recall_case',
+            entityId: row.id,
+            action: 'progress_updated',
+            actor: payload.actor,
+            metadata: {
+                retrievedQuantity: row.retrievedQuantity,
+                coveragePercent: row.coveragePercent,
+            },
+        });
+        return row;
+    }
+
+    async addRecallNotification(id: string, payload: {
+        recipientName: string;
+        recipientContact: string;
+        channel: RecallNotificationChannel;
+        evidenceNotes?: string;
+        actor?: string;
+    }) {
+        const recallCase = await this.recallRepo.findOneOrFail({ id });
+        if (recallCase.status === RecallStatus.CERRADO) {
+            throw new AppError('No puedes notificar un recall cerrado', 400);
+        }
+
+        const notification = this.recallNotificationRepo.create({
+            recallCase,
+            recipientName: payload.recipientName,
+            recipientContact: payload.recipientContact,
+            channel: payload.channel,
+            status: RecallNotificationStatus.PENDIENTE,
+            evidenceNotes: payload.evidenceNotes,
+            createdBy: payload.actor,
+        } as unknown as RecallNotification);
+
+        if (recallCase.status === RecallStatus.ABIERTO) {
+            recallCase.status = RecallStatus.EN_EJECUCION;
+        }
+
+        await this.em.persistAndFlush([notification, recallCase]);
+        await this.logEvent({
+            entityType: 'recall_notification',
+            entityId: notification.id,
+            action: 'created',
+            actor: payload.actor,
+            metadata: {
+                recallCaseId: id,
+                channel: notification.channel,
+                status: notification.status,
+            },
+        });
+        return notification;
+    }
+
+    async updateRecallNotification(notificationId: string, payload: {
+        status: RecallNotificationStatus;
+        sentAt?: Date;
+        acknowledgedAt?: Date;
+        evidenceNotes?: string;
+        actor?: string;
+    }) {
+        const notification = await this.recallNotificationRepo.findOneOrFail({ id: notificationId }, { populate: ['recallCase'] });
+        notification.status = payload.status;
+        if (payload.sentAt) notification.sentAt = payload.sentAt;
+        if (payload.acknowledgedAt) notification.acknowledgedAt = payload.acknowledgedAt;
+        if (payload.evidenceNotes !== undefined) notification.evidenceNotes = payload.evidenceNotes;
+
+        await this.em.persistAndFlush(notification);
+        await this.logEvent({
+            entityType: 'recall_notification',
+            entityId: notification.id,
+            action: 'updated',
+            actor: payload.actor,
+            metadata: {
+                recallCaseId: notification.recallCase.id,
+                status: notification.status,
+                sentAt: notification.sentAt,
+                acknowledgedAt: notification.acknowledgedAt,
+            },
+        });
+        return notification;
+    }
+
+    async closeRecallCase(id: string, payload: {
+        closureEvidence: string;
+        endedAt?: Date;
+        actualResponseMinutes?: number;
+        actor?: string;
+    }) {
+        const row = await this.recallRepo.findOneOrFail({ id });
+        if (row.status === RecallStatus.CERRADO) {
+            throw new AppError('El recall ya está cerrado', 409);
+        }
+
+        row.status = RecallStatus.CERRADO;
+        row.endedAt = payload.endedAt ?? new Date();
+        row.closureEvidence = payload.closureEvidence;
+        row.actualResponseMinutes = payload.actualResponseMinutes ?? this.calculateMinutes(row.startedAt, row.endedAt);
+        row.coveragePercent = this.calculateCoverage(row.affectedQuantity, row.retrievedQuantity);
+
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'recall_case',
+            entityId: row.id,
+            action: 'closed',
+            actor: payload.actor,
+            metadata: {
+                closureEvidence: row.closureEvidence,
+                endedAt: row.endedAt,
+                actualResponseMinutes: row.actualResponseMinutes,
+                coveragePercent: row.coveragePercent,
+            },
+        });
+        return row;
+    }
+
+    private calculateCoverage(affectedQuantity: number, retrievedQuantity: number) {
+        if (affectedQuantity <= 0) return 0;
+        const value = (retrievedQuantity / affectedQuantity) * 100;
+        return Number(value.toFixed(2));
+    }
+
+    private calculateMinutes(startedAt: Date, endedAt?: Date) {
+        const end = endedAt ?? new Date();
+        return Math.max(1, Math.round((end.getTime() - startedAt.getTime()) / 60000));
     }
 
     async logEvent(payload: {

@@ -4,6 +4,9 @@ import {
     DocumentStatus,
     NonConformityStatus,
     QualitySeverity,
+    RecallNotificationStatus,
+    RecallScopeType,
+    RecallStatus,
     TechnovigilanceCaseType,
     TechnovigilanceCausality,
     TechnovigilanceSeverity,
@@ -25,25 +28,30 @@ export default function QualityCompliancePage() {
         capas,
         audits,
         technovigilanceCases,
+        recalls,
         documents,
         openNc,
         ncForm,
         capaForm,
         documentForm,
         technoForm,
+        recallForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
         setTechnoForm,
+        setRecallForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
         loadingTechno,
+        loadingRecalls,
         loadingDocuments,
         creatingNc,
         creatingCapa,
         creatingDocument,
         creatingTechnoCase,
+        creatingRecall,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -56,6 +64,11 @@ export default function QualityCompliancePage() {
         handleCreateTechnoCase,
         quickSetTechnoStatus,
         quickReportTechno,
+        handleCreateRecall,
+        quickUpdateRecallProgress,
+        quickCreateRecallNotification,
+        quickUpdateRecallNotificationStatus,
+        quickCloseRecall,
     } = useQualityCompliance();
 
     return (
@@ -72,6 +85,7 @@ export default function QualityCompliancePage() {
                     <TabsTrigger value="nc">No Conformidades</TabsTrigger>
                     <TabsTrigger value="capa">CAPA</TabsTrigger>
                     <TabsTrigger value="techno">Tecnovigilancia</TabsTrigger>
+                    <TabsTrigger value="recall">Recall</TabsTrigger>
                     <TabsTrigger value="docs">Control documental</TabsTrigger>
                     <TabsTrigger value="audit">Auditoría</TabsTrigger>
                 </TabsList>
@@ -308,6 +322,187 @@ export default function QualityCompliancePage() {
                                                 Reportar a INVIMA
                                             </Button>
                                         ) : null}
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="recall" className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Crear Recall / Simulacro</CardTitle></CardHeader>
+                        <CardContent>
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={handleCreateRecall}>
+                                <div className="space-y-1">
+                                    <Label>Título</Label>
+                                    <Input
+                                        value={recallForm.title}
+                                        onChange={(e) => setRecallForm((p) => ({ ...p, title: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Tipo de alcance</Label>
+                                    <select
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={recallForm.scopeType}
+                                        onChange={(e) => setRecallForm((p) => ({ ...p, scopeType: e.target.value as RecallScopeType }))}
+                                    >
+                                        <option value={RecallScopeType.LOTE}>Por lote</option>
+                                        <option value={RecallScopeType.SERIAL}>Por serial</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Motivo</Label>
+                                    <Textarea
+                                        value={recallForm.reason}
+                                        onChange={(e) => setRecallForm((p) => ({ ...p, reason: e.target.value }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Código de lote</Label>
+                                    <Input
+                                        value={recallForm.lotCode}
+                                        onChange={(e) => setRecallForm((p) => ({ ...p, lotCode: e.target.value }))}
+                                        required={recallForm.scopeType === RecallScopeType.LOTE}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Código serial</Label>
+                                    <Input
+                                        value={recallForm.serialCode}
+                                        onChange={(e) => setRecallForm((p) => ({ ...p, serialCode: e.target.value }))}
+                                        required={recallForm.scopeType === RecallScopeType.SERIAL}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Cantidad afectada</Label>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        value={recallForm.affectedQuantity}
+                                        onChange={(e) => setRecallForm((p) => ({ ...p, affectedQuantity: Number(e.target.value) || 1 }))}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Objetivo de respuesta (min)</Label>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        value={recallForm.targetResponseMinutes}
+                                        onChange={(e) => setRecallForm((p) => ({ ...p, targetResponseMinutes: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="md:col-span-2 flex items-center justify-between">
+                                    <label className="text-sm flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={recallForm.isMock}
+                                            onChange={(e) => setRecallForm((p) => ({ ...p, isMock: e.target.checked }))}
+                                        />
+                                        Marcar como simulacro
+                                    </label>
+                                    <Button type="submit" disabled={creatingRecall}>
+                                        {creatingRecall ? 'Guardando...' : 'Crear recall'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Casos de Recall ({recalls.length})</CardTitle></CardHeader>
+                        <CardContent className="space-y-3">
+                            {loadingRecalls ? <div>Cargando...</div> : recalls.length === 0 ? <div className="text-sm text-slate-500">Sin recalls registrados.</div> : recalls.map((recall) => (
+                                <div key={recall.id} className="border rounded-md p-3 space-y-3">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <div className="font-medium">{recall.code} - {recall.title}</div>
+                                            <div className="text-sm text-slate-600">{recall.reason}</div>
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                Alcance: {recall.scopeType} | Lote: {recall.lotCode || 'N/A'} | Serial: {recall.serialCode || 'N/A'}
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                Recuperado: {recall.retrievedQuantity}/{recall.affectedQuantity} ({recall.coveragePercent}%)
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                Simulacro: {recall.isMock ? 'Sí' : 'No'} | Meta(min): {recall.targetResponseMinutes || 'N/A'} | Real(min): {recall.actualResponseMinutes || 'N/A'}
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-1">
+                                                Inicio: {new Date(recall.startedAt).toLocaleString()} {recall.endedAt ? `| Cierre: ${new Date(recall.endedAt).toLocaleString()}` : ''}
+                                            </div>
+                                            {recall.closureEvidence ? (
+                                                <div className="text-xs text-slate-500 mt-1">Evidencia: {recall.closureEvidence}</div>
+                                            ) : null}
+                                            <Badge variant="outline" className="mt-2">{recall.status}</Badge>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 justify-end">
+                                            {recall.status !== RecallStatus.CERRADO ? (
+                                                <>
+                                                    <Button size="sm" variant="outline" onClick={() => quickUpdateRecallProgress(recall.id, recall.retrievedQuantity)}>
+                                                        Actualizar avance
+                                                    </Button>
+                                                    <Button size="sm" variant="outline" onClick={() => quickCreateRecallNotification(recall.id)}>
+                                                        Notificar cliente
+                                                    </Button>
+                                                    <Button size="sm" onClick={() => quickCloseRecall(recall.id)}>
+                                                        Cerrar con evidencia
+                                                    </Button>
+                                                </>
+                                            ) : null}
+                                        </div>
+                                    </div>
+
+                                    <div className="border rounded-md p-2 space-y-2">
+                                        <div className="text-sm font-medium">Notificaciones ({recall.notifications?.length || 0})</div>
+                                        {recall.notifications && recall.notifications.length > 0 ? recall.notifications.map((notification) => (
+                                            <div key={notification.id} className="border rounded p-2 flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="text-sm font-medium">{notification.recipientName}</div>
+                                                    <div className="text-xs text-slate-600">
+                                                        {notification.channel} | {notification.recipientContact}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 mt-1">
+                                                        Enviada: {notification.sentAt ? new Date(notification.sentAt).toLocaleString() : 'pendiente'} | Confirmada: {notification.acknowledgedAt ? new Date(notification.acknowledgedAt).toLocaleString() : 'pendiente'}
+                                                    </div>
+                                                    <Badge variant="outline" className="mt-2">{notification.status}</Badge>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2 justify-end">
+                                                    {notification.status === RecallNotificationStatus.PENDIENTE ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => quickUpdateRecallNotificationStatus(notification.id, RecallNotificationStatus.ENVIADA)}
+                                                        >
+                                                            Marcar enviada
+                                                        </Button>
+                                                    ) : null}
+                                                    {notification.status !== RecallNotificationStatus.CONFIRMADA ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => quickUpdateRecallNotificationStatus(notification.id, RecallNotificationStatus.CONFIRMADA)}
+                                                        >
+                                                            Marcar confirmada
+                                                        </Button>
+                                                    ) : null}
+                                                    {notification.status !== RecallNotificationStatus.FALLIDA ? (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => quickUpdateRecallNotificationStatus(notification.id, RecallNotificationStatus.FALLIDA)}
+                                                        >
+                                                            Marcar fallida
+                                                        </Button>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        )) : (
+                                            <div className="text-xs text-slate-500">Sin notificaciones registradas.</div>
+                                        )}
                                     </div>
                                 </div>
                             ))}

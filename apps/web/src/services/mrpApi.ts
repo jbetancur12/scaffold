@@ -28,6 +28,12 @@ import {
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
     TechnovigilanceReportChannel,
+    RecallCase,
+    RecallNotification,
+    RecallNotificationChannel,
+    RecallNotificationStatus,
+    RecallScopeType,
+    RecallStatus,
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
@@ -157,6 +163,46 @@ export interface ReportTechnovigilanceCasePayload {
     reportPayloadRef?: string;
     reportedAt?: string | Date;
     ackAt?: string | Date;
+    actor?: string;
+}
+
+export interface CreateRecallCasePayload {
+    title: string;
+    reason: string;
+    scopeType: RecallScopeType;
+    lotCode?: string;
+    serialCode?: string;
+    affectedQuantity: number;
+    isMock?: boolean;
+    targetResponseMinutes?: number;
+    actor?: string;
+}
+
+export interface UpdateRecallProgressPayload {
+    retrievedQuantity: number;
+    actor?: string;
+}
+
+export interface CreateRecallNotificationPayload {
+    recipientName: string;
+    recipientContact: string;
+    channel: RecallNotificationChannel;
+    evidenceNotes?: string;
+    actor?: string;
+}
+
+export interface UpdateRecallNotificationPayload {
+    status: RecallNotificationStatus;
+    sentAt?: string | Date;
+    acknowledgedAt?: string | Date;
+    evidenceNotes?: string;
+    actor?: string;
+}
+
+export interface CloseRecallCasePayload {
+    closureEvidence: string;
+    endedAt?: string | Date;
+    actualResponseMinutes?: number;
     actor?: string;
 }
 
@@ -414,6 +460,30 @@ export const mrpApi = {
     },
     reportTechnovigilanceCase: async (id: string, data: ReportTechnovigilanceCasePayload): Promise<TechnovigilanceCase> => {
         const response = await api.post<TechnovigilanceCase>(`/mrp/quality/technovigilance-cases/${id}/report-invima`, data);
+        return response.data;
+    },
+    createRecallCase: async (data: CreateRecallCasePayload): Promise<RecallCase> => {
+        const response = await api.post<RecallCase>('/mrp/quality/recalls', data);
+        return response.data;
+    },
+    listRecallCases: async (filters?: { status?: RecallStatus; isMock?: boolean }): Promise<RecallCase[]> => {
+        const response = await api.get<RecallCase[]>('/mrp/quality/recalls', { params: filters });
+        return response.data;
+    },
+    updateRecallProgress: async (id: string, data: UpdateRecallProgressPayload): Promise<RecallCase> => {
+        const response = await api.patch<RecallCase>(`/mrp/quality/recalls/${id}/progress`, data);
+        return response.data;
+    },
+    createRecallNotification: async (id: string, data: CreateRecallNotificationPayload): Promise<RecallNotification> => {
+        const response = await api.post<RecallNotification>(`/mrp/quality/recalls/${id}/notifications`, data);
+        return response.data;
+    },
+    updateRecallNotification: async (notificationId: string, data: UpdateRecallNotificationPayload): Promise<RecallNotification> => {
+        const response = await api.patch<RecallNotification>(`/mrp/quality/recall-notifications/${notificationId}`, data);
+        return response.data;
+    },
+    closeRecallCase: async (id: string, data: CloseRecallCasePayload): Promise<RecallCase> => {
+        const response = await api.post<RecallCase>(`/mrp/quality/recalls/${id}/close`, data);
         return response.data;
     },
     createControlledDocument: async (data: CreateControlledDocumentPayload): Promise<ControlledDocument> => {

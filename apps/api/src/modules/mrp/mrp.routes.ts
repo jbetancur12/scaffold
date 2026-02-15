@@ -68,6 +68,12 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/technovigilance-cases', (req, res, next) => mrpController.listTechnovigilanceCases(req, res, next));
     router.patch('/quality/technovigilance-cases/:id', (req, res, next) => mrpController.updateTechnovigilanceCase(req, res, next));
     router.post('/quality/technovigilance-cases/:id/report-invima', (req, res, next) => mrpController.reportTechnovigilanceCase(req, res, next));
+    router.post('/quality/recalls', (req, res, next) => mrpController.createRecallCase(req, res, next));
+    router.get('/quality/recalls', (req, res, next) => mrpController.listRecallCases(req, res, next));
+    router.patch('/quality/recalls/:id/progress', (req, res, next) => mrpController.updateRecallProgress(req, res, next));
+    router.post('/quality/recalls/:id/notifications', (req, res, next) => mrpController.createRecallNotification(req, res, next));
+    router.patch('/quality/recall-notifications/:notificationId', (req, res, next) => mrpController.updateRecallNotification(req, res, next));
+    router.post('/quality/recalls/:id/close', (req, res, next) => mrpController.closeRecallCase(req, res, next));
     router.post('/quality/documents', (req, res, next) => mrpController.createControlledDocument(req, res, next));
     router.get('/quality/documents', (req, res, next) => mrpController.listControlledDocuments(req, res, next));
     router.post('/quality/documents/:id/submit-review', (req, res, next) => mrpController.submitControlledDocument(req, res, next));

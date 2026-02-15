@@ -10,6 +10,9 @@ import {
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
     TechnovigilanceReportChannel,
+    RecallScopeType,
+    RecallNotificationChannel,
+    RecallNotificationStatus,
 } from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -29,6 +32,12 @@ import {
     useUpdateNonConformityMutation,
     useUpdateTechnovigilanceCaseMutation,
     useReportTechnovigilanceCaseMutation,
+    useRecallCasesQuery,
+    useCreateRecallCaseMutation,
+    useUpdateRecallProgressMutation,
+    useCreateRecallNotificationMutation,
+    useUpdateRecallNotificationMutation,
+    useCloseRecallCaseMutation,
 } from '@/hooks/mrp/useQuality';
 
 export const useQualityCompliance = () => {
@@ -37,6 +46,7 @@ export const useQualityCompliance = () => {
     const { data: capasData, loading: loadingCapas } = useCapasQuery();
     const { data: auditData, loading: loadingAudit } = useQualityAuditQuery();
     const { data: technovigilanceData, loading: loadingTechno } = useTechnovigilanceCasesQuery();
+    const { data: recallsData, loading: loadingRecalls } = useRecallCasesQuery();
     const { data: documentsData, loading: loadingDocuments } = useControlledDocumentsQuery();
     const { execute: createNc, loading: creatingNc } = useCreateNonConformityMutation();
     const { execute: updateNc } = useUpdateNonConformityMutation();
@@ -48,6 +58,11 @@ export const useQualityCompliance = () => {
     const { execute: createTechnoCase, loading: creatingTechnoCase } = useCreateTechnovigilanceCaseMutation();
     const { execute: updateTechnoCase } = useUpdateTechnovigilanceCaseMutation();
     const { execute: reportTechnoCase } = useReportTechnovigilanceCaseMutation();
+    const { execute: createRecallCase, loading: creatingRecall } = useCreateRecallCaseMutation();
+    const { execute: updateRecallProgress } = useUpdateRecallProgressMutation();
+    const { execute: createRecallNotification } = useCreateRecallNotificationMutation();
+    const { execute: updateRecallNotification } = useUpdateRecallNotificationMutation();
+    const { execute: closeRecallCase } = useCloseRecallCaseMutation();
 
     const [ncForm, setNcForm] = useState({
         title: '',
@@ -79,11 +94,22 @@ export const useQualityCompliance = () => {
         lotCode: '',
         serialCode: '',
     });
+    const [recallForm, setRecallForm] = useState({
+        title: '',
+        reason: '',
+        scopeType: RecallScopeType.LOTE,
+        lotCode: '',
+        serialCode: '',
+        affectedQuantity: 1,
+        isMock: false,
+        targetResponseMinutes: '',
+    });
 
     const nonConformities = nonConformitiesData ?? [];
     const capas = capasData ?? [];
     const audits = auditData ?? [];
     const technovigilanceCases = technovigilanceData ?? [];
+    const recalls = recallsData ?? [];
     const documents = documentsData ?? [];
     const openNc = nonConformities.filter((n) => n.status !== NonConformityStatus.CERRADA);
 
@@ -260,30 +286,147 @@ export const useQualityCompliance = () => {
         }
     };
 
+    const handleCreateRecall = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await createRecallCase({
+                title: recallForm.title,
+                reason: recallForm.reason,
+                scopeType: recallForm.scopeType,
+                lotCode: recallForm.lotCode || undefined,
+                serialCode: recallForm.serialCode || undefined,
+                affectedQuantity: Number(recallForm.affectedQuantity),
+                isMock: recallForm.isMock,
+                targetResponseMinutes: recallForm.targetResponseMinutes ? Number(recallForm.targetResponseMinutes) : undefined,
+                actor: 'sistema-web',
+            });
+            setRecallForm({
+                title: '',
+                reason: '',
+                scopeType: RecallScopeType.LOTE,
+                lotCode: '',
+                serialCode: '',
+                affectedQuantity: 1,
+                isMock: false,
+                targetResponseMinutes: '',
+            });
+            toast({ title: 'Recall creado', description: 'Caso de retiro registrado.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear el recall'), variant: 'destructive' });
+        }
+    };
+
+    const quickUpdateRecallProgress = async (id: string, current: number) => {
+        try {
+            const value = window.prompt('Cantidad recuperada acumulada', String(current));
+            if (value === null) return;
+            const retrievedQuantity = Number(value);
+            if (Number.isNaN(retrievedQuantity) || retrievedQuantity < 0) {
+                toast({ title: 'Error', description: 'Cantidad inválida', variant: 'destructive' });
+                return;
+            }
+            await updateRecallProgress({ id, retrievedQuantity, actor: 'sistema-web' });
+            toast({ title: 'Recall actualizado', description: 'Cobertura y avance actualizados.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo actualizar el recall'), variant: 'destructive' });
+        }
+    };
+
+    const quickCreateRecallNotification = async (id: string) => {
+        try {
+            const recipientName = window.prompt('Nombre del destinatario');
+            if (!recipientName) return;
+            const recipientContact = window.prompt('Contacto (email/teléfono)');
+            if (!recipientContact) return;
+            const channelRaw = window.prompt('Canal (email, telefono, whatsapp, otro)', RecallNotificationChannel.EMAIL);
+            if (!channelRaw) return;
+            if (!Object.values(RecallNotificationChannel).includes(channelRaw as RecallNotificationChannel)) {
+                toast({ title: 'Error', description: 'Canal inválido', variant: 'destructive' });
+                return;
+            }
+
+            await createRecallNotification({
+                id,
+                recipientName,
+                recipientContact,
+                channel: channelRaw as RecallNotificationChannel,
+                actor: 'sistema-web',
+            });
+            toast({ title: 'Notificación creada', description: 'Registro de notificación agregado.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear la notificación'), variant: 'destructive' });
+        }
+    };
+
+    const quickUpdateRecallNotificationStatus = async (notificationId: string, status: RecallNotificationStatus) => {
+        try {
+            const payload: {
+                notificationId: string;
+                status: RecallNotificationStatus;
+                sentAt?: string;
+                acknowledgedAt?: string;
+                actor: string;
+            } = {
+                notificationId,
+                status,
+                actor: 'sistema-web',
+            };
+
+            if (status === RecallNotificationStatus.ENVIADA) payload.sentAt = new Date().toISOString();
+            if (status === RecallNotificationStatus.CONFIRMADA) payload.acknowledgedAt = new Date().toISOString();
+
+            await updateRecallNotification(payload);
+            toast({ title: 'Notificación actualizada', description: `Estado: ${status}` });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo actualizar la notificación'), variant: 'destructive' });
+        }
+    };
+
+    const quickCloseRecall = async (id: string) => {
+        try {
+            const closureEvidence = window.prompt('Evidencia de cierre del recall');
+            if (!closureEvidence) return;
+            await closeRecallCase({
+                id,
+                closureEvidence,
+                endedAt: new Date().toISOString(),
+                actor: 'sistema-web',
+            });
+            toast({ title: 'Recall cerrado', description: 'Caso cerrado con evidencia registrada.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo cerrar el recall'), variant: 'destructive' });
+        }
+    };
+
     return {
         nonConformities,
         capas,
         audits,
         technovigilanceCases,
+        recalls,
         documents,
         openNc,
         ncForm,
         capaForm,
         documentForm,
         technoForm,
+        recallForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
         setTechnoForm,
+        setRecallForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
         loadingTechno,
+        loadingRecalls,
         loadingDocuments,
         creatingNc,
         creatingCapa,
         creatingDocument,
         creatingTechnoCase,
+        creatingRecall,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -296,5 +439,10 @@ export const useQualityCompliance = () => {
         handleCreateTechnoCase,
         quickSetTechnoStatus,
         quickReportTechno,
+        handleCreateRecall,
+        quickUpdateRecallProgress,
+        quickCreateRecallNotification,
+        quickUpdateRecallNotificationStatus,
+        quickCloseRecall,
     };
 };

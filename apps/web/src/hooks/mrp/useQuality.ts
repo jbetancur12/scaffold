@@ -16,6 +16,12 @@ import {
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
     TechnovigilanceReportChannel,
+    RecallCase,
+    RecallNotification,
+    RecallNotificationChannel,
+    RecallNotificationStatus,
+    RecallScopeType,
+    RecallStatus,
 } from '@scaffold/types';
 import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
@@ -166,6 +172,104 @@ export const useReportTechnovigilanceCaseMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityTechnovigilanceCases);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useRecallCasesQuery = (filters?: { status?: RecallStatus; isMock?: boolean }) => {
+    const fetcher = useCallback(async (): Promise<RecallCase[]> => {
+        return mrpApi.listRecallCases(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityRecalls);
+};
+
+export const useCreateRecallCaseMutation = () => {
+    return useMrpMutation<{
+        title: string;
+        reason: string;
+        scopeType: RecallScopeType;
+        lotCode?: string;
+        serialCode?: string;
+        affectedQuantity: number;
+        isMock?: boolean;
+        targetResponseMinutes?: number;
+        actor?: string;
+    }, RecallCase>(
+        async (payload) => mrpApi.createRecallCase(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useUpdateRecallProgressMutation = () => {
+    return useMrpMutation<{ id: string; retrievedQuantity: number; actor?: string }, RecallCase>(
+        async ({ id, ...payload }) => mrpApi.updateRecallProgress(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useCreateRecallNotificationMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        recipientName: string;
+        recipientContact: string;
+        channel: RecallNotificationChannel;
+        evidenceNotes?: string;
+        actor?: string;
+    }, RecallNotification>(
+        async ({ id, ...payload }) => mrpApi.createRecallNotification(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useUpdateRecallNotificationMutation = () => {
+    return useMrpMutation<{
+        notificationId: string;
+        status: RecallNotificationStatus;
+        sentAt?: string;
+        acknowledgedAt?: string;
+        evidenceNotes?: string;
+        actor?: string;
+    }, RecallNotification>(
+        async ({ notificationId, ...payload }) => mrpApi.updateRecallNotification(notificationId, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useCloseRecallCaseMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        closureEvidence: string;
+        endedAt?: string;
+        actualResponseMinutes?: number;
+        actor?: string;
+    }, RecallCase>(
+        async ({ id, ...payload }) => mrpApi.closeRecallCase(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
                 invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
             },
         }

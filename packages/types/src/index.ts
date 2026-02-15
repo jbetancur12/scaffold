@@ -132,6 +132,31 @@ export enum TechnovigilanceReportChannel {
     OTRO = 'otro',
 }
 
+export enum RecallScopeType {
+    LOTE = 'lote',
+    SERIAL = 'serial',
+}
+
+export enum RecallStatus {
+    ABIERTO = 'abierto',
+    EN_EJECUCION = 'en_ejecucion',
+    CERRADO = 'cerrado',
+}
+
+export enum RecallNotificationChannel {
+    EMAIL = 'email',
+    TELEFONO = 'telefono',
+    WHATSAPP = 'whatsapp',
+    OTRO = 'otro',
+}
+
+export enum RecallNotificationStatus {
+    PENDIENTE = 'pendiente',
+    ENVIADA = 'enviada',
+    CONFIRMADA = 'confirmada',
+    FALLIDA = 'fallida',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -414,6 +439,45 @@ export interface TechnovigilanceCase {
     lotCode?: string;
     serialCode?: string;
     createdBy?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface RecallNotification {
+    id: string;
+    recallCaseId: string;
+    recipientName: string;
+    recipientContact: string;
+    channel: RecallNotificationChannel;
+    status: RecallNotificationStatus;
+    sentAt?: string | Date;
+    acknowledgedAt?: string | Date;
+    evidenceNotes?: string;
+    createdBy?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface RecallCase {
+    id: string;
+    code: string;
+    title: string;
+    reason: string;
+    scopeType: RecallScopeType;
+    lotCode?: string;
+    serialCode?: string;
+    affectedQuantity: number;
+    retrievedQuantity: number;
+    coveragePercent: number;
+    status: RecallStatus;
+    isMock: boolean;
+    targetResponseMinutes?: number;
+    actualResponseMinutes?: number;
+    startedAt: string | Date;
+    endedAt?: string | Date;
+    closureEvidence?: string;
+    createdBy?: string;
+    notifications?: RecallNotification[];
     createdAt: string | Date;
     updatedAt: string | Date;
 }

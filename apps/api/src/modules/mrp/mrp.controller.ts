@@ -39,6 +39,12 @@ import {
     ListTechnovigilanceCasesQuerySchema,
     UpdateTechnovigilanceCaseSchema,
     ReportTechnovigilanceCaseSchema,
+    CreateRecallCaseSchema,
+    ListRecallCasesQuerySchema,
+    UpdateRecallProgressSchema,
+    CreateRecallNotificationSchema,
+    UpdateRecallNotificationSchema,
+    CloseRecallCaseSchema,
     CreateControlledDocumentSchema,
     ListControlledDocumentsQuerySchema,
     ActorPayloadSchema,
@@ -597,6 +603,70 @@ export class MrpController {
                 ackAt: payload.ackAt,
             }, payload.actor);
             return ApiResponse.success(res, row, 'Caso reportado a INVIMA');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createRecallCase(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateRecallCaseSchema.parse(req.body);
+            const row = await this.qualityService.createRecallCase(payload);
+            return ApiResponse.success(res, row, 'Caso de recall creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listRecallCases(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListRecallCasesQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listRecallCases(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateRecallProgress(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateRecallProgressSchema.parse(req.body);
+            const row = await this.qualityService.updateRecallProgress(id, payload);
+            return ApiResponse.success(res, row, 'Avance de recall actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createRecallNotification(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = CreateRecallNotificationSchema.parse(req.body);
+            const row = await this.qualityService.addRecallNotification(id, payload);
+            return ApiResponse.success(res, row, 'Notificación de recall creada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateRecallNotification(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { notificationId } = req.params;
+            const payload = UpdateRecallNotificationSchema.parse(req.body);
+            const row = await this.qualityService.updateRecallNotification(notificationId, payload);
+            return ApiResponse.success(res, row, 'Notificación de recall actualizada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async closeRecallCase(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = CloseRecallCaseSchema.parse(req.body);
+            const row = await this.qualityService.closeRecallCase(id, payload);
+            return ApiResponse.success(res, row, 'Recall cerrado');
         } catch (error) {
             next(error);
         }
