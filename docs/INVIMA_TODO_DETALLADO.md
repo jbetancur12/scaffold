@@ -2,6 +2,12 @@
 
 Este plan extiende lo ya implementado en `docs/INVIMA_TODO.md` y se enfoca en cerrar brechas operativas desde ingreso de materia prima hasta despacho y postmercado.
 
+## Plan de ejecución técnica
+
+Para ejecutar este roadmap con foco en escalabilidad y mantenibilidad (separación de responsabilidades y centralización en `packages`), seguir:
+
+- `docs/QUALITY_REFACTOR_PHASES.md`
+
 ## Objetivo
 
 Llevar la app de "buen soporte de trazabilidad" a "operación robusta para auditoría en planta", con controles obligatorios, evidencia consolidada y bloqueos preventivos.
