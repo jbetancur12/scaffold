@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -63,6 +63,16 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
 }
 
+function LegacyQualitySectionRedirect() {
+    const { section } = useParams<{ section: string }>();
+    return <Navigate to={`/quality/${section || 'nc'}`} replace />;
+}
+
+function LegacyPostmarketSectionRedirect() {
+    const { section } = useParams<{ section: string }>();
+    return <Navigate to={`/postmarket/${section || 'techno'}`} replace />;
+}
+
 export default function App() {
     return (
         <BrowserRouter>
@@ -117,8 +127,14 @@ export default function App() {
                         <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
 
                         <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
-                        <Route path="/mrp/quality" element={<Navigate to="/mrp/quality/nc" replace />} />
-                        <Route path="/mrp/quality/:section" element={<QualityCompliancePage />} />
+                        <Route path="/quality" element={<Navigate to="/quality/nc" replace />} />
+                        <Route path="/quality/:section" element={<QualityCompliancePage />} />
+                        <Route path="/postmarket" element={<Navigate to="/postmarket/techno" replace />} />
+                        <Route path="/postmarket/:section" element={<QualityCompliancePage />} />
+                        <Route path="/mrp/quality" element={<Navigate to="/quality/nc" replace />} />
+                        <Route path="/mrp/quality/:section" element={<LegacyQualitySectionRedirect />} />
+                        <Route path="/mrp/postmarket" element={<Navigate to="/postmarket/techno" replace />} />
+                        <Route path="/mrp/postmarket/:section" element={<LegacyPostmarketSectionRedirect />} />
 
                         <Route path="/mrp/inventory" element={<InventoryDashboardPage />} />
                         <Route path="/mrp/warehouses" element={<WarehouseListPage />} />

@@ -18,6 +18,7 @@ import {
     Warehouse,
     Settings,
     ShieldCheck,
+    Megaphone,
     ChevronDown,
     ChevronRight,
     Boxes
@@ -26,6 +27,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
 import { cn } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
+import { qualitySectionCategoryLabels, qualitySectionCategoryOrder, qualitySections } from '@/constants/mrpNavigation';
 
 interface SidebarItemProps {
     icon: React.ElementType;
@@ -57,6 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isMrpOpen, setIsMrpOpen] = useState(true);
     const [isQualityOpen, setIsQualityOpen] = useState(true);
+    const [isPostmarketOpen, setIsPostmarketOpen] = useState(true);
 
     const roleLabels: Record<string, string> = {
         [UserRole.SUPERADMIN]: 'Super Administrador',
@@ -75,28 +78,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: Settings, label: 'Configuración Operativa', path: '/mrp/operational-settings', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
     ];
 
-    const qualityItems = [
-        { label: 'No Conformidades', path: '/mrp/quality/nc' },
-        { label: 'CAPA', path: '/mrp/quality/capa' },
-        { label: 'Tecnovigilancia', path: '/mrp/quality/techno' },
-        { label: 'Recall', path: '/mrp/quality/recall' },
-        { label: 'Despachos', path: '/mrp/quality/shipment' },
-        { label: 'DHR/DMR', path: '/mrp/quality/dhr-dmr' },
-        { label: 'Etiquetado', path: '/mrp/quality/labeling' },
-        { label: 'Recepción', path: '/mrp/quality/incoming' },
-        { label: 'Liberación QA', path: '/mrp/quality/batch-release' },
-        { label: 'Registros INVIMA', path: '/mrp/quality/invima' },
-        { label: 'Cumplimiento', path: '/mrp/quality/compliance' },
-        { label: 'Control documental', path: '/mrp/quality/docs' },
-        { label: 'Auditoría', path: '/mrp/quality/audit' },
+    const mrpCategories = [
+        {
+            label: 'Maestros',
+            items: ['/mrp/products', '/mrp/raw-materials', '/mrp/suppliers'],
+        },
+        {
+            label: 'Operación',
+            items: ['/mrp/purchase-orders', '/mrp/production-orders', '/mrp/inventory', '/mrp/warehouses'],
+        },
+        {
+            label: 'Parámetros',
+            items: ['/mrp/operational-settings'],
+        },
     ];
 
     const filteredMrpItems = mrpItems.filter(item =>
         item.roles.includes(user?.role as UserRole)
     );
 
-    const isMrpActive = location.pathname.includes('/mrp/');
-    const isQualityActive = location.pathname.startsWith('/mrp/quality');
+    const isMrpActive = location.pathname.startsWith('/mrp/') && !location.pathname.startsWith('/mrp/quality') && !location.pathname.startsWith('/mrp/postmarket');
+    const isQualityActive = location.pathname.startsWith('/quality') || location.pathname.startsWith('/mrp/quality');
+    const isPostmarketActive = location.pathname.startsWith('/postmarket') || location.pathname.startsWith('/mrp/postmarket');
 
     const handleLogout = async () => {
         try {
@@ -145,19 +148,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                 {isMrpOpen && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
-                        {filteredMrpItems.map((item) => (
-                            <SidebarItem
-                                key={item.path}
-                                icon={item.icon}
-                                label={item.label}
-                                active={location.pathname === item.path}
-                                isChild={true}
-                                onClick={() => {
-                                    navigate(item.path);
-                                    onItemClick?.();
-                                }}
-                            />
-                        ))}
+                        {mrpCategories.map((category) => {
+                            const categoryItems = filteredMrpItems.filter((item) => category.items.includes(item.path));
+                            if (categoryItems.length === 0) return null;
+                            return (
+                                <div key={category.label} className="space-y-1 pt-1">
+                                    <div className="pl-11 pr-2 text-[10px] uppercase tracking-wide text-slate-400">{category.label}</div>
+                                    {categoryItems.map((item) => (
+                                        <SidebarItem
+                                            key={item.path}
+                                            icon={item.icon}
+                                            label={item.label}
+                                            active={location.pathname === item.path}
+                                            isChild={true}
+                                            onClick={() => {
+                                                navigate(item.path);
+                                                onItemClick?.();
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -180,19 +192,76 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
                 {isQualityOpen && (
                     <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
-                        {qualityItems.map((item) => (
-                            <SidebarItem
-                                key={item.path}
-                                icon={ShieldCheck}
-                                label={item.label}
-                                active={location.pathname === item.path}
-                                isChild={true}
-                                onClick={() => {
-                                    navigate(item.path);
-                                    onItemClick?.();
-                                }}
-                            />
-                        ))}
+                        {qualitySectionCategoryOrder.map((categoryKey) => {
+                            const categoryItems = qualitySections.filter((item) => item.domain === 'quality' && item.category === categoryKey);
+                            if (categoryItems.length === 0) return null;
+                            return (
+                                <div key={categoryKey} className="space-y-1 pt-1">
+                                    <div className="pl-11 pr-2 text-[10px] uppercase tracking-wide text-slate-400">
+                                        {qualitySectionCategoryLabels[categoryKey]}
+                                    </div>
+                                    {categoryItems.map((item) => (
+                                        <SidebarItem
+                                            key={item.path}
+                                            icon={ShieldCheck}
+                                            label={item.label}
+                                            active={location.pathname === item.path}
+                                            isChild={true}
+                                            onClick={() => {
+                                                navigate(item.path);
+                                                onItemClick?.();
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Postmarket Group */}
+            <div className="space-y-1">
+                <button
+                    onClick={() => setIsPostmarketOpen(!isPostmarketOpen)}
+                    className={cn(
+                        "sidebar-link w-full justify-between pr-4",
+                        isPostmarketActive && "text-primary font-medium bg-primary/5"
+                    )}
+                >
+                    <div className="flex items-center gap-3">
+                        <Megaphone className="h-5 w-5" />
+                        <span>Postmercado</span>
+                    </div>
+                    {isPostmarketOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+
+                {isPostmarketOpen && (
+                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                        {qualitySectionCategoryOrder.map((categoryKey) => {
+                            const categoryItems = qualitySections.filter((item) => item.domain === 'postmarket' && item.category === categoryKey);
+                            if (categoryItems.length === 0) return null;
+                            return (
+                                <div key={`post-${categoryKey}`} className="space-y-1 pt-1">
+                                    <div className="pl-11 pr-2 text-[10px] uppercase tracking-wide text-slate-400">
+                                        {qualitySectionCategoryLabels[categoryKey]}
+                                    </div>
+                                    {categoryItems.map((item) => (
+                                        <SidebarItem
+                                            key={item.path}
+                                            icon={Megaphone}
+                                            label={item.label}
+                                            active={location.pathname === item.path}
+                                            isChild={true}
+                                            onClick={() => {
+                                                navigate(item.path);
+                                                onItemClick?.();
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
