@@ -142,6 +142,9 @@ Objetivo: llevar el módulo de Calidad/INVIMA a un estado más escalable y mante
 - Flujos críticos sin regresión.
 - Documento de hallazgos y pendientes residuales.
 
+Evidencia de ejecución y checklist:
+- `docs/QUALITY_PHASE5_HARDENING.md`
+
 ---
 
 ## Backlog técnico sugerido

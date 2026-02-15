@@ -3,6 +3,17 @@ import { winstonLogger } from '../../config/logger';
 import { AppError } from '../utils/response';
 import { ZodError } from 'zod';
 
+type ValidationIssue = {
+    path: string;
+    message: string;
+};
+
+const formatZodIssues = (error: ZodError): ValidationIssue[] =>
+    error.errors.map((issue) => ({
+        path: issue.path.length > 0 ? issue.path.join('.') : 'request',
+        message: issue.message,
+    }));
+
 export const errorHandler = (
     err: unknown,
     req: Request,
@@ -26,7 +37,17 @@ export const errorHandler = (
                 : isUniqueConstraint
                     ? 409
                     : 500;
-    const message = (err instanceof Error) ? err.message : 'Internal Server Error';
+    const validationIssues = err instanceof ZodError ? formatZodIssues(err) : undefined;
+    const message = (() => {
+        if (err instanceof ZodError) {
+            const first = validationIssues?.[0];
+            return first ? `Validación fallida en ${first.path}: ${first.message}` : 'Validación fallida';
+        }
+        if (err instanceof Error && err.name === 'SyntaxError' && statusCode === 400) {
+            return 'JSON inválido en la solicitud';
+        }
+        return (err instanceof Error) ? err.message : 'Internal Server Error';
+    })();
     const stack = (err instanceof Error) ? err.stack : undefined;
     const errorCode = (err instanceof AppError) ? err.errorCode : undefined;
 
@@ -45,6 +66,7 @@ export const errorHandler = (
             : message,
         errorCode,
         requestId,
+        ...(validationIssues && { details: validationIssues }),
         ...(process.env.NODE_ENV !== 'production' && { stack })
     });
 };
