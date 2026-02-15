@@ -36,6 +36,8 @@ import {
     IncomingInspection,
     IncomingInspectionResult,
     IncomingInspectionStatus,
+    BatchRelease,
+    BatchReleaseStatus,
 } from '@scaffold/types';
 import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
@@ -442,6 +444,52 @@ export const useResolveIncomingInspectionMutation = () => {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityIncomingInspections);
                 invalidateMrpQuery(mrpQueryKeys.rawMaterials);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useBatchReleasesQuery = (filters?: { productionBatchId?: string; status?: BatchReleaseStatus }) => {
+    const fetcher = useCallback(async (): Promise<BatchRelease[]> => {
+        return mrpApi.listBatchReleases(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityBatchReleases);
+};
+
+export const useUpsertBatchReleaseChecklistMutation = () => {
+    return useMrpMutation<{
+        productionBatchId: string;
+        qcApproved: boolean;
+        labelingValidated: boolean;
+        documentsCurrent: boolean;
+        evidencesComplete: boolean;
+        checklistNotes?: string;
+        rejectedReason?: string;
+        actor?: string;
+    }, BatchRelease>(
+        async (payload) => mrpApi.upsertBatchReleaseChecklist(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityBatchReleases);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useSignBatchReleaseMutation = () => {
+    return useMrpMutation<{
+        productionBatchId: string;
+        actor: string;
+        approvalMethod: DocumentApprovalMethod;
+        approvalSignature: string;
+    }, BatchRelease>(
+        async ({ productionBatchId, ...payload }) => mrpApi.signBatchRelease(productionBatchId, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityBatchReleases);
                 invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
             },
         }

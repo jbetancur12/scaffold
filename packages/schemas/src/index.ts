@@ -27,6 +27,7 @@ import {
     QualityRiskControlStatus,
     IncomingInspectionResult,
     IncomingInspectionStatus,
+    BatchReleaseStatus,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -523,6 +524,28 @@ export const ResolveIncomingInspectionSchema = z.object({
     if (data.quantityAccepted === 0 && data.quantityRejected === 0) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['quantityAccepted'], message: 'Debes registrar cantidad aceptada o rechazada' });
     }
+});
+
+export const UpsertBatchReleaseChecklistSchema = z.object({
+    productionBatchId: z.string().uuid(),
+    qcApproved: z.boolean(),
+    labelingValidated: z.boolean(),
+    documentsCurrent: z.boolean(),
+    evidencesComplete: z.boolean(),
+    checklistNotes: z.string().optional(),
+    rejectedReason: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const SignBatchReleaseSchema = z.object({
+    actor: z.string().min(2),
+    approvalMethod: z.nativeEnum(DocumentApprovalMethod),
+    approvalSignature: z.string().min(4),
+});
+
+export const ListBatchReleasesQuerySchema = z.object({
+    productionBatchId: z.string().uuid().optional(),
+    status: z.nativeEnum(BatchReleaseStatus).optional(),
 });
 
 export const OperationalConfigSchema = z.object({

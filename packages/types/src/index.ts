@@ -199,6 +199,12 @@ export enum IncomingInspectionResult {
     RECHAZADO = 'rechazado',
 }
 
+export enum BatchReleaseStatus {
+    PENDIENTE_LIBERACION = 'pendiente_liberacion',
+    LIBERADO_QA = 'liberado_qa',
+    RECHAZADO = 'rechazado',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -631,6 +637,25 @@ export interface IncomingInspection {
     inspectedAt?: string | Date;
     releasedBy?: string;
     releasedAt?: string | Date;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface BatchRelease {
+    id: string;
+    productionBatchId: string;
+    status: BatchReleaseStatus;
+    qcApproved: boolean;
+    labelingValidated: boolean;
+    documentsCurrent: boolean;
+    evidencesComplete: boolean;
+    checklistNotes?: string;
+    rejectedReason?: string;
+    signedBy?: string;
+    approvalMethod?: DocumentApprovalMethod;
+    approvalSignature?: string;
+    signedAt?: string | Date;
+    reviewedBy?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

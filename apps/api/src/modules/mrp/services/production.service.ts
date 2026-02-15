@@ -5,6 +5,7 @@ import {
     ProductionBatchQcStatus,
     ProductionBatchStatus,
     ProductionOrderStatus,
+    BatchReleaseStatus,
     RegulatoryLabelScopeType,
     RegulatoryLabelStatus,
     WarehouseType,
@@ -21,6 +22,7 @@ import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
+import { BatchRelease } from '../entities/batch-release.entity';
 import { DocumentControlService } from './document-control.service';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema } from '@scaffold/schemas';
 import { z } from 'zod';
@@ -34,6 +36,7 @@ export class ProductionService {
     private readonly batchUnitRepo: EntityRepository<ProductionBatchUnit>;
     private readonly auditRepo: EntityRepository<QualityAuditEvent>;
     private readonly regulatoryLabelRepo: EntityRepository<RegulatoryLabel>;
+    private readonly batchReleaseRepo: EntityRepository<BatchRelease>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -43,6 +46,7 @@ export class ProductionService {
         this.batchUnitRepo = em.getRepository(ProductionBatchUnit);
         this.auditRepo = em.getRepository(QualityAuditEvent);
         this.regulatoryLabelRepo = em.getRepository(RegulatoryLabel);
+        this.batchReleaseRepo = em.getRepository(BatchRelease);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
@@ -198,6 +202,9 @@ export class ProductionService {
         batch.qcStatus = passed ? ProductionBatchQcStatus.PASSED : ProductionBatchQcStatus.FAILED;
         batch.status = passed ? ProductionBatchStatus.QC_PASSED : ProductionBatchStatus.QC_PENDING;
         await this.em.persistAndFlush(batch);
+        if (!passed) {
+            await this.reopenBatchReleaseIfNeeded(batch.id, 'Cambio de QC del lote');
+        }
         await this.logAudit('production_batch', batch.id, 'qc_updated', { passed });
         return batch;
     }
@@ -222,6 +229,9 @@ export class ProductionService {
         batch.packagingStatus = packed ? ProductionBatchPackagingStatus.PACKED : ProductionBatchPackagingStatus.PENDING;
         batch.status = packed ? ProductionBatchStatus.READY : ProductionBatchStatus.PACKING;
         await this.em.persistAndFlush(batch);
+        if (!packed) {
+            await this.reopenBatchReleaseIfNeeded(batch.id, 'Cambio de estado de empaque del lote');
+        }
         await this.logAudit('production_batch', batch.id, 'packaging_updated', { packed });
         return batch;
     }
@@ -262,6 +272,9 @@ export class ProductionService {
             unit.packaged = false;
         }
         await this.em.persistAndFlush(unit);
+        if (!passed) {
+            await this.reopenBatchReleaseIfNeeded(unit.batch.id, 'Cambio de QC en unidad serial');
+        }
         await this.logAudit('production_batch_unit', unit.id, 'qc_updated', { passed });
         return unit;
     }
@@ -274,6 +287,9 @@ export class ProductionService {
         }
         unit.packaged = packaged;
         await this.em.persistAndFlush(unit);
+        if (!packaged) {
+            await this.reopenBatchReleaseIfNeeded(unit.batch.id, 'Cambio de empaque en unidad serial');
+        }
         await this.logAudit('production_batch_unit', unit.id, 'packaging_updated', { packaged });
         return unit;
     }
@@ -411,6 +427,10 @@ export class ProductionService {
                         if (batch.qcStatus !== ProductionBatchQcStatus.PASSED || batch.packagingStatus !== ProductionBatchPackagingStatus.PACKED) {
                             throw new AppError(`El lote ${batch.code} no está listo (QC + Empaque)`, 400);
                         }
+                        const release = await this.batchReleaseRepo.findOne({ productionBatch: batch.id });
+                        if (!release || release.status !== BatchReleaseStatus.LIBERADO_QA) {
+                            throw new AppError(`El lote ${batch.code} no está liberado por QA`, 400);
+                        }
 
                         const units = batch.units.getItems();
                         if (units.length > 0) {
@@ -485,5 +505,30 @@ export class ProductionService {
     private async assertProcessDocument(process: DocumentProcess) {
         const service = new DocumentControlService(this.em);
         await service.assertActiveProcessDocument(process);
+    }
+
+    private async reopenBatchReleaseIfNeeded(productionBatchId: string, reason: string) {
+        const release = await this.batchReleaseRepo.findOne({ productionBatch: productionBatchId });
+        if (!release || release.status !== BatchReleaseStatus.LIBERADO_QA) {
+            return;
+        }
+
+        release.status = BatchReleaseStatus.PENDIENTE_LIBERACION;
+        release.signedBy = undefined;
+        release.approvalMethod = undefined;
+        release.approvalSignature = undefined;
+        release.signedAt = undefined;
+        release.documentsCurrent = false;
+        release.reviewedBy = 'sistema-backend';
+        release.checklistNotes = release.checklistNotes
+            ? `${release.checklistNotes}\nRevalidación requerida: ${reason}.`
+            : `Revalidación requerida: ${reason}.`;
+
+        await this.em.persistAndFlush(release);
+        await this.logAudit('batch_release', release.id, 'reopened', {
+            productionBatchId,
+            reason,
+            status: release.status,
+        });
     }
 }

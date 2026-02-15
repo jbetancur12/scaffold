@@ -85,6 +85,9 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/training-evidence', (req, res, next) => mrpController.listQualityTrainingEvidence(req, res, next));
     router.get('/quality/incoming-inspections', (req, res, next) => mrpController.listIncomingInspections(req, res, next));
     router.patch('/quality/incoming-inspections/:id/resolve', (req, res, next) => mrpController.resolveIncomingInspection(req, res, next));
+    router.post('/quality/batch-releases', (req, res, next) => mrpController.upsertBatchReleaseChecklist(req, res, next));
+    router.get('/quality/batch-releases', (req, res, next) => mrpController.listBatchReleases(req, res, next));
+    router.post('/quality/batch-releases/:productionBatchId/sign', (req, res, next) => mrpController.signBatchRelease(req, res, next));
     router.post('/quality/documents', (req, res, next) => mrpController.createControlledDocument(req, res, next));
     router.get('/quality/documents', (req, res, next) => mrpController.listControlledDocuments(req, res, next));
     router.post('/quality/documents/:id/submit-review', (req, res, next) => mrpController.submitControlledDocument(req, res, next));

@@ -53,6 +53,9 @@ import {
     useTrainingEvidenceQuery,
     useCreateTrainingEvidenceMutation,
     useIncomingInspectionsQuery,
+    useBatchReleasesQuery,
+    useSignBatchReleaseMutation,
+    useUpsertBatchReleaseChecklistMutation,
     useResolveIncomingInspectionMutation,
 } from '@/hooks/mrp/useQuality';
 
@@ -65,6 +68,7 @@ export const useQualityCompliance = () => {
     const { data: recallsData, loading: loadingRecalls } = useRecallCasesQuery();
     const { data: regulatoryLabelsData, loading: loadingRegulatoryLabels } = useRegulatoryLabelsQuery();
     const { data: incomingInspectionsData, loading: loadingIncomingInspections } = useIncomingInspectionsQuery();
+    const { data: batchReleasesData, loading: loadingBatchReleases } = useBatchReleasesQuery();
     const { data: complianceDashboardData, loading: loadingComplianceDashboard } = useComplianceDashboardQuery();
     const { data: riskControlsData, loading: loadingRiskControls } = useRiskControlsQuery();
     const { data: trainingEvidenceData, loading: loadingTrainingEvidence } = useTrainingEvidenceQuery();
@@ -90,6 +94,8 @@ export const useQualityCompliance = () => {
     const { execute: createRiskControl, loading: creatingRiskControl } = useCreateRiskControlMutation();
     const { execute: createTrainingEvidence, loading: creatingTrainingEvidence } = useCreateTrainingEvidenceMutation();
     const { execute: resolveIncomingInspection } = useResolveIncomingInspectionMutation();
+    const { execute: upsertBatchReleaseChecklist, loading: savingBatchReleaseChecklist } = useUpsertBatchReleaseChecklistMutation();
+    const { execute: signBatchRelease, loading: signingBatchRelease } = useSignBatchReleaseMutation();
 
     const [ncForm, setNcForm] = useState({
         title: '',
@@ -166,6 +172,15 @@ export const useQualityCompliance = () => {
         trainerName: '',
         evidenceRef: '',
     });
+    const [batchReleaseForm, setBatchReleaseForm] = useState({
+        productionBatchId: '',
+        qcApproved: false,
+        labelingValidated: false,
+        documentsCurrent: false,
+        evidencesComplete: false,
+        checklistNotes: '',
+        rejectedReason: '',
+    });
 
     const nonConformities = nonConformitiesData ?? [];
     const capas = capasData ?? [];
@@ -174,6 +189,7 @@ export const useQualityCompliance = () => {
     const recalls = recallsData ?? [];
     const regulatoryLabels = regulatoryLabelsData ?? [];
     const incomingInspections = incomingInspectionsData ?? [];
+    const batchReleases = batchReleasesData ?? [];
     const complianceDashboard = complianceDashboardData;
     const riskControls = riskControlsData ?? [];
     const trainingEvidence = trainingEvidenceData ?? [];
@@ -633,6 +649,58 @@ export const useQualityCompliance = () => {
         }
     };
 
+    const handleUpsertBatchReleaseChecklist = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!batchReleaseForm.productionBatchId) {
+            toast({ title: 'Error', description: 'Debes indicar el ID del lote', variant: 'destructive' });
+            return;
+        }
+        try {
+            await upsertBatchReleaseChecklist({
+                productionBatchId: batchReleaseForm.productionBatchId.trim(),
+                qcApproved: batchReleaseForm.qcApproved,
+                labelingValidated: batchReleaseForm.labelingValidated,
+                documentsCurrent: batchReleaseForm.documentsCurrent,
+                evidencesComplete: batchReleaseForm.evidencesComplete,
+                checklistNotes: batchReleaseForm.checklistNotes || undefined,
+                rejectedReason: batchReleaseForm.rejectedReason || undefined,
+                actor: 'sistema-web',
+            });
+            toast({ title: 'Checklist guardado', description: 'La liberación quedó actualizada.' });
+            setBatchReleaseForm((prev) => ({ ...prev, checklistNotes: '', rejectedReason: '' }));
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo guardar checklist de liberación'), variant: 'destructive' });
+        }
+    };
+
+    const quickSignBatchRelease = async (productionBatchId: string) => {
+        try {
+            const approvalSignature = window.prompt('Firma de aprobación QA (nombre completo o identificador)');
+            if (!approvalSignature) return;
+
+            const methodRaw = window.prompt(
+                'Método de firma (firma_manual, firma_digital)',
+                DocumentApprovalMethod.FIRMA_MANUAL
+            );
+            if (!methodRaw) return;
+
+            if (!Object.values(DocumentApprovalMethod).includes(methodRaw as DocumentApprovalMethod)) {
+                toast({ title: 'Error', description: 'Método de firma inválido', variant: 'destructive' });
+                return;
+            }
+
+            await signBatchRelease({
+                productionBatchId,
+                actor: 'sistema-web',
+                approvalMethod: methodRaw as DocumentApprovalMethod,
+                approvalSignature,
+            });
+            toast({ title: 'Lote liberado', description: 'La liberación QA quedó firmada.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo firmar la liberación QA'), variant: 'destructive' });
+        }
+    };
+
     return {
         nonConformities,
         capas,
@@ -641,6 +709,7 @@ export const useQualityCompliance = () => {
         recalls,
         regulatoryLabels,
         incomingInspections,
+        batchReleases,
         complianceDashboard,
         riskControls,
         trainingEvidence,
@@ -654,6 +723,7 @@ export const useQualityCompliance = () => {
         regulatoryLabelForm,
         riskControlForm,
         trainingForm,
+        batchReleaseForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
@@ -662,6 +732,7 @@ export const useQualityCompliance = () => {
         setRegulatoryLabelForm,
         setRiskControlForm,
         setTrainingForm,
+        setBatchReleaseForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
@@ -669,6 +740,7 @@ export const useQualityCompliance = () => {
         loadingRecalls,
         loadingRegulatoryLabels,
         loadingIncomingInspections,
+        loadingBatchReleases,
         loadingComplianceDashboard,
         loadingRiskControls,
         loadingTrainingEvidence,
@@ -683,6 +755,8 @@ export const useQualityCompliance = () => {
         exportingCompliance,
         creatingRiskControl,
         creatingTrainingEvidence,
+        savingBatchReleaseChecklist,
+        signingBatchRelease,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -703,6 +777,8 @@ export const useQualityCompliance = () => {
         handleUpsertRegulatoryLabel,
         quickValidateDispatch,
         quickResolveIncomingInspection,
+        handleUpsertBatchReleaseChecklist,
+        quickSignBatchRelease,
         handleExportCompliance,
         handleCreateRiskControl,
         handleCreateTrainingEvidence,

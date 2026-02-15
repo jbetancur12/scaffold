@@ -55,6 +55,9 @@ import {
     ListQualityTrainingEvidenceQuerySchema,
     ListIncomingInspectionsQuerySchema,
     ResolveIncomingInspectionSchema,
+    UpsertBatchReleaseChecklistSchema,
+    SignBatchReleaseSchema,
+    ListBatchReleasesQuerySchema,
     CreateControlledDocumentSchema,
     ListControlledDocumentsQuerySchema,
     ActorPayloadSchema,
@@ -787,6 +790,37 @@ export class MrpController {
             const payload = ResolveIncomingInspectionSchema.parse(req.body);
             const row = await this.qualityService.resolveIncomingInspection(id, payload);
             return ApiResponse.success(res, row, 'Inspección de recepción resuelta');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async upsertBatchReleaseChecklist(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = UpsertBatchReleaseChecklistSchema.parse(req.body);
+            const row = await this.qualityService.upsertBatchReleaseChecklist(payload);
+            return ApiResponse.success(res, row, 'Checklist de liberación QA actualizado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async signBatchRelease(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productionBatchId } = req.params;
+            const payload = SignBatchReleaseSchema.parse(req.body);
+            const row = await this.qualityService.signBatchRelease(productionBatchId, payload);
+            return ApiResponse.success(res, row, 'Lote liberado por QA');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listBatchReleases(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListBatchReleasesQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listBatchReleases(filters);
+            return ApiResponse.success(res, rows);
         } catch (error) {
             next(error);
         }

@@ -48,6 +48,8 @@ import {
     IncomingInspection,
     IncomingInspectionResult,
     IncomingInspectionStatus,
+    BatchRelease,
+    BatchReleaseStatus,
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
@@ -273,6 +275,17 @@ export interface ResolveIncomingInspectionPayload {
     notes?: string;
     quantityAccepted: number;
     quantityRejected: number;
+    actor?: string;
+}
+
+export interface UpsertBatchReleaseChecklistPayload {
+    productionBatchId: string;
+    qcApproved: boolean;
+    labelingValidated: boolean;
+    documentsCurrent: boolean;
+    evidencesComplete: boolean;
+    checklistNotes?: string;
+    rejectedReason?: string;
     actor?: string;
 }
 
@@ -609,6 +622,21 @@ export const mrpApi = {
     },
     resolveIncomingInspection: async (id: string, data: ResolveIncomingInspectionPayload): Promise<IncomingInspection> => {
         const response = await api.patch<IncomingInspection>(`/mrp/quality/incoming-inspections/${id}/resolve`, data);
+        return response.data;
+    },
+    upsertBatchReleaseChecklist: async (data: UpsertBatchReleaseChecklistPayload): Promise<BatchRelease> => {
+        const response = await api.post<BatchRelease>('/mrp/quality/batch-releases', data);
+        return response.data;
+    },
+    listBatchReleases: async (filters?: { productionBatchId?: string; status?: BatchReleaseStatus }): Promise<BatchRelease[]> => {
+        const response = await api.get<BatchRelease[]>('/mrp/quality/batch-releases', { params: filters });
+        return response.data;
+    },
+    signBatchRelease: async (
+        productionBatchId: string,
+        payload: { actor: string; approvalMethod: DocumentApprovalMethod; approvalSignature: string }
+    ): Promise<BatchRelease> => {
+        const response = await api.post<BatchRelease>(`/mrp/quality/batch-releases/${productionBatchId}/sign`, payload);
         return response.data;
     },
     createControlledDocument: async (data: CreateControlledDocumentPayload): Promise<ControlledDocument> => {

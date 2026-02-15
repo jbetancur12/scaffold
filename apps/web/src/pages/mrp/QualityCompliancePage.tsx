@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+    BatchReleaseStatus,
     CapaStatus,
     DocumentProcess,
     DocumentStatus,
@@ -60,6 +61,9 @@ const auditActionLabels: Record<string, string> = {
     qc_updated: 'QC actualizado',
     packaging_updated: 'Empaque actualizado',
     progress_updated: 'Avance actualizado',
+    checklist_updated: 'Checklist actualizado',
+    signed: 'Liberación firmada',
+    reopened: 'Liberación reabierta',
 };
 
 const shortId = (value?: string) => {
@@ -76,6 +80,7 @@ const formatAuditMetadata = (
     const metadataLabels: Record<string, string> = {
         code: 'Código',
         batchId: 'Lote',
+        productionBatchId: 'Lote de producción',
         batchUnitId: 'Unidad serial',
         rawMaterialId: 'Materia prima',
         purchaseOrderId: 'Orden de compra',
@@ -94,6 +99,7 @@ const formatAuditMetadata = (
     const knownKeys = [
         'code',
         'batchId',
+        'productionBatchId',
         'batchUnitId',
         'rawMaterialId',
         'purchaseOrderId',
@@ -142,6 +148,7 @@ export default function QualityCompliancePage() {
         recalls,
         regulatoryLabels,
         incomingInspections,
+        batchReleases,
         complianceDashboard,
         riskControls,
         trainingEvidence,
@@ -155,6 +162,7 @@ export default function QualityCompliancePage() {
         regulatoryLabelForm,
         riskControlForm,
         trainingForm,
+        batchReleaseForm,
         setNcForm,
         setCapaForm,
         setDocumentForm,
@@ -163,6 +171,7 @@ export default function QualityCompliancePage() {
         setRegulatoryLabelForm,
         setRiskControlForm,
         setTrainingForm,
+        setBatchReleaseForm,
         loadingNc,
         loadingCapas,
         loadingAudit,
@@ -170,6 +179,7 @@ export default function QualityCompliancePage() {
         loadingRecalls,
         loadingRegulatoryLabels,
         loadingIncomingInspections,
+        loadingBatchReleases,
         loadingComplianceDashboard,
         loadingRiskControls,
         loadingTrainingEvidence,
@@ -184,6 +194,8 @@ export default function QualityCompliancePage() {
         exportingCompliance,
         creatingRiskControl,
         creatingTrainingEvidence,
+        savingBatchReleaseChecklist,
+        signingBatchRelease,
         submittingDocument,
         approvingDocument,
         handleCreateNc,
@@ -204,6 +216,8 @@ export default function QualityCompliancePage() {
         handleUpsertRegulatoryLabel,
         quickValidateDispatch,
         quickResolveIncomingInspection,
+        handleUpsertBatchReleaseChecklist,
+        quickSignBatchRelease,
         handleExportCompliance,
         handleCreateRiskControl,
         handleCreateTrainingEvidence,
@@ -235,6 +249,7 @@ export default function QualityCompliancePage() {
                     <TabsTrigger value="recall">Recall</TabsTrigger>
                     <TabsTrigger value="labeling">Etiquetado</TabsTrigger>
                     <TabsTrigger value="incoming">Recepción</TabsTrigger>
+                    <TabsTrigger value="batch-release">Liberación QA</TabsTrigger>
                     <TabsTrigger value="compliance">Cumplimiento</TabsTrigger>
                     <TabsTrigger value="docs">Control documental</TabsTrigger>
                     <TabsTrigger value="audit">Auditoría</TabsTrigger>
@@ -1087,6 +1102,119 @@ export default function QualityCompliancePage() {
                                                 onClick={() => quickResolveIncomingInspection(inspection.id, Number(inspection.quantityReceived))}
                                             >
                                                 Resolver QA
+                                            </Button>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="batch-release" className="space-y-4">
+                    <Card>
+                        <CardHeader><CardTitle>Checklist de Liberación QA</CardTitle></CardHeader>
+                        <CardContent>
+                            <form className="grid grid-cols-1 md:grid-cols-2 gap-3" onSubmit={handleUpsertBatchReleaseChecklist}>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>ID Lote de producción</Label>
+                                    <Input
+                                        value={batchReleaseForm.productionBatchId}
+                                        onChange={(e) => setBatchReleaseForm((p) => ({ ...p, productionBatchId: e.target.value }))}
+                                        placeholder="UUID del lote"
+                                        required
+                                    />
+                                </div>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={batchReleaseForm.qcApproved}
+                                        onChange={(e) => setBatchReleaseForm((p) => ({ ...p, qcApproved: e.target.checked }))}
+                                    />
+                                    QC aprobado
+                                </label>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={batchReleaseForm.labelingValidated}
+                                        onChange={(e) => setBatchReleaseForm((p) => ({ ...p, labelingValidated: e.target.checked }))}
+                                    />
+                                    Etiquetado validado
+                                </label>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={batchReleaseForm.documentsCurrent}
+                                        onChange={(e) => setBatchReleaseForm((p) => ({ ...p, documentsCurrent: e.target.checked }))}
+                                    />
+                                    Documentación vigente
+                                </label>
+                                <label className="flex items-center gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={batchReleaseForm.evidencesComplete}
+                                        onChange={(e) => setBatchReleaseForm((p) => ({ ...p, evidencesComplete: e.target.checked }))}
+                                    />
+                                    Evidencias completas
+                                </label>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Notas de checklist (opcional)</Label>
+                                    <Textarea
+                                        value={batchReleaseForm.checklistNotes}
+                                        onChange={(e) => setBatchReleaseForm((p) => ({ ...p, checklistNotes: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <Label>Motivo de rechazo (opcional)</Label>
+                                    <Textarea
+                                        value={batchReleaseForm.rejectedReason}
+                                        onChange={(e) => setBatchReleaseForm((p) => ({ ...p, rejectedReason: e.target.value }))}
+                                        placeholder="Si se llena, el lote queda rechazado"
+                                    />
+                                </div>
+                                <div className="md:col-span-2 flex justify-end">
+                                    <Button type="submit" disabled={savingBatchReleaseChecklist}>
+                                        {savingBatchReleaseChecklist ? 'Guardando...' : 'Guardar checklist'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader><CardTitle>Liberaciones QA ({batchReleases.length})</CardTitle></CardHeader>
+                        <CardContent className="space-y-2">
+                            {loadingBatchReleases ? <div>Cargando...</div> : batchReleases.length === 0 ? <div className="text-sm text-slate-500">Sin liberaciones.</div> : batchReleases.map((release) => (
+                                <div key={release.id} className="border rounded-md p-3 flex items-start justify-between gap-4">
+                                    <div>
+                                        <div className="font-medium">
+                                            Lote: <span title={release.productionBatchId}>{shortId(release.productionBatchId)}</span>
+                                        </div>
+                                        <div className="text-xs text-slate-600 mt-1">
+                                            QC: {release.qcApproved ? 'ok' : 'pendiente'} | Etiquetado: {release.labelingValidated ? 'ok' : 'pendiente'} | Docs: {release.documentsCurrent ? 'ok' : 'pendiente'} | Evidencias: {release.evidencesComplete ? 'ok' : 'pendiente'}
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1">
+                                            Revisó: {release.reviewedBy || 'N/A'} | Firma: {release.signedBy || 'N/A'}
+                                        </div>
+                                        {release.rejectedReason ? (
+                                            <div className="text-xs text-red-600 mt-1">Motivo rechazo: {release.rejectedReason}</div>
+                                        ) : null}
+                                        <Badge variant="outline" className="mt-2">
+                                            {release.status === BatchReleaseStatus.PENDIENTE_LIBERACION
+                                                ? 'pendiente_liberacion'
+                                                : release.status === BatchReleaseStatus.LIBERADO_QA
+                                                    ? 'liberado_qa'
+                                                    : 'rechazado'}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {release.status === BatchReleaseStatus.PENDIENTE_LIBERACION ? (
+                                            <Button
+                                                size="sm"
+                                                disabled={signingBatchRelease}
+                                                onClick={() => quickSignBatchRelease(release.productionBatchId)}
+                                            >
+                                                {signingBatchRelease ? 'Firmando...' : 'Firmar liberación'}
                                             </Button>
                                         ) : null}
                                     </div>

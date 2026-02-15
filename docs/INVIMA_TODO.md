@@ -12,6 +12,9 @@
 - [x] Flujo de aprobacion de documentos con firma.
 - [x] Vincular documento vigente a cada proceso (produccion, QC, empaque).
 - [x] Bloquear ejecucion si no existe documento aprobado vigente.
+- [x] Checklist de liberacion QA por lote (QC, etiquetado, documentos, evidencias).
+- [x] Firma de liberacion QA (manual/digital) con auditoria.
+- [x] Bloquear cierre de orden/lote si no esta en `liberado_qa`.
 
 ## Fase 3 - Tecnovigilancia y postmercado
 - [x] Registro de quejas y eventos adversos.
