@@ -607,8 +607,17 @@ export interface QualityTrainingEvidence {
 export interface IncomingInspection {
     id: string;
     purchaseOrderId?: string;
+    purchaseOrder?: Pick<PurchaseOrder, 'id'> & {
+        supplier?: Pick<Supplier, 'id' | 'name'>;
+    };
     purchaseOrderItemId?: string;
+    purchaseOrderItem?: {
+        id: string;
+        quantity?: number;
+        rawMaterial?: Pick<RawMaterial, 'id' | 'name' | 'sku' | 'unit'>;
+    };
     rawMaterialId: string;
+    rawMaterial?: Pick<RawMaterial, 'id' | 'name' | 'sku' | 'unit'>;
     warehouseId: string;
     status: IncomingInspectionStatus;
     inspectionResult?: IncomingInspectionResult;

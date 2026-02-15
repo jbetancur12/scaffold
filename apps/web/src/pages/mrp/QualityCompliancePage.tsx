@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     CapaStatus,
     DocumentProcess,
@@ -28,7 +30,110 @@ import { Badge } from '@/components/ui/badge';
 import { qualityDocumentStatusLabels, qualityProcessLabels } from '@/constants/mrpQuality';
 import { useQualityCompliance } from '@/hooks/mrp/useQualityCompliance';
 
+const auditEntityLabels: Record<string, string> = {
+    incoming_inspection: 'Inspección de recepción',
+    controlled_document: 'Documento controlado',
+    non_conformity: 'No conformidad',
+    capa: 'CAPA',
+    technovigilance_case: 'Tecnovigilancia',
+    recall_case: 'Recall',
+    recall_notification: 'Notificación de recall',
+    regulatory_label: 'Etiqueta regulatoria',
+    production_batch: 'Lote de producción',
+    production_batch_unit: 'Unidad serial',
+    production_order: 'Orden de producción',
+    quality_risk_control: 'Riesgo/control',
+    quality_training_evidence: 'Capacitación',
+};
+
+const auditActionLabels: Record<string, string> = {
+    created: 'Creado',
+    updated: 'Actualizado',
+    approved: 'Aprobado',
+    closed: 'Cerrado',
+    resolved: 'Resuelto',
+    upserted: 'Registrado',
+    dispatch_validated: 'Despacho validado',
+    reported_invima: 'Reportado a INVIMA',
+    status_updated: 'Estado actualizado',
+    units_added: 'Unidades agregadas',
+    qc_updated: 'QC actualizado',
+    packaging_updated: 'Empaque actualizado',
+    progress_updated: 'Avance actualizado',
+};
+
+const shortId = (value?: string) => {
+    if (!value) return 'N/A';
+    return value.length > 12 ? `${value.slice(0, 8)}...` : value;
+};
+
+const formatAuditMetadata = (
+    metadata?: Record<string, unknown>,
+    rawMaterialLabelsById?: Record<string, string>
+) => {
+    if (!metadata) return '';
+
+    const metadataLabels: Record<string, string> = {
+        code: 'Código',
+        batchId: 'Lote',
+        batchUnitId: 'Unidad serial',
+        rawMaterialId: 'Materia prima',
+        purchaseOrderId: 'Orden de compra',
+        recallCaseId: 'Caso de recall',
+        status: 'Estado',
+        scopeType: 'Alcance',
+        inspectionResult: 'Resultado de inspección',
+        quantityAccepted: 'Cantidad aceptada',
+        quantityRejected: 'Cantidad rechazada',
+        quantity: 'Cantidad',
+        coveragePercent: 'Cobertura (%)',
+        reportNumber: 'Número de reporte',
+        reportChannel: 'Canal de reporte',
+    };
+
+    const knownKeys = [
+        'code',
+        'batchId',
+        'batchUnitId',
+        'rawMaterialId',
+        'purchaseOrderId',
+        'recallCaseId',
+        'status',
+        'scopeType',
+        'inspectionResult',
+        'quantityAccepted',
+        'quantityRejected',
+        'quantity',
+        'coveragePercent',
+        'reportNumber',
+        'reportChannel',
+    ];
+
+    const values = knownKeys
+        .filter((key) => metadata[key] !== undefined && metadata[key] !== null && metadata[key] !== '')
+        .map((key) => {
+            const value = metadata[key];
+            const printable = typeof value === 'string' ? value : JSON.stringify(value);
+            const label = metadataLabels[key] || key;
+            if (key === 'rawMaterialId' && rawMaterialLabelsById && rawMaterialLabelsById[printable]) {
+                return `${label}: ${rawMaterialLabelsById[printable]}`;
+            }
+            if (key.toLowerCase().endsWith('id')) return `${label}: ${shortId(printable)}`;
+            return `${label}: ${printable}`;
+        });
+
+    if (values.length > 0) return values.join(' | ');
+
+    const fallback = Object.entries(metadata)
+        .slice(0, 4)
+        .map(([key, value]) => `${metadataLabels[key] || key}: ${typeof value === 'string' ? value : JSON.stringify(value)}`);
+    return fallback.join(' | ');
+};
+
 export default function QualityCompliancePage() {
+    const navigate = useNavigate();
+    const [expandedIncomingInspectionId, setExpandedIncomingInspectionId] = useState<string | null>(null);
+
     const {
         nonConformities,
         capas,
@@ -103,6 +208,15 @@ export default function QualityCompliancePage() {
         handleCreateRiskControl,
         handleCreateTrainingEvidence,
     } = useQualityCompliance();
+
+    const rawMaterialLabelsById = incomingInspections.reduce<Record<string, string>>((acc, inspection) => {
+        if (inspection.rawMaterialId && inspection.rawMaterial?.name) {
+            acc[inspection.rawMaterialId] = inspection.rawMaterial.sku
+                ? `${inspection.rawMaterial.name} (${inspection.rawMaterial.sku})`
+                : inspection.rawMaterial.name;
+        }
+        return acc;
+    }, {});
 
     return (
         <div className="space-y-6">
@@ -902,23 +1016,80 @@ export default function QualityCompliancePage() {
                             {loadingIncomingInspections ? <div>Cargando...</div> : incomingInspections.length === 0 ? <div className="text-sm text-slate-500">Sin inspecciones.</div> : incomingInspections.map((inspection) => (
                                 <div key={inspection.id} className="border rounded-md p-3 flex items-start justify-between gap-3">
                                     <div>
-                                        <div className="font-medium">Materia prima: {inspection.rawMaterialId}</div>
+                                        <div className="font-medium">
+                                            Materia prima: {inspection.rawMaterial?.name || inspection.rawMaterialId}
+                                            {inspection.rawMaterial?.sku ? ` (${inspection.rawMaterial.sku})` : ''}
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1">ID: {inspection.rawMaterialId}</div>
                                         <div className="text-xs text-slate-600 mt-1">
                                             Recibido: {inspection.quantityReceived} | Aceptado: {inspection.quantityAccepted} | Rechazado: {inspection.quantityRejected}
                                         </div>
                                         <div className="text-xs text-slate-500 mt-1">
-                                            OC: {inspection.purchaseOrderId || 'N/A'} | Certificado: {inspection.certificateRef || 'N/A'}
+                                            OC:{' '}
+                                            {inspection.purchaseOrderId ? (
+                                                <button
+                                                    type="button"
+                                                    className="underline text-blue-700 hover:text-blue-900"
+                                                    onClick={() => navigate(`/mrp/purchase-orders/${inspection.purchaseOrderId}`)}
+                                                    title={inspection.purchaseOrderId}
+                                                >
+                                                    {inspection.purchaseOrder?.id
+                                                        ? `OC-${inspection.purchaseOrder.id.slice(0, 8).toUpperCase()}`
+                                                        : `OC-${inspection.purchaseOrderId.slice(0, 8).toUpperCase()}`}
+                                                </button>
+                                            ) : 'N/A'}
+                                            {' '}| Proveedor:{' '}
+                                            {inspection.purchaseOrder?.supplier?.id ? (
+                                                <button
+                                                    type="button"
+                                                    className="underline text-blue-700 hover:text-blue-900"
+                                                    onClick={() => navigate(`/mrp/suppliers/${inspection.purchaseOrder!.supplier!.id}`)}
+                                                    title={inspection.purchaseOrder!.supplier!.id}
+                                                >
+                                                    {inspection.purchaseOrder?.supplier?.name || 'N/A'}
+                                                </button>
+                                            ) : (inspection.purchaseOrder?.supplier?.name || 'N/A')}
+                                            {' '}| Certificado: {inspection.certificateRef || 'Sin certificado cargado'}
                                         </div>
+                                        {expandedIncomingInspectionId === inspection.id ? (
+                                            <div className="text-xs text-slate-600 mt-2 border rounded-md p-2 bg-slate-50 space-y-1">
+                                                <div>Resultado inspección: {inspection.inspectionResult || 'N/A'}</div>
+                                                <div>Lote proveedor: {inspection.supplierLotCode || 'N/A'}</div>
+                                                <div>Notas: {inspection.notes || 'Sin notas'}</div>
+                                                <div>Inspeccionado por: {inspection.inspectedBy || 'N/A'}</div>
+                                                <div>Fecha inspección: {inspection.inspectedAt ? new Date(inspection.inspectedAt).toLocaleString() : 'N/A'}</div>
+                                                <div>Liberado por: {inspection.releasedBy || 'N/A'}</div>
+                                                <div>Fecha liberación: {inspection.releasedAt ? new Date(inspection.releasedAt).toLocaleString() : 'N/A'}</div>
+                                                <div>
+                                                    Ítem OC:{' '}
+                                                    {inspection.purchaseOrderItem?.rawMaterial
+                                                        ? `${inspection.purchaseOrderItem.rawMaterial.name} (${inspection.purchaseOrderItem.rawMaterial.sku}) x ${inspection.purchaseOrderItem.quantity || 0}`
+                                                        : (inspection.purchaseOrderItemId || 'N/A')}
+                                                    {inspection.purchaseOrderItemId ? (
+                                                        <> {' '}<span title={inspection.purchaseOrderItemId} className="text-slate-500">[{shortId(inspection.purchaseOrderItemId)}]</span></>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        ) : null}
                                         <Badge variant="outline" className="mt-2">{inspection.status}</Badge>
                                     </div>
-                                    {inspection.status === IncomingInspectionStatus.PENDIENTE ? (
+                                    <div className="flex gap-2">
                                         <Button
                                             size="sm"
-                                            onClick={() => quickResolveIncomingInspection(inspection.id, Number(inspection.quantityReceived))}
+                                            variant="outline"
+                                            onClick={() => setExpandedIncomingInspectionId((prev) => (prev === inspection.id ? null : inspection.id))}
                                         >
-                                            Resolver QA
+                                            {expandedIncomingInspectionId === inspection.id ? 'Ocultar detalle' : 'Ver detalle'}
                                         </Button>
-                                    ) : null}
+                                        {inspection.status === IncomingInspectionStatus.PENDIENTE ? (
+                                            <Button
+                                                size="sm"
+                                                onClick={() => quickResolveIncomingInspection(inspection.id, Number(inspection.quantityReceived))}
+                                            >
+                                                Resolver QA
+                                            </Button>
+                                        ) : null}
+                                    </div>
                                 </div>
                             ))}
                         </CardContent>
@@ -1049,8 +1220,19 @@ export default function QualityCompliancePage() {
                         <CardContent className="space-y-2">
                             {loadingAudit ? <div>Cargando...</div> : audits.length === 0 ? <div className="text-sm text-slate-500">Sin eventos.</div> : audits.map((a) => (
                                 <div key={a.id} className="border rounded-md p-3">
-                                    <div className="text-sm font-medium">{a.entityType} / {a.entityId}</div>
-                                    <div className="text-xs text-slate-600">{a.action} {a.actor ? `por ${a.actor}` : ''}</div>
+                                    <div className="text-sm font-medium">
+                                        {auditEntityLabels[a.entityType] || a.entityType} /{' '}
+                                        <span title={a.entityId}>{shortId(a.entityId)}</span>
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-1">ID: {a.entityId}</div>
+                                    <div className="text-xs text-slate-600">
+                                        {auditActionLabels[a.action] || a.action} {a.actor ? `por ${a.actor}` : ''}
+                                    </div>
+                                    {a.metadata ? (
+                                        <div className="text-[11px] text-slate-600 mt-1">
+                                            {formatAuditMetadata(a.metadata, rawMaterialLabelsById)}
+                                        </div>
+                                    ) : null}
                                     <div className="text-[11px] text-slate-500">{new Date(a.createdAt).toLocaleString()}</div>
                                 </div>
                             ))}

@@ -877,7 +877,7 @@ export class QualityService {
         if (filters.rawMaterialId) query.rawMaterial = filters.rawMaterialId;
         if (filters.purchaseOrderId) query.purchaseOrder = filters.purchaseOrderId;
         return this.incomingInspectionRepo.find(query, {
-            populate: ['rawMaterial', 'warehouse', 'purchaseOrder', 'purchaseOrderItem'],
+            populate: ['rawMaterial', 'warehouse', 'purchaseOrder', 'purchaseOrder.supplier', 'purchaseOrderItem', 'purchaseOrderItem.rawMaterial'],
             orderBy: { createdAt: 'DESC' },
         });
     }
