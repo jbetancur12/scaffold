@@ -947,6 +947,7 @@ export interface IncomingInspection {
     quantityReceived: number;
     quantityAccepted: number;
     quantityRejected: number;
+    acceptedUnitCost?: number;
     inspectedBy?: string;
     inspectedAt?: string | Date;
     releasedBy?: string;
@@ -1506,6 +1507,7 @@ export interface ResolveIncomingInspectionPayload {
     notes?: string;
     quantityAccepted: number;
     quantityRejected: number;
+    acceptedUnitCost?: number;
     actor?: string;
 }
 

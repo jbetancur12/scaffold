@@ -56,6 +56,7 @@ export class QualityIncomingService {
         notes?: string;
         quantityAccepted: number;
         quantityRejected: number;
+        acceptedUnitCost?: number;
         actor?: string;
     }) {
         const row = await this.incomingInspectionRepo.findOneOrFail(
@@ -85,6 +86,7 @@ export class QualityIncomingService {
         row.notes = payload.notes;
         row.quantityAccepted = payload.quantityAccepted;
         row.quantityRejected = payload.quantityRejected;
+        row.acceptedUnitCost = payload.acceptedUnitCost;
         row.inspectedBy = payload.actor;
         row.inspectedAt = new Date();
         row.releasedBy = payload.actor;
@@ -122,10 +124,12 @@ export class QualityIncomingService {
             const acceptedQty = Number(payload.quantityAccepted);
             releasedInventory.quantity = currentStock + acceptedQty;
 
-            const purchasePrice = Number(row.rawMaterial.lastPurchasePrice || row.rawMaterial.averageCost || 0);
+            const purchasePrice = Number(payload.acceptedUnitCost ?? row.rawMaterial.lastPurchasePrice ?? row.rawMaterial.averageCost ?? 0);
             const currentAvg = Number(row.rawMaterial.averageCost || 0);
             if (currentStock + acceptedQty > 0 && purchasePrice > 0) {
                 row.rawMaterial.averageCost = ((currentStock * currentAvg) + (acceptedQty * purchasePrice)) / (currentStock + acceptedQty);
+                row.rawMaterial.lastPurchasePrice = purchasePrice;
+                row.rawMaterial.lastPurchaseDate = new Date();
             }
 
             await this.em.persistAndFlush([releasedInventory, row.rawMaterial]);
@@ -144,6 +148,7 @@ export class QualityIncomingService {
                 inspectionResult: row.inspectionResult,
                 quantityAccepted: row.quantityAccepted,
                 quantityRejected: row.quantityRejected,
+                acceptedUnitCost: row.acceptedUnitCost,
                 rawMaterialId: row.rawMaterial.id,
             },
         });

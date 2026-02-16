@@ -12,6 +12,16 @@ export class OperationalConfigService {
         this.configRepo = em.getRepository(OperationalConfig);
     }
 
+    private roundTo(value: number, decimals = 4): number {
+        const factor = 10 ** decimals;
+        return Math.round((value + Number.EPSILON) * factor) / factor;
+    }
+
+    private getDefaultMonthlyProductiveMinutes(): number {
+        // 44 horas/semana promedio mensual: (44 * 52 / 12) * 60 = 11440
+        return Math.round((44 * 52 * 60) / 12);
+    }
+
     async getConfig(): Promise<OperationalConfig> {
         const configs = await this.configRepo.findAll({ limit: 1 });
         if (configs.length > 0) {
@@ -23,10 +33,10 @@ export class OperationalConfigService {
 
     async createDefaultConfig(): Promise<OperationalConfig> {
         const config = new OperationalConfig();
-        // Default values for Colombia context
-        config.operatorSalary = 1300000; // ~SMMLV
+        // Valores por defecto base
+        config.operatorSalary = 2000000;
         config.operatorLoadFactor = 1.38; // ~38% prestacional
-        config.operatorRealMonthlyMinutes = 11520; // 192 hours * 60
+        config.operatorRealMonthlyMinutes = this.getDefaultMonthlyProductiveMinutes();
 
         config.rent = 0;
         config.utilities = 0;
@@ -67,7 +77,7 @@ export class OperationalConfigService {
         // MOD Cost Per Minute: (Salary * Load) / Real Monthly Minutes
         const monthlyModCost = config.operatorSalary * config.operatorLoadFactor;
         config.modCostPerMinute = config.operatorRealMonthlyMinutes > 0
-            ? Math.round(monthlyModCost / config.operatorRealMonthlyMinutes)
+            ? this.roundTo(monthlyModCost / config.operatorRealMonthlyMinutes)
             : 0;
 
         // CIF Cost Per Minute: Total Indirect Expenses / Total Factory Minutes
@@ -75,11 +85,11 @@ export class OperationalConfigService {
         const totalFactoryMinutes = config.operatorRealMonthlyMinutes * config.numberOfOperators;
 
         config.cifCostPerMinute = totalFactoryMinutes > 0
-            ? Math.round(totalMonthlyCif / totalFactoryMinutes)
+            ? this.roundTo(totalMonthlyCif / totalFactoryMinutes)
             : 0;
 
         // Total
-        config.costPerMinute = config.modCostPerMinute + config.cifCostPerMinute;
+        config.costPerMinute = this.roundTo(config.modCostPerMinute + config.cifCostPerMinute);
 
         await this.em.flush();
         return config;

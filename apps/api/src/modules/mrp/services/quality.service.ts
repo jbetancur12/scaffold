@@ -648,6 +648,7 @@ export class QualityService {
         notes?: string;
         quantityAccepted: number;
         quantityRejected: number;
+        acceptedUnitCost?: number;
         actor?: string;
     }) {
         return this.incomingService.resolveIncomingInspection(id, payload);

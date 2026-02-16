@@ -59,6 +59,14 @@ export const useQualityReceptionReleaseFlow = () => {
             const supplierLotCode = window.prompt('Lote del proveedor (opcional)') || undefined;
             const certificateRef = window.prompt('Referencia de certificado (opcional)') || undefined;
             const notes = window.prompt('Notas de inspección (opcional)') || undefined;
+            const acceptedUnitCostRaw = window.prompt('Costo unitario real aceptado (opcional, para corregir costo promedio)');
+            const acceptedUnitCost = acceptedUnitCostRaw && acceptedUnitCostRaw.trim().length > 0
+                ? Number(acceptedUnitCostRaw)
+                : undefined;
+            if (acceptedUnitCostRaw && acceptedUnitCostRaw.trim().length > 0 && (Number.isNaN(acceptedUnitCost) || (acceptedUnitCost ?? 0) < 0)) {
+                toast({ title: 'Error', description: 'Costo unitario aceptado inválido', variant: 'destructive' });
+                return;
+            }
 
             await resolveIncomingInspection({
                 id,
@@ -68,6 +76,7 @@ export const useQualityReceptionReleaseFlow = () => {
                 notes,
                 quantityAccepted,
                 quantityRejected,
+                acceptedUnitCost,
                 actor: 'sistema-web',
             });
             toast({ title: 'Inspección resuelta', description: 'La recepción fue liberada/rechazada correctamente.' });

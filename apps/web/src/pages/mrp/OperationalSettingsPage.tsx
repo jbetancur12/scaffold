@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { OperationalConfig } from '@scaffold/types';
-import { Save, Calculator, Clock, Users, Building, Percent } from 'lucide-react';
+import { Save, Calculator, Users, Building } from 'lucide-react';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
@@ -12,12 +13,13 @@ import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/h
 
 export default function OperationalSettingsPage() {
     const { toast } = useToast();
+    const defaultMonthlyProductiveMinutes = Math.round((44 * 52 * 60) / 12); // 11440
     const [loading, setLoading] = useState(false);
     const [config, setConfig] = useState<OperationalConfig>({
         id: '',
-        operatorSalary: 0,
+        operatorSalary: 2000000,
         operatorLoadFactor: 1.38,
-        operatorRealMonthlyMinutes: 11520,
+        operatorRealMonthlyMinutes: defaultMonthlyProductiveMinutes,
         rent: 0,
         utilities: 0,
         adminSalaries: 0,
@@ -108,32 +110,29 @@ export default function OperationalSettingsPage() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="loadFactor">Factor Prestacional</Label>
-                                    <div className="relative">
-                                        <Percent className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <CurrencyInput
-                                            id="loadFactor"
-                                            prefix=""
-                                            className="pl-8"
-                                            value={config.operatorLoadFactor}
-                                            onValueChange={(val) => setConfig({ ...config, operatorLoadFactor: val || 0 })}
-                                            required
-                                        />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">Ej: 1.38 para 38%</p>
+                                    <Input
+                                        id="loadFactor"
+                                        type="number"
+                                        min={1}
+                                        step="0.01"
+                                        value={config.operatorLoadFactor}
+                                        onChange={(e) => setConfig({ ...config, operatorLoadFactor: Number(e.target.value) || 0 })}
+                                        required
+                                    />
+                                    <p className="text-xs text-muted-foreground">Ej: 1.52 = salario + 52% de carga prestacional.</p>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="realMinutes">Minutos Reales / Mes</Label>
-                                    <div className="relative">
-                                        <Clock className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <CurrencyInput
-                                            id="realMinutes"
-                                            prefix=""
-                                            className="pl-8"
-                                            value={config.operatorRealMonthlyMinutes}
-                                            onValueChange={(val) => setConfig({ ...config, operatorRealMonthlyMinutes: val || 0 })}
-                                            required
-                                        />
-                                    </div>
+                                    <Input
+                                        id="realMinutes"
+                                        type="number"
+                                        min={1}
+                                        step="1"
+                                        value={config.operatorRealMonthlyMinutes}
+                                        onChange={(e) => setConfig({ ...config, operatorRealMonthlyMinutes: Number(e.target.value) || 0 })}
+                                        required
+                                    />
+                                    <p className="text-xs text-muted-foreground">Solo tiempo productivo real (descuenta pausas, reuniones y tiempos muertos).</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -203,17 +202,15 @@ export default function OperationalSettingsPage() {
 
                             <div className="space-y-2 pt-2 border-t border-slate-100">
                                 <Label htmlFor="operators">Número de Operarios</Label>
-                                <div className="relative">
-                                    <Users className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                                    <CurrencyInput
-                                        id="operators"
-                                        prefix=""
-                                        className="pl-8"
-                                        value={config.numberOfOperators}
-                                        onValueChange={(val) => setConfig({ ...config, numberOfOperators: val || 0 })}
-                                        required
-                                    />
-                                </div>
+                                <Input
+                                    id="operators"
+                                    type="number"
+                                    min={1}
+                                    step="1"
+                                    value={config.numberOfOperators}
+                                    onChange={(e) => setConfig({ ...config, numberOfOperators: Number(e.target.value) || 0 })}
+                                    required
+                                />
                                 <p className="text-xs text-muted-foreground">Base para distribuir el CIF.</p>
                             </div>
                         </CardContent>
@@ -252,6 +249,11 @@ export default function OperationalSettingsPage() {
                                     </div>
                                     <p className="text-[10px] text-slate-400 mt-1">MOD + CIF</p>
                                 </div>
+                            </div>
+
+                            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                                Si una variante usa <strong>productionMinutes</strong>, el sistema aplica costo automático por minuto
+                                (MOD + CIF) y evita sumar <strong>laborCost</strong>/<strong>indirectCost</strong> manual para no duplicar.
                             </div>
 
                             <div className="mt-6 flex justify-end">

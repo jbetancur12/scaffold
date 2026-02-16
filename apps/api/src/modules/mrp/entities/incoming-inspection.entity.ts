@@ -68,6 +68,9 @@ export class IncomingInspection extends BaseEntity implements IIncomingInspectio
     @Property({ type: 'decimal', precision: 10, scale: 4, default: 0 })
     quantityRejected: number = 0;
 
+    @Property({ type: 'decimal', precision: 12, scale: 4, nullable: true })
+    acceptedUnitCost?: number;
+
     @Property({ nullable: true })
     inspectedBy?: string;
 

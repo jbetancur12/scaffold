@@ -155,16 +155,18 @@ export class MrpService {
             referenceMaterialCost += item.quantity * referenceUnitCost;
         }
 
-        const labor = variant.laborCost || 0; // Manual override if needed
-        const indirect = variant.indirectCost || 0; // Manual override if needed
+        const hasOperationalMinutes = Boolean(variant.productionMinutes && variant.productionMinutes > 0);
+        // If productionMinutes is present, MOD/CIF are already captured via costPerMinute.
+        const labor = hasOperationalMinutes ? 0 : (variant.laborCost || 0);
+        const indirect = hasOperationalMinutes ? 0 : (variant.indirectCost || 0);
 
         // Calculate Operational Cost based on time
         let operationalCost = 0;
-        if (variant.productionMinutes) {
+        if (hasOperationalMinutes) {
             const configRepo = this.em.getRepository(OperationalConfig);
             const [config] = await configRepo.find({}, { orderBy: { createdAt: 'DESC' }, limit: 1 }); // Get latest
             if (config) {
-                operationalCost = variant.productionMinutes * config.costPerMinute;
+                operationalCost = (variant.productionMinutes || 0) * config.costPerMinute;
             }
         }
 

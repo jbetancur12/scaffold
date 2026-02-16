@@ -43,19 +43,23 @@ export class ProductService {
             }
         }
 
+        const hasOperationalMinutes = Boolean(variant.productionMinutes && variant.productionMinutes > 0);
+        const labor = hasOperationalMinutes ? 0 : (variant.laborCost || 0);
+        const indirect = hasOperationalMinutes ? 0 : (variant.indirectCost || 0);
+
         // Calculate Operational Cost based on time
         let operationalCost = 0;
-        if (variant.productionMinutes) {
+        if (hasOperationalMinutes) {
             const configRepo = this.em.getRepository(OperationalConfig);
             // Use findOne with an empty object as the first argument
             const [config] = await configRepo.find({}, { orderBy: { createdAt: 'DESC' }, limit: 1 });
             if (config) {
-                operationalCost = variant.productionMinutes * config.costPerMinute;
+                operationalCost = (variant.productionMinutes || 0) * config.costPerMinute;
             }
         }
 
-        variant.cost = actualMaterialCost + (variant.laborCost || 0) + (variant.indirectCost || 0) + operationalCost;
-        variant.referenceCost = referenceMaterialCost + (variant.laborCost || 0) + (variant.indirectCost || 0) + operationalCost;
+        variant.cost = actualMaterialCost + labor + indirect + operationalCost;
+        variant.referenceCost = referenceMaterialCost + labor + indirect + operationalCost;
 
         await this.em.persistAndFlush(variant);
     }

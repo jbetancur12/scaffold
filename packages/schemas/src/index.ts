@@ -750,6 +750,7 @@ export const ResolveIncomingInspectionSchema = z.object({
     notes: z.string().optional(),
     quantityAccepted: z.number().nonnegative(),
     quantityRejected: z.number().nonnegative(),
+    acceptedUnitCost: z.number().nonnegative().optional(),
     actor: z.string().optional(),
 }).superRefine((data, ctx) => {
     if (data.quantityAccepted === 0 && data.quantityRejected === 0) {
