@@ -56,6 +56,8 @@ import {
     RegisterBatchEquipmentUsageSchema,
     ListEquipmentUsageQuerySchema,
     ListEquipmentAlertsQuerySchema,
+    ListOperationalAlertsQuerySchema,
+    ExportWeeklyComplianceReportQuerySchema,
     ListQualityAuditQuerySchema,
     CreateTechnovigilanceCaseSchema,
     ListTechnovigilanceCasesQuerySchema,
@@ -1077,6 +1079,26 @@ export class MrpController {
             const { format } = ComplianceExportQuerySchema.parse(req.query);
             const data = await this.qualityService.exportCompliance(format);
             return ApiResponse.success(res, data, 'Exportable de cumplimiento generado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listOperationalAlerts(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListOperationalAlertsQuerySchema.parse(req.query);
+            const data = await this.qualityService.listOperationalAlerts(filters);
+            return ApiResponse.success(res, data, 'Bandeja de alertas operativas');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async exportWeeklyComplianceReport(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ExportWeeklyComplianceReportQuerySchema.parse(req.query);
+            const data = await this.qualityService.exportWeeklyComplianceReport(filters);
+            return ApiResponse.success(res, data, 'Reporte semanal de cumplimiento');
         } catch (error) {
             next(error);
         }

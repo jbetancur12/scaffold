@@ -35,6 +35,9 @@ import {
     BatchEquipmentUsage,
     EquipmentAlert,
     EquipmentHistory,
+    OperationalAlertRole,
+    OperationalAlert,
+    WeeklyComplianceReportFile,
     ControlledDocument,
     DocumentProcess,
     TechnovigilanceCase,
@@ -95,6 +98,8 @@ import type {
     CreateEquipmentCalibrationPayload,
     CreateEquipmentMaintenancePayload,
     RegisterBatchEquipmentUsagePayload,
+    ListOperationalAlertsPayload,
+    ExportWeeklyComplianceReportPayload,
     CreateControlledDocumentPayload,
     ListControlledDocumentsFilters,
     CreateTechnovigilanceCasePayload,
@@ -598,6 +603,16 @@ export const mrpApi = {
     },
     exportCompliance: async (format: 'csv' | 'json' = 'csv'): Promise<ComplianceExportFile> => {
         const response = await api.get<ComplianceExportFile>('/mrp/quality/compliance-export', { params: { format } });
+        return response.data;
+    },
+    listOperationalAlerts: async (filters?: ListOperationalAlertsPayload & { role?: OperationalAlertRole }): Promise<OperationalAlert[]> => {
+        const response = await api.get<OperationalAlert[]>('/mrp/quality/operational-alerts', { params: filters });
+        return response.data;
+    },
+    exportWeeklyComplianceReport: async (
+        filters?: ExportWeeklyComplianceReportPayload & { role?: OperationalAlertRole; format?: 'csv' | 'json' }
+    ): Promise<WeeklyComplianceReportFile> => {
+        const response = await api.get<WeeklyComplianceReportFile>('/mrp/quality/weekly-compliance-report', { params: filters });
         return response.data;
     },
     createQualityRiskControl: async (data: CreateQualityRiskControlPayload): Promise<QualityRiskControl> => {

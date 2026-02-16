@@ -23,6 +23,9 @@ import {
     BatchEquipmentUsage,
     EquipmentAlert,
     EquipmentHistory,
+    OperationalAlertRole,
+    OperationalAlert,
+    WeeklyComplianceReportFile,
     ControlledDocument,
     DocumentApprovalMethod,
     DocumentProcess,
@@ -903,6 +906,24 @@ export const useComplianceDashboardQuery = () => {
 export const useExportComplianceMutation = () => {
     return useMrpMutation<{ format?: 'csv' | 'json' }, ComplianceExportFile>(
         async (payload) => mrpApi.exportCompliance(payload.format || 'csv')
+    );
+};
+
+export const useOperationalAlertsQuery = (filters?: { role?: OperationalAlertRole; daysAhead?: number }) => {
+    const fetcher = useCallback(async (): Promise<OperationalAlert[]> => {
+        return mrpApi.listOperationalAlerts(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityOperationalAlerts);
+};
+
+export const useExportWeeklyComplianceReportMutation = () => {
+    return useMrpMutation<{
+        role?: OperationalAlertRole;
+        daysAhead?: number;
+        format?: 'csv' | 'json';
+    }, WeeklyComplianceReportFile>(
+        async (payload) => mrpApi.exportWeeklyComplianceReport(payload)
     );
 };
 

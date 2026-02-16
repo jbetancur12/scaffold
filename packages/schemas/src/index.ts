@@ -40,6 +40,7 @@ import {
     EquipmentCalibrationResult,
     EquipmentMaintenanceType,
     EquipmentMaintenanceResult,
+    OperationalAlertRole,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -837,6 +838,17 @@ export const ListEquipmentAlertsQuerySchema = z.object({
     daysAhead: z.coerce.number().int().positive().max(365).optional(),
 });
 
+export const ListOperationalAlertsQuerySchema = z.object({
+    role: z.nativeEnum(OperationalAlertRole).optional(),
+    daysAhead: z.coerce.number().int().positive().max(90).optional(),
+});
+
+export const ExportWeeklyComplianceReportQuerySchema = z.object({
+    role: z.nativeEnum(OperationalAlertRole).optional(),
+    daysAhead: z.coerce.number().int().positive().max(90).optional(),
+    format: z.enum(['csv', 'json']).default('json'),
+});
+
 export const OperationalConfigSchema = z.object({
     // MOD
     operatorSalary: z.number().min(0, 'Salario debe ser mayor o igual a 0'),
@@ -913,3 +925,5 @@ export type UpdateEquipmentPayload = DateInputValue<z.input<typeof UpdateEquipme
 export type CreateEquipmentCalibrationPayload = DateInputValue<z.input<typeof CreateEquipmentCalibrationSchema>>;
 export type CreateEquipmentMaintenancePayload = DateInputValue<z.input<typeof CreateEquipmentMaintenanceSchema>>;
 export type RegisterBatchEquipmentUsagePayload = DateInputValue<z.input<typeof RegisterBatchEquipmentUsageSchema>>;
+export type ListOperationalAlertsPayload = DateInputValue<z.input<typeof ListOperationalAlertsQuerySchema>>;
+export type ExportWeeklyComplianceReportPayload = DateInputValue<z.input<typeof ExportWeeklyComplianceReportQuerySchema>>;

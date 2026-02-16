@@ -110,6 +110,8 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/quality/regulatory-labels/validate-dispatch', (req, res, next) => mrpController.validateDispatchReadiness(req, res, next));
     router.get('/quality/compliance-dashboard', (req, res, next) => mrpController.getComplianceDashboard(req, res, next));
     router.get('/quality/compliance-export', (req, res, next) => mrpController.exportCompliance(req, res, next));
+    router.get('/quality/operational-alerts', (req, res, next) => mrpController.listOperationalAlerts(req, res, next));
+    router.get('/quality/weekly-compliance-report', (req, res, next) => mrpController.exportWeeklyComplianceReport(req, res, next));
     router.post('/quality/risk-controls', (req, res, next) => mrpController.createQualityRiskControl(req, res, next));
     router.get('/quality/risk-controls', (req, res, next) => mrpController.listQualityRiskControls(req, res, next));
     router.post('/quality/training-evidence', (req, res, next) => mrpController.createQualityTrainingEvidence(req, res, next));

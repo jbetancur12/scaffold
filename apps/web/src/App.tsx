@@ -35,6 +35,7 @@ import {
     QualityCapaPage,
     QualityChangeControlPage,
     QualityComplianceDashboardPage,
+    QualityAlertsPage,
     QualityDeviationsOosPage,
     QualityDhrDmrPage,
     QualityDocsPage,
@@ -158,6 +159,7 @@ export default function App() {
                         <Route path="/quality/equipment" element={<QualityEquipmentPage />} />
                         <Route path="/quality/invima" element={<QualityInvimaPage />} />
                         <Route path="/quality/compliance" element={<QualityComplianceDashboardPage />} />
+                        <Route path="/quality/alerts" element={<QualityAlertsPage />} />
                         <Route path="/quality/change-control" element={<QualityChangeControlPage />} />
                         <Route path="/quality/docs" element={<QualityDocsPage />} />
                         <Route path="/quality/audit" element={<QualityAuditPage />} />

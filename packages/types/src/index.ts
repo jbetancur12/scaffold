@@ -282,6 +282,28 @@ export enum EquipmentMaintenanceResult {
     FALLIDO = 'fallido',
 }
 
+export enum OperationalAlertRole {
+    QA = 'qa',
+    REGULATORIO = 'regulatorio',
+    PRODUCCION = 'produccion',
+    DIRECCION_TECNICA = 'direccion_tecnica',
+}
+
+export enum OperationalAlertType {
+    CAPA_VENCIDA = 'capa_vencida',
+    CAPACITACION_VENCIDA = 'capacitacion_vencida',
+    DOCUMENTO_POR_VENCER = 'documento_por_vencer',
+    LOTE_PENDIENTE_LIBERACION = 'lote_pendiente_liberacion',
+    RECALL_ABIERTO = 'recall_abierto',
+    EQUIPO_CRITICO_VENCIDO = 'equipo_critico_vencido',
+}
+
+export enum OperationalAlertSeverity {
+    CRITICA = 'critica',
+    ALTA = 'alta',
+    MEDIA = 'media',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -679,6 +701,48 @@ export interface EquipmentHistory {
     calibrations: EquipmentCalibration[];
     maintenances: EquipmentMaintenance[];
     usages: BatchEquipmentUsage[];
+}
+
+export interface OperationalAlert {
+    id: string;
+    type: OperationalAlertType;
+    severity: OperationalAlertSeverity;
+    title: string;
+    description: string;
+    entityType: string;
+    entityId: string;
+    entityCode?: string;
+    dueAt?: string | Date;
+    createdAt?: string | Date;
+    roleTargets: OperationalAlertRole[];
+    routePath?: string;
+}
+
+export interface WeeklyComplianceReport {
+    generatedAt: string | Date;
+    periodStart: string | Date;
+    periodEnd: string | Date;
+    role?: OperationalAlertRole;
+    totalAlerts: number;
+    criticalAlerts: number;
+    highAlerts: number;
+    mediumAlerts: number;
+    alertsByType: Array<{
+        type: OperationalAlertType;
+        count: number;
+    }>;
+    auditEventsInPeriod: number;
+    alerts: OperationalAlert[];
+}
+
+export interface WeeklyComplianceReportFile {
+    generatedAt: string | Date;
+    periodStart: string | Date;
+    periodEnd: string | Date;
+    role?: OperationalAlertRole;
+    format: 'csv' | 'json';
+    fileName: string;
+    content: string;
 }
 
 export interface AuditEvent {
@@ -1241,6 +1305,17 @@ export interface RegisterBatchEquipmentUsagePayload {
     usedBy?: string;
     notes?: string;
     actor?: string;
+}
+
+export interface ListOperationalAlertsPayload {
+    role?: OperationalAlertRole;
+    daysAhead?: number;
+}
+
+export interface ExportWeeklyComplianceReportPayload {
+    role?: OperationalAlertRole;
+    daysAhead?: number;
+    format?: 'csv' | 'json';
 }
 
 export interface UpdateCapaPayload {

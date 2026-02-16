@@ -32,6 +32,7 @@ export const mrpQueryKeys = {
     qualityEquipmentUsage: 'mrp.quality.equipment-usage',
     qualityEquipmentAlerts: 'mrp.quality.equipment-alerts',
     qualityEquipmentHistory: (equipmentId: string) => `mrp.quality.equipment.history.${equipmentId}`,
+    qualityOperationalAlerts: 'mrp.quality.operational-alerts',
     qualityAuditEvents: 'mrp.quality.audit-events',
     qualityTechnovigilanceCases: 'mrp.quality.technovigilance-cases',
     qualityRecalls: 'mrp.quality.recalls',

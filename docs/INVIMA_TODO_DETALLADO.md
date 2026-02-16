@@ -199,6 +199,12 @@ Estado actual (implementación base):
 
 ## Epic 8 - Alertas Operativas y Gobierno de Cumplimiento
 
+Estado actual (implementación base):
+- Bandeja única de alertas operativas por rol (`qa`, `produccion`, `regulatorio`, `direccion_tecnica`) disponible en UI/API.
+- Alertas implementadas: CAPA vencida, capacitación vencida, documento próximo a expirar/vencido, lote pendiente de liberación, recall abierto y equipo crítico vencido.
+- Exportación de reporte semanal de cumplimiento en CSV/JSON disponible.
+- Guía de verificación manual: `docs/EPIC8_ALERTAS_SMOKE.md`.
+
 ### Alcance funcional
 
 - Alertas de:

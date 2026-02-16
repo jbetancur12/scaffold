@@ -12,6 +12,7 @@ export type QualitySection =
     | 'equipment'
     | 'invima'
     | 'compliance'
+    | 'alerts'
     | 'change-control'
     | 'docs'
     | 'audit';
@@ -42,6 +43,7 @@ export const qualitySections: Array<{
     { value: 'equipment', label: 'Equipos', domain: 'quality', path: '/quality/equipment', category: 'regulatorio' },
     { value: 'invima', label: 'Registros INVIMA', domain: 'quality', path: '/quality/invima', category: 'regulatorio' },
     { value: 'compliance', label: 'Cumplimiento', domain: 'quality', path: '/quality/compliance', category: 'gobierno' },
+    { value: 'alerts', label: 'Alertas', domain: 'quality', path: '/quality/alerts', category: 'gobierno' },
     { value: 'change-control', label: 'Control de cambios', domain: 'quality', path: '/quality/change-control', category: 'gobierno' },
     { value: 'docs', label: 'Control documental', domain: 'quality', path: '/quality/docs', category: 'gobierno' },
     { value: 'audit', label: 'Auditoría', domain: 'quality', path: '/quality/audit', category: 'gobierno' },

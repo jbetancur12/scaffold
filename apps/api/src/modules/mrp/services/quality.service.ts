@@ -17,6 +17,7 @@ import {
     ChangeControlType,
     ChangeImpactLevel,
     ChangeApprovalDecision,
+    OperationalAlertRole,
     EquipmentStatus,
     EquipmentCalibrationResult,
     EquipmentMaintenanceType,
@@ -61,6 +62,7 @@ import { QualityBatchReleaseService } from './quality-batch-release.service';
 import { QualityDeviationOosService } from './quality-deviation-oos.service';
 import { QualityChangeControlService } from './quality-change-control.service';
 import { QualityEquipmentService } from './quality-equipment.service';
+import { QualityAlertsService } from './quality-alerts.service';
 
 export class QualityService {
     private readonly em: EntityManager;
@@ -83,6 +85,7 @@ export class QualityService {
     private readonly deviationOosService: QualityDeviationOosService;
     private readonly changeControlService: QualityChangeControlService;
     private readonly equipmentService: QualityEquipmentService;
+    private readonly alertsService: QualityAlertsService;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -103,6 +106,7 @@ export class QualityService {
         this.deviationOosService = new QualityDeviationOosService(em, this.logEvent.bind(this));
         this.changeControlService = new QualityChangeControlService(em, this.logEvent.bind(this));
         this.equipmentService = new QualityEquipmentService(em, this.logEvent.bind(this));
+        this.alertsService = new QualityAlertsService(em);
         this.batchReleaseService = new QualityBatchReleaseService(
             em,
             this.logEvent.bind(this),
@@ -752,6 +756,18 @@ export class QualityService {
 
     async listEquipmentAlerts(daysAhead?: number) {
         return this.equipmentService.listEquipmentAlerts(daysAhead);
+    }
+
+    async listOperationalAlerts(filters: { role?: OperationalAlertRole; daysAhead?: number }) {
+        return this.alertsService.listOperationalAlerts(filters);
+    }
+
+    async exportWeeklyComplianceReport(filters: {
+        role?: OperationalAlertRole;
+        daysAhead?: number;
+        format?: 'csv' | 'json';
+    }) {
+        return this.alertsService.exportWeeklyComplianceReport(filters);
     }
 
     async createProcessDeviation(payload: {
