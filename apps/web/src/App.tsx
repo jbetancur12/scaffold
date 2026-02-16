@@ -38,6 +38,7 @@ import {
     QualityDeviationsOosPage,
     QualityDhrDmrPage,
     QualityDocsPage,
+    QualityEquipmentPage,
     QualityIncomingPage,
     QualityInvimaPage,
     QualityLabelingPage,
@@ -154,6 +155,7 @@ export default function App() {
                         <Route path="/quality/labeling" element={<QualityLabelingPage />} />
                         <Route path="/quality/incoming" element={<QualityIncomingPage />} />
                         <Route path="/quality/batch-release" element={<QualityBatchReleasePage />} />
+                        <Route path="/quality/equipment" element={<QualityEquipmentPage />} />
                         <Route path="/quality/invima" element={<QualityInvimaPage />} />
                         <Route path="/quality/compliance" element={<QualityComplianceDashboardPage />} />
                         <Route path="/quality/change-control" element={<QualityChangeControlPage />} />

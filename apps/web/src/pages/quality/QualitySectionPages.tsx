@@ -14,6 +14,7 @@ export const QualityDhrDmrPage = createSectionPage('dhr-dmr');
 export const QualityLabelingPage = createSectionPage('labeling');
 export const QualityIncomingPage = createSectionPage('incoming');
 export const QualityBatchReleasePage = createSectionPage('batch-release');
+export const QualityEquipmentPage = createSectionPage('equipment');
 export const QualityInvimaPage = createSectionPage('invima');
 export const QualityComplianceDashboardPage = createSectionPage('compliance');
 export const QualityChangeControlPage = createSectionPage('change-control');

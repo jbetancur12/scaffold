@@ -261,6 +261,27 @@ export enum ChangeApprovalDecision {
     RECHAZADO = 'rechazado',
 }
 
+export enum EquipmentStatus {
+    ACTIVO = 'activo',
+    INACTIVO = 'inactivo',
+}
+
+export enum EquipmentCalibrationResult {
+    APROBADA = 'aprobada',
+    RECHAZADA = 'rechazada',
+}
+
+export enum EquipmentMaintenanceType {
+    PREVENTIVO = 'preventivo',
+    CORRECTIVO = 'correctivo',
+}
+
+export enum EquipmentMaintenanceResult {
+    COMPLETADO = 'completado',
+    CON_OBSERVACIONES = 'con_observaciones',
+    FALLIDO = 'fallido',
+}
+
 // MRP Interfaces
 export interface Supplier {
     id: string;
@@ -581,6 +602,83 @@ export interface ChangeControlApproval {
     decidedAt?: string | Date;
     createdAt: string | Date;
     updatedAt: string | Date;
+}
+
+export interface Equipment {
+    id: string;
+    code: string;
+    name: string;
+    area?: string;
+    isCritical: boolean;
+    status: EquipmentStatus;
+    calibrationFrequencyDays?: number;
+    maintenanceFrequencyDays?: number;
+    lastCalibrationAt?: string | Date;
+    nextCalibrationDueAt?: string | Date;
+    lastMaintenanceAt?: string | Date;
+    nextMaintenanceDueAt?: string | Date;
+    notes?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface EquipmentCalibration {
+    id: string;
+    equipmentId: string;
+    executedAt: string | Date;
+    dueAt?: string | Date;
+    result: EquipmentCalibrationResult;
+    certificateRef?: string;
+    evidenceRef?: string;
+    performedBy?: string;
+    notes?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface EquipmentMaintenance {
+    id: string;
+    equipmentId: string;
+    executedAt: string | Date;
+    dueAt?: string | Date;
+    type: EquipmentMaintenanceType;
+    result: EquipmentMaintenanceResult;
+    evidenceRef?: string;
+    performedBy?: string;
+    notes?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface BatchEquipmentUsage {
+    id: string;
+    productionBatchId: string;
+    equipmentId: string;
+    productionBatch?: Pick<ProductionBatch, 'id' | 'code'>;
+    equipment?: Pick<Equipment, 'id' | 'code' | 'name' | 'isCritical' | 'status'>;
+    usedAt: string | Date;
+    usedBy?: string;
+    notes?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface EquipmentAlert {
+    equipmentId: string;
+    equipmentCode: string;
+    equipmentName: string;
+    isCritical: boolean;
+    alertType: 'calibration' | 'maintenance';
+    dueAt: string | Date;
+    daysRemaining: number;
+    severity: 'vencido' | 'proximo';
+}
+
+export interface EquipmentHistory {
+    equipment: Equipment;
+    calibrations: EquipmentCalibration[];
+    maintenances: EquipmentMaintenance[];
+    usages: BatchEquipmentUsage[];
 }
 
 export interface AuditEvent {
@@ -1087,6 +1185,61 @@ export interface CreateChangeControlApprovalPayload {
     approver?: string;
     decision: ChangeApprovalDecision;
     decisionNotes?: string;
+    actor?: string;
+}
+
+export interface CreateEquipmentPayload {
+    code: string;
+    name: string;
+    area?: string;
+    isCritical?: boolean;
+    status?: EquipmentStatus;
+    calibrationFrequencyDays?: number;
+    maintenanceFrequencyDays?: number;
+    notes?: string;
+    actor?: string;
+}
+
+export interface UpdateEquipmentPayload {
+    code?: string;
+    name?: string;
+    area?: string;
+    isCritical?: boolean;
+    status?: EquipmentStatus;
+    calibrationFrequencyDays?: number;
+    maintenanceFrequencyDays?: number;
+    notes?: string;
+    actor?: string;
+}
+
+export interface CreateEquipmentCalibrationPayload {
+    executedAt?: string | Date;
+    dueAt?: string | Date;
+    result?: EquipmentCalibrationResult;
+    certificateRef?: string;
+    evidenceRef?: string;
+    performedBy?: string;
+    notes?: string;
+    actor?: string;
+}
+
+export interface CreateEquipmentMaintenancePayload {
+    executedAt?: string | Date;
+    dueAt?: string | Date;
+    type?: EquipmentMaintenanceType;
+    result?: EquipmentMaintenanceResult;
+    evidenceRef?: string;
+    performedBy?: string;
+    notes?: string;
+    actor?: string;
+}
+
+export interface RegisterBatchEquipmentUsagePayload {
+    productionBatchId: string;
+    equipmentId: string;
+    usedAt?: string | Date;
+    usedBy?: string;
+    notes?: string;
     actor?: string;
 }
 

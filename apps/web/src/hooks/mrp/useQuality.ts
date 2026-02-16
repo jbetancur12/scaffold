@@ -13,6 +13,16 @@ import {
     ChangeControlStatus,
     ChangeImpactLevel,
     ChangeApprovalDecision,
+    Equipment,
+    EquipmentStatus,
+    EquipmentCalibration,
+    EquipmentCalibrationResult,
+    EquipmentMaintenance,
+    EquipmentMaintenanceType,
+    EquipmentMaintenanceResult,
+    BatchEquipmentUsage,
+    EquipmentAlert,
+    EquipmentHistory,
     ControlledDocument,
     DocumentApprovalMethod,
     DocumentProcess,
@@ -340,6 +350,177 @@ export const useCreateChangeControlApprovalMutation = () => {
             },
         }
     );
+};
+
+export const useEquipmentQuery = (filters?: { status?: EquipmentStatus; isCritical?: boolean }) => {
+    const fetcher = useCallback(async (): Promise<Equipment[]> => {
+        return mrpApi.listEquipment(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityEquipment);
+};
+
+export const useCreateEquipmentMutation = () => {
+    return useMrpMutation<{
+        code: string;
+        name: string;
+        area?: string;
+        isCritical?: boolean;
+        status?: EquipmentStatus;
+        calibrationFrequencyDays?: number;
+        maintenanceFrequencyDays?: number;
+        notes?: string;
+        actor?: string;
+    }, Equipment>(
+        async (payload) => mrpApi.createEquipment(payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityEquipment,
+                    mrpQueryKeys.qualityEquipmentAlerts,
+                    mrpQueryKeys.qualityAuditEvents,
+                ]);
+            },
+        }
+    );
+};
+
+export const useUpdateEquipmentMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        code?: string;
+        name?: string;
+        area?: string;
+        isCritical?: boolean;
+        status?: EquipmentStatus;
+        calibrationFrequencyDays?: number;
+        maintenanceFrequencyDays?: number;
+        notes?: string;
+        actor?: string;
+    }, Equipment>(
+        async ({ id, ...payload }) => mrpApi.updateEquipment(id, payload),
+        {
+            onSuccess: async (_result, input) => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityEquipment,
+                    mrpQueryKeys.qualityEquipmentAlerts,
+                    mrpQueryKeys.qualityAuditEvents,
+                ]);
+                if (input.id) {
+                    invalidateMrpQuery(mrpQueryKeys.qualityEquipmentHistory(input.id));
+                }
+            },
+        }
+    );
+};
+
+export const useCreateEquipmentCalibrationMutation = () => {
+    return useMrpMutation<{
+        equipmentId: string;
+        executedAt?: string;
+        dueAt?: string;
+        result?: EquipmentCalibrationResult;
+        certificateRef?: string;
+        evidenceRef?: string;
+        performedBy?: string;
+        notes?: string;
+        actor?: string;
+    }, EquipmentCalibration>(
+        async ({ equipmentId, ...payload }) => mrpApi.createEquipmentCalibration(equipmentId, payload),
+        {
+            onSuccess: async (_result, input) => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityEquipment,
+                    mrpQueryKeys.qualityEquipmentAlerts,
+                    mrpQueryKeys.qualityAuditEvents,
+                ]);
+                if (input.equipmentId) {
+                    invalidateMrpQuery(mrpQueryKeys.qualityEquipmentHistory(input.equipmentId));
+                }
+            },
+        }
+    );
+};
+
+export const useCreateEquipmentMaintenanceMutation = () => {
+    return useMrpMutation<{
+        equipmentId: string;
+        executedAt?: string;
+        dueAt?: string;
+        type?: EquipmentMaintenanceType;
+        result?: EquipmentMaintenanceResult;
+        evidenceRef?: string;
+        performedBy?: string;
+        notes?: string;
+        actor?: string;
+    }, EquipmentMaintenance>(
+        async ({ equipmentId, ...payload }) => mrpApi.createEquipmentMaintenance(equipmentId, payload),
+        {
+            onSuccess: async (_result, input) => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityEquipment,
+                    mrpQueryKeys.qualityEquipmentAlerts,
+                    mrpQueryKeys.qualityAuditEvents,
+                ]);
+                if (input.equipmentId) {
+                    invalidateMrpQuery(mrpQueryKeys.qualityEquipmentHistory(input.equipmentId));
+                }
+            },
+        }
+    );
+};
+
+export const useRegisterBatchEquipmentUsageMutation = () => {
+    return useMrpMutation<{
+        productionBatchId: string;
+        equipmentId: string;
+        usedAt?: string;
+        usedBy?: string;
+        notes?: string;
+        actor?: string;
+    }, BatchEquipmentUsage>(
+        async (payload) => mrpApi.registerBatchEquipmentUsage(payload),
+        {
+            onSuccess: async (_result, input) => {
+                invalidateMrpQueries([
+                    mrpQueryKeys.qualityEquipmentUsage,
+                    mrpQueryKeys.qualityAuditEvents,
+                ]);
+                if (input.equipmentId) {
+                    invalidateMrpQuery(mrpQueryKeys.qualityEquipmentHistory(input.equipmentId));
+                }
+            },
+        }
+    );
+};
+
+export const useBatchEquipmentUsageQuery = (filters?: { productionBatchId?: string; equipmentId?: string }) => {
+    const fetcher = useCallback(async (): Promise<BatchEquipmentUsage[]> => {
+        return mrpApi.listBatchEquipmentUsage(filters);
+    }, [filters]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityEquipmentUsage);
+};
+
+export const useEquipmentHistoryQuery = (equipmentId?: string) => {
+    const fetcher = useCallback(async (): Promise<EquipmentHistory | null> => {
+        if (!equipmentId) return null;
+        return mrpApi.getEquipmentHistory(equipmentId);
+    }, [equipmentId]);
+
+    return useMrpQuery(
+        fetcher,
+        Boolean(equipmentId),
+        equipmentId ? mrpQueryKeys.qualityEquipmentHistory(equipmentId) : undefined
+    );
+};
+
+export const useEquipmentAlertsQuery = (daysAhead = 30) => {
+    const fetcher = useCallback(async (): Promise<EquipmentAlert[]> => {
+        return mrpApi.listEquipmentAlerts(daysAhead);
+    }, [daysAhead]);
+
+    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityEquipmentAlerts);
 };
 
 export const useQualityAuditQuery = (filters?: { entityType?: string; entityId?: string }) => {

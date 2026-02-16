@@ -9,6 +9,7 @@ export type QualitySection =
     | 'labeling'
     | 'incoming'
     | 'batch-release'
+    | 'equipment'
     | 'invima'
     | 'compliance'
     | 'change-control'
@@ -38,6 +39,7 @@ export const qualitySections: Array<{
     { value: 'labeling', label: 'Etiquetado', domain: 'quality', path: '/quality/labeling', category: 'regulatorio' },
     { value: 'incoming', label: 'Recepción', domain: 'quality', path: '/quality/incoming', category: 'regulatorio' },
     { value: 'batch-release', label: 'Liberación QA', domain: 'quality', path: '/quality/batch-release', category: 'regulatorio' },
+    { value: 'equipment', label: 'Equipos', domain: 'quality', path: '/quality/equipment', category: 'regulatorio' },
     { value: 'invima', label: 'Registros INVIMA', domain: 'quality', path: '/quality/invima', category: 'regulatorio' },
     { value: 'compliance', label: 'Cumplimiento', domain: 'quality', path: '/quality/compliance', category: 'gobierno' },
     { value: 'change-control', label: 'Control de cambios', domain: 'quality', path: '/quality/change-control', category: 'gobierno' },

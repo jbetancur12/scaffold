@@ -48,6 +48,14 @@ import {
     UpdateChangeControlSchema,
     ListChangeControlsQuerySchema,
     CreateChangeControlApprovalSchema,
+    CreateEquipmentSchema,
+    UpdateEquipmentSchema,
+    ListEquipmentQuerySchema,
+    CreateEquipmentCalibrationSchema,
+    CreateEquipmentMaintenanceSchema,
+    RegisterBatchEquipmentUsageSchema,
+    ListEquipmentUsageQuerySchema,
+    ListEquipmentAlertsQuerySchema,
     ListQualityAuditQuerySchema,
     CreateTechnovigilanceCaseSchema,
     ListTechnovigilanceCasesQuerySchema,
@@ -713,6 +721,99 @@ export class MrpController {
             const payload = CreateChangeControlApprovalSchema.parse(req.body);
             const row = await this.qualityService.createChangeControlApproval(payload);
             return ApiResponse.success(res, row, 'Aprobación de cambio registrada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createEquipment(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateEquipmentSchema.parse(req.body);
+            const row = await this.qualityService.createEquipment(payload);
+            return ApiResponse.success(res, row, 'Equipo registrado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listEquipment(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListEquipmentQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listEquipment(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateEquipment(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateEquipmentSchema.parse(req.body);
+            const row = await this.qualityService.updateEquipment(id, payload, payload.actor);
+            return ApiResponse.success(res, row, 'Equipo actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createEquipmentCalibration(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = CreateEquipmentCalibrationSchema.parse(req.body);
+            const row = await this.qualityService.createEquipmentCalibration(id, payload);
+            return ApiResponse.success(res, row, 'Calibración registrada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createEquipmentMaintenance(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = CreateEquipmentMaintenanceSchema.parse(req.body);
+            const row = await this.qualityService.createEquipmentMaintenance(id, payload);
+            return ApiResponse.success(res, row, 'Mantenimiento registrado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async registerBatchEquipmentUsage(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = RegisterBatchEquipmentUsageSchema.parse(req.body);
+            const row = await this.qualityService.registerBatchEquipmentUsage(payload);
+            return ApiResponse.success(res, row, 'Uso de equipo registrado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listBatchEquipmentUsage(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListEquipmentUsageQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listBatchEquipmentUsage(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getEquipmentHistory(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const row = await this.qualityService.getEquipmentHistory(id);
+            return ApiResponse.success(res, row);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listEquipmentAlerts(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { daysAhead } = ListEquipmentAlertsQuerySchema.parse(req.query);
+            const rows = await this.qualityService.listEquipmentAlerts(daysAhead);
+            return ApiResponse.success(res, rows);
         } catch (error) {
             next(error);
         }

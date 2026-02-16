@@ -17,6 +17,10 @@ import {
     ChangeControlType,
     ChangeImpactLevel,
     ChangeApprovalDecision,
+    EquipmentStatus,
+    EquipmentCalibrationResult,
+    EquipmentMaintenanceType,
+    EquipmentMaintenanceResult,
     NonConformityStatus,
     QualitySeverity,
     QualityRiskControlStatus,
@@ -56,6 +60,7 @@ import { QualityIncomingService } from './quality-incoming.service';
 import { QualityBatchReleaseService } from './quality-batch-release.service';
 import { QualityDeviationOosService } from './quality-deviation-oos.service';
 import { QualityChangeControlService } from './quality-change-control.service';
+import { QualityEquipmentService } from './quality-equipment.service';
 
 export class QualityService {
     private readonly em: EntityManager;
@@ -77,6 +82,7 @@ export class QualityService {
     private readonly batchReleaseService: QualityBatchReleaseService;
     private readonly deviationOosService: QualityDeviationOosService;
     private readonly changeControlService: QualityChangeControlService;
+    private readonly equipmentService: QualityEquipmentService;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -96,6 +102,7 @@ export class QualityService {
         this.incomingService = new QualityIncomingService(em, this.logEvent.bind(this));
         this.deviationOosService = new QualityDeviationOosService(em, this.logEvent.bind(this));
         this.changeControlService = new QualityChangeControlService(em, this.logEvent.bind(this));
+        this.equipmentService = new QualityEquipmentService(em, this.logEvent.bind(this));
         this.batchReleaseService = new QualityBatchReleaseService(
             em,
             this.logEvent.bind(this),
@@ -111,11 +118,12 @@ export class QualityService {
     }
 
     private async getBatchOperationalBlockingIssues(productionBatchId: string): Promise<string[]> {
-        const [deviationAndOos, criticalChanges] = await Promise.all([
+        const [deviationAndOos, criticalChanges, equipmentIssues] = await Promise.all([
             this.deviationOosService.getBatchBlockingIssues(productionBatchId),
             this.changeControlService.getBatchBlockingIssues(productionBatchId),
+            this.equipmentService.getBatchBlockingIssues(productionBatchId),
         ]);
-        return [...deviationAndOos, ...criticalChanges];
+        return [...deviationAndOos, ...criticalChanges, ...equipmentIssues];
     }
 
     async createNonConformity(payload: {
@@ -664,6 +672,86 @@ export class QualityService {
 
     async listBatchReleases(filters: { productionBatchId?: string; status?: BatchReleaseStatus }) {
         return this.batchReleaseService.listBatchReleases(filters);
+    }
+
+    async createEquipment(payload: {
+        code: string;
+        name: string;
+        area?: string;
+        isCritical?: boolean;
+        status?: EquipmentStatus;
+        calibrationFrequencyDays?: number;
+        maintenanceFrequencyDays?: number;
+        notes?: string;
+        actor?: string;
+    }) {
+        return this.equipmentService.createEquipment(payload);
+    }
+
+    async updateEquipment(id: string, payload: Partial<{
+        code: string;
+        name: string;
+        area: string;
+        isCritical: boolean;
+        status: EquipmentStatus;
+        calibrationFrequencyDays: number;
+        maintenanceFrequencyDays: number;
+        notes: string;
+    }>, actor?: string) {
+        return this.equipmentService.updateEquipment(id, payload, actor);
+    }
+
+    async listEquipment(filters: { status?: EquipmentStatus; isCritical?: boolean }) {
+        return this.equipmentService.listEquipment(filters);
+    }
+
+    async createEquipmentCalibration(equipmentId: string, payload: {
+        executedAt?: Date;
+        dueAt?: Date;
+        result?: EquipmentCalibrationResult;
+        certificateRef?: string;
+        evidenceRef?: string;
+        performedBy?: string;
+        notes?: string;
+        actor?: string;
+    }) {
+        return this.equipmentService.addCalibration(equipmentId, payload);
+    }
+
+    async createEquipmentMaintenance(equipmentId: string, payload: {
+        executedAt?: Date;
+        dueAt?: Date;
+        type?: EquipmentMaintenanceType;
+        result?: EquipmentMaintenanceResult;
+        evidenceRef?: string;
+        performedBy?: string;
+        notes?: string;
+        actor?: string;
+    }) {
+        return this.equipmentService.addMaintenance(equipmentId, payload);
+    }
+
+    async registerBatchEquipmentUsage(payload: {
+        productionBatchId: string;
+        equipmentId: string;
+        usedAt?: Date;
+        usedBy?: string;
+        notes?: string;
+        actor?: string;
+    }) {
+        return this.equipmentService.registerBatchEquipmentUsage(payload);
+    }
+
+    async listBatchEquipmentUsage(filters: { productionBatchId?: string; equipmentId?: string }) {
+        return this.equipmentService.listBatchEquipmentUsage(filters);
+    }
+
+    async getEquipmentHistory(equipmentId: string) {
+        return this.equipmentService.getEquipmentHistory(equipmentId);
+    }
+
+    async listEquipmentAlerts(daysAhead?: number) {
+        return this.equipmentService.listEquipmentAlerts(daysAhead);
     }
 
     async createProcessDeviation(payload: {

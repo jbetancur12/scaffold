@@ -76,6 +76,15 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/change-controls', (req, res, next) => mrpController.listChangeControls(req, res, next));
     router.patch('/quality/change-controls/:id', (req, res, next) => mrpController.updateChangeControl(req, res, next));
     router.post('/quality/change-controls/approvals', (req, res, next) => mrpController.createChangeControlApproval(req, res, next));
+    router.post('/quality/equipment', (req, res, next) => mrpController.createEquipment(req, res, next));
+    router.get('/quality/equipment', (req, res, next) => mrpController.listEquipment(req, res, next));
+    router.patch('/quality/equipment/:id', (req, res, next) => mrpController.updateEquipment(req, res, next));
+    router.post('/quality/equipment/:id/calibrations', (req, res, next) => mrpController.createEquipmentCalibration(req, res, next));
+    router.post('/quality/equipment/:id/maintenances', (req, res, next) => mrpController.createEquipmentMaintenance(req, res, next));
+    router.get('/quality/equipment/:id/history', (req, res, next) => mrpController.getEquipmentHistory(req, res, next));
+    router.post('/quality/equipment-usage', (req, res, next) => mrpController.registerBatchEquipmentUsage(req, res, next));
+    router.get('/quality/equipment-usage', (req, res, next) => mrpController.listBatchEquipmentUsage(req, res, next));
+    router.get('/quality/equipment-alerts', (req, res, next) => mrpController.listEquipmentAlerts(req, res, next));
     router.get('/quality/audit-events', (req, res, next) => mrpController.listQualityAudit(req, res, next));
     router.post('/quality/technovigilance-cases', (req, res, next) => mrpController.createTechnovigilanceCase(req, res, next));
     router.get('/quality/technovigilance-cases', (req, res, next) => mrpController.listTechnovigilanceCases(req, res, next));

@@ -25,6 +25,16 @@ import {
     ChangeControlStatus,
     ChangeImpactLevel,
     ChangeApprovalDecision,
+    Equipment,
+    EquipmentStatus,
+    EquipmentCalibration,
+    EquipmentCalibrationResult,
+    EquipmentMaintenance,
+    EquipmentMaintenanceType,
+    EquipmentMaintenanceResult,
+    BatchEquipmentUsage,
+    EquipmentAlert,
+    EquipmentHistory,
     ControlledDocument,
     DocumentProcess,
     TechnovigilanceCase,
@@ -80,6 +90,11 @@ import type {
     UpdateChangeControlPayload,
     ListChangeControlsFilters,
     CreateChangeControlApprovalPayload,
+    CreateEquipmentPayload,
+    UpdateEquipmentPayload,
+    CreateEquipmentCalibrationPayload,
+    CreateEquipmentMaintenancePayload,
+    RegisterBatchEquipmentUsagePayload,
     CreateControlledDocumentPayload,
     ListControlledDocumentsFilters,
     CreateTechnovigilanceCasePayload,
@@ -419,6 +434,51 @@ export const mrpApi = {
         data: CreateChangeControlApprovalPayload & { decision?: ChangeApprovalDecision }
     ): Promise<ChangeControl> => {
         const response = await api.post<ChangeControl>('/mrp/quality/change-controls/approvals', data);
+        return response.data;
+    },
+    createEquipment: async (data: CreateEquipmentPayload): Promise<Equipment> => {
+        const response = await api.post<Equipment>('/mrp/quality/equipment', data);
+        return response.data;
+    },
+    listEquipment: async (filters?: { status?: EquipmentStatus; isCritical?: boolean }): Promise<Equipment[]> => {
+        const response = await api.get<Equipment[]>('/mrp/quality/equipment', { params: filters });
+        return response.data;
+    },
+    updateEquipment: async (id: string, data: UpdateEquipmentPayload): Promise<Equipment> => {
+        const response = await api.patch<Equipment>(`/mrp/quality/equipment/${id}`, data);
+        return response.data;
+    },
+    createEquipmentCalibration: async (
+        equipmentId: string,
+        data: CreateEquipmentCalibrationPayload & { result?: EquipmentCalibrationResult }
+    ): Promise<EquipmentCalibration> => {
+        const response = await api.post<EquipmentCalibration>(`/mrp/quality/equipment/${equipmentId}/calibrations`, data);
+        return response.data;
+    },
+    createEquipmentMaintenance: async (
+        equipmentId: string,
+        data: CreateEquipmentMaintenancePayload & {
+            type?: EquipmentMaintenanceType;
+            result?: EquipmentMaintenanceResult;
+        }
+    ): Promise<EquipmentMaintenance> => {
+        const response = await api.post<EquipmentMaintenance>(`/mrp/quality/equipment/${equipmentId}/maintenances`, data);
+        return response.data;
+    },
+    registerBatchEquipmentUsage: async (data: RegisterBatchEquipmentUsagePayload): Promise<BatchEquipmentUsage> => {
+        const response = await api.post<BatchEquipmentUsage>('/mrp/quality/equipment-usage', data);
+        return response.data;
+    },
+    listBatchEquipmentUsage: async (filters?: { productionBatchId?: string; equipmentId?: string }): Promise<BatchEquipmentUsage[]> => {
+        const response = await api.get<BatchEquipmentUsage[]>('/mrp/quality/equipment-usage', { params: filters });
+        return response.data;
+    },
+    getEquipmentHistory: async (equipmentId: string): Promise<EquipmentHistory> => {
+        const response = await api.get<EquipmentHistory>(`/mrp/quality/equipment/${equipmentId}/history`);
+        return response.data;
+    },
+    listEquipmentAlerts: async (daysAhead?: number): Promise<EquipmentAlert[]> => {
+        const response = await api.get<EquipmentAlert[]>('/mrp/quality/equipment-alerts', { params: { daysAhead } });
         return response.data;
     },
     listQualityAuditEvents: async (filters?: { entityType?: string; entityId?: string }): Promise<AuditEvent[]> => {

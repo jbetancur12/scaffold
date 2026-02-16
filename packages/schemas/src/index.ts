@@ -36,6 +36,10 @@ import {
     ChangeControlStatus,
     ChangeImpactLevel,
     ChangeApprovalDecision,
+    EquipmentStatus,
+    EquipmentCalibrationResult,
+    EquipmentMaintenanceType,
+    EquipmentMaintenanceResult,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -774,6 +778,65 @@ export const ListBatchReleasesQuerySchema = z.object({
     status: z.nativeEnum(BatchReleaseStatus).optional(),
 });
 
+export const CreateEquipmentSchema = z.object({
+    code: z.string().min(2),
+    name: z.string().min(3),
+    area: z.string().optional(),
+    isCritical: z.boolean().optional(),
+    status: z.nativeEnum(EquipmentStatus).optional(),
+    calibrationFrequencyDays: z.number().int().positive().optional(),
+    maintenanceFrequencyDays: z.number().int().positive().optional(),
+    notes: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const UpdateEquipmentSchema = CreateEquipmentSchema.partial();
+
+export const ListEquipmentQuerySchema = z.object({
+    status: z.nativeEnum(EquipmentStatus).optional(),
+    isCritical: z.coerce.boolean().optional(),
+});
+
+export const CreateEquipmentCalibrationSchema = z.object({
+    executedAt: z.coerce.date().optional(),
+    dueAt: z.coerce.date().optional(),
+    result: z.nativeEnum(EquipmentCalibrationResult).optional(),
+    certificateRef: z.string().optional(),
+    evidenceRef: z.string().optional(),
+    performedBy: z.string().optional(),
+    notes: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const CreateEquipmentMaintenanceSchema = z.object({
+    executedAt: z.coerce.date().optional(),
+    dueAt: z.coerce.date().optional(),
+    type: z.nativeEnum(EquipmentMaintenanceType).optional(),
+    result: z.nativeEnum(EquipmentMaintenanceResult).optional(),
+    evidenceRef: z.string().optional(),
+    performedBy: z.string().optional(),
+    notes: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const RegisterBatchEquipmentUsageSchema = z.object({
+    productionBatchId: z.string().uuid(),
+    equipmentId: z.string().uuid(),
+    usedAt: z.coerce.date().optional(),
+    usedBy: z.string().optional(),
+    notes: z.string().optional(),
+    actor: z.string().optional(),
+});
+
+export const ListEquipmentUsageQuerySchema = z.object({
+    productionBatchId: z.string().uuid().optional(),
+    equipmentId: z.string().uuid().optional(),
+});
+
+export const ListEquipmentAlertsQuerySchema = z.object({
+    daysAhead: z.coerce.number().int().positive().max(365).optional(),
+});
+
 export const OperationalConfigSchema = z.object({
     // MOD
     operatorSalary: z.number().min(0, 'Salario debe ser mayor o igual a 0'),
@@ -845,3 +908,8 @@ export type SignBatchReleasePayload = DateInputValue<z.input<typeof SignBatchRel
 export type ApproveControlledDocumentPayload = DateInputValue<z.input<typeof ApproveControlledDocumentSchema>>;
 export type CreateInvimaRegistrationPayload = DateInputValue<z.input<typeof CreateInvimaRegistrationSchema>>;
 export type UpdateInvimaRegistrationPayload = DateInputValue<z.input<typeof UpdateInvimaRegistrationSchema>>;
+export type CreateEquipmentPayload = DateInputValue<z.input<typeof CreateEquipmentSchema>>;
+export type UpdateEquipmentPayload = DateInputValue<z.input<typeof UpdateEquipmentSchema>>;
+export type CreateEquipmentCalibrationPayload = DateInputValue<z.input<typeof CreateEquipmentCalibrationSchema>>;
+export type CreateEquipmentMaintenancePayload = DateInputValue<z.input<typeof CreateEquipmentMaintenanceSchema>>;
+export type RegisterBatchEquipmentUsagePayload = DateInputValue<z.input<typeof RegisterBatchEquipmentUsageSchema>>;

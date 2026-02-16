@@ -172,6 +172,12 @@ Estado actual (implementación base):
 
 ## Epic 7 - Calibración y Mantenimiento de Equipos
 
+Estado actual (implementación base):
+- Flujo API/UI para `equipment`, `equipment_calibration`, `equipment_maintenance` y `batch_equipment_usage` disponible.
+- Alertas operativas por vencimiento (próximo/vencido) visibles en módulo de calidad.
+- Bloqueo de liberación QA/despacho cuando el lote tenga uso de equipo crítico con calibración o mantenimiento vencido.
+- Guía de verificación manual: `docs/EPIC7_EQUIPOS_SMOKE.md`.
+
 ### Alcance funcional
 
 - Maestro de equipos críticos.
