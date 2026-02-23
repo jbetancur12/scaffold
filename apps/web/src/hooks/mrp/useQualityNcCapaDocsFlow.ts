@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import {
     CapaStatus,
+    DocumentCategory,
     DocumentApprovalMethod,
     DocumentProcess,
+    DocumentProcessAreaCode,
     NonConformityStatus,
     QualitySeverity,
 } from '@scaffold/types';
@@ -18,9 +20,11 @@ import {
     useQualityAuditQuery,
     useSubmitControlledDocumentMutation,
     useApproveControlledDocumentMutation,
+    useUploadControlledDocumentSourceMutation,
     useUpdateCapaMutation,
     useUpdateNonConformityMutation,
 } from '@/hooks/mrp/useQuality';
+import { mrpApi } from '@/services/mrpApi';
 
 export const useQualityNcCapaDocsFlow = () => {
     const { toast } = useToast();
@@ -37,6 +41,7 @@ export const useQualityNcCapaDocsFlow = () => {
     const { execute: createDocument, loading: creatingDocument } = useCreateControlledDocumentMutation();
     const { execute: submitDocument, loading: submittingDocument } = useSubmitControlledDocumentMutation();
     const { execute: approveDocument, loading: approvingDocument } = useApproveControlledDocumentMutation();
+    const { execute: uploadDocumentSource, loading: uploadingDocumentSource } = useUploadControlledDocumentSourceMutation();
 
     const [ncForm, setNcForm] = useState({
         title: '',
@@ -51,9 +56,11 @@ export const useQualityNcCapaDocsFlow = () => {
         dueDate: '',
     });
     const [documentForm, setDocumentForm] = useState({
-        code: '',
+        codeNumber: '',
         title: '',
-        process: DocumentProcess.PRODUCCION,
+        process: DocumentProcess.CONTROL_CALIDAD,
+        documentCategory: DocumentCategory.MAN,
+        processAreaCode: DocumentProcessAreaCode.GC,
         version: 1,
         content: '',
         effectiveDate: '',
@@ -64,6 +71,7 @@ export const useQualityNcCapaDocsFlow = () => {
     const capas = capasData ?? [];
     const audits = auditData ?? [];
     const documents = documentsData ?? [];
+    const requiresInitialControlDocument = documents.length === 0;
     const openNc = nonConformities.filter((n) => n.status !== NonConformityStatus.CERRADA);
 
     const handleCreateNc = async (e: React.FormEvent) => {
@@ -108,13 +116,26 @@ export const useQualityNcCapaDocsFlow = () => {
         }
     };
 
+    const mapAreaToProcess = (area: DocumentProcessAreaCode): DocumentProcess => {
+        if (area === DocumentProcessAreaCode.GP) return DocumentProcess.PRODUCCION;
+        return DocumentProcess.CONTROL_CALIDAD;
+    };
+
     const handleCreateDocument = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            const codeNumber = documentForm.codeNumber.trim().toUpperCase();
+            if (!codeNumber) {
+                toast({ title: 'Error', description: 'Debes indicar el consecutivo del código (ej: 05)', variant: 'destructive' });
+                return;
+            }
+            const code = `${documentForm.processAreaCode.toUpperCase()}-${documentForm.documentCategory.toUpperCase()}-${codeNumber}`;
             await createDocument({
-                code: documentForm.code,
+                code,
                 title: documentForm.title,
-                process: documentForm.process,
+                process: mapAreaToProcess(documentForm.processAreaCode),
+                documentCategory: documentForm.documentCategory,
+                processAreaCode: documentForm.processAreaCode,
                 version: documentForm.version,
                 content: documentForm.content || undefined,
                 effectiveDate: documentForm.effectiveDate || undefined,
@@ -122,9 +143,11 @@ export const useQualityNcCapaDocsFlow = () => {
                 actor: 'sistema-web',
             });
             setDocumentForm({
-                code: '',
+                codeNumber: '',
                 title: '',
-                process: DocumentProcess.PRODUCCION,
+                process: DocumentProcess.CONTROL_CALIDAD,
+                documentCategory: DocumentCategory.MAN,
+                processAreaCode: DocumentProcessAreaCode.GC,
                 version: 1,
                 content: '',
                 effectiveDate: '',
@@ -133,6 +156,79 @@ export const useQualityNcCapaDocsFlow = () => {
             toast({ title: 'Documento creado', description: 'Documento controlado registrado en borrador.' });
         } catch (err) {
             toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear el documento'), variant: 'destructive' });
+        }
+    };
+
+    const presetInitialControlDocument = () => {
+        setDocumentForm((prev) => ({
+            ...prev,
+            title: 'CONTROL DE DOCUMENTOS COLMOR',
+            processAreaCode: DocumentProcessAreaCode.GC,
+            documentCategory: DocumentCategory.MAN,
+            process: DocumentProcess.CONTROL_CALIDAD,
+            version: 1,
+        }));
+    };
+
+    const toBase64 = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result ?? ''));
+            reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleUploadDocumentSource = async (id: string, file: File) => {
+        try {
+            const base64Data = await toBase64(file);
+            await uploadDocumentSource({
+                id,
+                fileName: file.name,
+                mimeType: file.type || 'application/octet-stream',
+                base64Data,
+                actor: 'sistema-web',
+            });
+            toast({ title: 'Archivo adjuntado', description: 'El archivo fuente quedó asociado al documento.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo adjuntar el archivo fuente'), variant: 'destructive' });
+        }
+    };
+
+    const handleDownloadDocumentSource = (id: string, fileName?: string) => {
+        void (async () => {
+            try {
+                const blob = await mrpApi.downloadControlledDocumentSource(id);
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName || `documento-controlado-${id}`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo descargar el archivo fuente'), variant: 'destructive' });
+            }
+        })();
+    };
+
+    const handlePrintDocument = async (id: string) => {
+        const win = window.open('', '_blank', 'noopener,noreferrer');
+        if (!win) {
+            toast({ title: 'Error', description: 'Bloqueador de ventanas impidió abrir la impresión', variant: 'destructive' });
+            return;
+        }
+        try {
+            const html = await mrpApi.getControlledDocumentPrintableHtml(id);
+            win.document.open();
+            win.document.write(html);
+            win.document.close();
+            win.focus();
+            win.print();
+        } catch (err) {
+            win.close();
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo generar la versión imprimible'), variant: 'destructive' });
         }
     };
 
@@ -178,6 +274,7 @@ export const useQualityNcCapaDocsFlow = () => {
         capas,
         audits,
         documents,
+        requiresInitialControlDocument,
         openNc,
         ncForm,
         capaForm,
@@ -194,12 +291,17 @@ export const useQualityNcCapaDocsFlow = () => {
         creatingDocument,
         submittingDocument,
         approvingDocument,
+        uploadingDocumentSource,
         handleCreateNc,
         handleCreateCapa,
         quickCloseNc,
         quickCloseCapa,
         handleCreateDocument,
+        presetInitialControlDocument,
         handleSubmitDocument,
         handleApproveDocument,
+        handleUploadDocumentSource,
+        handleDownloadDocumentSource,
+        handlePrintDocument,
     };
 };
