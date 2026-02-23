@@ -1534,6 +1534,9 @@ export interface ResolveIncomingInspectionPayload {
     quantityAccepted: number;
     quantityRejected: number;
     acceptedUnitCost?: number;
+    inspectedBy: string;
+    approvedBy: string;
+    managerApprovedBy?: string;
     actor?: string;
 }
 

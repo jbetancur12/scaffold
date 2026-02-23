@@ -773,10 +773,84 @@ export const ResolveIncomingInspectionSchema = z.object({
     quantityAccepted: z.number().nonnegative(),
     quantityRejected: z.number().nonnegative(),
     acceptedUnitCost: z.number().nonnegative().optional(),
+    inspectedBy: z.string().min(2),
+    approvedBy: z.string().min(2),
+    managerApprovedBy: z.string().optional(),
     actor: z.string().optional(),
 }).superRefine((data, ctx) => {
-    if (data.quantityAccepted === 0 && data.quantityRejected === 0) {
+    if (
+        data.inspectionResult !== IncomingInspectionResult.CONDICIONAL &&
+        data.quantityAccepted === 0 &&
+        data.quantityRejected === 0
+    ) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['quantityAccepted'], message: 'Debes registrar cantidad aceptada o rechazada' });
+    }
+    if (data.inspectionResult === IncomingInspectionResult.APROBADO && data.quantityRejected > 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['quantityRejected'],
+            message: 'Si el resultado es aprobado, la cantidad rechazada debe ser 0',
+        });
+    }
+    if (data.inspectionResult === IncomingInspectionResult.RECHAZADO && data.quantityAccepted > 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['quantityAccepted'],
+            message: 'Si el resultado es rechazado, la cantidad aceptada debe ser 0',
+        });
+    }
+    if (data.inspectionResult === IncomingInspectionResult.APROBADO && data.quantityAccepted === 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['quantityAccepted'],
+            message: 'Si el resultado es aprobado, la cantidad aceptada debe ser mayor a 0',
+        });
+    }
+    if (data.inspectionResult === IncomingInspectionResult.RECHAZADO && data.quantityRejected === 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['quantityRejected'],
+            message: 'Si el resultado es rechazado, la cantidad rechazada debe ser mayor a 0',
+        });
+    }
+    if (
+        data.inspectionResult === IncomingInspectionResult.CONDICIONAL &&
+        (data.quantityAccepted !== 0 || data.quantityRejected !== 0)
+    ) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['quantityAccepted'],
+            message: 'Resultado condicional no libera cantidades: registra 0 aceptado y 0 rechazado',
+        });
+    }
+    if (data.quantityAccepted > 0 && !data.supplierLotCode?.trim()) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['supplierLotCode'],
+            message: 'Debes registrar el lote del proveedor cuando existe cantidad aceptada',
+        });
+    }
+    if (
+        (data.inspectionResult === IncomingInspectionResult.CONDICIONAL ||
+            data.inspectionResult === IncomingInspectionResult.RECHAZADO) &&
+        (!data.notes || data.notes.trim().length < 10)
+    ) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['notes'],
+            message: 'Para resultado condicional o rechazado, registra notas de al menos 10 caracteres',
+        });
+    }
+    if (
+        (data.inspectionResult === IncomingInspectionResult.CONDICIONAL ||
+            data.inspectionResult === IncomingInspectionResult.RECHAZADO) &&
+        !data.managerApprovedBy?.trim()
+    ) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['managerApprovedBy'],
+            message: 'Para condicional o rechazado debes registrar aprobación del jefe de calidad',
+        });
     }
 });
 

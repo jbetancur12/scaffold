@@ -649,6 +649,9 @@ export class QualityService {
         quantityAccepted: number;
         quantityRejected: number;
         acceptedUnitCost?: number;
+        inspectedBy: string;
+        approvedBy: string;
+        managerApprovedBy?: string;
         actor?: string;
     }) {
         return this.incomingService.resolveIncomingInspection(id, payload);

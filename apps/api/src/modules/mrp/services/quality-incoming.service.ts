@@ -57,6 +57,9 @@ export class QualityIncomingService {
         quantityAccepted: number;
         quantityRejected: number;
         acceptedUnitCost?: number;
+        inspectedBy: string;
+        approvedBy: string;
+        managerApprovedBy?: string;
         actor?: string;
     }) {
         const row = await this.incomingInspectionRepo.findOneOrFail(
@@ -68,16 +71,46 @@ export class QualityIncomingService {
         }
 
         const totalResolved = Number(payload.quantityAccepted) + Number(payload.quantityRejected);
-        if (totalResolved !== Number(row.quantityReceived)) {
+        const isConditional = payload.inspectionResult === IncomingInspectionResult.CONDICIONAL;
+        if (!isConditional && totalResolved !== Number(row.quantityReceived)) {
             throw new AppError('La suma aceptada/rechazada debe ser igual a la cantidad recibida', 400);
         }
+        if (payload.inspectionResult === IncomingInspectionResult.APROBADO && Number(payload.quantityRejected) > 0) {
+            throw new AppError('Si el resultado es aprobado, la cantidad rechazada debe ser 0', 400);
+        }
+        if (payload.inspectionResult === IncomingInspectionResult.RECHAZADO && Number(payload.quantityAccepted) > 0) {
+            throw new AppError('Si el resultado es rechazado, la cantidad aceptada debe ser 0', 400);
+        }
+        if (payload.inspectionResult === IncomingInspectionResult.CONDICIONAL && totalResolved !== 0) {
+            throw new AppError('Resultado condicional no libera cantidades: registra 0 aceptado y 0 rechazado', 400);
+        }
+        if (Number(payload.quantityAccepted) > 0 && !payload.supplierLotCode?.trim()) {
+            throw new AppError('Debes registrar el lote del proveedor cuando existe cantidad aceptada', 400);
+        }
+        if (
+            (payload.inspectionResult === IncomingInspectionResult.CONDICIONAL ||
+                payload.inspectionResult === IncomingInspectionResult.RECHAZADO) &&
+            (!payload.notes || payload.notes.trim().length < 10)
+        ) {
+            throw new AppError('Para resultado condicional o rechazado debes registrar notas de al menos 10 caracteres', 400);
+        }
+        if (
+            (payload.inspectionResult === IncomingInspectionResult.CONDICIONAL ||
+                payload.inspectionResult === IncomingInspectionResult.RECHAZADO) &&
+            !payload.managerApprovedBy?.trim()
+        ) {
+            throw new AppError('Para condicional o rechazado debes registrar aprobación del jefe de calidad', 400);
+        }
 
-        const quarantineInventory = await this.inventoryRepo.findOne({
-            rawMaterial: row.rawMaterial.id,
-            warehouse: row.warehouse.id,
-        });
-        if (!quarantineInventory || Number(quarantineInventory.quantity) < totalResolved) {
-            throw new AppError('No hay stock suficiente en cuarentena para resolver la inspeccion', 400);
+        let quarantineInventory: InventoryItem | null = null;
+        if (!isConditional) {
+            quarantineInventory = await this.inventoryRepo.findOne({
+                rawMaterial: row.rawMaterial.id,
+                warehouse: row.warehouse.id,
+            });
+            if (!quarantineInventory || Number(quarantineInventory.quantity) < totalResolved) {
+                throw new AppError('No hay stock suficiente en cuarentena para resolver la inspeccion', 400);
+            }
         }
 
         row.inspectionResult = payload.inspectionResult;
@@ -87,17 +120,21 @@ export class QualityIncomingService {
         row.quantityAccepted = payload.quantityAccepted;
         row.quantityRejected = payload.quantityRejected;
         row.acceptedUnitCost = payload.acceptedUnitCost;
-        row.inspectedBy = payload.actor;
+        row.inspectedBy = payload.inspectedBy;
         row.inspectedAt = new Date();
-        row.releasedBy = payload.actor;
-        row.releasedAt = new Date();
-        row.status = payload.quantityAccepted > 0
-            ? IncomingInspectionStatus.LIBERADO
-            : IncomingInspectionStatus.RECHAZADO;
+        row.releasedBy = isConditional ? undefined : payload.approvedBy;
+        row.releasedAt = isConditional ? undefined : new Date();
+        row.status = isConditional
+            ? IncomingInspectionStatus.PENDIENTE
+            : payload.quantityAccepted > 0
+                ? IncomingInspectionStatus.LIBERADO
+                : IncomingInspectionStatus.RECHAZADO;
 
-        quarantineInventory.quantity = Number(quarantineInventory.quantity) - totalResolved;
+        if (!isConditional && quarantineInventory) {
+            quarantineInventory.quantity = Number(quarantineInventory.quantity) - totalResolved;
+        }
 
-        if (payload.quantityAccepted > 0) {
+        if (!isConditional && payload.quantityAccepted > 0) {
             let releasedWarehouse = await this.warehouseRepo.findOne({ type: WarehouseType.RAW_MATERIALS });
             if (!releasedWarehouse) {
                 releasedWarehouse = this.warehouseRepo.create({
@@ -137,12 +174,16 @@ export class QualityIncomingService {
             await mrpService.recalculateVariantsByMaterial(row.rawMaterial.id);
         }
 
-        await this.em.persistAndFlush([row, quarantineInventory]);
+        if (quarantineInventory) {
+            await this.em.persistAndFlush([row, quarantineInventory]);
+        } else {
+            await this.em.persistAndFlush(row);
+        }
         await this.logEvent({
             entityType: 'incoming_inspection',
             entityId: row.id,
             action: 'resolved',
-            actor: payload.actor,
+            actor: payload.approvedBy,
             metadata: {
                 status: row.status,
                 inspectionResult: row.inspectionResult,
@@ -150,6 +191,10 @@ export class QualityIncomingService {
                 quantityRejected: row.quantityRejected,
                 acceptedUnitCost: row.acceptedUnitCost,
                 rawMaterialId: row.rawMaterial.id,
+                inspectedBy: payload.inspectedBy,
+                approvedBy: payload.approvedBy,
+                managerApprovedBy: payload.managerApprovedBy,
+                conditionalHold: isConditional,
             },
         });
         return row;

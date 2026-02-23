@@ -15,7 +15,7 @@ export const useQualityReceptionReleaseFlow = () => {
     const { toast } = useToast();
     const { data: incomingInspectionsData, loading: loadingIncomingInspections } = useIncomingInspectionsQuery();
     const { data: batchReleasesData, loading: loadingBatchReleases } = useBatchReleasesQuery();
-    const { execute: resolveIncomingInspection } = useResolveIncomingInspectionMutation();
+    const { execute: resolveIncomingInspection, loading: resolvingIncomingInspection } = useResolveIncomingInspectionMutation();
     const { execute: correctIncomingInspectionCost } = useCorrectIncomingInspectionCostMutation();
     const { execute: upsertBatchReleaseChecklist, loading: savingBatchReleaseChecklist } = useUpsertBatchReleaseChecklistMutation();
     const { execute: signBatchRelease, loading: signingBatchRelease } = useSignBatchReleaseMutation();
@@ -33,6 +33,31 @@ export const useQualityReceptionReleaseFlow = () => {
     const incomingInspections = incomingInspectionsData ?? [];
     const batchReleases = batchReleasesData ?? [];
 
+    const resolveIncomingInspectionWithPayload = async (payload: {
+        id: string;
+        inspectionResult: IncomingInspectionResult;
+        supplierLotCode?: string;
+        certificateRef?: string;
+        notes?: string;
+        quantityAccepted: number;
+        quantityRejected: number;
+        acceptedUnitCost?: number;
+        inspectedBy: string;
+        approvedBy: string;
+        managerApprovedBy?: string;
+    }) => {
+        try {
+            await resolveIncomingInspection({
+                ...payload,
+                actor: 'sistema-web',
+            });
+            toast({ title: 'Inspección resuelta', description: 'La recepción fue liberada/rechazada correctamente.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo resolver la inspección'), variant: 'destructive' });
+            throw err;
+        }
+    };
+
     const quickResolveIncomingInspection = async (id: string, quantityReceived: number) => {
         try {
             const resultRaw = window.prompt(
@@ -47,12 +72,17 @@ export const useQualityReceptionReleaseFlow = () => {
 
             const acceptedRaw = window.prompt('Cantidad aceptada', String(quantityReceived));
             if (acceptedRaw === null) return;
-            const quantityAccepted = Number(acceptedRaw);
+            let quantityAccepted = Number(acceptedRaw);
             if (Number.isNaN(quantityAccepted) || quantityAccepted < 0) {
                 toast({ title: 'Error', description: 'Cantidad aceptada inválida', variant: 'destructive' });
                 return;
             }
-            const quantityRejected = Number((quantityReceived - quantityAccepted).toFixed(4));
+            if ((resultRaw as IncomingInspectionResult) === IncomingInspectionResult.CONDICIONAL) {
+                quantityAccepted = 0;
+            }
+            const quantityRejected = (resultRaw as IncomingInspectionResult) === IncomingInspectionResult.CONDICIONAL
+                ? 0
+                : Number((quantityReceived - quantityAccepted).toFixed(4));
             if (quantityRejected < 0) {
                 toast({ title: 'Error', description: 'La cantidad aceptada no puede exceder la recibida', variant: 'destructive' });
                 return;
@@ -70,6 +100,20 @@ export const useQualityReceptionReleaseFlow = () => {
                 return;
             }
 
+            const inspectedBy = window.prompt('Inspector QA (obligatorio)');
+            if (!inspectedBy || inspectedBy.trim().length < 2) {
+                toast({ title: 'Error', description: 'Inspector QA inválido', variant: 'destructive' });
+                return;
+            }
+            const approvedBy = window.prompt('Aprobador QA (obligatorio)');
+            if (!approvedBy || approvedBy.trim().length < 2) {
+                toast({ title: 'Error', description: 'Aprobador QA inválido', variant: 'destructive' });
+                return;
+            }
+            const managerApprovedBy = [IncomingInspectionResult.CONDICIONAL, IncomingInspectionResult.RECHAZADO].includes(resultRaw as IncomingInspectionResult)
+                ? (window.prompt('Jefe de calidad (obligatorio para condicional/rechazado)') || undefined)
+                : undefined;
+
             await resolveIncomingInspection({
                 id,
                 inspectionResult: resultRaw as IncomingInspectionResult,
@@ -79,6 +123,9 @@ export const useQualityReceptionReleaseFlow = () => {
                 quantityAccepted,
                 quantityRejected,
                 acceptedUnitCost,
+                inspectedBy: inspectedBy.trim(),
+                approvedBy: approvedBy.trim(),
+                managerApprovedBy: managerApprovedBy?.trim(),
                 actor: 'sistema-web',
             });
             toast({ title: 'Inspección resuelta', description: 'La recepción fue liberada/rechazada correctamente.' });
@@ -177,7 +224,9 @@ export const useQualityReceptionReleaseFlow = () => {
         loadingBatchReleases,
         savingBatchReleaseChecklist,
         signingBatchRelease,
+        resolvingIncomingInspection,
         quickResolveIncomingInspection,
+        resolveIncomingInspectionWithPayload,
         quickCorrectIncomingInspectionCost,
         handleUpsertBatchReleaseChecklist,
         quickSignBatchRelease,

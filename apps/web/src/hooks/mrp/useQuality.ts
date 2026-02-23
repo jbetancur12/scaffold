@@ -1011,6 +1011,9 @@ export const useResolveIncomingInspectionMutation = () => {
         quantityAccepted: number;
         quantityRejected: number;
         acceptedUnitCost?: number;
+        inspectedBy: string;
+        approvedBy: string;
+        managerApprovedBy?: string;
         actor?: string;
     }, IncomingInspection>(
         async ({ id, ...payload }) => mrpApi.resolveIncomingInspection(id, payload),
