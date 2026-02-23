@@ -69,6 +69,11 @@ export default function OperationalSettingsPage() {
         }
     };
 
+    const totalFactoryMinutes = (config.operatorRealMonthlyMinutes || 0) * (config.numberOfOperators || 0);
+    const adminCostPerMinute = totalFactoryMinutes > 0
+        ? (config.adminSalaries || 0) / totalFactoryMinutes
+        : 0;
+
     return (
         <div className="container mx-auto py-6 max-w-4xl space-y-6">
             <div className="flex justify-between items-center">
@@ -146,7 +151,7 @@ export default function OperationalSettingsPage() {
                                 Costos Indirectos (CIF)
                             </CardTitle>
                             <CardDescription>
-                                Gastos fijos distribuidos en la capacidad instalada.
+                                Gastos fijos del taller distribuidos en la capacidad instalada.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -186,6 +191,9 @@ export default function OperationalSettingsPage() {
                                             onValueChange={(val) => setConfig({ ...config, adminSalaries: val || 0 })}
                                         />
                                     </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Referencial para PyG. No se incluye en costo por minuto de fabricación.
+                                    </p>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="otherExpenses">Otros Gastos</Label>
@@ -239,7 +247,7 @@ export default function OperationalSettingsPage() {
                                     <div className="text-2xl font-bold text-orange-600">
                                         {formatCurrency(config.cifCostPerMinute)}
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-1">Total Gastos / (Minutos * Operarios)</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">Arriendo + Servicios + Otros / (Minutos * Operarios)</p>
                                 </div>
 
                                 <div className="bg-slate-900 p-4 rounded-xl shadow-sm text-center">
@@ -254,6 +262,11 @@ export default function OperationalSettingsPage() {
                             <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
                                 Si una variante usa <strong>productionMinutes</strong>, el sistema aplica costo automático por minuto
                                 (MOD + CIF) y evita sumar <strong>laborCost</strong>/<strong>indirectCost</strong> manual para no duplicar.
+                            </div>
+
+                            <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+                                <strong>Administración (informativo):</strong> {formatCurrency(adminCostPerMinute)} por minuto
+                                en base a nómina administrativa y capacidad mensual. Este valor no se carga al costo unitario de producto.
                             </div>
 
                             <div className="mt-6 flex justify-end">

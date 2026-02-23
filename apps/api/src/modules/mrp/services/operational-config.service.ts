@@ -80,8 +80,9 @@ export class OperationalConfigService {
             ? this.roundTo(monthlyModCost / config.operatorRealMonthlyMinutes)
             : 0;
 
-        // CIF Cost Per Minute: Total Indirect Expenses / Total Factory Minutes
-        const totalMonthlyCif = config.rent + config.utilities + config.adminSalaries + config.otherExpenses;
+        // CIF Cost Per Minute (manufacturing only):
+        // Administrative payroll is tracked but excluded from product costing.
+        const totalMonthlyCif = config.rent + config.utilities + config.otherExpenses;
         const totalFactoryMinutes = config.operatorRealMonthlyMinutes * config.numberOfOperators;
 
         config.cifCostPerMinute = totalFactoryMinutes > 0
