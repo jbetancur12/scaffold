@@ -91,6 +91,7 @@ import {
     SignBatchReleaseSchema,
     ListBatchReleasesQuerySchema,
     CreateControlledDocumentSchema,
+    UploadControlledDocumentSourceSchema,
     ListControlledDocumentsQuerySchema,
     ActorPayloadSchema,
     ApproveControlledDocumentSchema,
@@ -1245,6 +1246,40 @@ export class MrpController {
             const payload = ApproveControlledDocumentSchema.parse(req.body ?? {});
             const row = await this.documentControlService.approve(id, payload);
             return ApiResponse.success(res, row, 'Documento aprobado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async uploadControlledDocumentSource(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UploadControlledDocumentSourceSchema.parse(req.body);
+            const row = await this.documentControlService.uploadSourceFile(id, payload);
+            return ApiResponse.success(res, row, 'Archivo fuente adjuntado al documento');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadControlledDocumentSource(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const file = await this.documentControlService.readSourceFile(id);
+            res.setHeader('Content-Type', file.mimeType);
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async printControlledDocument(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const html = await this.documentControlService.getPrintableHtml(id);
+            res.setHeader('Content-Type', 'text/html; charset=utf-8');
+            return res.send(html);
         } catch (error) {
             next(error);
         }

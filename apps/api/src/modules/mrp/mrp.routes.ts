@@ -126,6 +126,9 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/documents', (req, res, next) => mrpController.listControlledDocuments(req, res, next));
     router.post('/quality/documents/:id/submit-review', (req, res, next) => mrpController.submitControlledDocument(req, res, next));
     router.post('/quality/documents/:id/approve', (req, res, next) => mrpController.approveControlledDocument(req, res, next));
+    router.post('/quality/documents/:id/source-file', (req, res, next) => mrpController.uploadControlledDocumentSource(req, res, next));
+    router.get('/quality/documents/:id/source-file', (req, res, next) => mrpController.downloadControlledDocumentSource(req, res, next));
+    router.get('/quality/documents/:id/print', (req, res, next) => mrpController.printControlledDocument(req, res, next));
     router.get('/quality/documents/active/:process', (req, res, next) => mrpController.listActiveControlledDocumentsByProcess(req, res, next));
 
 

@@ -33,7 +33,8 @@ app.use(cors({
     origin: origins,
     credentials: true,
 }));
-app.use(express.json());
+// Allow controlled-document source uploads sent as base64 JSON payload.
+app.use(express.json({ limit: '15mb' }));
 app.use(cookieParser());
 app.use(requestObservabilityMiddleware);
 setupSwagger(app);

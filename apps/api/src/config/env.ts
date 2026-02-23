@@ -21,6 +21,11 @@ const envSchema = z.object({
     JWT_REFRESH_EXPIRATION: z.string().default('7d'),
     FRONTEND_URL: z.string().url().default('http://localhost:3000'),
     CORS_ORIGIN: z.string().optional(),
+    STORAGE_PROVIDER: z.enum(['local', 'minio']).default('local'),
+    MINIO_ENDPOINT: z.string().url().optional(),
+    MINIO_ACCESS_KEY: z.string().optional(),
+    MINIO_SECRET_KEY: z.string().optional(),
+    MINIO_BUCKET: z.string().default('mrp-quality-documents'),
 
 });
 

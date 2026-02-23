@@ -13,6 +13,7 @@ coverage
 .next
 .env.production.local
 apps/api/temp/
+apps/api/storage/
 
 # Lint artifacts
 apps/web/lint_output.txt

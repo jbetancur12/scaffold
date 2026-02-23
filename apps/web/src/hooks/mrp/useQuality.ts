@@ -28,7 +28,9 @@ import {
     WeeklyComplianceReportFile,
     ControlledDocument,
     DocumentApprovalMethod,
+    DocumentCategory,
     DocumentProcess,
+    DocumentProcessAreaCode,
     DocumentStatus,
     NonConformity,
     NonConformityStatus,
@@ -1086,10 +1088,19 @@ export const useSignBatchReleaseMutation = () => {
     );
 };
 
-export const useControlledDocumentsQuery = (filters?: { process?: DocumentProcess; status?: DocumentStatus }) => {
+export const useControlledDocumentsQuery = (filters?: {
+    process?: DocumentProcess;
+    documentCategory?: DocumentCategory;
+    processAreaCode?: DocumentProcessAreaCode;
+    status?: DocumentStatus;
+}) => {
+    const process = filters?.process;
+    const documentCategory = filters?.documentCategory;
+    const processAreaCode = filters?.processAreaCode;
+    const status = filters?.status;
     const fetcher = useCallback(async (): Promise<ControlledDocument[]> => {
-        return mrpApi.listControlledDocuments(filters);
-    }, [filters]);
+        return mrpApi.listControlledDocuments({ process, documentCategory, processAreaCode, status });
+    }, [documentCategory, process, processAreaCode, status]);
 
     return useMrpQuery(fetcher, true, mrpQueryKeys.qualityDocuments);
 };
@@ -1107,6 +1118,8 @@ export const useCreateControlledDocumentMutation = () => {
         code: string;
         title: string;
         process: DocumentProcess;
+        documentCategory: DocumentCategory;
+        processAreaCode: DocumentProcessAreaCode;
         version?: number;
         content?: string;
         effectiveDate?: string;
@@ -1144,6 +1157,24 @@ export const useApproveControlledDocumentMutation = () => {
                     mrpQueryKeys.qualityActiveDocuments(DocumentProcess.CONTROL_CALIDAD),
                     mrpQueryKeys.qualityActiveDocuments(DocumentProcess.EMPAQUE),
                 ]);
+            },
+        }
+    );
+};
+
+export const useUploadControlledDocumentSourceMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        fileName: string;
+        mimeType: string;
+        base64Data: string;
+        actor?: string;
+    }, ControlledDocument>(
+        async ({ id, ...payload }) => mrpApi.uploadControlledDocumentSource(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityDocuments);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );

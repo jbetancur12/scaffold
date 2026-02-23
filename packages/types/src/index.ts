@@ -88,6 +88,22 @@ export enum DocumentProcess {
     EMPAQUE = 'empaque',
 }
 
+export enum DocumentCategory {
+    MAN = 'man',
+    PRO = 'pro',
+    INS = 'ins',
+    FOR = 'for',
+}
+
+export enum DocumentProcessAreaCode {
+    GAF = 'gaf',
+    GC = 'gc',
+    GP = 'gp',
+    GTH = 'gth',
+    GS = 'gs',
+    GM = 'gm',
+}
+
 export enum DocumentStatus {
     BORRADOR = 'borrador',
     EN_REVISION = 'en_revision',
@@ -762,6 +778,8 @@ export interface ControlledDocument {
     code: string;
     title: string;
     process: DocumentProcess;
+    documentCategory?: DocumentCategory;
+    processAreaCode?: DocumentProcessAreaCode;
     version: number;
     status: DocumentStatus;
     content?: string;
@@ -771,6 +789,9 @@ export interface ControlledDocument {
     approvedAt?: string | Date;
     approvalMethod?: DocumentApprovalMethod;
     approvalSignature?: string;
+    sourceFileName?: string;
+    sourceFileMime?: string;
+    sourceFilePath?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -1332,6 +1353,8 @@ export interface CreateControlledDocumentPayload {
     code: string;
     title: string;
     process: DocumentProcess;
+    documentCategory: DocumentCategory;
+    processAreaCode: DocumentProcessAreaCode;
     version?: number;
     content?: string;
     effectiveDate?: string | Date;
@@ -1341,6 +1364,8 @@ export interface CreateControlledDocumentPayload {
 
 export interface ListControlledDocumentsFilters {
     process?: DocumentProcess;
+    documentCategory?: DocumentCategory;
+    processAreaCode?: DocumentProcessAreaCode;
     status?: DocumentStatus;
 }
 

@@ -101,6 +101,7 @@ import type {
     ListOperationalAlertsPayload,
     ExportWeeklyComplianceReportPayload,
     CreateControlledDocumentPayload,
+    UploadControlledDocumentSourcePayload,
     ListControlledDocumentsFilters,
     CreateTechnovigilanceCasePayload,
     UpdateTechnovigilanceCasePayload,
@@ -683,6 +684,25 @@ export const mrpApi = {
         payload: ApproveControlledDocumentPayload
     ): Promise<ControlledDocument> => {
         const response = await api.post<ControlledDocument>(`/mrp/quality/documents/${id}/approve`, payload);
+        return response.data;
+    },
+    uploadControlledDocumentSource: async (
+        id: string,
+        payload: UploadControlledDocumentSourcePayload
+    ): Promise<ControlledDocument> => {
+        const response = await api.post<ControlledDocument>(`/mrp/quality/documents/${id}/source-file`, payload);
+        return response.data;
+    },
+    downloadControlledDocumentSource: async (id: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/quality/documents/${id}/source-file`, {
+            responseType: 'blob',
+        });
+        return response.data as Blob;
+    },
+    getControlledDocumentPrintableHtml: async (id: string): Promise<string> => {
+        const response = await api.get<string>(`/mrp/quality/documents/${id}/print`, {
+            responseType: 'text',
+        });
         return response.data;
     },
     listActiveControlledDocumentsByProcess: async (process: DocumentProcess): Promise<ControlledDocument[]> => {

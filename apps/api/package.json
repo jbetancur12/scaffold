@@ -20,6 +20,7 @@
         "seed:prod": "node dist/apps/api/src/scripts/seed.js"
     },
     "dependencies": {
+        "@mikro-orm/cli": "^6.6.6",
         "@mikro-orm/core": "^6.1.4",
         "@mikro-orm/migrations": "^6.6.6",
         "@mikro-orm/postgresql": "^6.1.4",
@@ -29,20 +30,20 @@
         "argon2": "^0.40.1",
         "cookie-parser": "^1.4.6",
         "cors": "^2.8.5",
+        "cross-env": "^7.0.3",
         "dotenv": "^16.4.5",
         "express": "^4.18.2",
         "express-rate-limit": "^7.1.5",
         "helmet": "^7.1.0",
         "jsonwebtoken": "^9.0.2",
+        "minio": "^8.0.6",
         "redis": "^4.6.13",
         "reflect-metadata": "^0.2.2",
         "swagger-ui-express": "^5.0.1",
         "tsx": "^4.21.0",
         "uuid": "^9.0.1",
         "winston": "^3.11.0",
-        "zod": "^3.22.4",
-        "cross-env": "^7.0.3",
-        "@mikro-orm/cli": "^6.6.6"
+        "zod": "^3.22.4"
     },
     "devDependencies": {
         "@scaffold/config": "*",

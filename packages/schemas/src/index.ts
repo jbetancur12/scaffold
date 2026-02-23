@@ -7,6 +7,8 @@ import {
     PurchaseOrderStatus,
     CapaStatus,
     DocumentProcess,
+    DocumentCategory,
+    DocumentProcessAreaCode,
     DocumentStatus,
     DocumentApprovalMethod,
     NonConformityStatus,
@@ -523,15 +525,35 @@ export const CreateControlledDocumentSchema = z.object({
     code: z.string().min(2),
     title: z.string().min(3),
     process: z.nativeEnum(DocumentProcess),
+    documentCategory: z.nativeEnum(DocumentCategory),
+    processAreaCode: z.nativeEnum(DocumentProcessAreaCode),
     version: z.number().int().positive().optional(),
     content: z.string().optional(),
     effectiveDate: z.coerce.date().optional(),
     expiresAt: z.coerce.date().optional(),
     actor: z.string().optional(),
+}).superRefine((data, ctx) => {
+    const expectedPrefix = `${data.processAreaCode.toUpperCase()}-${data.documentCategory.toUpperCase()}-`;
+    if (!data.code.toUpperCase().startsWith(expectedPrefix)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['code'],
+            message: `El código debe iniciar por ${expectedPrefix}`,
+        });
+    }
+});
+
+export const UploadControlledDocumentSourceSchema = z.object({
+    fileName: z.string().min(1),
+    mimeType: z.string().min(3),
+    base64Data: z.string().min(8),
+    actor: z.string().optional(),
 });
 
 export const ListControlledDocumentsQuerySchema = z.object({
     process: z.nativeEnum(DocumentProcess).optional(),
+    documentCategory: z.nativeEnum(DocumentCategory).optional(),
+    processAreaCode: z.nativeEnum(DocumentProcessAreaCode).optional(),
     status: z.nativeEnum(DocumentStatus).optional(),
 });
 
@@ -905,6 +927,7 @@ export type UpdateChangeControlPayload = DateInputValue<z.input<typeof UpdateCha
 export type ListChangeControlsFilters = DateInputValue<z.input<typeof ListChangeControlsQuerySchema>>;
 export type CreateChangeControlApprovalPayload = DateInputValue<z.input<typeof CreateChangeControlApprovalSchema>>;
 export type CreateControlledDocumentPayload = DateInputValue<z.input<typeof CreateControlledDocumentSchema>>;
+export type UploadControlledDocumentSourcePayload = DateInputValue<z.input<typeof UploadControlledDocumentSourceSchema>>;
 export type ListControlledDocumentsFilters = DateInputValue<z.input<typeof ListControlledDocumentsQuerySchema>>;
 export type CreateTechnovigilanceCasePayload = DateInputValue<z.input<typeof CreateTechnovigilanceCaseSchema>>;
 export type UpdateTechnovigilanceCasePayload = DateInputValue<z.input<typeof UpdateTechnovigilanceCaseSchema>>;
