@@ -11,8 +11,20 @@ export class PurchaseOrderItem {
     @ManyToOne(() => PurchaseOrder)
     purchaseOrder!: PurchaseOrder;
 
-    @ManyToOne(() => RawMaterial)
-    rawMaterial!: RawMaterial;
+    @Property({ default: true })
+    isCatalogItem: boolean = true;
+
+    @ManyToOne(() => RawMaterial, { nullable: true })
+    rawMaterial?: RawMaterial;
+
+    @Property({ nullable: true })
+    customDescription?: string;
+
+    @Property({ nullable: true })
+    customUnit?: string;
+
+    @Property({ default: true })
+    isInventoriable: boolean = true;
 
     @Property({ type: 'decimal', precision: 10, scale: 2 })
     quantity!: number;

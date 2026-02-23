@@ -213,10 +213,10 @@ export default function PurchaseOrderDetailPage() {
                             <thead className="bg-slate-50">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                                        Materia Prima
+                                        Descripción
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                                        SKU
+                                        Referencia
                                     </th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
                                         Cantidad
@@ -234,15 +234,15 @@ export default function PurchaseOrderDetailPage() {
                                     <tr key={item.id}>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-medium text-slate-900">
-                                                {item.rawMaterial.name}
+                                                {item.rawMaterial?.name || item.customDescription || 'Ítem libre'}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-slate-500">{item.rawMaterial.sku}</div>
+                                            <div className="text-sm text-slate-500">{item.rawMaterial?.sku || '-'}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <div className="text-sm text-slate-900">
-                                                {item.quantity} {item.rawMaterial.unit}
+                                                {item.quantity} {item.rawMaterial?.unit || item.customUnit || ''}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">

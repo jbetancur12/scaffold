@@ -233,12 +233,25 @@ export const CreatePurchaseOrderSchema = z.object({
     otherChargesAmount: z.number().min(0).optional(),
     netTotalAmount: z.number().min(0).optional(),
     warehouseId: z.string().uuid().optional(),
-    items: z.array(z.object({
-        rawMaterialId: z.string().uuid(),
-        quantity: z.number().min(0.01),
-        unitPrice: z.number().min(0),
-        taxAmount: z.number().min(0).optional(),
-    })),
+    items: z.array(z.union([
+        z.object({
+            isCatalogItem: z.literal(true).optional(),
+            rawMaterialId: z.string().uuid(),
+            quantity: z.number().min(0.01),
+            unitPrice: z.number().min(0),
+            taxAmount: z.number().min(0).optional(),
+            isInventoriable: z.boolean().optional(),
+        }),
+        z.object({
+            isCatalogItem: z.literal(false),
+            customDescription: z.string().min(2),
+            customUnit: z.string().min(1),
+            quantity: z.number().min(0.01),
+            unitPrice: z.number().min(0),
+            taxAmount: z.number().min(0).optional(),
+            isInventoriable: z.boolean().optional(),
+        }),
+    ])).min(1),
 });
 
 export const CreatePurchaseRequisitionSchema = z.object({

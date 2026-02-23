@@ -382,7 +382,11 @@ export interface PurchaseRecord {
 
 export interface PurchaseOrderItem {
     id: string;
-    rawMaterial: Pick<RawMaterial, 'id' | 'name' | 'sku' | 'unit'>;
+    isCatalogItem?: boolean;
+    rawMaterial?: Pick<RawMaterial, 'id' | 'name' | 'sku' | 'unit'>;
+    customDescription?: string;
+    customUnit?: string;
+    isInventoriable?: boolean;
     quantity: number;
     unitPrice: number;
     taxAmount: number;

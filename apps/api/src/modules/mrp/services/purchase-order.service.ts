@@ -49,7 +49,8 @@ export class PurchaseOrderService {
 
         // Create purchase order items
         for (const itemData of data.items) {
-            const rawMaterial = await this.rawMaterialRepo.findOneOrFail({ id: itemData.rawMaterialId });
+            const isCatalogItem = itemData.isCatalogItem !== false;
+            const rawMaterial = isCatalogItem ? await this.rawMaterialRepo.findOneOrFail({ id: itemData.rawMaterialId }) : undefined;
 
             const subtotal = itemData.quantity * itemData.unitPrice;
             const taxAmount = itemData.taxAmount || 0;
@@ -61,7 +62,11 @@ export class PurchaseOrderService {
 
             const item = this.purchaseOrderItemRepo.create({
                 purchaseOrder,
+                isCatalogItem,
                 rawMaterial,
+                customDescription: !isCatalogItem ? itemData.customDescription?.trim() : undefined,
+                customUnit: !isCatalogItem ? itemData.customUnit?.trim() : undefined,
+                isInventoriable: itemData.isInventoriable ?? isCatalogItem,
                 quantity: itemData.quantity,
                 unitPrice: itemData.unitPrice,
                 taxAmount,
@@ -160,6 +165,9 @@ export class PurchaseOrderService {
             }
 
             for (const item of purchaseOrder.items) {
+                if (!item.rawMaterial || item.isInventoriable === false) {
+                    continue;
+                }
                 await this.updateQuarantineInventory(tx, item, warehouseId);
                 await this.createIncomingInspection(tx, purchaseOrder, item, warehouseId);
                 await this.updateLastPurchaseInfo(tx, purchaseOrder.supplier, item);
@@ -174,6 +182,7 @@ export class PurchaseOrderService {
     }
 
     private async updateLastPurchaseInfo(em: EntityManager, supplier: Supplier, item: PurchaseOrderItem): Promise<void> {
+        if (!item.rawMaterial) return;
         // Price with tax = (Base Price * Qty + Tax) / Qty
         // Note: item.subtotal already includes taxAmount (see createPurchaseOrder)
         const purchasePriceWithTax = item.quantity > 0 ? Number(item.subtotal) / Number(item.quantity) : Number(item.unitPrice);
@@ -206,6 +215,7 @@ export class PurchaseOrderService {
     }
 
     private async updateQuarantineInventory(em: EntityManager, item: PurchaseOrderItem, warehouseId?: string): Promise<void> {
+        if (!item.rawMaterial) return;
         // Get or create quarantine warehouse
         const warehouseRepo = em.getRepository(Warehouse);
         const inventoryRepo = em.getRepository(InventoryItem);
@@ -248,6 +258,7 @@ export class PurchaseOrderService {
     }
 
     private async createIncomingInspection(em: EntityManager, purchaseOrder: PurchaseOrder, item: PurchaseOrderItem, warehouseId?: string) {
+        if (!item.rawMaterial) return;
         const warehouseRepo = em.getRepository(Warehouse);
         let warehouse: Warehouse | null = null;
         if (warehouseId) {

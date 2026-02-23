@@ -20,7 +20,12 @@ import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
 import { mrpApi, RawMaterialSupplier } from '@/services/mrpApi';
 
 interface OrderItem {
+    isCatalogItem: boolean;
     rawMaterialId: string;
+    catalogSearch: string;
+    customDescription: string;
+    customUnit: string;
+    isInventoriable: boolean;
     quantity: number;
     unitPrice: number;
     hasIva: boolean;
@@ -38,6 +43,8 @@ export default function PurchaseOrderFormPage() {
     const [loading, setLoading] = useState(false);
     const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(0);
     const [activeCalcIdx, setActiveCalcIdx] = useState<number | null>(null);
+    const [activeCatalogComboboxIdx, setActiveCatalogComboboxIdx] = useState<number | null>(null);
+    const [catalogHighlightByIndex, setCatalogHighlightByIndex] = useState<Record<number, number>>({});
     const [calcBulkPrice, setCalcBulkPrice] = useState<number>(0);
     const [calcBulkQty, setCalcBulkQty] = useState<number>(0);
     const [formData, setFormData] = useState({
@@ -59,7 +66,18 @@ export default function PurchaseOrderFormPage() {
     const [loadingMaterialSuppliersByMaterialId, setLoadingMaterialSuppliersByMaterialId] = useState<Record<string, boolean>>({});
 
     const [items, setItems] = useState<OrderItem[]>([
-        { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false, ivaIncluded: false }
+        {
+            isCatalogItem: true,
+            rawMaterialId: '',
+            catalogSearch: '',
+            customDescription: '',
+            customUnit: '',
+            isInventoriable: true,
+            quantity: 0,
+            unitPrice: 0,
+            hasIva: false,
+            ivaIncluded: false,
+        }
     ]);
 
     const { data: suppliersResponse, error: suppliersError } = useSuppliersQuery(1, 100);
@@ -82,7 +100,12 @@ export default function PurchaseOrderFormPage() {
         if (requisitionItems.length > 0) {
             setItems(
                 requisitionItems.map((item) => ({
+                    isCatalogItem: true,
                     rawMaterialId: item.rawMaterial.id,
+                    catalogSearch: `${item.rawMaterial.sku} ${item.rawMaterial.name}`,
+                    customDescription: '',
+                    customUnit: '',
+                    isInventoriable: true,
                     quantity: item.quantity,
                     unitPrice: 0,
                     hasIva: false,
@@ -119,7 +142,18 @@ export default function PurchaseOrderFormPage() {
 
     const addItem = () => {
         setItems((prev) => {
-            const next = [...prev, { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false, ivaIncluded: false }];
+            const next = [...prev, {
+                isCatalogItem: true,
+                rawMaterialId: '',
+                catalogSearch: '',
+                customDescription: '',
+                customUnit: '',
+                isInventoriable: true,
+                quantity: 0,
+                unitPrice: 0,
+                hasIva: false,
+                ivaIncluded: false,
+            }];
             setExpandedItemIndex(next.length - 1);
             return next;
         });
@@ -179,8 +213,13 @@ export default function PurchaseOrderFormPage() {
     };
 
     const handleMaterialChange = async (index: number, materialId: string) => {
+        const selectedMaterial = rawMaterials.find((material) => material.id === materialId);
         updateItem(index, 'rawMaterialId', materialId);
+        if (selectedMaterial) {
+            updateItem(index, 'catalogSearch', `${selectedMaterial.sku} ${selectedMaterial.name}`);
+        }
         if (!materialId) return;
+        if (!items[index]?.isCatalogItem) return;
 
         const material = getMaterialById(materialId);
         const suggestedSuppliers = await fetchMaterialSuppliers(materialId);
@@ -194,7 +233,7 @@ export default function PurchaseOrderFormPage() {
     const applyDominantSuggestedSupplier = () => {
         const counts: Record<string, number> = {};
         for (const item of items) {
-            if (!item.rawMaterialId) continue;
+            if (!item.isCatalogItem || !item.rawMaterialId) continue;
             const material = getMaterialById(item.rawMaterialId);
             const suggested = materialSuppliersByMaterialId[item.rawMaterialId]?.[0]?.supplier?.id || material?.supplierId;
             if (!suggested) continue;
@@ -249,9 +288,11 @@ export default function PurchaseOrderFormPage() {
             return;
         }
 
-        const invalidItems = items.filter(item =>
-            !item.rawMaterialId || item.quantity <= 0 || item.unitPrice <= 0
-        );
+        const invalidItems = items.filter((item) => {
+            if (item.quantity <= 0 || item.unitPrice <= 0) return true;
+            if (item.isCatalogItem) return !item.rawMaterialId;
+            return !item.customDescription.trim() || !item.customUnit.trim();
+        });
 
         if (invalidItems.length > 0) {
             toast({
@@ -277,19 +318,43 @@ export default function PurchaseOrderFormPage() {
                 netTotalAmount: netTotal,
                 expectedDeliveryDate: formData.expectedDeliveryDate || undefined,
                 items: items.map(item => ({
-                    ...(item.hasIva && item.ivaIncluded
+                    ...(item.isCatalogItem ? (
+                        item.hasIva && item.ivaIncluded
                         ? {
+                            isCatalogItem: true,
                             rawMaterialId: item.rawMaterialId,
                             quantity: item.quantity,
                             unitPrice: item.quantity > 0 ? ((item.quantity * item.unitPrice) / 1.19) / item.quantity : 0,
                             taxAmount: (item.quantity * item.unitPrice) - ((item.quantity * item.unitPrice) / 1.19),
                         }
                         : {
+                            isCatalogItem: true,
                             rawMaterialId: item.rawMaterialId,
                             quantity: item.quantity,
                             unitPrice: item.unitPrice,
                             taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0,
-                        }),
+                        }
+                    ) : (
+                        item.hasIva && item.ivaIncluded
+                        ? {
+                            isCatalogItem: false,
+                            customDescription: item.customDescription.trim(),
+                            customUnit: item.customUnit.trim(),
+                            isInventoriable: item.isInventoriable,
+                            quantity: item.quantity,
+                            unitPrice: item.quantity > 0 ? ((item.quantity * item.unitPrice) / 1.19) / item.quantity : 0,
+                            taxAmount: (item.quantity * item.unitPrice) - ((item.quantity * item.unitPrice) / 1.19),
+                        }
+                        : {
+                            isCatalogItem: false,
+                            customDescription: item.customDescription.trim(),
+                            customUnit: item.customUnit.trim(),
+                            isInventoriable: item.isInventoriable,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice,
+                            taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0,
+                        }
+                    )),
                 })),
             };
             const validatedData = CreatePurchaseOrderSchema.parse(submitData);
@@ -326,6 +391,53 @@ export default function PurchaseOrderFormPage() {
 
     const getMaterialById = (id: string) => {
         return rawMaterials.find(m => m.id === id);
+    };
+    const getFilteredMaterials = (search: string) => {
+        const normalized = search.trim().toLowerCase();
+        if (!normalized) return rawMaterials.slice(0, 50);
+        return rawMaterials
+            .filter((material) =>
+                material.name.toLowerCase().includes(normalized) ||
+                material.sku.toLowerCase().includes(normalized)
+            )
+            .slice(0, 100);
+    };
+    const handleCatalogInputKeyDown = async (index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
+        const list = getFilteredMaterials(items[index]?.catalogSearch || '');
+        if (list.length === 0) return;
+        const current = catalogHighlightByIndex[index] ?? 0;
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setActiveCatalogComboboxIdx(index);
+            setCatalogHighlightByIndex((prev) => ({
+                ...prev,
+                [index]: Math.min(current + 1, list.length - 1),
+            }));
+            return;
+        }
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveCatalogComboboxIdx(index);
+            setCatalogHighlightByIndex((prev) => ({
+                ...prev,
+                [index]: Math.max(current - 1, 0),
+            }));
+            return;
+        }
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const selected = list[current] || list[0];
+            if (selected) {
+                await handleMaterialChange(index, selected.id);
+                setActiveCatalogComboboxIdx(null);
+            }
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            setActiveCatalogComboboxIdx(null);
+        }
     };
     const selectedSupplier = getSupplierById(formData.supplierId);
 
@@ -609,6 +721,10 @@ export default function PurchaseOrderFormPage() {
 
                         {items.map((item, index) => {
                             const material = getMaterialById(item.rawMaterialId);
+                            const itemLabel = item.isCatalogItem
+                                ? (material ? `${material.name} (${material.sku})` : `Ítem ${index + 1}`)
+                                : (item.customDescription?.trim() || `Ítem libre ${index + 1}`);
+                            const itemUnit = item.isCatalogItem ? (material?.unit || '') : (item.customUnit || '');
                             const enteredLineTotal = item.quantity * item.unitPrice;
                             const subtotal = item.hasIva && item.ivaIncluded ? enteredLineTotal / 1.19 : enteredLineTotal;
                             const taxAmount = item.hasIva ? (item.ivaIncluded ? enteredLineTotal - subtotal : subtotal * 0.19) : 0;
@@ -620,10 +736,10 @@ export default function PurchaseOrderFormPage() {
                                     <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
                                         <div className="min-w-0">
                                             <div className="text-sm font-semibold text-slate-900 truncate">
-                                                {material ? `${material.name} (${material.sku})` : `Ítem ${index + 1}`}
+                                                {itemLabel}
                                             </div>
                                             <div className="text-xs text-slate-500">
-                                                Cant: {item.quantity || 0} {material?.unit || ''} | Total: {formatCurrency(lineTotal)}
+                                                {item.isCatalogItem ? 'Catálogo' : 'Libre'} | Cant: {item.quantity || 0} {itemUnit} | Total: {formatCurrency(lineTotal)}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
@@ -659,24 +775,94 @@ export default function PurchaseOrderFormPage() {
 
                                     {isExpanded ? (
                                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-5 items-start xl:items-center pt-4">
-                                        <div className="xl:col-span-3">
-                                            <Label className="xl:hidden">Materia Prima *</Label>
+                                        <div className="xl:col-span-12">
+                                            <Label>Tipo de línea</Label>
                                             <select
-                                                className="w-full mt-1 md:mt-0 px-2 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                value={item.rawMaterialId}
+                                                className="w-full md:w-64 mt-1 px-2 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                                value={item.isCatalogItem ? 'catalog' : 'free'}
                                                 onChange={(e) => {
-                                                    void handleMaterialChange(index, e.target.value);
+                                                    const isCatalog = e.target.value === 'catalog';
+                                                    setItems((prev) => {
+                                                        const next = [...prev];
+                                                        next[index] = {
+                                                            ...next[index],
+                                                            isCatalogItem: isCatalog,
+                                                            rawMaterialId: isCatalog ? next[index].rawMaterialId : '',
+                                                            catalogSearch: isCatalog ? next[index].catalogSearch : '',
+                                                            customDescription: isCatalog ? '' : next[index].customDescription,
+                                                            customUnit: isCatalog ? '' : next[index].customUnit,
+                                                            isInventoriable: isCatalog ? true : false,
+                                                        };
+                                                        return next;
+                                                    });
                                                 }}
-                                                required
                                             >
-                                                <option value="">Selecciona...</option>
-                                                {rawMaterials.map((material) => (
-                                                    <option key={material.id} value={material.id}>
-                                                        {material.name} ({material.sku})
-                                                    </option>
-                                                ))}
+                                                <option value="catalog">Ítem de catálogo</option>
+                                                <option value="free">Ítem libre (ocasional)</option>
                                             </select>
-                                            {item.rawMaterialId ? (
+                                        </div>
+                                        <div className="xl:col-span-3">
+                                            <Label className="xl:hidden">{item.isCatalogItem ? 'Materia Prima *' : 'Descripción *'}</Label>
+                                            {item.isCatalogItem ? (
+                                                <>
+                                                    <div className="relative">
+                                                        <Input
+                                                            className="mt-1 md:mt-0"
+                                                            placeholder="Buscar por nombre o SKU..."
+                                                            value={item.catalogSearch}
+                                                            onFocus={() => {
+                                                                setActiveCatalogComboboxIdx(index);
+                                                                setCatalogHighlightByIndex((prev) => ({ ...prev, [index]: 0 }));
+                                                            }}
+                                                            onBlur={() => {
+                                                                setTimeout(() => {
+                                                                    setActiveCatalogComboboxIdx((prev) => (prev === index ? null : prev));
+                                                                }, 120);
+                                                            }}
+                                                            onKeyDown={(e) => {
+                                                                void handleCatalogInputKeyDown(index, e);
+                                                            }}
+                                                            onChange={(e) => {
+                                                                updateItem(index, 'catalogSearch', e.target.value);
+                                                                setActiveCatalogComboboxIdx(index);
+                                                                setCatalogHighlightByIndex((prev) => ({ ...prev, [index]: 0 }));
+                                                            }}
+                                                        />
+                                                        {activeCatalogComboboxIdx === index ? (
+                                                            <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg max-h-60 overflow-auto">
+                                                                {getFilteredMaterials(item.catalogSearch).length === 0 ? (
+                                                                    <div className="px-3 py-2 text-xs text-slate-500">Sin resultados para tu búsqueda.</div>
+                                                                ) : (
+                                                                    getFilteredMaterials(item.catalogSearch).map((material, resultIndex) => {
+                                                                        const highlighted = (catalogHighlightByIndex[index] ?? 0) === resultIndex;
+                                                                        return (
+                                                                            <button
+                                                                                key={material.id}
+                                                                                type="button"
+                                                                                className={`w-full text-left px-3 py-2 text-sm border-b border-slate-100 last:border-b-0 ${highlighted ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50'}`}
+                                                                                onMouseDown={() => {
+                                                                                    void handleMaterialChange(index, material.id);
+                                                                                    setActiveCatalogComboboxIdx(null);
+                                                                                }}
+                                                                            >
+                                                                                <span className="font-medium">{material.sku}</span> - {material.name}
+                                                                            </button>
+                                                                        );
+                                                                    })
+                                                                )}
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <Input
+                                                    className="mt-1 md:mt-0"
+                                                    placeholder="Ej: Servicio de transporte especial"
+                                                    value={item.customDescription}
+                                                    onChange={(e) => updateItem(index, 'customDescription', e.target.value)}
+                                                />
+                                            )}
+                                            {item.isCatalogItem && item.rawMaterialId ? (
                                                 <div className="mt-1 space-y-1">
                                                     {loadingMaterialSuppliersByMaterialId[item.rawMaterialId] ? (
                                                         <div className="text-[11px] text-slate-500">Cargando proveedores sugeridos...</div>
@@ -730,6 +916,14 @@ export default function PurchaseOrderFormPage() {
                                                 {material && (
                                                     <span className="text-[11px] text-slate-500">{material.unit}</span>
                                                 )}
+                                                {!item.isCatalogItem ? (
+                                                    <Input
+                                                        className="h-8 text-xs"
+                                                        placeholder="Unidad (ej: servicio, und, hora)"
+                                                        value={item.customUnit}
+                                                        onChange={(e) => updateItem(index, 'customUnit', e.target.value)}
+                                                    />
+                                                ) : null}
                                             </div>
                                         </div>
 
@@ -873,6 +1067,18 @@ export default function PurchaseOrderFormPage() {
                                         </div>
 
                                         <div className="xl:col-span-1"></div>
+                                        {!item.isCatalogItem ? (
+                                            <div className="xl:col-span-12">
+                                                <label className="text-sm flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.isInventoriable}
+                                                        onChange={(e) => updateItem(index, 'isInventoriable', e.target.checked)}
+                                                    />
+                                                    Item libre inventariable (si se marca, se gestiona como compra interna sin materia prima)
+                                                </label>
+                                            </div>
+                                        ) : null}
                                     </div>
                                     ) : null}
                                 </div>
