@@ -51,5 +51,7 @@ export const mrpQueryKeys = {
     qualityIncomingInspections: 'mrp.quality.incoming-inspections',
     qualityBatchReleases: 'mrp.quality.batch-releases',
     qualityDocuments: 'mrp.quality.documents',
+    qualityDocumentsList: (process?: string, category?: string, area?: string, status?: string) =>
+        `mrp.quality.documents.${process || 'all'}.${category || 'all'}.${area || 'all'}.${status || 'all'}`,
     qualityActiveDocuments: (process: string) => `mrp.quality.documents.active.${process}`,
 };

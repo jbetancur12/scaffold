@@ -1688,6 +1688,7 @@ export interface OperationalConfig {
     }>;
     defaultPurchaseOrderControlledDocumentId?: string;
     defaultPurchaseOrderControlledDocumentCode?: string;
+    defaultIncomingInspectionControlledDocumentCode?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

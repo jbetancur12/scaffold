@@ -46,6 +46,9 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
     @Property({ nullable: true })
     defaultPurchaseOrderControlledDocumentCode?: string;
 
+    @Property({ nullable: true })
+    defaultIncomingInspectionControlledDocumentCode?: string;
+
     @Property({ type: 'json', nullable: true })
     purchaseWithholdingRules: Array<{ key: string; label: string; rate: number; active: boolean }> = [];
 }

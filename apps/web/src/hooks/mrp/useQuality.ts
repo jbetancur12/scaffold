@@ -72,7 +72,7 @@ import {
 } from '@scaffold/types';
 import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
-import { invalidateMrpQueries, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
+import { invalidateMrpQueries, invalidateMrpQueriesByPrefix, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
 export const useNonConformitiesQuery = (filters?: { status?: NonConformityStatus; severity?: QualitySeverity; source?: string }) => {
     const fetcher = useCallback(async (): Promise<NonConformity[]> => {
@@ -1105,7 +1105,11 @@ export const useControlledDocumentsQuery = (filters?: {
         return mrpApi.listControlledDocuments({ process, documentCategory, processAreaCode, status });
     }, [documentCategory, process, processAreaCode, status]);
 
-    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityDocuments);
+    return useMrpQuery(
+        fetcher,
+        true,
+        mrpQueryKeys.qualityDocumentsList(process, documentCategory, processAreaCode, status)
+    );
 };
 
 export const useActiveControlledDocumentsByProcessQuery = (process: DocumentProcess) => {
@@ -1132,7 +1136,7 @@ export const useCreateControlledDocumentMutation = () => {
         async (payload) => mrpApi.createControlledDocument(payload),
         {
             onSuccess: async () => {
-                invalidateMrpQuery(mrpQueryKeys.qualityDocuments);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityDocuments);
             },
         }
     );
@@ -1143,7 +1147,7 @@ export const useSubmitControlledDocumentMutation = () => {
         async ({ id, actor }) => mrpApi.submitControlledDocument(id, actor),
         {
             onSuccess: async () => {
-                invalidateMrpQuery(mrpQueryKeys.qualityDocuments);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityDocuments);
             },
         }
     );
@@ -1154,7 +1158,7 @@ export const useApproveControlledDocumentMutation = () => {
         async ({ id, ...payload }) => mrpApi.approveControlledDocument(id, payload),
         {
             onSuccess: async (_result, _input) => {
-                invalidateMrpQuery(mrpQueryKeys.qualityDocuments);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityDocuments);
                 invalidateMrpQueries([
                     mrpQueryKeys.qualityActiveDocuments(DocumentProcess.PRODUCCION),
                     mrpQueryKeys.qualityActiveDocuments(DocumentProcess.CONTROL_CALIDAD),
@@ -1176,7 +1180,7 @@ export const useUploadControlledDocumentSourceMutation = () => {
         async ({ id, ...payload }) => mrpApi.uploadControlledDocumentSource(id, payload),
         {
             onSuccess: async () => {
-                invalidateMrpQuery(mrpQueryKeys.qualityDocuments);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityDocuments);
                 invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
             },
         }

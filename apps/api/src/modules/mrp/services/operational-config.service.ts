@@ -61,6 +61,7 @@ export class OperationalConfigService {
         config.purchasePaymentMethods = ['Contado', 'Crédito 30 días', 'Transferencia'];
         config.defaultPurchaseOrderControlledDocumentId = undefined;
         config.defaultPurchaseOrderControlledDocumentCode = undefined;
+        config.defaultIncomingInspectionControlledDocumentCode = undefined;
         config.purchaseWithholdingRules = [
             { key: 'compra', label: 'Compra', rate: 2.5, active: true },
             { key: 'servicio', label: 'Servicio', rate: 4, active: true },
@@ -96,6 +97,9 @@ export class OperationalConfigService {
         }
         if (data.defaultPurchaseOrderControlledDocumentCode !== undefined) {
             config.defaultPurchaseOrderControlledDocumentCode = data.defaultPurchaseOrderControlledDocumentCode?.trim() || undefined;
+        }
+        if (data.defaultIncomingInspectionControlledDocumentCode !== undefined) {
+            config.defaultIncomingInspectionControlledDocumentCode = data.defaultIncomingInspectionControlledDocumentCode?.trim() || undefined;
         }
         if (data.purchaseWithholdingRules !== undefined) {
             config.purchaseWithholdingRules = data.purchaseWithholdingRules.map((rule) => ({

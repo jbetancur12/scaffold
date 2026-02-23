@@ -225,213 +225,211 @@ export function QualityDocsTab({ model }: { model: QualityComplianceModel }) {
       <Card>
         <CardHeader><CardTitle>Documentos ({model.documents.length})</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          {model.loadingDocuments ? <div>Cargando...</div> : model.documents.length === 0 ? (
-            <div className="text-sm text-slate-500">Sin documentos.</div>
-          ) : (
-            <>
-              <div className="rounded-md border p-3">
-                <div className="text-sm font-semibold text-slate-700">Índice rápido (Código, Nombre, Versión)</div>
-                <div className="mt-2 max-w-md">
-                  <div className="mb-2 flex flex-wrap gap-2">
+          {model.loadingDocuments ? <div>Cargando...</div> : (
+            <div className="rounded-md border p-3">
+              <div className="text-sm font-semibold text-slate-700">Índice rápido (Código, Nombre, Versión)</div>
+              <div className="mt-2 max-w-md">
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={indexCategoryFilter === 'all' ? 'default' : 'outline'}
+                    onClick={() => setIndexCategoryFilter('all')}
+                  >
+                    Todas
+                  </Button>
+                  {categoryOrder.map((category) => (
                     <Button
+                      key={`chip-${category}`}
                       type="button"
                       size="sm"
-                      variant={indexCategoryFilter === 'all' ? 'default' : 'outline'}
-                      onClick={() => setIndexCategoryFilter('all')}
+                      variant={indexCategoryFilter === category ? 'default' : 'outline'}
+                      onClick={() => setIndexCategoryFilter(category)}
                     >
-                      Todas
+                      {category}
                     </Button>
-                    {categoryOrder.map((category) => (
-                      <Button
-                        key={`chip-${category}`}
-                        type="button"
-                        size="sm"
-                        variant={indexCategoryFilter === category ? 'default' : 'outline'}
-                        onClick={() => setIndexCategoryFilter(category)}
-                      >
-                        {category}
-                      </Button>
-                    ))}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={indexCategoryFilter === 'uncategorized' ? 'default' : 'outline'}
-                      onClick={() => setIndexCategoryFilter('uncategorized')}
-                    >
-                      Sin categoría
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={showObsolete ? 'default' : 'outline'}
-                      onClick={() => setShowObsolete((prev) => !prev)}
-                    >
-                      {showObsolete ? 'Ocultando obsoletos' : 'Mostrar obsoletos'}
-                    </Button>
-                  </div>
-                  <Input
-                    value={indexQuery}
-                    onChange={(e) => setIndexQuery(e.target.value)}
-                    placeholder="Buscar por código o título"
-                  />
+                  ))}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={indexCategoryFilter === 'uncategorized' ? 'default' : 'outline'}
+                    onClick={() => setIndexCategoryFilter('uncategorized')}
+                  >
+                    Sin categoría
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={showObsolete ? 'default' : 'outline'}
+                    onClick={() => setShowObsolete((prev) => !prev)}
+                  >
+                    {showObsolete ? 'Ocultando obsoletos' : 'Mostrar obsoletos'}
+                  </Button>
                 </div>
-                {filteredDocuments.length === 0 ? (
-                  <div className="mt-3 text-sm text-slate-500">Sin resultados para la búsqueda.</div>
-                ) : (
-                  <div className="mt-3 space-y-3">
-                    <div className="text-xs text-slate-600">
-                      Mostrando {pagedDocuments.length} de {filteredDocuments.length} documentos
-                    </div>
-                    <div className="max-h-80 overflow-auto rounded-md border">
-                      <table className="w-full text-sm">
-                        <thead className="sticky top-0 bg-slate-100">
-                          <tr className="text-left text-slate-700">
-                            <th className="py-2 px-2">Código</th>
-                            <th className="py-2 px-2">Nombre</th>
-                            <th className="py-2 px-2">Categoría</th>
-                            <th className="py-2 px-2">Estado</th>
-                            <th className="py-2 px-2">Versión</th>
-                            <th className="py-2 px-2">Acción</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pagedDocuments.map((doc) => (
-                            <Fragment key={`index-fragment-${doc.id}`}>
-                              <tr id={`doc-row-${doc.id}`} key={`index-${doc.id}`} className="border-t">
-                                <td className="py-2 px-2">{doc.code}</td>
-                                <td className="py-2 px-2">{doc.title}</td>
-                                <td className="py-2 px-2">
-                                  {doc.documentCategory ? qualityDocumentCategoryLabels[doc.documentCategory] : 'Sin categoría'}
-                                </td>
-                                <td className="py-2 px-2">{qualityDocumentStatusLabels[doc.status]}</td>
-                                <td className="py-2 px-2">{doc.version}</td>
-                                <td className="py-2 px-2">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => setExpandedDocumentId((prev) => (prev === doc.id ? null : doc.id))}
-                                  >
-                                    {expandedDocumentId === doc.id ? 'Ocultar' : 'Detalles'}
-                                  </Button>
+                <Input
+                  value={indexQuery}
+                  onChange={(e) => setIndexQuery(e.target.value)}
+                  placeholder="Buscar por código o título"
+                />
+              </div>
+              {filteredDocuments.length === 0 ? (
+                <div className="mt-3 text-sm text-slate-500">
+                  Sin resultados para la búsqueda/filtros. Si esperabas ver obsoletos, activa “Mostrar obsoletos”.
+                </div>
+              ) : (
+                <div className="mt-3 space-y-3">
+                  <div className="text-xs text-slate-600">
+                    Mostrando {pagedDocuments.length} de {filteredDocuments.length} documentos
+                  </div>
+                  <div className="max-h-80 overflow-auto rounded-md border">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-slate-100">
+                        <tr className="text-left text-slate-700">
+                          <th className="py-2 px-2">Código</th>
+                          <th className="py-2 px-2">Nombre</th>
+                          <th className="py-2 px-2">Categoría</th>
+                          <th className="py-2 px-2">Estado</th>
+                          <th className="py-2 px-2">Versión</th>
+                          <th className="py-2 px-2">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pagedDocuments.map((doc) => (
+                          <Fragment key={`index-fragment-${doc.id}`}>
+                            <tr id={`doc-row-${doc.id}`} key={`index-${doc.id}`} className="border-t">
+                              <td className="py-2 px-2">{doc.code}</td>
+                              <td className="py-2 px-2">{doc.title}</td>
+                              <td className="py-2 px-2">
+                                {doc.documentCategory ? qualityDocumentCategoryLabels[doc.documentCategory] : 'Sin categoría'}
+                              </td>
+                              <td className="py-2 px-2">{qualityDocumentStatusLabels[doc.status]}</td>
+                              <td className="py-2 px-2">{doc.version}</td>
+                              <td className="py-2 px-2">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setExpandedDocumentId((prev) => (prev === doc.id ? null : doc.id))}
+                                >
+                                  {expandedDocumentId === doc.id ? 'Ocultar' : 'Detalles'}
+                                </Button>
+                              </td>
+                            </tr>
+                            {expandedDocumentId === doc.id ? (
+                              <tr className="bg-slate-50/80">
+                                <td colSpan={6} className="px-3 py-3">
+                                  <div className="space-y-3">
+                                    <div className="text-xs text-slate-600">
+                                      Área: {doc.processAreaCode ? qualityProcessAreaCodeLabels[doc.processAreaCode] : 'N/A'} | Proceso: {qualityProcessLabels[doc.process]} | Estado: {qualityDocumentStatusLabels[doc.status]}
+                                    </div>
+                                    {doc.approvedAt ? (
+                                      <div className="text-xs text-slate-600">
+                                        Aprobado: {new Date(doc.approvedAt).toLocaleString()}
+                                      </div>
+                                    ) : null}
+                                    <div className="text-xs">
+                                      {doc.sourceFileName ? (
+                                        <span className="text-slate-600">Fuente adjunta: {doc.sourceFileName}</span>
+                                      ) : (
+                                        <span className="text-amber-700">Sin archivo fuente adjunto</span>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Badge variant="outline">{qualityDocumentStatusLabels[doc.status]}</Badge>
+                                      <Input
+                                        id={`upload-doc-${doc.id}`}
+                                        type="file"
+                                        className="hidden"
+                                        accept=".xlsx,.xls,.csv,.pdf,.doc,.docx"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (!file) return;
+                                          void model.handleUploadDocumentSource(doc.id, file);
+                                          e.currentTarget.value = '';
+                                        }}
+                                      />
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        type="button"
+                                        disabled={model.uploadingDocumentSource}
+                                        onClick={() => {
+                                          const input = document.getElementById(`upload-doc-${doc.id}`) as HTMLInputElement | null;
+                                          input?.click();
+                                        }}
+                                      >
+                                        {model.uploadingDocumentSource ? 'Adjuntando...' : 'Adjuntar archivo'}
+                                      </Button>
+                                      {doc.sourceFilePath ? (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => model.handleDownloadDocumentSource(doc.id, doc.sourceFileName)}
+                                        >
+                                          Descargar fuente
+                                        </Button>
+                                      ) : null}
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => model.handlePrintDocument(doc.id)}
+                                      >
+                                        Imprimir/PDF
+                                      </Button>
+                                      {doc.status === DocumentStatus.BORRADOR ? (
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={model.submittingDocument}
+                                          onClick={() => model.handleSubmitDocument(doc.id)}
+                                        >
+                                          Enviar revisión
+                                        </Button>
+                                      ) : null}
+                                      {doc.status === DocumentStatus.EN_REVISION ? (
+                                        <Button
+                                          size="sm"
+                                          disabled={model.approvingDocument}
+                                          onClick={() => model.handleApproveDocument(doc.id)}
+                                        >
+                                          Aprobar
+                                        </Button>
+                                      ) : null}
+                                    </div>
+                                  </div>
                                 </td>
                               </tr>
-                              {expandedDocumentId === doc.id ? (
-                                <tr className="bg-slate-50/80">
-                                  <td colSpan={6} className="px-3 py-3">
-                                    <div className="space-y-3">
-                                      <div className="text-xs text-slate-600">
-                                        Área: {doc.processAreaCode ? qualityProcessAreaCodeLabels[doc.processAreaCode] : 'N/A'} | Proceso: {qualityProcessLabels[doc.process]} | Estado: {qualityDocumentStatusLabels[doc.status]}
-                                      </div>
-                                      {doc.approvedAt ? (
-                                        <div className="text-xs text-slate-600">
-                                          Aprobado: {new Date(doc.approvedAt).toLocaleString()}
-                                        </div>
-                                      ) : null}
-                                      <div className="text-xs">
-                                        {doc.sourceFileName ? (
-                                          <span className="text-slate-600">Fuente adjunta: {doc.sourceFileName}</span>
-                                        ) : (
-                                          <span className="text-amber-700">Sin archivo fuente adjunto</span>
-                                        )}
-                                      </div>
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant="outline">{qualityDocumentStatusLabels[doc.status]}</Badge>
-                                        <Input
-                                          id={`upload-doc-${doc.id}`}
-                                          type="file"
-                                          className="hidden"
-                                          accept=".xlsx,.xls,.csv,.pdf,.doc,.docx"
-                                          onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (!file) return;
-                                            void model.handleUploadDocumentSource(doc.id, file);
-                                            e.currentTarget.value = '';
-                                          }}
-                                        />
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          type="button"
-                                          disabled={model.uploadingDocumentSource}
-                                          onClick={() => {
-                                            const input = document.getElementById(`upload-doc-${doc.id}`) as HTMLInputElement | null;
-                                            input?.click();
-                                          }}
-                                        >
-                                          {model.uploadingDocumentSource ? 'Adjuntando...' : 'Adjuntar archivo'}
-                                        </Button>
-                                        {doc.sourceFilePath ? (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => model.handleDownloadDocumentSource(doc.id, doc.sourceFileName)}
-                                          >
-                                            Descargar fuente
-                                          </Button>
-                                        ) : null}
-                                        <Button
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={() => model.handlePrintDocument(doc.id)}
-                                        >
-                                          Imprimir/PDF
-                                        </Button>
-                                        {doc.status === DocumentStatus.BORRADOR ? (
-                                          <Button
-                                            size="sm"
-                                            variant="outline"
-                                            disabled={model.submittingDocument}
-                                            onClick={() => model.handleSubmitDocument(doc.id)}
-                                          >
-                                            Enviar revisión
-                                          </Button>
-                                        ) : null}
-                                        {doc.status === DocumentStatus.EN_REVISION ? (
-                                          <Button
-                                            size="sm"
-                                            disabled={model.approvingDocument}
-                                            onClick={() => model.handleApproveDocument(doc.id)}
-                                          >
-                                            Aprobar
-                                          </Button>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ) : null}
-                            </Fragment>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={indexPage <= 1}
-                        onClick={() => setIndexPage((p) => Math.max(1, p - 1))}
-                      >
-                        Anterior
-                      </Button>
-                      <div className="text-xs text-slate-600">
-                        Página {indexPage} de {totalIndexPages}
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        disabled={indexPage >= totalIndexPages}
-                        onClick={() => setIndexPage((p) => Math.min(totalIndexPages, p + 1))}
-                      >
-                        Siguiente
-                      </Button>
-                    </div>
+                            ) : null}
+                          </Fragment>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                )}
-              </div>
-            </>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={indexPage <= 1}
+                      onClick={() => setIndexPage((p) => Math.max(1, p - 1))}
+                    >
+                      Anterior
+                    </Button>
+                    <div className="text-xs text-slate-600">
+                      Página {indexPage} de {totalIndexPages}
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={indexPage >= totalIndexPages}
+                      onClick={() => setIndexPage((p) => Math.min(totalIndexPages, p + 1))}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

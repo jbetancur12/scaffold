@@ -1027,6 +1027,7 @@ export const OperationalConfigSchema = z.object({
     purchasePaymentMethods: z.array(z.string().min(1, 'Forma de pago inválida')).min(1, 'Debe haber al menos una forma de pago'),
     defaultPurchaseOrderControlledDocumentId: z.string().uuid().optional(),
     defaultPurchaseOrderControlledDocumentCode: z.string().min(1).optional(),
+    defaultIncomingInspectionControlledDocumentCode: z.string().min(1).optional(),
     purchaseWithholdingRules: z.array(
         z.object({
             key: z.string().min(1),

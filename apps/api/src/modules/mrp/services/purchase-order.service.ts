@@ -324,7 +324,11 @@ export class PurchaseOrderService {
     private async createIncomingInspection(em: EntityManager, purchaseOrder: PurchaseOrder, item: PurchaseOrderItem, warehouseId?: string) {
         if (!item.rawMaterial) return;
         const warehouseRepo = em.getRepository(Warehouse);
-        const controlDoc = await this.findActiveIncomingInspectionControlDocument(em);
+        const [config] = await em.find(OperationalConfig, {}, { orderBy: { createdAt: 'DESC' }, limit: 1 });
+        const controlDoc = await this.findActiveIncomingInspectionControlDocument(
+            em,
+            config?.defaultIncomingInspectionControlledDocumentCode || 'GC-FOR-28'
+        );
         let warehouse: Warehouse | null = null;
         if (warehouseId) {
             warehouse = await warehouseRepo.findOne({ id: warehouseId });
@@ -357,10 +361,10 @@ export class PurchaseOrderService {
         await em.persistAndFlush(inspection);
     }
 
-    private async findActiveIncomingInspectionControlDocument(em: EntityManager) {
+    private async findActiveIncomingInspectionControlDocument(em: EntityManager, code: string) {
         const now = new Date();
         return em.findOne(ControlledDocument, {
-            code: 'GC-FOR-28',
+            code,
             status: DocumentStatus.APROBADO,
             $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
             $and: [{ $or: [{ effectiveDate: null }, { effectiveDate: { $lte: now } }] }],

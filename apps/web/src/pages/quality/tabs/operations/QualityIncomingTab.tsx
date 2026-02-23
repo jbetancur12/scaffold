@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DocumentCategory, DocumentProcess, DocumentStatus, IncomingInspectionResult, IncomingInspectionStatus } from '@scaffold/types';
+import { ControlledDocument, DocumentCategory, DocumentStatus, IncomingInspectionResult, IncomingInspectionStatus, OperationalConfig } from '@scaffold/types';
 import { TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { mrpApi } from '@/services/mrpApi';
 import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
+import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/hooks/mrp/useOperationalConfig';
+import { Settings } from 'lucide-react';
+import { getErrorMessage } from '@/lib/api-error';
 import type { QualityComplianceModel } from '../types';
 
 const shortId = (value?: string) => {
@@ -21,6 +24,8 @@ const shortId = (value?: string) => {
 export function QualityIncomingTab({ model }: { model: QualityComplianceModel }) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [showReceptionDocSettings, setShowReceptionDocSettings] = useState(false);
+  const [globalReceptionDocCode, setGlobalReceptionDocCode] = useState('');
   const [expandedIncomingInspectionId, setExpandedIncomingInspectionId] = useState<string | null>(null);
   const [resolverOpenId, setResolverOpenId] = useState<string | null>(null);
   const [resolverForm, setResolverForm] = useState<{
@@ -66,25 +71,49 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
     });
   };
   const { data: controlledDocuments, error: controlledDocumentsError } = useControlledDocumentsQuery({
-    process: DocumentProcess.CONTROL_CALIDAD,
     documentCategory: DocumentCategory.FOR,
     status: DocumentStatus.APROBADO,
   });
+  const { data: controlledDocumentsAll, error: controlledDocumentsAllError } = useControlledDocumentsQuery({
+    documentCategory: DocumentCategory.FOR,
+  });
+  const { data: operationalConfig } = useOperationalConfigQuery();
+  const { execute: saveOperationalConfig, loading: savingReceptionDocSetting } = useSaveOperationalConfigMutation();
+  const latestDocByCode = useMemo(
+    () =>
+      (controlledDocumentsAll ?? []).reduce<Record<string, ControlledDocument>>((acc, doc) => {
+        const current = acc[doc.code];
+        if (!current || doc.version > current.version) acc[doc.code] = doc;
+        return acc;
+      }, {}),
+    [controlledDocumentsAll]
+  );
+  const documentCodeOptions = useMemo(
+    () => Object.values(latestDocByCode).sort((a, b) => a.code.localeCompare(b.code)),
+    [latestDocByCode]
+  );
   useEffect(() => {
-    if (!controlledDocumentsError) return;
+    if (!controlledDocumentsError && !controlledDocumentsAllError) return;
     toast({
       title: 'Error',
       description: 'No se pudieron cargar formatos de control documental',
       variant: 'destructive',
     });
-  }, [controlledDocumentsError, toast]);
+  }, [controlledDocumentsError, controlledDocumentsAllError, toast]);
   useEffect(() => {
     if (!controlledDocuments?.length) return;
     setResolverForm((prev) => {
       if (prev.controlledDocumentId) return prev;
+      if (operationalConfig?.defaultIncomingInspectionControlledDocumentCode) {
+        const configured = controlledDocuments.find((doc) => doc.code === operationalConfig.defaultIncomingInspectionControlledDocumentCode);
+        if (configured) return { ...prev, controlledDocumentId: configured.id };
+      }
       return { ...prev, controlledDocumentId: controlledDocuments[0].id };
     });
-  }, [controlledDocuments]);
+  }, [controlledDocuments, operationalConfig]);
+  useEffect(() => {
+    setGlobalReceptionDocCode(operationalConfig?.defaultIncomingInspectionControlledDocumentCode || '');
+  }, [operationalConfig]);
 
   const submitResolveInspection = async (inspectionId: string, quantityReceived: number) => {
     if (!resolverForm.inspectedBy.trim() || resolverForm.inspectedBy.trim().length < 2) {
@@ -168,11 +197,103 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
       });
     }
   };
+  const saveGlobalReceptionDoc = async () => {
+    if (!operationalConfig) {
+      toast({ title: 'Error', description: 'Configuración operativa no cargada todavía', variant: 'destructive' });
+      return;
+    }
+    try {
+      const sanitizedPaymentMethods = (operationalConfig.purchasePaymentMethods ?? [])
+        .map((method) => String(method ?? '').trim())
+        .filter((method) => method.length > 0);
+
+      const sanitizedWithholdingRules = (operationalConfig.purchaseWithholdingRules ?? [])
+        .map((rule) => ({
+          key: String(rule.key ?? '').trim().toLowerCase(),
+          label: String(rule.label ?? '').trim(),
+          rate: Number(rule.rate ?? 0),
+          active: rule.active ?? true,
+        }))
+        .filter((rule) => rule.key.length > 0 && rule.label.length > 0);
+
+      const payload: Partial<OperationalConfig> = {
+        operatorSalary: Number(operationalConfig.operatorSalary || 0),
+        operatorLoadFactor: Number(operationalConfig.operatorLoadFactor || 1),
+        operatorRealMonthlyMinutes: Number(operationalConfig.operatorRealMonthlyMinutes || 1),
+        rent: Number(operationalConfig.rent || 0),
+        utilities: Number(operationalConfig.utilities || 0),
+        adminSalaries: Number(operationalConfig.adminSalaries || 0),
+        otherExpenses: Number(operationalConfig.otherExpenses || 0),
+        numberOfOperators: Number(operationalConfig.numberOfOperators || 1),
+        purchasePaymentMethods: sanitizedPaymentMethods.length > 0
+          ? sanitizedPaymentMethods
+          : ['Contado'],
+        purchaseWithholdingRules: sanitizedWithholdingRules.length > 0
+          ? sanitizedWithholdingRules
+          : [{ key: 'compra', label: 'Compra', rate: 2.5, active: true }],
+        defaultPurchaseOrderControlledDocumentId: operationalConfig.defaultPurchaseOrderControlledDocumentId || undefined,
+        defaultPurchaseOrderControlledDocumentCode: operationalConfig.defaultPurchaseOrderControlledDocumentCode || undefined,
+        defaultIncomingInspectionControlledDocumentCode: globalReceptionDocCode || undefined,
+      };
+      await saveOperationalConfig(payload);
+      toast({ title: 'Configuración guardada', description: 'Formato global de recepción actualizado.' });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: getErrorMessage(error, 'No se pudo guardar el formato global de recepción'),
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
                 <TabsContent value="incoming" className="space-y-4">
                     <Card>
-                        <CardHeader><CardTitle>Inspecciones de Recepción</CardTitle></CardHeader>
+                        <CardHeader>
+                          <div className="flex items-center justify-between gap-2">
+                            <CardTitle>Inspecciones de Recepción</CardTitle>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setShowReceptionDocSettings((prev) => !prev)}
+                            >
+                              <Settings className="h-4 w-4 mr-2" />
+                              Formato global
+                            </Button>
+                          </div>
+                          {showReceptionDocSettings ? (
+                            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 space-y-2">
+                              <div className="text-sm text-slate-600">
+                                Selecciona el código documental global para recepción. Se aplicará por defecto en esta sección y en nuevos PDFs.
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                                <div className="md:col-span-2 space-y-1">
+                                  <Label>Formato global de recepción (Calidad / FOR)</Label>
+                                  <select
+                                    className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                    value={globalReceptionDocCode}
+                                    onChange={(e) => setGlobalReceptionDocCode(e.target.value)}
+                                  >
+                                    <option value="">Automático (GC-FOR-28 vigente)</option>
+                                    {documentCodeOptions.map((doc) => (
+                                      <option key={doc.code} value={doc.code}>
+                                        {doc.code} (última v{doc.version}, {doc.status}) - {doc.title}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <Button
+                                  type="button"
+                                  onClick={saveGlobalReceptionDoc}
+                                  disabled={savingReceptionDocSetting}
+                                >
+                                  {savingReceptionDocSetting ? 'Guardando...' : 'Guardar'}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </CardHeader>
                         <CardContent className="space-y-2">
                             {model.loadingIncomingInspections ? <div>Cargando...</div> : model.incomingInspections.length === 0 ? <div className="text-sm text-slate-500">Sin inspecciones.</div> : model.incomingInspections.map((inspection) => (
                                 <div key={inspection.id} className="border rounded-md p-3 flex items-start justify-between gap-3">
