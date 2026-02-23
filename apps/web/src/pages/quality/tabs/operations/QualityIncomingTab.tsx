@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IncomingInspectionResult, IncomingInspectionStatus } from '@scaffold/types';
+import { DocumentCategory, DocumentProcess, DocumentStatus, IncomingInspectionResult, IncomingInspectionStatus } from '@scaffold/types';
 import { TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
+import { mrpApi } from '@/services/mrpApi';
+import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
 import type { QualityComplianceModel } from '../types';
 
 const shortId = (value?: string) => {
@@ -23,9 +25,11 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
   const [resolverOpenId, setResolverOpenId] = useState<string | null>(null);
   const [resolverForm, setResolverForm] = useState<{
     inspectionResult: IncomingInspectionResult;
+    controlledDocumentId: string;
     quantityAccepted: string;
     supplierLotCode: string;
     certificateRef: string;
+    invoiceNumber: string;
     acceptedUnitCost: string;
     notes: string;
     inspectedBy: string;
@@ -33,9 +37,11 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
     managerApprovedBy: string;
   }>({
     inspectionResult: IncomingInspectionResult.APROBADO,
+    controlledDocumentId: '',
     quantityAccepted: '',
     supplierLotCode: '',
     certificateRef: '',
+    invoiceNumber: '',
     acceptedUnitCost: '',
     notes: '',
     inspectedBy: '',
@@ -47,9 +53,11 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
     setResolverOpenId(inspectionId);
     setResolverForm({
       inspectionResult: IncomingInspectionResult.APROBADO,
+      controlledDocumentId: '',
       quantityAccepted: String(quantityReceived),
       supplierLotCode: '',
       certificateRef: '',
+      invoiceNumber: '',
       acceptedUnitCost: '',
       notes: '',
       inspectedBy: '',
@@ -57,6 +65,26 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
       managerApprovedBy: '',
     });
   };
+  const { data: controlledDocuments, error: controlledDocumentsError } = useControlledDocumentsQuery({
+    process: DocumentProcess.CONTROL_CALIDAD,
+    documentCategory: DocumentCategory.FOR,
+    status: DocumentStatus.APROBADO,
+  });
+  useEffect(() => {
+    if (!controlledDocumentsError) return;
+    toast({
+      title: 'Error',
+      description: 'No se pudieron cargar formatos de control documental',
+      variant: 'destructive',
+    });
+  }, [controlledDocumentsError, toast]);
+  useEffect(() => {
+    if (!controlledDocuments?.length) return;
+    setResolverForm((prev) => {
+      if (prev.controlledDocumentId) return prev;
+      return { ...prev, controlledDocumentId: controlledDocuments[0].id };
+    });
+  }, [controlledDocuments]);
 
   const submitResolveInspection = async (inspectionId: string, quantityReceived: number) => {
     if (!resolverForm.inspectedBy.trim() || resolverForm.inspectedBy.trim().length < 2) {
@@ -99,8 +127,10 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
       await model.resolveIncomingInspectionWithPayload({
         id: inspectionId,
         inspectionResult: resolverForm.inspectionResult,
+        controlledDocumentId: resolverForm.controlledDocumentId || undefined,
         supplierLotCode: resolverForm.supplierLotCode.trim() || undefined,
         certificateRef: resolverForm.certificateRef.trim() || undefined,
+        invoiceNumber: resolverForm.invoiceNumber.trim() || undefined,
         notes: resolverForm.notes.trim() || undefined,
         quantityAccepted,
         quantityRejected,
@@ -118,6 +148,26 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
   const isConditionalPending = (inspection: NonNullable<typeof model.incomingInspections>[number]) =>
     inspection.status === IncomingInspectionStatus.PENDIENTE &&
     inspection.inspectionResult === IncomingInspectionResult.CONDICIONAL;
+
+  const downloadFor28Pdf = async (inspectionId: string) => {
+    try {
+      const blob = await mrpApi.getIncomingInspectionPdf(inspectionId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `GC-FOR-28-${inspectionId.slice(0, 8).toUpperCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'No se pudo descargar el formato GC-FOR-28',
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
                 <TabsContent value="incoming" className="space-y-4">
@@ -170,8 +220,10 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                         {expandedIncomingInspectionId === inspection.id ? (
                                             <div className="text-xs text-slate-600 mt-2 border rounded-md p-2 bg-slate-50 space-y-1">
                                                 <div>Resultado inspección: {inspection.inspectionResult || 'N/A'}</div>
+                                                <div>Formato: {(inspection.documentControlCode || 'N/A')} v{inspection.documentControlVersion || 1}</div>
                                                 <div>Costo unitario aceptado: {inspection.acceptedUnitCost ?? 'N/A'}</div>
                                                 <div>Lote proveedor: {inspection.supplierLotCode || 'N/A'}</div>
+                                                <div>Factura N°: {inspection.invoiceNumber || 'N/A'}</div>
                                                 <div>Notas: {inspection.notes || 'Sin notas'}</div>
                                                 <div>Inspeccionado por: {inspection.inspectedBy || 'N/A'}</div>
                                                 <div>Fecha inspección: {inspection.inspectedAt ? new Date(inspection.inspectedAt).toLocaleString() : 'N/A'}</div>
@@ -213,6 +265,21 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                                 </select>
                                               </div>
                                               <div className="space-y-1">
+                                                <Label>Formato control documental</Label>
+                                                <select
+                                                  className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                                  value={resolverForm.controlledDocumentId}
+                                                  onChange={(e) => setResolverForm((p) => ({ ...p, controlledDocumentId: e.target.value }))}
+                                                >
+                                                  <option value="">Usar formato vigente</option>
+                                                  {(controlledDocuments ?? []).map((doc) => (
+                                                    <option key={doc.id} value={doc.id}>
+                                                      {doc.code} v{doc.version} - {doc.title}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                              <div className="space-y-1">
                                                 <Label>Cantidad aceptada</Label>
                                                 <Input
                                                   type="number"
@@ -249,6 +316,14 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                                   value={resolverForm.certificateRef}
                                                   onChange={(e) => setResolverForm((p) => ({ ...p, certificateRef: e.target.value }))}
                                                   placeholder="Requerido para aprobado/condicional"
+                                                />
+                                              </div>
+                                              <div className="space-y-1">
+                                                <Label>Factura N°</Label>
+                                                <Input
+                                                  value={resolverForm.invoiceNumber}
+                                                  onChange={(e) => setResolverForm((p) => ({ ...p, invoiceNumber: e.target.value }))}
+                                                  placeholder="Opcional"
                                                 />
                                               </div>
                                               <div className="space-y-1">
@@ -318,6 +393,13 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                             onClick={() => setExpandedIncomingInspectionId((prev) => (prev === inspection.id ? null : inspection.id))}
                                         >
                                             {expandedIncomingInspectionId === inspection.id ? 'Ocultar detalle' : 'Ver detalle'}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => downloadFor28Pdf(inspection.id)}
+                                        >
+                                            Descargar FOR-28
                                         </Button>
                                         {inspection.status === IncomingInspectionStatus.PENDIENTE ? (
                                             <Button

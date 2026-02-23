@@ -324,6 +324,7 @@ export class PurchaseOrderService {
     private async createIncomingInspection(em: EntityManager, purchaseOrder: PurchaseOrder, item: PurchaseOrderItem, warehouseId?: string) {
         if (!item.rawMaterial) return;
         const warehouseRepo = em.getRepository(Warehouse);
+        const controlDoc = await this.findActiveIncomingInspectionControlDocument(em);
         let warehouse: Warehouse | null = null;
         if (warehouseId) {
             warehouse = await warehouseRepo.findOne({ id: warehouseId });
@@ -348,8 +349,24 @@ export class PurchaseOrderService {
             quantityReceived: item.quantity,
             quantityAccepted: 0,
             quantityRejected: 0,
+            documentControlCode: controlDoc?.code || 'GC-FOR-28',
+            documentControlTitle: controlDoc?.title || 'Recepción de Materias Primas',
+            documentControlVersion: controlDoc?.version || 1,
+            documentControlDate: controlDoc?.effectiveDate || controlDoc?.approvedAt || new Date(),
         } as unknown as IncomingInspection);
         await em.persistAndFlush(inspection);
+    }
+
+    private async findActiveIncomingInspectionControlDocument(em: EntityManager) {
+        const now = new Date();
+        return em.findOne(ControlledDocument, {
+            code: 'GC-FOR-28',
+            status: DocumentStatus.APROBADO,
+            $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+            $and: [{ $or: [{ effectiveDate: null }, { effectiveDate: { $lte: now } }] }],
+        }, {
+            orderBy: [{ version: 'DESC' }, { approvedAt: 'DESC' }],
+        });
     }
 
     async cancelPurchaseOrder(id: string): Promise<void> {

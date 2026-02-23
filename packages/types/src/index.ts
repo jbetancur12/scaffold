@@ -1017,6 +1017,11 @@ export interface IncomingInspection {
     inspectionResult?: IncomingInspectionResult;
     supplierLotCode?: string;
     certificateRef?: string;
+    invoiceNumber?: string;
+    documentControlCode?: string;
+    documentControlTitle?: string;
+    documentControlVersion?: number;
+    documentControlDate?: string | Date;
     notes?: string;
     quantityReceived: number;
     quantityAccepted: number;
@@ -1599,8 +1604,10 @@ export interface CreateQualityTrainingEvidencePayload {
 
 export interface ResolveIncomingInspectionPayload {
     inspectionResult: IncomingInspectionResult;
+    controlledDocumentId?: string;
     supplierLotCode?: string;
     certificateRef?: string;
+    invoiceNumber?: string;
     notes?: string;
     quantityAccepted: number;
     quantityRejected: number;

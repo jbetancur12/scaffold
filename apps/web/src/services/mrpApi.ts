@@ -688,6 +688,10 @@ export const mrpApi = {
         const response = await api.get<IncomingInspection[]>('/mrp/quality/incoming-inspections', { params: filters });
         return response.data;
     },
+    getIncomingInspectionPdf: async (id: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/quality/incoming-inspections/${id}/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
+    },
     resolveIncomingInspection: async (id: string, data: ResolveIncomingInspectionPayload): Promise<IncomingInspection> => {
         const response = await api.patch<IncomingInspection>(`/mrp/quality/incoming-inspections/${id}/resolve`, data);
         return response.data;

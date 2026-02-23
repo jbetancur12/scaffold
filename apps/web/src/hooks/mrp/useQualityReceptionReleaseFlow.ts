@@ -36,8 +36,10 @@ export const useQualityReceptionReleaseFlow = () => {
     const resolveIncomingInspectionWithPayload = async (payload: {
         id: string;
         inspectionResult: IncomingInspectionResult;
+        controlledDocumentId?: string;
         supplierLotCode?: string;
         certificateRef?: string;
+        invoiceNumber?: string;
         notes?: string;
         quantityAccepted: number;
         quantityRejected: number;

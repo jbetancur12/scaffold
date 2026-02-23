@@ -824,8 +824,10 @@ export const ListIncomingInspectionsQuerySchema = z.object({
 
 export const ResolveIncomingInspectionSchema = z.object({
     inspectionResult: z.nativeEnum(IncomingInspectionResult),
+    controlledDocumentId: z.string().uuid().optional(),
     supplierLotCode: z.string().optional(),
     certificateRef: z.string().optional(),
+    invoiceNumber: z.string().optional(),
     notes: z.string().optional(),
     quantityAccepted: z.number().nonnegative(),
     quantityRejected: z.number().nonnegative(),

@@ -643,8 +643,10 @@ export class QualityService {
 
     async resolveIncomingInspection(id: string, payload: {
         inspectionResult: IncomingInspectionResult;
+        controlledDocumentId?: string;
         supplierLotCode?: string;
         certificateRef?: string;
+        invoiceNumber?: string;
         notes?: string;
         quantityAccepted: number;
         quantityRejected: number;

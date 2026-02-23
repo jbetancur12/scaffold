@@ -10,6 +10,7 @@ import { PurchaseOrderPdfService } from './services/purchase-order-pdf.service';
 import { PurchaseRequisitionService } from './services/purchase-requisition.service';
 import { QualityService } from './services/quality.service';
 import { DocumentControlService } from './services/document-control.service';
+import { QualityIncomingPdfService } from './services/quality-incoming-pdf.service';
 import {
     ProductSchema,
     UpdateProductSchema,
@@ -133,6 +134,7 @@ export class MrpController {
     private get productionService() { return new ProductionService(this.em); }
     private get purchaseOrderService() { return new PurchaseOrderService(this.em); }
     private get purchaseOrderPdfService() { return new PurchaseOrderPdfService(this.em); }
+    private get qualityIncomingPdfService() { return new QualityIncomingPdfService(this.em); }
     private get purchaseRequisitionService() { return new PurchaseRequisitionService(this.em); }
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
@@ -1182,6 +1184,18 @@ export class MrpController {
             const payload = CorrectIncomingInspectionCostSchema.parse(req.body);
             const row = await this.qualityService.correctResolvedIncomingInspectionCost(id, payload);
             return ApiResponse.success(res, row, 'Costo de recepción corregido');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadIncomingInspectionPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const file = await this.qualityIncomingPdfService.generateIncomingInspectionPdf(id);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.buffer);
         } catch (error) {
             next(error);
         }

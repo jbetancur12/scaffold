@@ -1,5 +1,8 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import {
+    DocumentCategory,
+    DocumentProcess,
+    DocumentStatus,
     IncomingInspectionResult,
     IncomingInspectionStatus,
     WarehouseType,
@@ -8,6 +11,7 @@ import { AppError } from '../../../shared/utils/response';
 import { IncomingInspection } from '../entities/incoming-inspection.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { ControlledDocument } from '../entities/controlled-document.entity';
 import { MrpService } from './mrp.service';
 
 type QualityAuditLogger = (payload: {
@@ -22,6 +26,7 @@ type QualityAuditLogger = (payload: {
 export class QualityIncomingService {
     private readonly em: EntityManager;
     private readonly incomingInspectionRepo: EntityRepository<IncomingInspection>;
+    private readonly controlledDocumentRepo: EntityRepository<ControlledDocument>;
     private readonly inventoryRepo: EntityRepository<InventoryItem>;
     private readonly warehouseRepo: EntityRepository<Warehouse>;
     private readonly logEvent: QualityAuditLogger;
@@ -30,6 +35,7 @@ export class QualityIncomingService {
         this.em = em;
         this.logEvent = logEvent;
         this.incomingInspectionRepo = em.getRepository(IncomingInspection);
+        this.controlledDocumentRepo = em.getRepository(ControlledDocument);
         this.inventoryRepo = em.getRepository(InventoryItem);
         this.warehouseRepo = em.getRepository(Warehouse);
     }
@@ -51,8 +57,10 @@ export class QualityIncomingService {
 
     async resolveIncomingInspection(id: string, payload: {
         inspectionResult: IncomingInspectionResult;
+        controlledDocumentId?: string;
         supplierLotCode?: string;
         certificateRef?: string;
+        invoiceNumber?: string;
         notes?: string;
         quantityAccepted: number;
         quantityRejected: number;
@@ -114,8 +122,24 @@ export class QualityIncomingService {
         }
 
         row.inspectionResult = payload.inspectionResult;
+        if (payload.controlledDocumentId) {
+            const selectedDocument = await this.controlledDocumentRepo.findOne({
+                id: payload.controlledDocumentId,
+                process: DocumentProcess.CONTROL_CALIDAD,
+                documentCategory: DocumentCategory.FOR,
+                status: DocumentStatus.APROBADO,
+            });
+            if (!selectedDocument) {
+                throw new AppError('El formato seleccionado no está aprobado o no corresponde a Control de Calidad/FOR', 400);
+            }
+            row.documentControlCode = selectedDocument.code;
+            row.documentControlTitle = selectedDocument.title;
+            row.documentControlVersion = selectedDocument.version;
+            row.documentControlDate = selectedDocument.effectiveDate || selectedDocument.approvedAt || new Date();
+        }
         row.supplierLotCode = payload.supplierLotCode;
         row.certificateRef = payload.certificateRef;
+        row.invoiceNumber = payload.invoiceNumber;
         row.notes = payload.notes;
         row.quantityAccepted = payload.quantityAccepted;
         row.quantityRejected = payload.quantityRejected;
@@ -194,6 +218,9 @@ export class QualityIncomingService {
                 inspectedBy: payload.inspectedBy,
                 approvedBy: payload.approvedBy,
                 managerApprovedBy: payload.managerApprovedBy,
+                documentControlCode: row.documentControlCode,
+                documentControlVersion: row.documentControlVersion,
+                invoiceNumber: row.invoiceNumber,
                 conditionalHold: isConditional,
             },
         });
