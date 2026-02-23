@@ -62,6 +62,7 @@ COPY --from=builder /app/apps/api/dist ./apps/api/dist
 # IMPORTANT: Copy migrations separately (if they're not in dist)
 # If migrations are .ts files, you might need to copy them
 COPY --from=builder /app/apps/api/src/migrations ./apps/api/dist/apps/api/src/migrations
+COPY --from=builder /app/apps/api/src/assets ./apps/api/dist/apps/api/src/assets
 
 # ⭐ Verificar la estructura final
 RUN echo "=== Final dist structure ===" && \

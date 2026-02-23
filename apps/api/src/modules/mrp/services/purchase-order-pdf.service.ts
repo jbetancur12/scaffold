@@ -1,6 +1,8 @@
 import { EntityManager } from '@mikro-orm/core';
 import { AppError } from '../../../shared/utils/response';
 import { PurchaseOrderService } from './purchase-order.service';
+import fs from 'node:fs';
+import path from 'node:path';
 
 type PugModule = {
     compile: (template: string, options?: { pretty?: boolean }) => (locals: Record<string, unknown>) => string;
@@ -26,13 +28,8 @@ html(lang="es")
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
     title= orderNumber + ' - ' + title
     style.
-      @page { size: A4; margin: 110px 24px 80px 24px; }
       * { box-sizing: border-box; }
       body { font-family: Arial, sans-serif; color: #0f172a; font-size: 12px; margin: 0; }
-      .doc-header { position: fixed; top: -95px; left: 0; right: 0; border: 1px solid #0f172a; padding: 10px 12px; }
-      .doc-header-grid { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; align-items: center; }
-      .company { font-weight: 700; font-size: 11px; line-height: 1.3; }
-      .title { text-align: center; font-size: 17px; font-weight: 700; }
       .meta { border: 1px solid #0f172a; width: 100%; border-collapse: collapse; }
       .meta td { border: 1px solid #0f172a; padding: 4px 6px; font-size: 11px; }
       .section { margin-top: 14px; }
@@ -49,26 +46,7 @@ html(lang="es")
       .totals td { border: 1px solid #0f172a; padding: 6px; font-size: 11px; }
       .totals .label { background: #f8fafc; }
       .totals .net { font-size: 13px; font-weight: 700; background: #e2e8f0; }
-      .doc-footer { position: fixed; bottom: -64px; left: 0; right: 0; border-top: 1px solid #0f172a; padding-top: 6px; font-size: 10px; color: #475569; }
-      .footer-grid { display: flex; justify-content: space-between; gap: 10px; }
   body
-    .doc-header
-      .doc-header-grid
-        .company
-          div COLOMBIA MEDICAS Y ORTOPEDICAS SAS COLMOR
-          div NIT 900.712.025-4
-        .title
-          div= title
-        table.meta
-          tr
-            td Código
-            td= docCode
-          tr
-            td Versión
-            td= docVersion
-          tr
-            td Fecha
-            td= docDate
     .section
       h3 Información General
       .grid-2
@@ -137,10 +115,6 @@ html(lang="es")
         h3 Observaciones
         .field
           .v(style='white-space: pre-wrap; font-weight: 400')= notes
-    .doc-footer
-      .footer-grid
-        span Documento generado por plataforma MRP COLMOR
-        span= generatedAt
 `;
 
 export class PurchaseOrderPdfService {
@@ -165,6 +139,111 @@ export class PurchaseOrderPdfService {
         return new Date(value).toLocaleDateString('es-CO');
     }
 
+    private formatHeaderDate(value?: Date | string | null) {
+        if (!value) return 'N/A';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return 'N/A';
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    private resolveProcessLabelByDocCode(code?: string | null) {
+        const normalizedCode = (code || '').trim().toUpperCase();
+        const prefix = normalizedCode.split('-')[0];
+        const map: Record<string, string> = {
+            GP: 'Proceso de Gestión de Producción',
+            GC: 'Proceso de Gestión de Calidad',
+            GAF: 'Proceso de Gestión Administrativa y Financiera',
+            GTH: 'Proceso de Gestión de Talento Humano',
+            GS: 'Proceso de Gestión de Seguridad',
+            GM: 'Proceso de Gestión de Mantenimiento',
+        };
+        return map[prefix] || 'Proceso de Gestión de Producción';
+    }
+
+    private escapeHtml(value: string) {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    private buildHeaderTemplate(data: {
+        logoDataUrl?: string;
+        title: string;
+        processLabel: string;
+        docCode: string;
+        docVersion: number;
+        docDate: string;
+    }) {
+        const safeTitle = this.escapeHtml(data.title);
+        const safeProcessLabel = this.escapeHtml(data.processLabel);
+        const safeDocCode = this.escapeHtml(data.docCode);
+        const safeDocDate = this.escapeHtml(data.docDate);
+        const logoCell = data.logoDataUrl
+            ? `<img style="width:100%;max-height:56px;object-fit:contain;display:block;margin:0 auto;" src="${data.logoDataUrl}" alt="COLMOR" />`
+            : '<div style="text-align:center;font-weight:700;font-size:16px;">COLMOR</div>';
+
+        return `
+            <style>
+              html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; }
+              .header-wrap { padding: 8px 24px 0 24px; width: 100%; background: #fff; }
+              .header-table { width: 100%; border-collapse: collapse; border: 1px solid #0f172a; table-layout: fixed; }
+              .header-table td { border: 1px solid #0f172a; padding: 4px 6px; vertical-align: middle; font-size: 11px; }
+              .meta { width: 100%; border-collapse: collapse; }
+              .meta td { border: 1px solid #0f172a; padding: 4px 6px; font-size: 11px; }
+              .doc-title { text-align: center; font-weight: 700; line-height: 1.25; }
+              .doc-title .l1 { font-size: 12px; }
+              .doc-title .l2 { font-size: 11px; margin-top: 2px; }
+              .doc-title .l3 { font-size: 12px; margin-top: 2px; }
+            </style>
+            <div class="header-wrap">
+              <table class="header-table">
+                <tr>
+                  <td style="width:36%">${logoCell}</td>
+                  <td style="width:40%">
+                    <div class="doc-title">
+                      <div class="l1">SAS COLMOR</div>
+                      <div class="l2">${safeProcessLabel}</div>
+                      <div class="l3">${safeTitle}</div>
+                    </div>
+                  </td>
+                  <td style="width:24%; padding:0">
+                    <table class="meta">
+                      <tr><td>Versión</td><td>${data.docVersion}</td></tr>
+                      <tr><td>Código</td><td>${safeDocCode}</td></tr>
+                      <tr><td>Fecha</td><td>${safeDocDate}</td></tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </div>
+        `;
+    }
+
+    private buildFooterTemplate() {
+        return `
+            <style>
+              html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; }
+              .footer-wrap { width: 100%; padding: 0 24px 8px 24px; background: #fff; }
+              .footer-line { border-top: 1px solid #0f172a; margin-bottom: 6px; }
+              .footer-text { text-align: center; font-size: 10px; line-height: 1.2; color: #111827; }
+            </style>
+            <div class="footer-wrap">
+              <div class="footer-line"></div>
+              <div class="footer-text">
+                <div>Calle 35 13-46 Guadalupe Dosquebradas - Risaralda</div>
+                <div>Contáctenos: 3113441682 - 3425070 comercial@metromedicslab.com.co</div>
+                <div>www.metromedics.co</div>
+              </div>
+            </div>
+        `;
+    }
+
     private loadPug(): PugModule {
         try {
             // eslint-disable-next-line @typescript-eslint/no-implied-eval
@@ -183,6 +262,27 @@ export class PurchaseOrderPdfService {
         }
     }
 
+    private getLogoDataUrl(): string | undefined {
+        const candidates = [
+            path.resolve(__dirname, '../../../assets/colmor-logo.jpg'),
+            path.resolve(process.cwd(), 'logo.jpg'),
+            path.resolve(process.cwd(), 'logo-c.jpg'),
+            path.resolve(process.cwd(), '..', 'logo.jpg'),
+            path.resolve(process.cwd(), '..', 'logo-c.jpg'),
+            path.resolve(process.cwd(), 'src/assets/colmor-logo.jpg'),
+            path.resolve(process.cwd(), 'apps/api/src/assets/colmor-logo.jpg'),
+            path.resolve(process.cwd(), 'apps/web/src/assets/logo.jpg'),
+            path.resolve(process.cwd(), '..', 'apps/web/src/assets/logo.jpg'),
+        ];
+        for (const filePath of candidates) {
+            if (!fs.existsSync(filePath)) continue;
+            const mime = filePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
+            const base64 = fs.readFileSync(filePath).toString('base64');
+            return `data:${mime};base64,${base64}`;
+        }
+        return undefined;
+    }
+
     async generatePurchaseOrderPdf(id: string) {
         const order = await this.purchaseOrderService.getPurchaseOrder(id);
         if (!order) {
@@ -192,11 +292,16 @@ export class PurchaseOrderPdfService {
         const pug = this.loadPug();
         const playwright = this.loadPlaywright();
         const compile = pug.compile(purchaseOrderPdfTemplate);
+        const logoDataUrl = this.getLogoDataUrl();
+        const docCode = order.documentControlCode || 'GP-FOR-04';
+        const processLabel = this.resolveProcessLabelByDocCode(docCode);
+        const docDate = this.formatHeaderDate(order.documentControlDate || order.createdAt);
         const html = compile({
             title: order.documentControlTitle || 'Orden de Compra',
-            docCode: order.documentControlCode || 'GP-FOR-04',
+            processLabel,
+            docCode,
             docVersion: order.documentControlVersion || 1,
-            docDate: this.formatDate(order.documentControlDate || order.createdAt),
+            docDate,
             orderNumber: `OC-${order.id.slice(0, 8).toUpperCase()}`,
             orderDate: this.formatDate(order.orderDate),
             supplierName: order.supplier?.name || 'N/A',
@@ -219,7 +324,7 @@ export class PurchaseOrderPdfService {
             withholdingAmount: this.formatCurrency(Number(order.withholdingAmount || 0)),
             otherChargesAmount: this.formatCurrency(Number(order.otherChargesAmount || 0)),
             netTotalAmount: this.formatCurrency(Number(order.netTotalAmount || order.totalAmount || 0)),
-            generatedAt: new Date().toLocaleString('es-CO'),
+            logoDataUrl,
         });
 
         const browser = await playwright.chromium.launch({
@@ -232,7 +337,22 @@ export class PurchaseOrderPdfService {
             const pdfBuffer = await page.pdf({
                 format: 'A4',
                 printBackground: true,
-                preferCSSPageSize: true,
+                displayHeaderFooter: true,
+                headerTemplate: this.buildHeaderTemplate({
+                    logoDataUrl,
+                    title: order.documentControlTitle || 'Orden de Compra',
+                    processLabel,
+                    docCode,
+                    docVersion: order.documentControlVersion || 1,
+                    docDate,
+                }),
+                footerTemplate: this.buildFooterTemplate(),
+                margin: {
+                    top: '140px',
+                    bottom: '70px',
+                    left: '24px',
+                    right: '24px',
+                },
             });
             return {
                 fileName: `${order.documentControlCode || 'OC'}-${order.id.slice(0, 8).toUpperCase()}-v${order.documentControlVersion || 1}.pdf`,
