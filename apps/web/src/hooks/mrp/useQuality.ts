@@ -910,11 +910,14 @@ export const useExportComplianceMutation = () => {
 };
 
 export const useOperationalAlertsQuery = (filters?: { role?: OperationalAlertRole; daysAhead?: number }) => {
+    const role = filters?.role;
+    const daysAhead = filters?.daysAhead;
     const fetcher = useCallback(async (): Promise<OperationalAlert[]> => {
-        return mrpApi.listOperationalAlerts(filters);
-    }, [filters]);
+        return mrpApi.listOperationalAlerts({ role, daysAhead });
+    }, [daysAhead, role]);
 
-    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityOperationalAlerts);
+    const queryKey = `${mrpQueryKeys.qualityOperationalAlerts}:${role ?? 'all'}:${daysAhead ?? 'default'}`;
+    return useMrpQuery(fetcher, true, queryKey);
 };
 
 export const useExportWeeklyComplianceReportMutation = () => {
@@ -1009,6 +1012,24 @@ export const useResolveIncomingInspectionMutation = () => {
         actor?: string;
     }, IncomingInspection>(
         async ({ id, ...payload }) => mrpApi.resolveIncomingInspection(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityIncomingInspections);
+                invalidateMrpQuery(mrpQueryKeys.rawMaterials);
+                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useCorrectIncomingInspectionCostMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        acceptedUnitCost: number;
+        reason: string;
+        actor?: string;
+    }, IncomingInspection>(
+        async ({ id, ...payload }) => mrpApi.correctIncomingInspectionCost(id, payload),
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityIncomingInspections);

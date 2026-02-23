@@ -654,6 +654,14 @@ export class QualityService {
         return this.incomingService.resolveIncomingInspection(id, payload);
     }
 
+    async correctResolvedIncomingInspectionCost(id: string, payload: {
+        acceptedUnitCost: number;
+        reason: string;
+        actor?: string;
+    }) {
+        return this.incomingService.correctResolvedIncomingInspectionCost(id, payload);
+    }
+
     async upsertBatchReleaseChecklist(payload: {
         productionBatchId: string;
         qcApproved: boolean;

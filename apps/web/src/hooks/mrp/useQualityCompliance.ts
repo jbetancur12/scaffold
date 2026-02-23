@@ -49,6 +49,7 @@ export const useQualityCompliance = () => {
         handleUpsertRegulatoryLabel: regulatoryFlow.handleUpsertRegulatoryLabel,
         quickValidateDispatch: regulatoryFlow.quickValidateDispatch,
         quickResolveIncomingInspection: receptionReleaseFlow.quickResolveIncomingInspection,
+        quickCorrectIncomingInspectionCost: receptionReleaseFlow.quickCorrectIncomingInspectionCost,
         handleUpsertBatchReleaseChecklist: receptionReleaseFlow.handleUpsertBatchReleaseChecklist,
         quickSignBatchRelease: receptionReleaseFlow.quickSignBatchRelease,
         handleCreateInvimaRegistration: regulatoryFlow.handleCreateInvimaRegistration,

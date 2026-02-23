@@ -6,6 +6,7 @@ import {
     useIncomingInspectionsQuery,
     useBatchReleasesQuery,
     useResolveIncomingInspectionMutation,
+    useCorrectIncomingInspectionCostMutation,
     useUpsertBatchReleaseChecklistMutation,
     useSignBatchReleaseMutation,
 } from '@/hooks/mrp/useQuality';
@@ -15,6 +16,7 @@ export const useQualityReceptionReleaseFlow = () => {
     const { data: incomingInspectionsData, loading: loadingIncomingInspections } = useIncomingInspectionsQuery();
     const { data: batchReleasesData, loading: loadingBatchReleases } = useBatchReleasesQuery();
     const { execute: resolveIncomingInspection } = useResolveIncomingInspectionMutation();
+    const { execute: correctIncomingInspectionCost } = useCorrectIncomingInspectionCostMutation();
     const { execute: upsertBatchReleaseChecklist, loading: savingBatchReleaseChecklist } = useUpsertBatchReleaseChecklistMutation();
     const { execute: signBatchRelease, loading: signingBatchRelease } = useSignBatchReleaseMutation();
 
@@ -85,6 +87,35 @@ export const useQualityReceptionReleaseFlow = () => {
         }
     };
 
+    const quickCorrectIncomingInspectionCost = async (id: string) => {
+        try {
+            const acceptedUnitCostRaw = window.prompt('Nuevo costo unitario real aceptado');
+            if (acceptedUnitCostRaw === null) return;
+            const acceptedUnitCost = Number(acceptedUnitCostRaw);
+            if (Number.isNaN(acceptedUnitCost) || acceptedUnitCost <= 0) {
+                toast({ title: 'Error', description: 'Costo unitario corregido inválido', variant: 'destructive' });
+                return;
+            }
+
+            const reason = window.prompt('Motivo de corrección (trazabilidad de auditoría)');
+            if (!reason || reason.trim().length < 5) {
+                toast({ title: 'Error', description: 'Debes indicar un motivo de al menos 5 caracteres', variant: 'destructive' });
+                return;
+            }
+
+            await correctIncomingInspectionCost({
+                id,
+                acceptedUnitCost,
+                reason: reason.trim(),
+                actor: 'sistema-web',
+            });
+
+            toast({ title: 'Costo corregido', description: 'Se actualizó el costo aceptado y se registró auditoría.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo corregir el costo de recepción'), variant: 'destructive' });
+        }
+    };
+
     const handleUpsertBatchReleaseChecklist = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!batchReleaseForm.productionBatchId) {
@@ -147,6 +178,7 @@ export const useQualityReceptionReleaseFlow = () => {
         savingBatchReleaseChecklist,
         signingBatchRelease,
         quickResolveIncomingInspection,
+        quickCorrectIncomingInspectionCost,
         handleUpsertBatchReleaseChecklist,
         quickSignBatchRelease,
     };

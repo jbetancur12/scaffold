@@ -758,6 +758,12 @@ export const ResolveIncomingInspectionSchema = z.object({
     }
 });
 
+export const CorrectIncomingInspectionCostSchema = z.object({
+    acceptedUnitCost: z.number().positive(),
+    reason: z.string().min(5),
+    actor: z.string().optional(),
+});
+
 export const UpsertBatchReleaseChecklistSchema = z.object({
     productionBatchId: z.string().uuid(),
     qcApproved: z.boolean(),
@@ -916,6 +922,7 @@ export type ValidateDispatchReadinessPayload = DateInputValue<z.input<typeof Val
 export type CreateQualityRiskControlPayload = DateInputValue<z.input<typeof CreateQualityRiskControlSchema>>;
 export type CreateQualityTrainingEvidencePayload = DateInputValue<z.input<typeof CreateQualityTrainingEvidenceSchema>>;
 export type ResolveIncomingInspectionPayload = DateInputValue<z.input<typeof ResolveIncomingInspectionSchema>>;
+export type CorrectIncomingInspectionCostPayload = DateInputValue<z.input<typeof CorrectIncomingInspectionCostSchema>>;
 export type UpsertBatchReleaseChecklistPayload = DateInputValue<z.input<typeof UpsertBatchReleaseChecklistSchema>>;
 export type SignBatchReleasePayload = DateInputValue<z.input<typeof SignBatchReleaseSchema>>;
 export type ApproveControlledDocumentPayload = DateInputValue<z.input<typeof ApproveControlledDocumentSchema>>;

@@ -118,6 +118,7 @@ import type {
     CreateQualityRiskControlPayload,
     CreateQualityTrainingEvidencePayload,
     ResolveIncomingInspectionPayload,
+    CorrectIncomingInspectionCostPayload,
     UpsertBatchReleaseChecklistPayload,
     SignBatchReleasePayload,
     ApproveControlledDocumentPayload,
@@ -644,6 +645,10 @@ export const mrpApi = {
     },
     resolveIncomingInspection: async (id: string, data: ResolveIncomingInspectionPayload): Promise<IncomingInspection> => {
         const response = await api.patch<IncomingInspection>(`/mrp/quality/incoming-inspections/${id}/resolve`, data);
+        return response.data;
+    },
+    correctIncomingInspectionCost: async (id: string, data: CorrectIncomingInspectionCostPayload): Promise<IncomingInspection> => {
+        const response = await api.patch<IncomingInspection>(`/mrp/quality/incoming-inspections/${id}/correct-cost`, data);
         return response.data;
     },
     upsertBatchReleaseChecklist: async (data: UpsertBatchReleaseChecklistPayload): Promise<BatchRelease> => {

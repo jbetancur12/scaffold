@@ -154,4 +154,76 @@ export class QualityIncomingService {
         });
         return row;
     }
+
+    async correctResolvedIncomingInspectionCost(id: string, payload: {
+        acceptedUnitCost: number;
+        reason: string;
+        actor?: string;
+    }) {
+        const row = await this.incomingInspectionRepo.findOneOrFail(
+            { id },
+            { populate: ['rawMaterial'] }
+        );
+
+        if (row.status === IncomingInspectionStatus.PENDIENTE) {
+            throw new AppError('Primero debes resolver la inspeccion antes de corregir costo', 409);
+        }
+        if (Number(row.quantityAccepted) <= 0) {
+            throw new AppError('La inspeccion no tiene cantidad aceptada para corregir costo', 409);
+        }
+
+        const previousAcceptedUnitCost = Number(row.acceptedUnitCost ?? row.rawMaterial.lastPurchasePrice ?? row.rawMaterial.averageCost ?? 0);
+        const nextAcceptedUnitCost = Number(payload.acceptedUnitCost);
+
+        if (nextAcceptedUnitCost <= 0) {
+            throw new AppError('El costo unitario corregido debe ser mayor a 0', 400);
+        }
+        if (previousAcceptedUnitCost > 0 && previousAcceptedUnitCost === nextAcceptedUnitCost) {
+            throw new AppError('El costo corregido es igual al costo actual de la inspeccion', 409);
+        }
+
+        const rawMaterialInventories = await this.inventoryRepo.find(
+            { rawMaterial: row.rawMaterial.id },
+            { populate: ['warehouse'] }
+        );
+        const rawMaterialStock = rawMaterialInventories.reduce((acc, item) => {
+            if (item.warehouse?.type !== WarehouseType.RAW_MATERIALS) return acc;
+            return acc + Number(item.quantity);
+        }, 0);
+
+        const acceptedQty = Number(row.quantityAccepted);
+        const costDeltaValue = acceptedQty * (nextAcceptedUnitCost - previousAcceptedUnitCost);
+
+        if (rawMaterialStock > 0 && costDeltaValue !== 0) {
+            const currentAvg = Number(row.rawMaterial.averageCost ?? 0);
+            const nextAvg = currentAvg + (costDeltaValue / rawMaterialStock);
+            row.rawMaterial.averageCost = Number(Math.max(0, nextAvg).toFixed(6));
+        }
+
+        row.acceptedUnitCost = nextAcceptedUnitCost;
+        row.rawMaterial.lastPurchasePrice = nextAcceptedUnitCost;
+        row.rawMaterial.lastPurchaseDate = new Date();
+
+        await this.em.persistAndFlush([row, row.rawMaterial]);
+        const mrpService = new MrpService(this.em);
+        await mrpService.recalculateVariantsByMaterial(row.rawMaterial.id);
+
+        await this.logEvent({
+            entityType: 'incoming_inspection',
+            entityId: row.id,
+            action: 'cost_corrected',
+            actor: payload.actor,
+            notes: payload.reason,
+            metadata: {
+                acceptedQty,
+                previousAcceptedUnitCost,
+                correctedAcceptedUnitCost: nextAcceptedUnitCost,
+                costDeltaValue,
+                rawMaterialStock,
+                rawMaterialId: row.rawMaterial.id,
+            },
+        });
+
+        return row;
+    }
 }

@@ -62,6 +62,7 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                         {expandedIncomingInspectionId === inspection.id ? (
                                             <div className="text-xs text-slate-600 mt-2 border rounded-md p-2 bg-slate-50 space-y-1">
                                                 <div>Resultado inspección: {inspection.inspectionResult || 'N/A'}</div>
+                                                <div>Costo unitario aceptado: {inspection.acceptedUnitCost ?? 'N/A'}</div>
                                                 <div>Lote proveedor: {inspection.supplierLotCode || 'N/A'}</div>
                                                 <div>Notas: {inspection.notes || 'Sin notas'}</div>
                                                 <div>Inspeccionado por: {inspection.inspectedBy || 'N/A'}</div>
@@ -96,7 +97,17 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                             >
                                                 Resolver QA
                                             </Button>
-                                        ) : null}
+                                        ) : (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => model.quickCorrectIncomingInspectionCost(inspection.id)}
+                                                disabled={Number(inspection.quantityAccepted) <= 0}
+                                                title={Number(inspection.quantityAccepted) <= 0 ? 'No aplica: inspección sin cantidad aceptada' : undefined}
+                                            >
+                                                Corregir costo
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             ))}

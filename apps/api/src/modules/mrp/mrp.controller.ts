@@ -86,6 +86,7 @@ import {
     ListQualityTrainingEvidenceQuerySchema,
     ListIncomingInspectionsQuerySchema,
     ResolveIncomingInspectionSchema,
+    CorrectIncomingInspectionCostSchema,
     UpsertBatchReleaseChecklistSchema,
     SignBatchReleaseSchema,
     ListBatchReleasesQuerySchema,
@@ -1160,6 +1161,17 @@ export class MrpController {
             const payload = ResolveIncomingInspectionSchema.parse(req.body);
             const row = await this.qualityService.resolveIncomingInspection(id, payload);
             return ApiResponse.success(res, row, 'Inspección de recepción resuelta');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async correctResolvedIncomingInspectionCost(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = CorrectIncomingInspectionCostSchema.parse(req.body);
+            const row = await this.qualityService.correctResolvedIncomingInspectionCost(id, payload);
+            return ApiResponse.success(res, row, 'Costo de recepción corregido');
         } catch (error) {
             next(error);
         }
