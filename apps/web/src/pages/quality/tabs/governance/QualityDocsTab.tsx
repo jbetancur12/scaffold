@@ -20,25 +20,26 @@ import {
 import type { QualityComplianceModel } from '../types';
 
 export function QualityDocsTab({ model }: { model: QualityComplianceModel }) {
-  const MASTER_DOCUMENT_TITLE = 'CONTROL DE DOCUMENTOS COLMOR';
   const categoryOrder: DocumentCategory[] = [
     DocumentCategory.MAN,
     DocumentCategory.PRO,
     DocumentCategory.INS,
     DocumentCategory.FOR,
   ];
-  const masterDocument = model.documents.find(
-    (doc) => doc.title.trim().toUpperCase() === MASTER_DOCUMENT_TITLE
-  );
+  const masterDocument = model.documents.find((doc) => doc.isInitialDictionary);
   const [indexQuery, setIndexQuery] = useState('');
   const [indexCategoryFilter, setIndexCategoryFilter] = useState<'all' | DocumentCategory | 'uncategorized'>('all');
   const [indexPage, setIndexPage] = useState(1);
   const [expandedDocumentId, setExpandedDocumentId] = useState<string | null>(null);
+  const [showObsolete, setShowObsolete] = useState(false);
   const INDEX_PAGE_SIZE = 8;
   const normalizedQuery = indexQuery.trim().toLowerCase();
   const filteredDocuments = useMemo(() => {
     const rows = [...model.documents].sort((a, b) => a.code.localeCompare(b.code));
-    const byText = !normalizedQuery ? rows : rows.filter((doc) => {
+    const byStatus = showObsolete
+      ? rows
+      : rows.filter((doc) => doc.status !== DocumentStatus.OBSOLETO);
+    const byText = !normalizedQuery ? byStatus : byStatus.filter((doc) => {
       const code = doc.code.toLowerCase();
       const title = doc.title.toLowerCase();
       return code.includes(normalizedQuery) || title.includes(normalizedQuery);
@@ -46,7 +47,7 @@ export function QualityDocsTab({ model }: { model: QualityComplianceModel }) {
     if (indexCategoryFilter === 'all') return byText;
     if (indexCategoryFilter === 'uncategorized') return byText.filter((doc) => !doc.documentCategory);
     return byText.filter((doc) => doc.documentCategory === indexCategoryFilter);
-  }, [model.documents, normalizedQuery, indexCategoryFilter]);
+  }, [model.documents, normalizedQuery, indexCategoryFilter, showObsolete]);
   const totalIndexPages = Math.max(1, Math.ceil(filteredDocuments.length / INDEX_PAGE_SIZE));
   const pagedDocuments = useMemo(() => {
     const start = (indexPage - 1) * INDEX_PAGE_SIZE;
@@ -88,14 +89,14 @@ export function QualityDocsTab({ model }: { model: QualityComplianceModel }) {
           {!masterDocument ? (
             <div className="rounded-md border border-amber-300 bg-amber-50 p-3">
               <p className="text-sm font-medium text-amber-900">
-                Aún no existe el documento maestro <strong>{MASTER_DOCUMENT_TITLE}</strong>.
+                Aún no existe el documento maestro inicial (diccionario).
               </p>
               <p className="mt-1 text-xs text-amber-800">
-                Crea ese documento primero y luego úsalo como índice de control documental.
+                El primer documento que crees quedará marcado automáticamente como diccionario.
               </p>
               <div className="mt-3">
                 <Button type="button" variant="outline" onClick={model.presetInitialControlDocument}>
-                  Prellenar documento maestro
+                  Usar plantilla recomendada
                 </Button>
               </div>
             </div>
@@ -258,6 +259,14 @@ export function QualityDocsTab({ model }: { model: QualityComplianceModel }) {
                       onClick={() => setIndexCategoryFilter('uncategorized')}
                     >
                       Sin categoría
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={showObsolete ? 'default' : 'outline'}
+                      onClick={() => setShowObsolete((prev) => !prev)}
+                    >
+                      {showObsolete ? 'Ocultando obsoletos' : 'Mostrar obsoletos'}
                     </Button>
                   </div>
                   <Input

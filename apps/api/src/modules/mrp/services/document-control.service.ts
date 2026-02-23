@@ -11,7 +11,6 @@ export class DocumentControlService {
     private readonly repo: EntityRepository<ControlledDocument>;
     private readonly auditRepo: EntityRepository<QualityAuditEvent>;
     private readonly storageService: ObjectStorageService;
-    private static readonly FIRST_DOCUMENT_REQUIRED_TITLE = 'CONTROL DE DOCUMENTOS COLMOR';
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -51,20 +50,12 @@ export class DocumentControlService {
         expiresAt?: Date;
     }, actor?: string) {
         const existingDocuments = await this.repo.count();
-        if (existingDocuments === 0) {
-            const normalizedTitle = payload.title.trim().toUpperCase();
-            if (normalizedTitle !== DocumentControlService.FIRST_DOCUMENT_REQUIRED_TITLE) {
-                throw new AppError(
-                    `El primer documento debe ser "${DocumentControlService.FIRST_DOCUMENT_REQUIRED_TITLE}"`,
-                    400
-                );
-            }
-        }
 
         const doc = this.repo.create({
             ...payload,
             version: payload.version ?? 1,
             status: DocumentStatus.BORRADOR,
+            isInitialDictionary: existingDocuments === 0,
         } as unknown as ControlledDocument);
         await this.em.persistAndFlush(doc);
         await this.log('controlled_document', doc.id, 'created', actor, { code: doc.code, version: doc.version });

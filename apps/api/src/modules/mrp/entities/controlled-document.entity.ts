@@ -62,4 +62,7 @@ export class ControlledDocument extends BaseEntity implements IControlledDocumen
 
     @Property({ nullable: true, type: 'text' })
     sourceFilePath?: string;
+
+    @Property({ default: false })
+    isInitialDictionary: boolean = false;
 }

@@ -792,6 +792,7 @@ export interface ControlledDocument {
     sourceFileName?: string;
     sourceFileMime?: string;
     sourceFilePath?: string;
+    isInitialDictionary?: boolean;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
