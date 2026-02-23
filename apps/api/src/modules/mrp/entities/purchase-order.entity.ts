@@ -24,6 +24,30 @@ export class PurchaseOrder {
     @Enum(() => PurchaseOrderStatus)
     status: PurchaseOrderStatus = PurchaseOrderStatus.PENDING;
 
+    @Property({ nullable: true })
+    purchaseType?: string;
+
+    @Property({ nullable: true })
+    paymentMethod?: string;
+
+    @Property({ nullable: true })
+    currency?: string;
+
+    @Property({ type: 'decimal', precision: 6, scale: 2, default: 0 })
+    withholdingRate: number = 0;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+    withholdingAmount: number = 0;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+    discountAmount: number = 0;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+    otherChargesAmount: number = 0;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+    netTotalAmount: number = 0;
+
     @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
     totalAmount: number = 0;
 

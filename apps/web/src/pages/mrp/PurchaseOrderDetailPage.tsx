@@ -179,6 +179,24 @@ export default function PurchaseOrderDetailPage() {
                             <div className="text-sm text-slate-600">Total</div>
                             <div className="font-medium text-lg">{formatCurrency(order.totalAmount)}</div>
                         </div>
+                        {order.netTotalAmount !== undefined && (
+                            <div>
+                                <div className="text-sm text-slate-600">Total Neto</div>
+                                <div className="font-medium text-lg">{formatCurrency(order.netTotalAmount)}</div>
+                            </div>
+                        )}
+                        {order.purchaseType && (
+                            <div>
+                                <div className="text-sm text-slate-600">Tipo de compra</div>
+                                <div className="font-medium">{order.purchaseType}</div>
+                            </div>
+                        )}
+                        {order.paymentMethod && (
+                            <div>
+                                <div className="text-sm text-slate-600">Forma de pago</div>
+                                <div className="font-medium">{order.paymentMethod}</div>
+                            </div>
+                        )}
                     </div>
                     {order.notes && (
                         <div className="mt-4">
@@ -264,12 +282,52 @@ export default function PurchaseOrderDetailPage() {
                                 </tr>
                                 <tr className="bg-slate-100/50">
                                     <td colSpan={4} className="px-6 py-4 text-right font-bold text-slate-900">
-                                        Gran Total:
+                                        Total Bruto:
                                     </td>
                                     <td className="px-6 py-4 text-right font-bold text-xl text-slate-900">
                                         {formatCurrency(order.totalAmount)}
                                     </td>
                                 </tr>
+                                {order.discountAmount ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-2 text-right text-sm text-slate-500">
+                                            Descuento:
+                                        </td>
+                                        <td className="px-6 py-2 text-right text-sm text-slate-700">
+                                            - {formatCurrency(order.discountAmount)}
+                                        </td>
+                                    </tr>
+                                ) : null}
+                                {order.withholdingAmount ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-2 text-right text-sm text-slate-500">
+                                            Retención ({order.withholdingRate || 0}%):
+                                        </td>
+                                        <td className="px-6 py-2 text-right text-sm text-slate-700">
+                                            - {formatCurrency(order.withholdingAmount)}
+                                        </td>
+                                    </tr>
+                                ) : null}
+                                {order.otherChargesAmount ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-2 text-right text-sm text-slate-500">
+                                            Otros cargos:
+                                        </td>
+                                        <td className="px-6 py-2 text-right text-sm text-slate-700">
+                                            {formatCurrency(order.otherChargesAmount)}
+                                        </td>
+                                    </tr>
+                                ) : null}
+                                {order.netTotalAmount !== undefined ? (
+                                    <tr className="bg-slate-100/80">
+                                        <td colSpan={4} className="px-6 py-4 text-right font-bold text-slate-900">
+                                            Total Neto:
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-bold text-xl text-slate-900">
+                                            {formatCurrency(order.netTotalAmount)}
+                                        </td>
+                                    </tr>
+                                ) : null}
                             </tfoot>
                         </table>
                     </div>

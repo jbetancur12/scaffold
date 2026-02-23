@@ -224,6 +224,14 @@ export const CreatePurchaseOrderSchema = z.object({
     supplierId: z.string().uuid(),
     expectedDeliveryDate: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
     notes: z.string().optional(),
+    purchaseType: z.string().min(1).optional(),
+    paymentMethod: z.string().min(1).optional(),
+    currency: z.string().min(1).optional(),
+    discountAmount: z.number().min(0).optional(),
+    withholdingRate: z.number().min(0).max(100).optional(),
+    withholdingAmount: z.number().min(0).optional(),
+    otherChargesAmount: z.number().min(0).optional(),
+    netTotalAmount: z.number().min(0).optional(),
     warehouseId: z.string().uuid().optional(),
     items: z.array(z.object({
         rawMaterialId: z.string().uuid(),
@@ -1000,6 +1008,15 @@ export const OperationalConfigSchema = z.object({
     otherExpenses: z.number().min(0, 'Otros gastos deben ser mayor o igual a 0'),
 
     numberOfOperators: z.number().min(1, 'Debe haber al menos 1 operario'),
+    purchasePaymentMethods: z.array(z.string().min(1, 'Forma de pago inválida')).min(1, 'Debe haber al menos una forma de pago'),
+    purchaseWithholdingRules: z.array(
+        z.object({
+            key: z.string().min(1),
+            label: z.string().min(1),
+            rate: z.number().min(0).max(100),
+            active: z.boolean().optional().default(true),
+        })
+    ).min(1, 'Debe haber al menos una regla de retención'),
 });
 
 export type CreateUserDto = z.infer<typeof CreateUserSchema>;

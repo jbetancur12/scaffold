@@ -396,6 +396,14 @@ export interface PurchaseOrder {
     expectedDeliveryDate?: string | Date;
     receivedDate?: string | Date;
     status: PurchaseOrderStatus;
+    purchaseType?: string;
+    paymentMethod?: string;
+    currency?: string;
+    withholdingRate?: number;
+    withholdingAmount?: number;
+    discountAmount?: number;
+    otherChargesAmount?: number;
+    netTotalAmount?: number;
     totalAmount: number;
     taxTotal: number;
     subtotalBase: number;
@@ -1655,6 +1663,13 @@ export interface OperationalConfig {
     modCostPerMinute: number; // (Salary * Load) / RealMinutes
     cifCostPerMinute: number; // (Rent + Utils + Admin + Other) / (RealMinutes * Ops)
     costPerMinute: number; // MO Cost + CIF Cost
+    purchasePaymentMethods: string[];
+    purchaseWithholdingRules: Array<{
+        key: string;
+        label: string;
+        rate: number;
+        active: boolean;
+    }>;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

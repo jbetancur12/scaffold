@@ -38,22 +38,49 @@ export class Migration20260223121000_AddPurchaseRequisitions extends Migration {
         this.addSql('create index if not exists "purchase_requisition_item_raw_material_index" on "purchase_requisition_item" ("raw_material_id");');
 
         this.addSql(`
-            alter table if exists "purchase_requisition_item"
-                add constraint "purchase_requisition_item_requisition_id_foreign"
-                foreign key ("requisition_id") references "purchase_requisition" ("id")
-                on update cascade on delete cascade;
+            do $$
+            begin
+                if not exists (
+                    select 1 from pg_constraint
+                    where conname = 'purchase_requisition_item_requisition_id_foreign'
+                ) then
+                    alter table if exists "purchase_requisition_item"
+                        add constraint "purchase_requisition_item_requisition_id_foreign"
+                        foreign key ("requisition_id") references "purchase_requisition" ("id")
+                        on update cascade on delete cascade;
+                end if;
+            end
+            $$;
         `);
         this.addSql(`
-            alter table if exists "purchase_requisition_item"
-                add constraint "purchase_requisition_item_raw_material_id_foreign"
-                foreign key ("raw_material_id") references "raw_material" ("id")
-                on update cascade on delete restrict;
+            do $$
+            begin
+                if not exists (
+                    select 1 from pg_constraint
+                    where conname = 'purchase_requisition_item_raw_material_id_foreign'
+                ) then
+                    alter table if exists "purchase_requisition_item"
+                        add constraint "purchase_requisition_item_raw_material_id_foreign"
+                        foreign key ("raw_material_id") references "raw_material" ("id")
+                        on update cascade on delete restrict;
+                end if;
+            end
+            $$;
         `);
         this.addSql(`
-            alter table if exists "purchase_requisition_item"
-                add constraint "purchase_requisition_item_suggested_supplier_id_foreign"
-                foreign key ("suggested_supplier_id") references "supplier" ("id")
-                on update cascade on delete set null;
+            do $$
+            begin
+                if not exists (
+                    select 1 from pg_constraint
+                    where conname = 'purchase_requisition_item_suggested_supplier_id_foreign'
+                ) then
+                    alter table if exists "purchase_requisition_item"
+                        add constraint "purchase_requisition_item_suggested_supplier_id_foreign"
+                        foreign key ("suggested_supplier_id") references "supplier" ("id")
+                        on update cascade on delete set null;
+                end if;
+            end
+            $$;
         `);
     }
 

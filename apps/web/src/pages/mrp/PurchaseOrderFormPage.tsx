@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
-import { Plus, Trash2, ArrowLeft, Calculator, Check, X } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Calculator, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '../../components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
@@ -16,6 +16,7 @@ import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 import { useCreatePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useMarkPurchaseRequisitionConvertedMutation, usePurchaseRequisitionQuery } from '@/hooks/mrp/usePurchaseRequisitions';
+import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
 import { mrpApi, RawMaterialSupplier } from '@/services/mrpApi';
 
 interface OrderItem {
@@ -23,6 +24,7 @@ interface OrderItem {
     quantity: number;
     unitPrice: number;
     hasIva: boolean;
+    ivaIncluded: boolean;
 }
 
 
@@ -34,6 +36,7 @@ export default function PurchaseOrderFormPage() {
     const requisitionId = searchParams.get('requisitionId') || undefined;
     const didHydrateRequisitionRef = useRef(false);
     const [loading, setLoading] = useState(false);
+    const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(0);
     const [activeCalcIdx, setActiveCalcIdx] = useState<number | null>(null);
     const [calcBulkPrice, setCalcBulkPrice] = useState<number>(0);
     const [calcBulkQty, setCalcBulkQty] = useState<number>(0);
@@ -42,11 +45,21 @@ export default function PurchaseOrderFormPage() {
         expectedDeliveryDate: '',
         notes: '',
     });
+    const [purchaseConditions, setPurchaseConditions] = useState({
+        purchaseType: 'compra',
+        deliveryLocation: '',
+        paymentMethod: 'Contado',
+        currency: 'COP',
+        qualityRequirements: '',
+        approvedBy: '',
+        discountAmount: 0,
+        otherChargesAmount: 0,
+    });
     const [materialSuppliersByMaterialId, setMaterialSuppliersByMaterialId] = useState<Record<string, RawMaterialSupplier[]>>({});
     const [loadingMaterialSuppliersByMaterialId, setLoadingMaterialSuppliersByMaterialId] = useState<Record<string, boolean>>({});
 
     const [items, setItems] = useState<OrderItem[]>([
-        { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false }
+        { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false, ivaIncluded: false }
     ]);
 
     const { data: suppliersResponse, error: suppliersError } = useSuppliersQuery(1, 100);
@@ -54,11 +67,13 @@ export default function PurchaseOrderFormPage() {
     const { execute: createPurchaseOrder } = useCreatePurchaseOrderMutation();
     const { execute: markPurchaseRequisitionConverted } = useMarkPurchaseRequisitionConvertedMutation();
     const { data: requisition, error: requisitionError } = usePurchaseRequisitionQuery(requisitionId);
+    const { data: operationalConfig, error: operationalConfigError } = useOperationalConfigQuery();
     const suppliers = suppliersResponse?.suppliers ?? [];
 
     useMrpQueryErrorToast(suppliersError, 'No se pudo cargar la información inicial');
     useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar la información inicial');
     useMrpQueryErrorToast(requisitionError, 'No se pudo cargar la requisición para precargar la orden');
+    useMrpQueryErrorToast(operationalConfigError, 'No se pudo cargar la configuración operativa');
 
     useEffect(() => {
         if (!requisition || didHydrateRequisitionRef.current) return;
@@ -71,6 +86,7 @@ export default function PurchaseOrderFormPage() {
                     quantity: item.quantity,
                     unitPrice: 0,
                     hasIva: false,
+                    ivaIncluded: false,
                 }))
             );
         }
@@ -90,8 +106,23 @@ export default function PurchaseOrderFormPage() {
         didHydrateRequisitionRef.current = true;
     }, [requisition]);
 
+    useEffect(() => {
+        if (!operationalConfig) return;
+        const firstPayment = operationalConfig.purchasePaymentMethods?.[0] || 'Contado';
+        const firstRule = operationalConfig.purchaseWithholdingRules?.find((rule) => rule.active) || operationalConfig.purchaseWithholdingRules?.[0];
+        setPurchaseConditions((prev) => ({
+            ...prev,
+            paymentMethod: prev.paymentMethod || firstPayment,
+            purchaseType: prev.purchaseType || firstRule?.key || 'compra',
+        }));
+    }, [operationalConfig]);
+
     const addItem = () => {
-        setItems([...items, { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false }]);
+        setItems((prev) => {
+            const next = [...prev, { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false, ivaIncluded: false }];
+            setExpandedItemIndex(next.length - 1);
+            return next;
+        });
     };
 
     const removeItem = (index: number) => {
@@ -103,13 +134,21 @@ export default function PurchaseOrderFormPage() {
             });
             return;
         }
-        setItems(items.filter((_, i) => i !== index));
+        setItems((prev) => prev.filter((_, i) => i !== index));
+        setExpandedItemIndex((prev) => {
+            if (prev === null) return null;
+            if (prev === index) return null;
+            if (prev > index) return prev - 1;
+            return prev;
+        });
     };
 
     const updateItem = (index: number, field: keyof OrderItem, value: string | number | boolean) => {
-        const newItems = [...items];
-        newItems[index] = { ...newItems[index], [field]: value } as OrderItem;
-        setItems(newItems);
+        setItems((prev) => {
+            const newItems = [...prev];
+            newItems[index] = { ...newItems[index], [field]: value } as OrderItem;
+            return newItems;
+        });
     };
 
     const getSupplierById = (supplierId?: string) => {
@@ -175,15 +214,28 @@ export default function PurchaseOrderFormPage() {
 
     const calculateTotals = () => {
         return items.reduce((acc, item) => {
-            const subtotal = item.quantity * item.unitPrice;
-            const taxAmount = item.hasIva ? subtotal * 0.19 : 0;
+            const enteredLineTotal = item.quantity * item.unitPrice;
+            const subtotal = item.hasIva && item.ivaIncluded ? enteredLineTotal / 1.19 : enteredLineTotal;
+            const taxAmount = item.hasIva ? (item.ivaIncluded ? enteredLineTotal - subtotal : subtotal * 0.19) : 0;
+            const lineTotal = item.hasIva && item.ivaIncluded ? enteredLineTotal : subtotal + taxAmount;
             return {
                 subtotal: acc.subtotal + subtotal,
                 tax: acc.tax + taxAmount,
-                total: acc.total + subtotal + taxAmount
+                total: acc.total + lineTotal
             };
         }, { subtotal: 0, tax: 0, total: 0 });
     };
+
+    const activeWithholdingRules = (operationalConfig?.purchaseWithholdingRules ?? []).filter((rule) => rule.active);
+    const withholdingRule = activeWithholdingRules.find((rule) => rule.key === purchaseConditions.purchaseType) || activeWithholdingRules[0];
+    const withholdingRate = withholdingRule?.rate ?? 0;
+    const totals = calculateTotals();
+    const discountAmount = Number(purchaseConditions.discountAmount || 0);
+    const otherChargesAmount = Number(purchaseConditions.otherChargesAmount || 0);
+    const taxableBase = Math.max(0, totals.subtotal - discountAmount);
+    const withholdingAmount = taxableBase * (withholdingRate / 100);
+    const grossTotal = Math.max(0, totals.total - discountAmount + otherChargesAmount);
+    const netTotal = Math.max(0, grossTotal - withholdingAmount);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -214,12 +266,30 @@ export default function PurchaseOrderFormPage() {
             setLoading(true);
             const submitData = {
                 ...formData,
+                notes: buildStructuredNotes(),
+                purchaseType: purchaseConditions.purchaseType,
+                paymentMethod: purchaseConditions.paymentMethod,
+                currency: purchaseConditions.currency,
+                discountAmount,
+                withholdingRate,
+                withholdingAmount,
+                otherChargesAmount,
+                netTotalAmount: netTotal,
                 expectedDeliveryDate: formData.expectedDeliveryDate || undefined,
                 items: items.map(item => ({
-                    rawMaterialId: item.rawMaterialId,
-                    quantity: item.quantity,
-                    unitPrice: item.unitPrice,
-                    taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0
+                    ...(item.hasIva && item.ivaIncluded
+                        ? {
+                            rawMaterialId: item.rawMaterialId,
+                            quantity: item.quantity,
+                            unitPrice: item.quantity > 0 ? ((item.quantity * item.unitPrice) / 1.19) / item.quantity : 0,
+                            taxAmount: (item.quantity * item.unitPrice) - ((item.quantity * item.unitPrice) / 1.19),
+                        }
+                        : {
+                            rawMaterialId: item.rawMaterialId,
+                            quantity: item.quantity,
+                            unitPrice: item.unitPrice,
+                            taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0,
+                        }),
                 })),
             };
             const validatedData = CreatePurchaseOrderSchema.parse(submitData);
@@ -257,6 +327,36 @@ export default function PurchaseOrderFormPage() {
     const getMaterialById = (id: string) => {
         return rawMaterials.find(m => m.id === id);
     };
+    const selectedSupplier = getSupplierById(formData.supplierId);
+
+    const buildStructuredNotes = () => {
+        const blocks: string[] = [];
+        const purchaseTypeLabel = activeWithholdingRules.find((rule) => rule.key === purchaseConditions.purchaseType)?.label || purchaseConditions.purchaseType;
+        if (formData.notes.trim()) {
+            blocks.push(formData.notes.trim());
+        }
+
+        const structuredLines = [
+            `Tipo de compra: ${purchaseTypeLabel}`,
+            `Lugar de entrega: ${purchaseConditions.deliveryLocation || 'N/A'}`,
+            `Forma de pago: ${purchaseConditions.paymentMethod || 'N/A'}`,
+            `Moneda: ${purchaseConditions.currency || 'N/A'}`,
+            `Aprobador: ${purchaseConditions.approvedBy || 'N/A'}`,
+            `Requisitos de calidad: ${purchaseConditions.qualityRequirements || 'N/A'}`,
+            `Descuento: ${discountAmount.toFixed(2)}`,
+            `Retención (${withholdingRate}%): ${withholdingAmount.toFixed(2)}`,
+            `Otros cargos: ${otherChargesAmount.toFixed(2)}`,
+            `Total neto estimado: ${netTotal.toFixed(2)}`,
+            requisition ? `Requisicion origen: ${requisition.id}` : '',
+            requisition?.productionOrderId ? `OP origen: ${requisition.productionOrderId}` : '',
+        ].filter(Boolean);
+
+        if (structuredLines.length > 0) {
+            blocks.push('[DETALLE OC]');
+            blocks.push(...structuredLines);
+        }
+        return blocks.join('\n');
+    };
 
     return (
         <div className="p-6">
@@ -293,7 +393,7 @@ export default function PurchaseOrderFormPage() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="bg-white rounded-lg shadow p-6 space-y-4">
-                    <h2 className="text-xl font-semibold">Información General</h2>
+                    <h2 className="text-xl font-semibold">Encabezado y Proveedor</h2>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -323,7 +423,7 @@ export default function PurchaseOrderFormPage() {
                                 </Button>
                                 {formData.supplierId ? (
                                     <span className="text-xs text-slate-500">
-                                        Seleccionado: {getSupplierById(formData.supplierId)?.name || 'N/A'}
+                                        Seleccionado: {selectedSupplier?.name || 'N/A'}
                                     </span>
                                 ) : (
                                     <span className="text-xs text-slate-500">Sin proveedor seleccionado</span>
@@ -340,6 +440,137 @@ export default function PurchaseOrderFormPage() {
                                 onChange={(e) => setFormData({ ...formData, expectedDeliveryDate: e.target.value })}
                             />
                         </div>
+                    </div>
+
+                    {selectedSupplier ? (
+                        <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                            <div className="text-sm font-semibold text-slate-800 mb-2">Ficha rápida del proveedor</div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-slate-700">
+                                <div><span className="font-medium">Contacto:</span> {selectedSupplier.contactName || 'N/A'}</div>
+                                <div><span className="font-medium">Email:</span> {selectedSupplier.email || 'N/A'}</div>
+                                <div><span className="font-medium">Teléfono:</span> {selectedSupplier.phone || 'N/A'}</div>
+                                <div><span className="font-medium">Ciudad:</span> {selectedSupplier.city || 'N/A'}</div>
+                                <div className="md:col-span-2"><span className="font-medium">Dirección:</span> {selectedSupplier.address || 'N/A'}</div>
+                            </div>
+                        </div>
+                    ) : null}
+
+                    {requisition ? (
+                        <div className="rounded-md border border-slate-200 p-4">
+                            <div className="text-sm font-semibold text-slate-800 mb-2">Trazabilidad de origen</div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm text-slate-700">
+                                <div><span className="font-medium">Requisición:</span> {requisition.id.slice(0, 8).toUpperCase()}</div>
+                                <div><span className="font-medium">Estado:</span> {requisition.status}</div>
+                                <div><span className="font-medium">Solicitó:</span> {requisition.requestedBy}</div>
+                                <div className="md:col-span-2"><span className="font-medium">OP origen:</span> {requisition.productionOrderId || 'N/A'}</div>
+                                <div><span className="font-medium">Necesaria para:</span> {requisition.neededBy ? new Date(requisition.neededBy).toLocaleDateString() : 'N/A'}</div>
+                            </div>
+                        </div>
+                    ) : null}
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-6 space-y-4">
+                    <h2 className="text-xl font-semibold">Condiciones y Requisitos</h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <Label htmlFor="purchaseType">Tipo de compra</Label>
+                            <select
+                                id="purchaseType"
+                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={purchaseConditions.purchaseType}
+                                onChange={(e) => setPurchaseConditions({ ...purchaseConditions, purchaseType: e.target.value })}
+                            >
+                                {activeWithholdingRules.length === 0 ? (
+                                    <option value="compra">Compra</option>
+                                ) : (
+                                    activeWithholdingRules.map((rule) => (
+                                        <option key={rule.key} value={rule.key}>
+                                            {rule.label}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+                        <div>
+                            <Label htmlFor="paymentMethod">Forma de pago</Label>
+                            <select
+                                id="paymentMethod"
+                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                value={purchaseConditions.paymentMethod}
+                                onChange={(e) => setPurchaseConditions({ ...purchaseConditions, paymentMethod: e.target.value })}
+                            >
+                                {(operationalConfig?.purchasePaymentMethods?.length
+                                    ? operationalConfig.purchasePaymentMethods
+                                    : ['Contado']).map((method) => (
+                                    <option key={method} value={method}>
+                                        {method}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <Label htmlFor="currency">Moneda</Label>
+                            <Input
+                                id="currency"
+                                value={purchaseConditions.currency}
+                                onChange={(e) => setPurchaseConditions({ ...purchaseConditions, currency: e.target.value.toUpperCase() })}
+                                placeholder="COP"
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <Label htmlFor="deliveryLocation">Lugar de entrega</Label>
+                            <Input
+                                id="deliveryLocation"
+                                value={purchaseConditions.deliveryLocation}
+                                onChange={(e) => setPurchaseConditions({ ...purchaseConditions, deliveryLocation: e.target.value })}
+                                placeholder="Bodega principal / sede..."
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="approvedBy">Quién aprueba</Label>
+                            <Input
+                                id="approvedBy"
+                                value={purchaseConditions.approvedBy}
+                                onChange={(e) => setPurchaseConditions({ ...purchaseConditions, approvedBy: e.target.value })}
+                                placeholder="Nombre del aprobador"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="discountAmount">Descuento</Label>
+                            <CurrencyInput
+                                id="discountAmount"
+                                value={purchaseConditions.discountAmount || ''}
+                                onValueChange={(value) => setPurchaseConditions({ ...purchaseConditions, discountAmount: value || 0 })}
+                                placeholder="$0"
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="otherChargesAmount">Otros cargos</Label>
+                            <CurrencyInput
+                                id="otherChargesAmount"
+                                value={purchaseConditions.otherChargesAmount || ''}
+                                onValueChange={(value) => setPurchaseConditions({ ...purchaseConditions, otherChargesAmount: value || 0 })}
+                                placeholder="$0"
+                            />
+                        </div>
+                        <div>
+                            <Label>Retención aplicada</Label>
+                            <div className="mt-1 h-10 px-3 flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm text-slate-700">
+                                {withholdingRule ? `${withholdingRule.label} (${withholdingRate}%)` : 'Sin regla activa'}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <Label htmlFor="qualityRequirements">Requisitos de compra/calidad</Label>
+                        <Textarea
+                            id="qualityRequirements"
+                            value={purchaseConditions.qualityRequirements}
+                            onChange={(e) => setPurchaseConditions({ ...purchaseConditions, qualityRequirements: e.target.value })}
+                            placeholder="Ej: Exigir CoA, lote, fecha de vencimiento, condiciones de empaque y transporte..."
+                            rows={3}
+                        />
                     </div>
 
                     <div>
@@ -366,25 +597,70 @@ export default function PurchaseOrderFormPage() {
                     <div className="space-y-2">
                         {/* Header for Desktop */}
                         {items.length > 0 && (
-                            <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-2 bg-slate-50 border border-slate-200 rounded-t-lg text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                                <div className="md:col-span-4">Materia Prima</div>
-                                <div className="md:col-span-1 text-center">Cantidad</div>
-                                <div className="md:col-span-2 text-right">Precio Unit.</div>
-                                <div className="md:col-span-1 text-center">IVA</div>
-                                <div className="md:col-span-3 text-right">Total Línea</div>
-                                <div className="md:col-span-1"></div>
+                            <div className="hidden xl:grid xl:grid-cols-12 gap-6 px-6 py-3 bg-slate-50 border border-slate-200 rounded-t-lg text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <div className="xl:col-span-3">Materia Prima</div>
+                                <div className="xl:col-span-2 text-center">Cantidad</div>
+                                <div className="xl:col-span-2 text-right">Precio Unit.</div>
+                                <div className="xl:col-span-2 text-center">IVA</div>
+                                <div className="xl:col-span-2 text-right">Total Línea</div>
+                                <div className="xl:col-span-1"></div>
                             </div>
                         )}
 
                         {items.map((item, index) => {
                             const material = getMaterialById(item.rawMaterialId);
-                            const subtotal = item.quantity * item.unitPrice;
+                            const enteredLineTotal = item.quantity * item.unitPrice;
+                            const subtotal = item.hasIva && item.ivaIncluded ? enteredLineTotal / 1.19 : enteredLineTotal;
+                            const taxAmount = item.hasIva ? (item.ivaIncluded ? enteredLineTotal - subtotal : subtotal * 0.19) : 0;
+                            const lineTotal = item.hasIva && item.ivaIncluded ? enteredLineTotal : subtotal + taxAmount;
+                            const isExpanded = expandedItemIndex === index;
 
                             return (
-                                <div key={index} className="border border-slate-200 rounded-lg md:rounded-none md:border-t-0 p-4 md:p-3 hover:bg-slate-50/50 transition-colors">
-                                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                                        <div className="md:col-span-4">
-                                            <Label className="md:hidden">Materia Prima *</Label>
+                                <div key={index} className="border border-slate-200 rounded-lg xl:rounded-none xl:border-t-0 p-4 xl:px-6 xl:py-4 hover:bg-slate-50/50 transition-colors">
+                                    <div className="flex items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-semibold text-slate-900 truncate">
+                                                {material ? `${material.name} (${material.sku})` : `Ítem ${index + 1}`}
+                                            </div>
+                                            <div className="text-xs text-slate-500">
+                                                Cant: {item.quantity || 0} {material?.unit || ''} | Total: {formatCurrency(lineTotal)}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setExpandedItemIndex(isExpanded ? null : index)}
+                                            >
+                                                {isExpanded ? (
+                                                    <>
+                                                        <ChevronUp className="h-4 w-4 mr-1" />
+                                                        Ocultar
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ChevronDown className="h-4 w-4 mr-1" />
+                                                        Ver detalle
+                                                    </>
+                                                )}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => removeItem(index)}
+                                                className="text-slate-400 hover:text-red-600 h-8 w-8 p-0"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {isExpanded ? (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-5 items-start xl:items-center pt-4">
+                                        <div className="xl:col-span-3">
+                                            <Label className="xl:hidden">Materia Prima *</Label>
                                             <select
                                                 className="w-full mt-1 md:mt-0 px-2 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 value={item.rawMaterialId}
@@ -439,29 +715,29 @@ export default function PurchaseOrderFormPage() {
                                             ) : null}
                                         </div>
 
-                                        <div className="md:col-span-1">
-                                            <Label className="md:hidden">Cantidad *</Label>
-                                            <div className="flex items-center gap-1">
+                                        <div className="xl:col-span-2">
+                                            <Label className="xl:hidden">Cantidad *</Label>
+                                            <div className="flex flex-col gap-1">
                                                 <Input
                                                     type="number"
                                                     step="0.01"
                                                     min="0.01"
-                                                    className="px-2 py-1.5 h-8 text-sm text-center"
+                                                    className="px-3 py-2 h-9 text-sm text-center"
                                                     value={item.quantity || ''}
                                                     onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
                                                     required
                                                 />
                                                 {material && (
-                                                    <span className="text-[10px] text-slate-400 whitespace-nowrap">{material.unit}</span>
+                                                    <span className="text-[11px] text-slate-500">{material.unit}</span>
                                                 )}
                                             </div>
                                         </div>
 
-                                        <div className="md:col-span-2 relative">
-                                            <Label className="md:hidden">Precio Unitario *</Label>
-                                            <div className="flex items-center gap-1">
+                                        <div className="xl:col-span-2 relative">
+                                            <Label className="xl:hidden">Precio Unitario *</Label>
+                                            <div className="flex flex-col lg:flex-row lg:items-center gap-2">
                                                 <CurrencyInput
-                                                    className="h-8 text-sm text-right flex-1"
+                                                    className="h-9 text-sm text-right flex-1"
                                                     value={item.unitPrice || ''}
                                                     onValueChange={(val) => updateItem(index, 'unitPrice', val || 0)}
                                                     placeholder="$0"
@@ -471,7 +747,7 @@ export default function PurchaseOrderFormPage() {
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    className={`h-8 w-8 p-0 ${activeCalcIdx === index ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+                                                    className={`h-9 w-9 p-0 shrink-0 self-end lg:self-auto ${activeCalcIdx === index ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
                                                     onClick={() => {
                                                         if (activeCalcIdx === index) {
                                                             setActiveCalcIdx(null);
@@ -551,40 +827,54 @@ export default function PurchaseOrderFormPage() {
                                             )}
                                         </div>
 
-                                        <div className="md:col-span-1 flex items-center justify-center md:justify-center">
-                                            <Label className="md:hidden mr-2">IVA (19%)</Label>
-                                            <div className="flex items-center h-8">
-                                                <input
-                                                    type="checkbox"
-                                                    id={`iva-${index}`}
-                                                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-                                                    checked={item.hasIva}
-                                                    onChange={(e) => updateItem(index, 'hasIva', e.target.checked)}
-                                                />
+                                        <div className="xl:col-span-2 flex items-center justify-start xl:justify-center">
+                                            <Label className="xl:hidden mr-2">IVA (19%)</Label>
+                                            <div className="flex flex-col gap-1 w-full md:w-auto md:min-w-[120px]">
+                                                <label className="flex items-center gap-2 text-xs text-slate-600">
+                                                    <input
+                                                        type="checkbox"
+                                                        id={`iva-${index}`}
+                                                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                                        checked={item.hasIva}
+                                                        onChange={(e) => {
+                                                            updateItem(index, 'hasIva', e.target.checked);
+                                                            if (!e.target.checked) {
+                                                                updateItem(index, 'ivaIncluded', false);
+                                                            }
+                                                        }}
+                                                    />
+                                                    Aplica IVA
+                                                </label>
+                                                {item.hasIva ? (
+                                                    <select
+                                                        className="h-9 min-w-[110px] px-2 py-1 border border-slate-300 rounded-md text-sm"
+                                                        value={item.ivaIncluded ? 'included' : 'add'}
+                                                        onChange={(e) => updateItem(index, 'ivaIncluded', e.target.value === 'included')}
+                                                    >
+                                                        <option value="add">+ IVA</option>
+                                                        <option value="included">Incluido</option>
+                                                    </select>
+                                                ) : null}
                                             </div>
                                         </div>
 
-                                        <div className="md:col-span-3 flex md:flex-row flex-col items-center justify-between md:justify-end gap-2">
-                                            <div className="w-full md:w-auto">
-                                                <Label className="md:hidden">Total Línea</Label>
-                                                <div className="mt-1 md:mt-0 px-2 py-1 bg-slate-50 border border-slate-100 rounded md:border-none md:bg-transparent text-right text-sm font-semibold text-slate-700">
-                                                    {formatCurrency(subtotal)}
+                                        <div className="xl:col-span-2 flex xl:flex-row flex-col items-start xl:items-center justify-between xl:justify-end gap-2">
+                                            <div className="w-full xl:min-w-[180px]">
+                                                <Label className="xl:hidden">Total Línea</Label>
+                                                <div className="mt-1 xl:mt-0 px-2 py-1 bg-slate-50 border border-slate-100 rounded xl:border-none xl:bg-transparent text-right text-base font-semibold text-slate-700">
+                                                    {formatCurrency(lineTotal)}
                                                 </div>
+                                                {item.hasIva ? (
+                                                    <div className="text-xs text-slate-500 text-right">
+                                                        IVA: {formatCurrency(taxAmount)}
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         </div>
 
-                                        <div className="md:col-span-1 flex justify-end">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => removeItem(index)}
-                                                className="text-slate-400 hover:text-red-600 h-8 w-8 p-0"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
+                                        <div className="xl:col-span-1"></div>
                                     </div>
+                                    ) : null}
                                 </div>
                             );
                         })}
@@ -594,15 +884,31 @@ export default function PurchaseOrderFormPage() {
                         <div className="w-full max-w-xs space-y-2">
                             <div className="flex justify-between text-sm text-slate-600">
                                 <span>Subtotal (Base):</span>
-                                <span>{formatCurrency(calculateTotals().subtotal)}</span>
+                                <span>{formatCurrency(totals.subtotal)}</span>
                             </div>
                             <div className="flex justify-between text-sm text-slate-600">
                                 <span>IVA Total:</span>
-                                <span>{formatCurrency(calculateTotals().tax)}</span>
+                                <span>{formatCurrency(totals.tax)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-slate-600">
+                                <span>Descuento:</span>
+                                <span>- {formatCurrency(discountAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-slate-600">
+                                <span>Retención ({withholdingRate}%):</span>
+                                <span>- {formatCurrency(withholdingAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-slate-600">
+                                <span>Otros cargos:</span>
+                                <span>{formatCurrency(otherChargesAmount)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-slate-600">
+                                <span>Total bruto:</span>
+                                <span>{formatCurrency(grossTotal)}</span>
                             </div>
                             <div className="flex justify-between text-xl font-bold pt-2 border-t text-slate-900">
-                                <span>Gran Total</span>
-                                <span>{formatCurrency(calculateTotals().total)}</span>
+                                <span>Total neto</span>
+                                <span>{formatCurrency(netTotal)}</span>
                             </div>
                         </div>
                     </div>

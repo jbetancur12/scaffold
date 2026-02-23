@@ -28,6 +28,11 @@ export default function OperationalSettingsPage() {
         modCostPerMinute: 0,
         cifCostPerMinute: 0,
         costPerMinute: 0,
+        purchasePaymentMethods: ['Contado', 'Crédito 30 días', 'Transferencia'],
+        purchaseWithholdingRules: [
+            { key: 'compra', label: 'Compra', rate: 2.5, active: true },
+            { key: 'servicio', label: 'Servicio', rate: 4, active: true },
+        ],
         createdAt: new Date(),
         updatedAt: new Date()
     });
@@ -52,7 +57,26 @@ export default function OperationalSettingsPage() {
         e.preventDefault();
         try {
             setLoading(true);
-            const updated = await saveOperationalConfig(config);
+            const payload: Partial<OperationalConfig> = {
+                ...config,
+                purchasePaymentMethods: config.purchasePaymentMethods
+                    .map((method) => method.trim())
+                    .filter((method) => method.length > 0),
+                purchaseWithholdingRules: config.purchaseWithholdingRules
+                    .map((rule) => ({
+                        ...rule,
+                        key: rule.key.trim().toLowerCase(),
+                        label: rule.label.trim(),
+                    }))
+                    .filter((rule) => rule.key.length > 0 && rule.label.length > 0),
+            };
+            if (!payload.purchasePaymentMethods?.length) {
+                throw new Error('Debes configurar al menos una forma de pago');
+            }
+            if (!payload.purchaseWithholdingRules?.length) {
+                throw new Error('Debes configurar al menos un tipo de compra para retención');
+            }
+            const updated = await saveOperationalConfig(payload);
             setConfig(updated);
             toast({
                 title: 'Configuración actualizada',
@@ -67,6 +91,51 @@ export default function OperationalSettingsPage() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const updatePaymentMethod = (index: number, value: string) => {
+        const next = [...config.purchasePaymentMethods];
+        next[index] = value;
+        setConfig({ ...config, purchasePaymentMethods: next });
+    };
+
+    const addPaymentMethod = () => {
+        setConfig({
+            ...config,
+            purchasePaymentMethods: [...config.purchasePaymentMethods, ''],
+        });
+    };
+
+    const removePaymentMethod = (index: number) => {
+        const next = config.purchasePaymentMethods.filter((_, i) => i !== index);
+        setConfig({
+            ...config,
+            purchasePaymentMethods: next.length > 0 ? next : ['Contado'],
+        });
+    };
+
+    const updateWithholdingRule = (index: number, changes: Partial<OperationalConfig['purchaseWithholdingRules'][number]>) => {
+        const next = [...config.purchaseWithholdingRules];
+        next[index] = { ...next[index], ...changes };
+        setConfig({ ...config, purchaseWithholdingRules: next });
+    };
+
+    const addWithholdingRule = () => {
+        setConfig({
+            ...config,
+            purchaseWithholdingRules: [
+                ...config.purchaseWithholdingRules,
+                { key: '', label: '', rate: 0, active: true },
+            ],
+        });
+    };
+
+    const removeWithholdingRule = (index: number) => {
+        const next = config.purchaseWithholdingRules.filter((_, i) => i !== index);
+        setConfig({
+            ...config,
+            purchaseWithholdingRules: next.length > 0 ? next : [{ key: 'compra', label: 'Compra', rate: 2.5, active: true }],
+        });
     };
 
     const totalFactoryMinutes = (config.operatorRealMonthlyMinutes || 0) * (config.numberOfOperators || 0);
@@ -274,6 +343,86 @@ export default function OperationalSettingsPage() {
                                     <Save className="mr-2 h-4 w-4" />
                                     {loading ? 'Guardando...' : 'Guardar y Recalcular'}
                                 </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="lg:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="text-lg">Compras: Formas de Pago y Retención</CardTitle>
+                            <CardDescription>
+                                Configura aquí las opciones del formulario de orden de compra.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label>Formas de Pago (select)</Label>
+                                    <Button type="button" variant="outline" size="sm" onClick={addPaymentMethod}>
+                                        Agregar forma de pago
+                                    </Button>
+                                </div>
+                                {config.purchasePaymentMethods.map((method, index) => (
+                                    <div key={`pm-${index}`} className="flex gap-2">
+                                        <Input
+                                            value={method}
+                                            onChange={(e) => updatePaymentMethod(index, e.target.value)}
+                                            placeholder="Ej: Contado"
+                                        />
+                                        <Button type="button" variant="outline" onClick={() => removePaymentMethod(index)}>
+                                            Quitar
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <Label>Reglas de Retención por Tipo de Compra</Label>
+                                    <Button type="button" variant="outline" size="sm" onClick={addWithholdingRule}>
+                                        Agregar tipo
+                                    </Button>
+                                </div>
+                                {config.purchaseWithholdingRules.map((rule, index) => (
+                                    <div key={`wr-${index}`} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center rounded border p-2">
+                                        <Input
+                                            className="md:col-span-3"
+                                            value={rule.key}
+                                            onChange={(e) => updateWithholdingRule(index, { key: e.target.value.toLowerCase().trim() })}
+                                            placeholder="clave (ej: compra)"
+                                        />
+                                        <Input
+                                            className="md:col-span-4"
+                                            value={rule.label}
+                                            onChange={(e) => updateWithholdingRule(index, { label: e.target.value })}
+                                            placeholder="Etiqueta"
+                                        />
+                                        <Input
+                                            className="md:col-span-2"
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            step={0.01}
+                                            value={rule.rate}
+                                            onChange={(e) => updateWithholdingRule(index, { rate: Number(e.target.value) || 0 })}
+                                            placeholder="%"
+                                        />
+                                        <label className="md:col-span-2 text-sm flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={rule.active}
+                                                onChange={(e) => updateWithholdingRule(index, { active: e.target.checked })}
+                                            />
+                                            Activo
+                                        </label>
+                                        <Button type="button" variant="outline" className="md:col-span-1" onClick={() => removeWithholdingRule(index)}>
+                                            Quitar
+                                        </Button>
+                                    </div>
+                                ))}
+                                <p className="text-xs text-muted-foreground">
+                                    Recomendado: compra 2.5% y servicio 4% calculados sobre subtotal antes de IVA y después de descuento.
+                                </p>
                             </div>
                         </CardContent>
                     </Card>

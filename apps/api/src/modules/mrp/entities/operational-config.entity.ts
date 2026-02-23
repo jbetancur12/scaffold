@@ -36,4 +36,10 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
 
     @Property()
     costPerMinute!: number;
+
+    @Property({ type: 'json', nullable: true })
+    purchasePaymentMethods: string[] = [];
+
+    @Property({ type: 'json', nullable: true })
+    purchaseWithholdingRules: Array<{ key: string; label: string; rate: number; active: boolean }> = [];
 }

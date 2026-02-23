@@ -38,6 +38,9 @@ export class PurchaseOrderService {
             expectedDeliveryDate: data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : undefined,
             notes: data.notes,
             status: PurchaseOrderStatus.PENDING,
+            purchaseType: data.purchaseType,
+            paymentMethod: data.paymentMethod,
+            currency: data.currency || 'COP',
         } as PurchaseOrder);
 
         let totalAmount = 0;
@@ -68,9 +71,30 @@ export class PurchaseOrderService {
             purchaseOrder.items.add(item);
         }
 
+        const discountAmount = Number(data.discountAmount || 0);
+        const otherChargesAmount = Number(data.otherChargesAmount || 0);
+        const withholdingRate = Number(data.withholdingRate || 0);
+        const taxableBase = Math.max(0, subtotalBase - discountAmount);
+        const withholdingAmount = Number(
+            data.withholdingAmount !== undefined
+                ? data.withholdingAmount
+                : taxableBase * (withholdingRate / 100)
+        );
+        const grossTotal = Math.max(0, totalAmount - discountAmount + otherChargesAmount);
+        const netTotalAmount = Number(
+            data.netTotalAmount !== undefined
+                ? data.netTotalAmount
+                : Math.max(0, grossTotal - withholdingAmount)
+        );
+
         purchaseOrder.subtotalBase = subtotalBase;
         purchaseOrder.taxTotal = taxTotal;
-        purchaseOrder.totalAmount = totalAmount;
+        purchaseOrder.totalAmount = grossTotal;
+        purchaseOrder.discountAmount = discountAmount;
+        purchaseOrder.otherChargesAmount = otherChargesAmount;
+        purchaseOrder.withholdingRate = withholdingRate;
+        purchaseOrder.withholdingAmount = withholdingAmount;
+        purchaseOrder.netTotalAmount = netTotalAmount;
 
         await this.em.persistAndFlush(purchaseOrder);
         return purchaseOrder;

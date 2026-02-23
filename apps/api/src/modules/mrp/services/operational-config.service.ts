@@ -25,7 +25,17 @@ export class OperationalConfigService {
     async getConfig(): Promise<OperationalConfig> {
         const configs = await this.configRepo.findAll({ limit: 1 });
         if (configs.length > 0) {
-            return configs[0];
+            const config = configs[0];
+            if (!Array.isArray(config.purchasePaymentMethods) || config.purchasePaymentMethods.length === 0) {
+                config.purchasePaymentMethods = ['Contado', 'Crédito 30 días', 'Transferencia'];
+            }
+            if (!Array.isArray(config.purchaseWithholdingRules) || config.purchaseWithholdingRules.length === 0) {
+                config.purchaseWithholdingRules = [
+                    { key: 'compra', label: 'Compra', rate: 2.5, active: true },
+                    { key: 'servicio', label: 'Servicio', rate: 4, active: true },
+                ];
+            }
+            return config;
         }
 
         return this.createDefaultConfig();
@@ -48,6 +58,11 @@ export class OperationalConfigService {
         config.modCostPerMinute = 0;
         config.cifCostPerMinute = 0;
         config.costPerMinute = 0;
+        config.purchasePaymentMethods = ['Contado', 'Crédito 30 días', 'Transferencia'];
+        config.purchaseWithholdingRules = [
+            { key: 'compra', label: 'Compra', rate: 2.5, active: true },
+            { key: 'servicio', label: 'Servicio', rate: 4, active: true },
+        ];
 
         config.createdAt = new Date();
         config.updatedAt = new Date();
@@ -71,6 +86,15 @@ export class OperationalConfigService {
         if (data.otherExpenses !== undefined) config.otherExpenses = data.otherExpenses;
 
         if (data.numberOfOperators !== undefined) config.numberOfOperators = data.numberOfOperators;
+        if (data.purchasePaymentMethods !== undefined) {
+            config.purchasePaymentMethods = data.purchasePaymentMethods;
+        }
+        if (data.purchaseWithholdingRules !== undefined) {
+            config.purchaseWithholdingRules = data.purchaseWithholdingRules.map((rule) => ({
+                ...rule,
+                active: rule.active ?? true,
+            }));
+        }
 
         // Calculations
 
