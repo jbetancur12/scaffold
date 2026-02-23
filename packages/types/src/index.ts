@@ -396,6 +396,7 @@ export interface PurchaseOrderItem {
 export interface PurchaseOrder {
     id: string;
     supplier: Pick<Supplier, 'id' | 'name'>;
+    controlledDocumentId?: string;
     orderDate: string | Date;
     expectedDeliveryDate?: string | Date;
     receivedDate?: string | Date;
@@ -403,6 +404,10 @@ export interface PurchaseOrder {
     purchaseType?: string;
     paymentMethod?: string;
     currency?: string;
+    documentControlCode?: string;
+    documentControlTitle?: string;
+    documentControlVersion?: number;
+    documentControlDate?: string | Date;
     withholdingRate?: number;
     withholdingAmount?: number;
     discountAmount?: number;
@@ -1674,6 +1679,8 @@ export interface OperationalConfig {
         rate: number;
         active: boolean;
     }>;
+    defaultPurchaseOrderControlledDocumentId?: string;
+    defaultPurchaseOrderControlledDocumentCode?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

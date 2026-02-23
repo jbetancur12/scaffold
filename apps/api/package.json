@@ -17,7 +17,8 @@
         "schema:drop": "cross-env NODE_ENV=development mikro-orm schema:drop --run",
         "migration:fresh": "cross-env NODE_ENV=development mikro-orm migration:fresh",
         "seed": "cross-env NODE_ENV=development tsx src/scripts/seed.ts",
-        "seed:prod": "node dist/apps/api/src/scripts/seed.js"
+        "seed:prod": "node dist/apps/api/src/scripts/seed.js",
+        "pdf:setup": "npm install --workspace=api playwright pug @types/pug && npx playwright install chromium"
     },
     "dependencies": {
         "@mikro-orm/cli": "^6.6.6",
@@ -27,6 +28,7 @@
         "@mikro-orm/reflection": "^6.1.4",
         "@scaffold/schemas": "*",
         "@scaffold/types": "*",
+        "@types/pug": "^2.0.10",
         "argon2": "^0.40.1",
         "cookie-parser": "^1.4.6",
         "cors": "^2.8.5",
@@ -37,6 +39,8 @@
         "helmet": "^7.1.0",
         "jsonwebtoken": "^9.0.2",
         "minio": "^8.0.6",
+        "playwright": "^1.58.2",
+        "pug": "^3.0.3",
         "redis": "^4.6.13",
         "reflect-metadata": "^0.2.2",
         "swagger-ui-express": "^5.0.1",

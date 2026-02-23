@@ -4,12 +4,14 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { OperationalConfig } from '@scaffold/types';
+import { ControlledDocument, DocumentCategory, DocumentProcess, DocumentStatus, OperationalConfig } from '@scaffold/types';
 import { Save, Calculator, Users, Building } from 'lucide-react';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
 import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/hooks/mrp/useOperationalConfig';
+import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
 export default function OperationalSettingsPage() {
     const { toast } = useToast();
@@ -29,6 +31,8 @@ export default function OperationalSettingsPage() {
         cifCostPerMinute: 0,
         costPerMinute: 0,
         purchasePaymentMethods: ['Contado', 'Crédito 30 días', 'Transferencia'],
+        defaultPurchaseOrderControlledDocumentId: '',
+        defaultPurchaseOrderControlledDocumentCode: '',
         purchaseWithholdingRules: [
             { key: 'compra', label: 'Compra', rate: 2.5, active: true },
             { key: 'servicio', label: 'Servicio', rate: 4, active: true },
@@ -37,7 +41,13 @@ export default function OperationalSettingsPage() {
         updatedAt: new Date()
     });
     const { data: currentConfig, error } = useOperationalConfigQuery();
+    const { data: controlledDocuments, error: controlledDocumentsError } = useControlledDocumentsQuery({
+        process: DocumentProcess.PRODUCCION,
+        documentCategory: DocumentCategory.FOR,
+        status: DocumentStatus.APROBADO,
+    });
     const { execute: saveOperationalConfig } = useSaveOperationalConfigMutation();
+    useMrpQueryErrorToast(controlledDocumentsError, 'No se pudieron cargar documentos de control para OC');
 
     useEffect(() => {
         if (!currentConfig) return;
@@ -62,6 +72,8 @@ export default function OperationalSettingsPage() {
                 purchasePaymentMethods: config.purchasePaymentMethods
                     .map((method) => method.trim())
                     .filter((method) => method.length > 0),
+                defaultPurchaseOrderControlledDocumentId: config.defaultPurchaseOrderControlledDocumentId || undefined,
+                defaultPurchaseOrderControlledDocumentCode: config.defaultPurchaseOrderControlledDocumentCode || undefined,
                 purchaseWithholdingRules: config.purchaseWithholdingRules
                     .map((rule) => ({
                         ...rule,
@@ -142,6 +154,12 @@ export default function OperationalSettingsPage() {
     const adminCostPerMinute = totalFactoryMinutes > 0
         ? (config.adminSalaries || 0) / totalFactoryMinutes
         : 0;
+    const latestDocByCode = (controlledDocuments ?? []).reduce<Record<string, ControlledDocument>>((acc, doc) => {
+        const current = acc[doc.code];
+        if (!current || doc.version > current.version) acc[doc.code] = doc;
+        return acc;
+    }, {});
+    const documentCodeOptions = Object.values(latestDocByCode).sort((a, b) => a.code.localeCompare(b.code));
 
     return (
         <div className="container mx-auto py-6 max-w-4xl space-y-6">
@@ -342,6 +360,49 @@ export default function OperationalSettingsPage() {
                                 <Button type="submit" size="lg" disabled={loading}>
                                     <Save className="mr-2 h-4 w-4" />
                                     {loading ? 'Guardando...' : 'Guardar y Recalcular'}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="lg:col-span-2">
+                        <CardHeader>
+                            <CardTitle className="text-lg">Documento Global para Órdenes de Compra</CardTitle>
+                            <CardDescription>
+                                Este formato se aplicará por defecto a todas las nuevas OC.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="space-y-2">
+                                <Label htmlFor="defaultPurchaseOrderControlledDocumentCode">Código de formato (Producción / FOR)</Label>
+                                <select
+                                    id="defaultPurchaseOrderControlledDocumentCode"
+                                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    value={config.defaultPurchaseOrderControlledDocumentCode || ''}
+                                    onChange={(e) =>
+                                        setConfig({
+                                            ...config,
+                                            defaultPurchaseOrderControlledDocumentCode: e.target.value || undefined,
+                                        })
+                                    }
+                                >
+                                    <option value="">Automático (último formato aprobado activo)</option>
+                                    {documentCodeOptions.map((doc) => (
+                                        <option key={doc.code} value={doc.code}>
+                                            {doc.code} (última v{doc.version}) - {doc.title}
+                                        </option>
+                                    ))}
+                                </select>
+                                {(controlledDocuments?.length || 0) === 0 ? (
+                                    <p className="text-xs text-amber-700">
+                                        No hay formatos aprobados en Producción/FOR. Se usará encabezado por defecto.
+                                    </p>
+                                ) : null}
+                            </div>
+                            <div className="flex justify-end">
+                                <Button type="submit" disabled={loading}>
+                                    <Save className="mr-2 h-4 w-4" />
+                                    {loading ? 'Guardando...' : 'Guardar documento global'}
                                 </Button>
                             </div>
                         </CardContent>

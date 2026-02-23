@@ -287,7 +287,6 @@ export default function PurchaseOrderFormPage() {
             });
             return;
         }
-
         const invalidItems = items.filter((item) => {
             if (item.quantity <= 0 || item.unitPrice <= 0) return true;
             if (item.isCatalogItem) return !item.rawMaterialId;

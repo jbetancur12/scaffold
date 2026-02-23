@@ -226,6 +226,10 @@ export const mrpApi = {
         const response = await api.get<PurchaseOrder>(`/mrp/purchase-orders/${id}`);
         return response.data;
     },
+    getPurchaseOrderPdf: async (id: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/purchase-orders/${id}/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
+    },
 
     updatePurchaseOrderStatus: async (id: string, status: PurchaseOrderStatus): Promise<PurchaseOrder> => {
         const response = await api.put<PurchaseOrder>(`/mrp/purchase-orders/${id}/status`, { status });

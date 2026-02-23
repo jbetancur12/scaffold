@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
 import { useCancelPurchaseOrderMutation, usePurchaseOrderQuery, useReceivePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
+import { mrpApi } from '@/services/mrpApi';
 
 const statusLabels = {
     PENDING: 'Pendiente',
@@ -45,6 +46,7 @@ export default function PurchaseOrderDetailPage() {
     const { toast } = useToast();
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
 
     const { data: order, loading, error, execute: reloadOrder } = usePurchaseOrderQuery(id);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
@@ -94,6 +96,30 @@ export default function PurchaseOrderDetailPage() {
         }
     };
 
+    const handleDownloadPdf = async () => {
+        if (!id) return;
+        try {
+            setDownloadingPdf(true);
+            const blob = await mrpApi.getPurchaseOrderPdf(id);
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = `OC-${id.slice(0, 8).toUpperCase()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(objectUrl);
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo descargar el PDF de la orden'),
+                variant: 'destructive',
+            });
+        } finally {
+            setDownloadingPdf(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="p-6">Cargando...</div>
@@ -123,6 +149,9 @@ export default function PurchaseOrderDetailPage() {
                         <p className="text-slate-600">Detalles de la orden de compra.</p>
                     </div>
                     <div className="flex gap-2">
+                        <Button onClick={handleDownloadPdf} variant="outline" disabled={downloadingPdf}>
+                            {downloadingPdf ? 'Descargando PDF...' : 'Descargar PDF'}
+                        </Button>
                         {(order.status === 'PENDING' || order.status === 'CONFIRMED') && (
                             <>
                                 <Button onClick={() => setIsReceiveDialogOpen(true)} variant="default">
@@ -195,6 +224,14 @@ export default function PurchaseOrderDetailPage() {
                             <div>
                                 <div className="text-sm text-slate-600">Forma de pago</div>
                                 <div className="font-medium">{order.paymentMethod}</div>
+                            </div>
+                        )}
+                        {(order.documentControlCode || order.documentControlTitle) && (
+                            <div className="md:col-span-2">
+                                <div className="text-sm text-slate-600">Formato de Control Documental</div>
+                                <div className="font-medium">
+                                    {(order.documentControlCode || 'N/A')} v{order.documentControlVersion || 1} - {order.documentControlTitle || 'N/A'}
+                                </div>
                             </div>
                         )}
                     </div>

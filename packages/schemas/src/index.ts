@@ -222,6 +222,7 @@ export const ProductionOrderItemCreateSchema = z.object({
 
 export const CreatePurchaseOrderSchema = z.object({
     supplierId: z.string().uuid(),
+    controlledDocumentId: z.string().uuid().optional(),
     expectedDeliveryDate: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
     notes: z.string().optional(),
     purchaseType: z.string().min(1).optional(),
@@ -1022,6 +1023,8 @@ export const OperationalConfigSchema = z.object({
 
     numberOfOperators: z.number().min(1, 'Debe haber al menos 1 operario'),
     purchasePaymentMethods: z.array(z.string().min(1, 'Forma de pago inválida')).min(1, 'Debe haber al menos una forma de pago'),
+    defaultPurchaseOrderControlledDocumentId: z.string().uuid().optional(),
+    defaultPurchaseOrderControlledDocumentCode: z.string().min(1).optional(),
     purchaseWithholdingRules: z.array(
         z.object({
             key: z.string().min(1),

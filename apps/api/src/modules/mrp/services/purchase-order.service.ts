@@ -7,9 +7,11 @@ import { InventoryItem } from '../entities/inventory-item.entity';
 import { IncomingInspection } from '../entities/incoming-inspection.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Warehouse } from '../entities/warehouse.entity';
-import { PurchaseOrderStatus, WarehouseType } from '@scaffold/types';
+import { DocumentCategory, DocumentProcess, DocumentStatus, PurchaseOrderStatus, WarehouseType } from '@scaffold/types';
 import type { CreatePurchaseOrderDto } from '@scaffold/schemas';
 import { AppError } from '../../../shared/utils/response';
+import { ControlledDocument } from '../entities/controlled-document.entity';
+import { OperationalConfig } from '../entities/operational-config.entity';
 
 export class PurchaseOrderService {
     private purchaseOrderRepo: EntityRepository<PurchaseOrder>;
@@ -31,16 +33,22 @@ export class PurchaseOrderService {
     async createPurchaseOrder(data: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
         // Fetch supplier
         const supplier = await this.supplierRepo.findOneOrFail({ id: data.supplierId });
+        const controlDocument = await this.resolvePurchaseOrderControlDocument(data.controlledDocumentId);
 
         // Create purchase order
         const purchaseOrder = this.purchaseOrderRepo.create({
             supplier,
+            controlledDocumentId: controlDocument?.id,
             expectedDeliveryDate: data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : undefined,
             notes: data.notes,
             status: PurchaseOrderStatus.PENDING,
             purchaseType: data.purchaseType,
             paymentMethod: data.paymentMethod,
             currency: data.currency || 'COP',
+            documentControlCode: controlDocument?.code || 'GP-FOR-04',
+            documentControlTitle: controlDocument?.title || 'Orden de Compra de Materias Primas e Insumos',
+            documentControlVersion: controlDocument?.version || 1,
+            documentControlDate: controlDocument?.effectiveDate || controlDocument?.approvedAt || new Date(),
         } as PurchaseOrder);
 
         let totalAmount = 0;
@@ -103,6 +111,62 @@ export class PurchaseOrderService {
 
         await this.em.persistAndFlush(purchaseOrder);
         return purchaseOrder;
+    }
+
+    private async resolvePurchaseOrderControlDocument(controlledDocumentId?: string) {
+        if (controlledDocumentId) {
+            const selected = await this.findPurchaseOrderControlledDocumentById(controlledDocumentId);
+            if (!selected) {
+                throw new AppError('El documento de control seleccionado no está aprobado o no corresponde a formato de producción', 400);
+            }
+            return selected;
+        }
+        const [config] = await this.em.find(OperationalConfig, {}, { orderBy: { createdAt: 'DESC' }, limit: 1 });
+        if (config?.defaultPurchaseOrderControlledDocumentCode) {
+            const configuredByCode = await this.findActivePurchaseOrderControlDocumentByCode(config.defaultPurchaseOrderControlledDocumentCode);
+            if (configuredByCode) return configuredByCode;
+        }
+        if (config?.defaultPurchaseOrderControlledDocumentId) {
+            const configured = await this.findPurchaseOrderControlledDocumentById(config.defaultPurchaseOrderControlledDocumentId);
+            if (configured) return configured;
+        }
+        return this.findActivePurchaseOrderControlDocument();
+    }
+
+    private async findPurchaseOrderControlledDocumentById(id: string) {
+        return this.em.findOne(ControlledDocument, {
+            id,
+            process: DocumentProcess.PRODUCCION,
+            documentCategory: DocumentCategory.FOR,
+            status: DocumentStatus.APROBADO,
+        });
+    }
+
+    private async findActivePurchaseOrderControlDocument() {
+        const now = new Date();
+        return this.em.findOne(ControlledDocument, {
+            process: DocumentProcess.PRODUCCION,
+            documentCategory: DocumentCategory.FOR,
+            status: DocumentStatus.APROBADO,
+            $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+            $and: [{ $or: [{ effectiveDate: null }, { effectiveDate: { $lte: now } }] }],
+        }, {
+            orderBy: [{ version: 'DESC' }, { approvedAt: 'DESC' }],
+        });
+    }
+
+    private async findActivePurchaseOrderControlDocumentByCode(code: string) {
+        const now = new Date();
+        return this.em.findOne(ControlledDocument, {
+            code,
+            process: DocumentProcess.PRODUCCION,
+            documentCategory: DocumentCategory.FOR,
+            status: DocumentStatus.APROBADO,
+            $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+            $and: [{ $or: [{ effectiveDate: null }, { effectiveDate: { $lte: now } }] }],
+        }, {
+            orderBy: [{ version: 'DESC' }, { approvedAt: 'DESC' }],
+        });
     }
 
     async getPurchaseOrder(id: string): Promise<PurchaseOrder | null> {

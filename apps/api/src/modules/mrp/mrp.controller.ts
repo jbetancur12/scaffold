@@ -6,6 +6,7 @@ import { MrpService } from './services/mrp.service';
 import { InventoryService } from './services/inventory.service';
 import { ProductionService } from './services/production.service';
 import { PurchaseOrderService } from './services/purchase-order.service';
+import { PurchaseOrderPdfService } from './services/purchase-order-pdf.service';
 import { PurchaseRequisitionService } from './services/purchase-requisition.service';
 import { QualityService } from './services/quality.service';
 import { DocumentControlService } from './services/document-control.service';
@@ -131,6 +132,7 @@ export class MrpController {
     private get inventoryService() { return new InventoryService(this.em); }
     private get productionService() { return new ProductionService(this.em); }
     private get purchaseOrderService() { return new PurchaseOrderService(this.em); }
+    private get purchaseOrderPdfService() { return new PurchaseOrderPdfService(this.em); }
     private get purchaseRequisitionService() { return new PurchaseRequisitionService(this.em); }
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
@@ -1342,6 +1344,18 @@ export class MrpController {
                 throw new AppError('Orden de compra no encontrada', 404);
             }
             return ApiResponse.success(res, purchaseOrder);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadPurchaseOrderPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const pdf = await this.purchaseOrderPdfService.generatePurchaseOrderPdf(id);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
+            return res.send(pdf.buffer);
         } catch (error) {
             next(error);
         }

@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -30,9 +30,11 @@ RUN npm run build --workspace=@scaffold/schemas
 RUN npm run build --workspace=api
 
 # Production stage
-FROM node:18-alpine
+FROM node:20-bookworm-slim
 
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY --from=builder /app/package.json ./
@@ -45,6 +47,10 @@ COPY --from=builder /app/apps/api/package.json ./apps/api/
 
 # Install ONLY production dependencies
 RUN npm ci --omit=dev --workspace=api --workspace=@scaffold/types --workspace=@scaffold/schemas
+
+# PDF rendering dependencies (Playwright + Chromium only)
+RUN npm install --no-save playwright pug && \
+    npx playwright install --with-deps chromium
 
 # Copy built packages (dist folders)
 COPY --from=builder /app/packages/types/dist ./packages/types/dist
@@ -72,6 +78,7 @@ RUN echo "=== BUSCANDO SCRIPT DE MIGRACION ===" && \
 
 # Set environment
 ENV NODE_ENV=production
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Expose API port
 EXPOSE 5050

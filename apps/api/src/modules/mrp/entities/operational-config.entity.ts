@@ -40,6 +40,12 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
     @Property({ type: 'json', nullable: true })
     purchasePaymentMethods: string[] = [];
 
+    @Property({ nullable: true })
+    defaultPurchaseOrderControlledDocumentId?: string;
+
+    @Property({ nullable: true })
+    defaultPurchaseOrderControlledDocumentCode?: string;
+
     @Property({ type: 'json', nullable: true })
     purchaseWithholdingRules: Array<{ key: string; label: string; rate: number; active: boolean }> = [];
 }

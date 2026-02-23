@@ -12,6 +12,9 @@ export class PurchaseOrder {
     @ManyToOne(() => Supplier)
     supplier!: Supplier;
 
+    @Property({ nullable: true })
+    controlledDocumentId?: string;
+
     @Property()
     orderDate: Date = new Date();
 
@@ -32,6 +35,18 @@ export class PurchaseOrder {
 
     @Property({ nullable: true })
     currency?: string;
+
+    @Property({ nullable: true })
+    documentControlCode?: string;
+
+    @Property({ nullable: true })
+    documentControlTitle?: string;
+
+    @Property({ nullable: true })
+    documentControlVersion?: number;
+
+    @Property({ nullable: true })
+    documentControlDate?: Date;
 
     @Property({ type: 'decimal', precision: 6, scale: 2, default: 0 })
     withholdingRate: number = 0;
