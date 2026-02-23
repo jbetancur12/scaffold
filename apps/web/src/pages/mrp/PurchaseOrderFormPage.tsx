@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -9,11 +9,14 @@ import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '../../components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { CreatePurchaseOrderSchema } from '@scaffold/schemas';
+import { PurchaseRequisitionStatus } from '@scaffold/types';
 import { getErrorMessage } from '@/lib/api-error';
 import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 import { useCreatePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
+import { useMarkPurchaseRequisitionConvertedMutation, usePurchaseRequisitionQuery } from '@/hooks/mrp/usePurchaseRequisitions';
+import { mrpApi, RawMaterialSupplier } from '@/services/mrpApi';
 
 interface OrderItem {
     rawMaterialId: string;
@@ -26,7 +29,10 @@ interface OrderItem {
 
 export default function PurchaseOrderFormPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const { toast } = useToast();
+    const requisitionId = searchParams.get('requisitionId') || undefined;
+    const didHydrateRequisitionRef = useRef(false);
     const [loading, setLoading] = useState(false);
     const [activeCalcIdx, setActiveCalcIdx] = useState<number | null>(null);
     const [calcBulkPrice, setCalcBulkPrice] = useState<number>(0);
@@ -36,6 +42,8 @@ export default function PurchaseOrderFormPage() {
         expectedDeliveryDate: '',
         notes: '',
     });
+    const [materialSuppliersByMaterialId, setMaterialSuppliersByMaterialId] = useState<Record<string, RawMaterialSupplier[]>>({});
+    const [loadingMaterialSuppliersByMaterialId, setLoadingMaterialSuppliersByMaterialId] = useState<Record<string, boolean>>({});
 
     const [items, setItems] = useState<OrderItem[]>([
         { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false }
@@ -44,10 +52,43 @@ export default function PurchaseOrderFormPage() {
     const { data: suppliersResponse, error: suppliersError } = useSuppliersQuery(1, 100);
     const { materials: rawMaterials, error: rawMaterialsError } = useRawMaterialsQuery(1, 100, '');
     const { execute: createPurchaseOrder } = useCreatePurchaseOrderMutation();
+    const { execute: markPurchaseRequisitionConverted } = useMarkPurchaseRequisitionConvertedMutation();
+    const { data: requisition, error: requisitionError } = usePurchaseRequisitionQuery(requisitionId);
     const suppliers = suppliersResponse?.suppliers ?? [];
 
     useMrpQueryErrorToast(suppliersError, 'No se pudo cargar la información inicial');
     useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar la información inicial');
+    useMrpQueryErrorToast(requisitionError, 'No se pudo cargar la requisición para precargar la orden');
+
+    useEffect(() => {
+        if (!requisition || didHydrateRequisitionRef.current) return;
+
+        const requisitionItems = requisition.items ?? [];
+        if (requisitionItems.length > 0) {
+            setItems(
+                requisitionItems.map((item) => ({
+                    rawMaterialId: item.rawMaterial.id,
+                    quantity: item.quantity,
+                    unitPrice: 0,
+                    hasIva: false,
+                }))
+            );
+        }
+
+        const requisitionSuggestedSupplier = requisitionItems.find((item) => item.suggestedSupplier?.id)?.suggestedSupplier?.id;
+        const neededBy = requisition.neededBy ? new Date(requisition.neededBy) : null;
+        const expectedDeliveryDate = neededBy && !Number.isNaN(neededBy.getTime())
+            ? neededBy.toISOString().slice(0, 10)
+            : '';
+
+        setFormData((prev) => ({
+            supplierId: prev.supplierId || requisitionSuggestedSupplier || '',
+            expectedDeliveryDate: prev.expectedDeliveryDate || expectedDeliveryDate,
+            notes: prev.notes || requisition.notes || '',
+        }));
+
+        didHydrateRequisitionRef.current = true;
+    }, [requisition]);
 
     const addItem = () => {
         setItems([...items, { rawMaterialId: '', quantity: 0, unitPrice: 0, hasIva: false }]);
@@ -69,6 +110,67 @@ export default function PurchaseOrderFormPage() {
         const newItems = [...items];
         newItems[index] = { ...newItems[index], [field]: value } as OrderItem;
         setItems(newItems);
+    };
+
+    const getSupplierById = (supplierId?: string) => {
+        if (!supplierId) return undefined;
+        return suppliers.find((supplier) => supplier.id === supplierId);
+    };
+
+    const fetchMaterialSuppliers = async (materialId: string) => {
+        if (!materialId) return [];
+        if (materialSuppliersByMaterialId[materialId]) {
+            return materialSuppliersByMaterialId[materialId];
+        }
+        setLoadingMaterialSuppliersByMaterialId((prev) => ({ ...prev, [materialId]: true }));
+        try {
+            const rows = await mrpApi.getRawMaterialSuppliers(materialId);
+            setMaterialSuppliersByMaterialId((prev) => ({ ...prev, [materialId]: rows }));
+            return rows;
+        } catch {
+            toast({
+                title: 'Advertencia',
+                description: 'No se pudieron cargar proveedores sugeridos para la materia prima',
+                variant: 'destructive',
+            });
+            return [];
+        } finally {
+            setLoadingMaterialSuppliersByMaterialId((prev) => ({ ...prev, [materialId]: false }));
+        }
+    };
+
+    const handleMaterialChange = async (index: number, materialId: string) => {
+        updateItem(index, 'rawMaterialId', materialId);
+        if (!materialId) return;
+
+        const material = getMaterialById(materialId);
+        const suggestedSuppliers = await fetchMaterialSuppliers(materialId);
+        const bestSuggestedSupplierId = suggestedSuppliers[0]?.supplier?.id || material?.supplierId;
+
+        if (!formData.supplierId && bestSuggestedSupplierId) {
+            setFormData((prev) => ({ ...prev, supplierId: bestSuggestedSupplierId }));
+        }
+    };
+
+    const applyDominantSuggestedSupplier = () => {
+        const counts: Record<string, number> = {};
+        for (const item of items) {
+            if (!item.rawMaterialId) continue;
+            const material = getMaterialById(item.rawMaterialId);
+            const suggested = materialSuppliersByMaterialId[item.rawMaterialId]?.[0]?.supplier?.id || material?.supplierId;
+            if (!suggested) continue;
+            counts[suggested] = (counts[suggested] || 0) + 1;
+        }
+        const winner = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+        if (!winner) {
+            toast({
+                title: 'Sin sugerencia',
+                description: 'No hay sugerencias suficientes para aplicar proveedor automáticamente',
+                variant: 'destructive',
+            });
+            return;
+        }
+        setFormData((prev) => ({ ...prev, supplierId: winner }));
     };
 
     const calculateTotals = () => {
@@ -121,7 +223,20 @@ export default function PurchaseOrderFormPage() {
                 })),
             };
             const validatedData = CreatePurchaseOrderSchema.parse(submitData);
-            await createPurchaseOrder(validatedData);
+            const createdOrder = await createPurchaseOrder(validatedData);
+
+            if (requisitionId) {
+                try {
+                    await markPurchaseRequisitionConverted({ id: requisitionId, purchaseOrderId: createdOrder.id });
+                } catch (markError) {
+                    toast({
+                        title: 'OC creada con advertencia',
+                        description: getErrorMessage(markError, 'No se pudo marcar la requisición como convertida'),
+                        variant: 'destructive',
+                    });
+                }
+            }
+
             toast({
                 title: 'Éxito',
                 description: 'Orden de compra creada exitosamente',
@@ -158,6 +273,24 @@ export default function PurchaseOrderFormPage() {
                 <p className="text-slate-600">Crea una nueva orden de compra de materias primas.</p>
             </div>
 
+            {requisitionId ? (
+                <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                    {requisition ? (
+                        <>
+                            <span className="font-medium">Requisición vinculada:</span>{' '}
+                            {requisition.id.slice(0, 8).toUpperCase()} ({requisition.status}).
+                            {requisition.status === PurchaseRequisitionStatus.CONVERTIDA || requisition.status === PurchaseRequisitionStatus.CANCELADA ? (
+                                <span className="ml-2 text-amber-700">
+                                    Esta requisición ya no está activa; valida si deseas continuar con una nueva OC.
+                                </span>
+                            ) : null}
+                        </>
+                    ) : (
+                        <span>Cargando requisición vinculada...</span>
+                    )}
+                </div>
+            ) : null}
+
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="bg-white rounded-lg shadow p-6 space-y-4">
                     <h2 className="text-xl font-semibold">Información General</h2>
@@ -179,6 +312,23 @@ export default function PurchaseOrderFormPage() {
                                     </option>
                                 ))}
                             </select>
+                            <div className="mt-2 flex items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={applyDominantSuggestedSupplier}
+                                >
+                                    Aplicar proveedor sugerido
+                                </Button>
+                                {formData.supplierId ? (
+                                    <span className="text-xs text-slate-500">
+                                        Seleccionado: {getSupplierById(formData.supplierId)?.name || 'N/A'}
+                                    </span>
+                                ) : (
+                                    <span className="text-xs text-slate-500">Sin proveedor seleccionado</span>
+                                )}
+                            </div>
                         </div>
 
                         <div>
@@ -238,7 +388,9 @@ export default function PurchaseOrderFormPage() {
                                             <select
                                                 className="w-full mt-1 md:mt-0 px-2 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                                                 value={item.rawMaterialId}
-                                                onChange={(e) => updateItem(index, 'rawMaterialId', e.target.value)}
+                                                onChange={(e) => {
+                                                    void handleMaterialChange(index, e.target.value);
+                                                }}
                                                 required
                                             >
                                                 <option value="">Selecciona...</option>
@@ -248,6 +400,43 @@ export default function PurchaseOrderFormPage() {
                                                     </option>
                                                 ))}
                                             </select>
+                                            {item.rawMaterialId ? (
+                                                <div className="mt-1 space-y-1">
+                                                    {loadingMaterialSuppliersByMaterialId[item.rawMaterialId] ? (
+                                                        <div className="text-[11px] text-slate-500">Cargando proveedores sugeridos...</div>
+                                                    ) : null}
+                                                    {(() => {
+                                                        const suggestedRows = materialSuppliersByMaterialId[item.rawMaterialId] ?? [];
+                                                        const materialPreferredSupplier = getMaterialById(item.rawMaterialId)?.supplierId;
+                                                        const suggestedSupplierIds = new Set(suggestedRows.map((row) => row.supplier.id));
+                                                        if (materialPreferredSupplier) suggestedSupplierIds.add(materialPreferredSupplier);
+                                                        const selectedSupplierMismatch = Boolean(
+                                                            formData.supplierId &&
+                                                            suggestedSupplierIds.size > 0 &&
+                                                            !suggestedSupplierIds.has(formData.supplierId)
+                                                        );
+
+                                                        return (
+                                                            <>
+                                                                {suggestedRows.length > 0 ? (
+                                                                    <div className="text-[11px] text-slate-600">
+                                                                        Sugeridos: {suggestedRows.slice(0, 3).map((row) => row.supplier.name).join(', ')}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="text-[11px] text-slate-500">
+                                                                        Sin historial de proveedores para este material.
+                                                                    </div>
+                                                                )}
+                                                                {selectedSupplierMismatch ? (
+                                                                    <div className="text-[11px] text-amber-700">
+                                                                        El proveedor seleccionado no coincide con sugeridos/histórico de esta materia prima.
+                                                                    </div>
+                                                                ) : null}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            ) : null}
                                         </div>
 
                                         <div className="md:col-span-1">

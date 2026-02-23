@@ -72,6 +72,9 @@ import {
     PurchaseOrderStatus,
     PurchaseOrder,
     PurchaseOrderListResponse,
+    PurchaseRequisition,
+    PurchaseRequisitionListResponse,
+    PurchaseRequisitionStatus,
 } from '@scaffold/types';
 import type {
     CreatePurchaseOrderDto,
@@ -125,6 +128,8 @@ import type {
     ApproveControlledDocumentPayload,
     CreateInvimaRegistrationPayload,
     UpdateInvimaRegistrationPayload,
+    CreatePurchaseRequisitionPayload,
+    CreatePurchaseRequisitionFromProductionOrderPayload,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -234,6 +239,41 @@ export const mrpApi = {
 
     cancelPurchaseOrder: async (id: string): Promise<void> => {
         await api.delete(`/mrp/purchase-orders/${id}`);
+    },
+
+    // Purchase Requisitions
+    createPurchaseRequisition: async (data: CreatePurchaseRequisitionPayload): Promise<PurchaseRequisition> => {
+        const response = await api.post<PurchaseRequisition>('/mrp/purchase-requisitions', data);
+        return response.data;
+    },
+    createPurchaseRequisitionFromProductionOrder: async (
+        productionOrderId: string,
+        data: CreatePurchaseRequisitionFromProductionOrderPayload
+    ): Promise<PurchaseRequisition> => {
+        const response = await api.post<PurchaseRequisition>(`/mrp/production-orders/${productionOrderId}/purchase-requisition`, data);
+        return response.data;
+    },
+    listPurchaseRequisitions: async (
+        page = 1,
+        limit = 20,
+        filters?: { status?: PurchaseRequisitionStatus; productionOrderId?: string }
+    ): Promise<PurchaseRequisitionListResponse> => {
+        const response = await api.get<PurchaseRequisitionListResponse>('/mrp/purchase-requisitions', {
+            params: { page, limit, ...filters },
+        });
+        return response.data;
+    },
+    getPurchaseRequisition: async (id: string): Promise<PurchaseRequisition> => {
+        const response = await api.get<PurchaseRequisition>(`/mrp/purchase-requisitions/${id}`);
+        return response.data;
+    },
+    updatePurchaseRequisitionStatus: async (id: string, status: PurchaseRequisitionStatus): Promise<PurchaseRequisition> => {
+        const response = await api.patch<PurchaseRequisition>(`/mrp/purchase-requisitions/${id}/status`, { status });
+        return response.data;
+    },
+    markPurchaseRequisitionConverted: async (id: string, purchaseOrderId: string): Promise<PurchaseRequisition> => {
+        const response = await api.post<PurchaseRequisition>(`/mrp/purchase-requisitions/${id}/mark-converted`, { purchaseOrderId });
+        return response.data;
     },
 
     // Warehouses

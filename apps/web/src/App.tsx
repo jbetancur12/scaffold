@@ -21,6 +21,8 @@ import InventoryDashboardPage from '@/pages/mrp/InventoryDashboardPage';
 import PurchaseOrderListPage from '@/pages/mrp/PurchaseOrderListPage';
 import PurchaseOrderFormPage from '@/pages/mrp/PurchaseOrderFormPage';
 import PurchaseOrderDetailPage from '@/pages/mrp/PurchaseOrderDetailPage';
+import PurchaseRequisitionListPage from '@/pages/mrp/PurchaseRequisitionListPage';
+import PurchaseRequisitionFormPage from '@/pages/mrp/PurchaseRequisitionFormPage';
 import ProductionOrderDetailPage from '@/pages/mrp/ProductionOrderDetailPage';
 import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
 import WarehouseListPage from '@/pages/mrp/WarehouseListPage';
@@ -146,6 +148,8 @@ export default function App() {
                         <Route path="/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
                         <Route path="/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />
                         <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+                        <Route path="/mrp/purchase-requisitions" element={<PurchaseRequisitionListPage />} />
+                        <Route path="/mrp/purchase-requisitions/new" element={<PurchaseRequisitionFormPage />} />
 
                         <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
                         <Route path="/quality" element={<Navigate to="/quality/nc" replace />} />

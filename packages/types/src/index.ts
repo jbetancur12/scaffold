@@ -42,6 +42,13 @@ export enum PurchaseOrderStatus {
     CANCELLED = 'CANCELLED',
 }
 
+export enum PurchaseRequisitionStatus {
+    PENDIENTE = 'pendiente',
+    APROBADA = 'aprobada',
+    CONVERTIDA = 'convertida',
+    CANCELADA = 'cancelada',
+}
+
 export enum ProductionBatchQcStatus {
     PENDING = 'pending',
     PASSED = 'passed',
@@ -398,6 +405,34 @@ export interface PurchaseOrder {
 
 export interface PurchaseOrderListResponse {
     data: PurchaseOrder[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface PurchaseRequisitionItem {
+    id: string;
+    rawMaterial: Pick<RawMaterial, 'id' | 'name' | 'sku' | 'unit'>;
+    quantity: number;
+    suggestedSupplier?: Pick<Supplier, 'id' | 'name'>;
+    notes?: string;
+}
+
+export interface PurchaseRequisition {
+    id: string;
+    requestedBy: string;
+    productionOrderId?: string;
+    neededBy?: string | Date;
+    notes?: string;
+    status: PurchaseRequisitionStatus;
+    convertedPurchaseOrderId?: string;
+    items?: PurchaseRequisitionItem[];
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface PurchaseRequisitionListResponse {
+    data: PurchaseRequisition[];
     total: number;
     page: number;
     limit: number;
@@ -1285,6 +1320,25 @@ export interface CreateEquipmentPayload {
     maintenanceFrequencyDays?: number;
     notes?: string;
     actor?: string;
+}
+
+export interface CreatePurchaseRequisitionPayload {
+    requestedBy: string;
+    productionOrderId?: string;
+    neededBy?: string | Date;
+    notes?: string;
+    items: Array<{
+        rawMaterialId: string;
+        quantity: number;
+        suggestedSupplierId?: string;
+        notes?: string;
+    }>;
+}
+
+export interface CreatePurchaseRequisitionFromProductionOrderPayload {
+    requestedBy: string;
+    neededBy?: string | Date;
+    notes?: string;
 }
 
 export interface UpdateEquipmentPayload {

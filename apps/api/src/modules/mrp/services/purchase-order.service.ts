@@ -157,6 +157,7 @@ export class PurchaseOrderService {
         // Update global last purchase on raw material
         item.rawMaterial.lastPurchasePrice = purchasePriceWithTax;
         item.rawMaterial.lastPurchaseDate = new Date();
+        item.rawMaterial.supplier = supplier;
 
         // Upsert SupplierMaterial link
         const supplierMaterialRepo = em.getRepository(SupplierMaterial);

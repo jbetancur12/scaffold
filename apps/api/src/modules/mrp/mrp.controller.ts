@@ -6,6 +6,7 @@ import { MrpService } from './services/mrp.service';
 import { InventoryService } from './services/inventory.service';
 import { ProductionService } from './services/production.service';
 import { PurchaseOrderService } from './services/purchase-order.service';
+import { PurchaseRequisitionService } from './services/purchase-requisition.service';
 import { QualityService } from './services/quality.service';
 import { DocumentControlService } from './services/document-control.service';
 import {
@@ -30,6 +31,11 @@ import {
     UpdateProductionOrderStatusSchema,
     InventoryQuerySchema,
     ListPurchaseOrdersQuerySchema,
+    CreatePurchaseRequisitionSchema,
+    CreatePurchaseRequisitionFromProductionOrderSchema,
+    ListPurchaseRequisitionsQuerySchema,
+    UpdatePurchaseRequisitionStatusSchema,
+    MarkPurchaseRequisitionConvertedSchema,
     UpdatePurchaseOrderStatusSchema,
     ReceivePurchaseOrderSchema,
     CreateNonConformitySchema,
@@ -125,6 +131,7 @@ export class MrpController {
     private get inventoryService() { return new InventoryService(this.em); }
     private get productionService() { return new ProductionService(this.em); }
     private get purchaseOrderService() { return new PurchaseOrderService(this.em); }
+    private get purchaseRequisitionService() { return new PurchaseRequisitionService(this.em); }
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
 
@@ -1432,6 +1439,94 @@ export class MrpController {
             const { id } = req.params;
             await this.purchaseOrderService.cancelPurchaseOrder(id);
             return ApiResponse.success(res, null, 'Orden de compra cancelada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // --- Purchase Requisitions ---
+    async createPurchaseRequisition(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreatePurchaseRequisitionSchema.parse(req.body);
+            const row = await this.purchaseRequisitionService.create(payload);
+            return ApiResponse.success(res, row, 'Requisición de compra creada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createPurchaseRequisitionFromProductionOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id: productionOrderId } = req.params;
+            const payload = CreatePurchaseRequisitionFromProductionOrderSchema.parse(req.body ?? {});
+            const requirements = await this.productionService.calculateMaterialRequirements(productionOrderId);
+            const shortageItems = requirements
+                .filter((reqRow) => Number(reqRow.required) > Number(reqRow.available))
+                .map((reqRow) => {
+                    const deficit = Number((Number(reqRow.required) - Number(reqRow.available)).toFixed(4));
+                    return {
+                        rawMaterialId: reqRow.material.id,
+                        quantity: deficit,
+                        suggestedSupplierId: reqRow.potentialSuppliers[0]?.supplier?.id,
+                        notes: `Autogenerado desde OP ${productionOrderId}`,
+                    };
+                });
+
+            if (shortageItems.length === 0) {
+                throw new AppError('La orden no tiene faltantes de materias primas para requisición', 409);
+            }
+
+            const row = await this.purchaseRequisitionService.create({
+                requestedBy: payload.requestedBy,
+                productionOrderId,
+                neededBy: payload.neededBy,
+                notes: payload.notes,
+                items: shortageItems,
+            });
+            return ApiResponse.success(res, row, 'Requisición generada desde la orden de producción', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listPurchaseRequisitions(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { page, limit, status, productionOrderId } = ListPurchaseRequisitionsQuerySchema.parse(req.query);
+            const rows = await this.purchaseRequisitionService.list(page || 1, limit || 20, { status, productionOrderId });
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getPurchaseRequisition(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const row = await this.purchaseRequisitionService.getById(id);
+            if (!row) throw new AppError('Requisición no encontrada', 404);
+            return ApiResponse.success(res, row);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updatePurchaseRequisitionStatus(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { status } = UpdatePurchaseRequisitionStatusSchema.parse(req.body);
+            const row = await this.purchaseRequisitionService.updateStatus(id, status);
+            return ApiResponse.success(res, row, 'Estado de requisición actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async markPurchaseRequisitionConverted(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { purchaseOrderId } = MarkPurchaseRequisitionConvertedSchema.parse(req.body);
+            const row = await this.purchaseRequisitionService.markConverted(id, purchaseOrderId);
+            return ApiResponse.success(res, row, 'Requisición marcada como convertida');
         } catch (error) {
             next(error);
         }

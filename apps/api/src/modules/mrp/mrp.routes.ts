@@ -140,6 +140,14 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/purchase-orders/:id/receive', (req, res, next) => mrpController.receivePurchaseOrder(req, res, next));
     router.delete('/purchase-orders/:id', (req, res, next) => mrpController.cancelPurchaseOrder(req, res, next));
 
+    // Purchase Requisitions
+    router.post('/purchase-requisitions', (req, res, next) => mrpController.createPurchaseRequisition(req, res, next));
+    router.get('/purchase-requisitions', (req, res, next) => mrpController.listPurchaseRequisitions(req, res, next));
+    router.get('/purchase-requisitions/:id', (req, res, next) => mrpController.getPurchaseRequisition(req, res, next));
+    router.patch('/purchase-requisitions/:id/status', (req, res, next) => mrpController.updatePurchaseRequisitionStatus(req, res, next));
+    router.post('/purchase-requisitions/:id/mark-converted', (req, res, next) => mrpController.markPurchaseRequisitionConverted(req, res, next));
+    router.post('/production-orders/:id/purchase-requisition', (req, res, next) => mrpController.createPurchaseRequisitionFromProductionOrder(req, res, next));
+
     // Inventory
     router.get('/inventory', (req, res, next) => mrpController.getInventory(req, res, next));
     router.post('/inventory/manual-add', (req, res, next) => mrpController.addManualStock(req, res, next));

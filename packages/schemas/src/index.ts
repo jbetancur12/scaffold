@@ -5,6 +5,7 @@ import {
     WarehouseType,
     ProductionOrderStatus,
     PurchaseOrderStatus,
+    PurchaseRequisitionStatus,
     CapaStatus,
     DocumentProcess,
     DocumentCategory,
@@ -232,6 +233,25 @@ export const CreatePurchaseOrderSchema = z.object({
     })),
 });
 
+export const CreatePurchaseRequisitionSchema = z.object({
+    requestedBy: z.string().min(2),
+    productionOrderId: z.string().uuid().optional(),
+    neededBy: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    notes: z.string().optional(),
+    items: z.array(z.object({
+        rawMaterialId: z.string().uuid(),
+        quantity: z.number().min(0.01),
+        suggestedSupplierId: z.string().uuid().optional(),
+        notes: z.string().optional(),
+    })).min(1),
+});
+
+export const CreatePurchaseRequisitionFromProductionOrderSchema = z.object({
+    requestedBy: z.string().min(2),
+    neededBy: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    notes: z.string().optional(),
+});
+
 export const ManualStockSchema = z.object({
     rawMaterialId: z.string().uuid(),
     quantity: z.number().min(0.01),
@@ -303,6 +323,21 @@ export const ListPurchaseOrdersQuerySchema = z.object({
     limit: z.coerce.number().int().positive().optional(),
     status: z.nativeEnum(PurchaseOrderStatus).optional(),
     supplierId: z.string().uuid().optional(),
+});
+
+export const ListPurchaseRequisitionsQuerySchema = z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    status: z.nativeEnum(PurchaseRequisitionStatus).optional(),
+    productionOrderId: z.string().uuid().optional(),
+});
+
+export const UpdatePurchaseRequisitionStatusSchema = z.object({
+    status: z.nativeEnum(PurchaseRequisitionStatus),
+});
+
+export const MarkPurchaseRequisitionConvertedSchema = z.object({
+    purchaseOrderId: z.string().uuid(),
 });
 
 export const UpdatePurchaseOrderStatusSchema = z.object({
@@ -1025,6 +1060,8 @@ export type SignBatchReleasePayload = DateInputValue<z.input<typeof SignBatchRel
 export type ApproveControlledDocumentPayload = DateInputValue<z.input<typeof ApproveControlledDocumentSchema>>;
 export type CreateInvimaRegistrationPayload = DateInputValue<z.input<typeof CreateInvimaRegistrationSchema>>;
 export type UpdateInvimaRegistrationPayload = DateInputValue<z.input<typeof UpdateInvimaRegistrationSchema>>;
+export type CreatePurchaseRequisitionPayload = DateInputValue<z.input<typeof CreatePurchaseRequisitionSchema>>;
+export type CreatePurchaseRequisitionFromProductionOrderPayload = DateInputValue<z.input<typeof CreatePurchaseRequisitionFromProductionOrderSchema>>;
 export type CreateEquipmentPayload = DateInputValue<z.input<typeof CreateEquipmentSchema>>;
 export type UpdateEquipmentPayload = DateInputValue<z.input<typeof UpdateEquipmentSchema>>;
 export type CreateEquipmentCalibrationPayload = DateInputValue<z.input<typeof CreateEquipmentCalibrationSchema>>;
