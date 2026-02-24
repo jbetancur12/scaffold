@@ -551,7 +551,10 @@ export class ProductionService {
             const productionOrderRepo = tx.getRepository(ProductionOrder);
             const inventoryRepo = tx.getRepository(InventoryItem);
             const warehouseRepo = tx.getRepository(Warehouse);
-            const order = await productionOrderRepo.findOneOrFail({ id }, { populate: ['items', 'items.variant', 'batches', 'batches.units'] });
+            const order = await productionOrderRepo.findOneOrFail(
+                { id },
+                { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial', 'batches', 'batches.units'] }
+            );
 
             // Basic transition validation
             if (order.status === ProductionOrderStatus.COMPLETED || order.status === ProductionOrderStatus.CANCELLED) {
@@ -611,6 +614,93 @@ export class ProductionService {
                     variantQuantities.set(variantId, totalCompleted);
                 }
 
+                // Consume released raw materials based on actual completed production quantities.
+                const materialRequirements = new Map<string, {
+                    required: number;
+                    materialName: string;
+                }>();
+
+                for (const item of order.items) {
+                    const producedQty = Number(variantQuantities.get(item.variant.id) ?? 0);
+                    if (producedQty <= 0) {
+                        continue;
+                    }
+                    for (const bomItem of item.variant.bomItems) {
+                        if (!bomItem.rawMaterial) {
+                            continue;
+                        }
+                        const rawMaterialId = bomItem.rawMaterial.id;
+                        const requiredQty = Number(bomItem.quantity) * producedQty;
+                        if (requiredQty <= 0) {
+                            continue;
+                        }
+                        const current = materialRequirements.get(rawMaterialId);
+                        if (current) {
+                            current.required += requiredQty;
+                        } else {
+                            materialRequirements.set(rawMaterialId, {
+                                required: requiredQty,
+                                materialName: bomItem.rawMaterial.name,
+                            });
+                        }
+                    }
+                }
+
+                if (materialRequirements.size > 0) {
+                    const materialIds = Array.from(materialRequirements.keys());
+                    const rawInventoryItems = await inventoryRepo.find(
+                        {
+                            rawMaterial: { $in: materialIds },
+                            warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
+                        },
+                        { populate: ['rawMaterial', 'warehouse'], orderBy: [{ lastUpdated: 'ASC' }, { createdAt: 'ASC' }] }
+                    );
+
+                    const inventoryByMaterial = new Map<string, InventoryItem[]>();
+                    for (const inv of rawInventoryItems) {
+                        const materialId = inv.rawMaterial?.id;
+                        if (!materialId) {
+                            continue;
+                        }
+                        const rows = inventoryByMaterial.get(materialId) || [];
+                        rows.push(inv);
+                        inventoryByMaterial.set(materialId, rows);
+                    }
+
+                    for (const [materialId, requirement] of materialRequirements.entries()) {
+                        let pending = Number(requirement.required);
+                        const rows = inventoryByMaterial.get(materialId) || [];
+                        const available = rows.reduce((sum, row) => sum + Number(row.quantity), 0);
+                        if (available < pending) {
+                            throw new AppError(
+                                `Stock insuficiente para consumir ${requirement.materialName}. Requerido: ${pending.toFixed(4)}, disponible: ${available.toFixed(4)}`,
+                                400
+                            );
+                        }
+
+                        for (const row of rows) {
+                            if (pending <= 0) {
+                                break;
+                            }
+                            const currentQty = Number(row.quantity);
+                            if (currentQty <= 0) {
+                                continue;
+                            }
+                            const consume = Math.min(currentQty, pending);
+                            row.quantity = currentQty - consume;
+                            pending -= consume;
+                            tx.persist(row);
+                        }
+
+                        await this.logAudit('inventory_item', materialId, 'raw_material_consumed_by_production', {
+                            productionOrderId: order.id,
+                            productionOrderCode: order.code,
+                            rawMaterialId: materialId,
+                            required: Number(requirement.required),
+                        });
+                    }
+                }
+
                 // Get or create warehouse for finished goods
                 let warehouse: Warehouse | null = null;
                 if (warehouseId) {
@@ -645,7 +735,7 @@ export class ProductionService {
                             warehouse,
                             quantity: completedQty,
                             lastUpdated: new Date()
-                        } as InventoryItem);
+                        } as unknown as InventoryItem);
                     }
                     tx.persist(inventoryItem);
                 }
