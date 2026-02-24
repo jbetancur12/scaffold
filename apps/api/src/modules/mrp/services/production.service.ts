@@ -30,6 +30,8 @@ import { BatchRelease } from '../entities/batch-release.entity';
 import { ChangeControl } from '../entities/change-control.entity';
 import { ControlledDocument } from '../entities/controlled-document.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
+import { RawMaterialLot } from '../entities/raw-material-lot.entity';
+import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { DocumentControlService } from './document-control.service';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema } from '@scaffold/schemas';
 import { z } from 'zod';
@@ -46,6 +48,7 @@ export class ProductionService {
     private readonly batchReleaseRepo: EntityRepository<BatchRelease>;
     private readonly changeControlRepo: EntityRepository<ChangeControl>;
     private readonly operationalConfigRepo: EntityRepository<OperationalConfig>;
+    private readonly rawMaterialLotRepo: EntityRepository<RawMaterialLot>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -58,6 +61,7 @@ export class ProductionService {
         this.batchReleaseRepo = em.getRepository(BatchRelease);
         this.changeControlRepo = em.getRepository(ChangeControl);
         this.operationalConfigRepo = em.getRepository(OperationalConfig);
+        this.rawMaterialLotRepo = em.getRepository(RawMaterialLot);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
@@ -462,7 +466,8 @@ export class ProductionService {
         material: RawMaterial,
         required: number,
         available: number,
-        potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[]
+        potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[],
+        pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[]
     }[]> {
         const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] });
 
@@ -470,7 +475,8 @@ export class ProductionService {
             material: RawMaterial,
             required: number,
             available: number,
-            potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[]
+            potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[],
+            pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[]
         }>();
 
         // 1. Calculate Required
@@ -489,7 +495,8 @@ export class ProductionService {
                         material: bomItem.rawMaterial,
                         required: requiredQty,
                         available: 0, // Will populate next
-                        potentialSuppliers: [] // Will populate next
+                        potentialSuppliers: [], // Will populate next
+                        pepsLots: [], // Will populate next
                     });
                 }
             }
@@ -498,6 +505,7 @@ export class ProductionService {
         // 2. Check Available Stock
         const materialIds = Array.from(requirements.keys());
         if (materialIds.length > 0) {
+            await this.ensureLegacyLots(materialIds);
             const inventoryItems = await this.inventoryRepo.find({
                 rawMaterial: { $in: materialIds },
                 warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
@@ -507,6 +515,32 @@ export class ProductionService {
                 if (invItem.rawMaterial && requirements.has(invItem.rawMaterial.id)) {
                     requirements.get(invItem.rawMaterial.id)!.available += Number(invItem.quantity);
                 }
+            }
+
+            const lots = await this.rawMaterialLotRepo.find(
+                {
+                    rawMaterial: { $in: materialIds },
+                    quantityAvailable: { $gt: 0 },
+                    warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
+                },
+                {
+                    populate: ['warehouse', 'rawMaterial'],
+                    orderBy: [{ receivedAt: 'ASC' }, { createdAt: 'ASC' }],
+                }
+            );
+
+            for (const lot of lots) {
+                const materialId = lot.rawMaterial?.id;
+                if (!materialId || !requirements.has(materialId)) continue;
+                requirements.get(materialId)!.pepsLots.push({
+                    lotId: lot.id,
+                    lotCode: lot.supplierLotCode,
+                    warehouseId: lot.warehouse.id,
+                    warehouseName: lot.warehouse.name,
+                    available: Number(lot.quantityAvailable),
+                    receivedAt: lot.receivedAt,
+                    suggestedUse: 0,
+                });
             }
 
             // 3. Check Potential Suppliers (SupplierMaterial)
@@ -539,6 +573,13 @@ export class ProductionService {
                     // Sort again just to be sure
                     req.potentialSuppliers.sort((a, b) => a.lastPrice - b.lastPrice);
                     req.potentialSuppliers[0].isCheapest = true;
+                }
+                let pending = Number(req.required);
+                for (const lot of req.pepsLots) {
+                    if (pending <= 0) break;
+                    const use = Math.min(pending, Number(lot.available));
+                    lot.suggestedUse = use;
+                    pending -= use;
                 }
             }
         }
@@ -648,29 +689,34 @@ export class ProductionService {
 
                 if (materialRequirements.size > 0) {
                     const materialIds = Array.from(materialRequirements.keys());
-                    const rawInventoryItems = await inventoryRepo.find(
+                    await this.ensureLegacyLots(materialIds, tx);
+                    const lotRepo = tx.getRepository(RawMaterialLot);
+                    const kardexRepo = tx.getRepository(RawMaterialKardex);
+                    const lots = await lotRepo.find(
                         {
                             rawMaterial: { $in: materialIds },
+                            quantityAvailable: { $gt: 0 },
                             warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
                         },
-                        { populate: ['rawMaterial', 'warehouse'], orderBy: [{ lastUpdated: 'ASC' }, { createdAt: 'ASC' }] }
+                        { populate: ['rawMaterial', 'warehouse'], orderBy: [{ receivedAt: 'ASC' }, { createdAt: 'ASC' }] }
                     );
 
-                    const inventoryByMaterial = new Map<string, InventoryItem[]>();
-                    for (const inv of rawInventoryItems) {
-                        const materialId = inv.rawMaterial?.id;
+                    const lotsByMaterial = new Map<string, RawMaterialLot[]>();
+                    for (const lot of lots) {
+                        const materialId = lot.rawMaterial?.id;
                         if (!materialId) {
                             continue;
                         }
-                        const rows = inventoryByMaterial.get(materialId) || [];
-                        rows.push(inv);
-                        inventoryByMaterial.set(materialId, rows);
+                        const rows = lotsByMaterial.get(materialId) || [];
+                        rows.push(lot);
+                        lotsByMaterial.set(materialId, rows);
                     }
 
+                    const consumedByMaterialWarehouse = new Map<string, number>();
                     for (const [materialId, requirement] of materialRequirements.entries()) {
                         let pending = Number(requirement.required);
-                        const rows = inventoryByMaterial.get(materialId) || [];
-                        const available = rows.reduce((sum, row) => sum + Number(row.quantity), 0);
+                        const rows = lotsByMaterial.get(materialId) || [];
+                        const available = rows.reduce((sum, row) => sum + Number(row.quantityAvailable), 0);
                         if (available < pending) {
                             throw new AppError(
                                 `Stock insuficiente para consumir ${requirement.materialName}. Requerido: ${pending.toFixed(4)}, disponible: ${available.toFixed(4)}`,
@@ -678,21 +724,56 @@ export class ProductionService {
                             );
                         }
 
-                        for (const row of rows) {
+                        for (const lot of rows) {
                             if (pending <= 0) {
                                 break;
                             }
-                            const currentQty = Number(row.quantity);
+                            const currentQty = Number(lot.quantityAvailable);
                             if (currentQty <= 0) {
                                 continue;
                             }
                             const consume = Math.min(currentQty, pending);
-                            row.quantity = currentQty - consume;
+                            lot.quantityAvailable = currentQty - consume;
                             pending -= consume;
-                            tx.persist(row);
-                        }
 
-                        await this.logAudit('inventory_item', materialId, 'raw_material_consumed_by_production', {
+                            const key = `${materialId}::${lot.warehouse.id}`;
+                            consumedByMaterialWarehouse.set(key, Number(consumedByMaterialWarehouse.get(key) || 0) + consume);
+
+                            const kardex = kardexRepo.create({
+                                rawMaterial: lot.rawMaterial,
+                                warehouse: lot.warehouse,
+                                lot,
+                                movementType: 'SALIDA_PRODUCCION',
+                                quantity: -consume,
+                                balanceAfter: Number(lot.quantityAvailable),
+                                referenceType: 'production_order',
+                                referenceId: order.id,
+                                notes: `Consumo OP ${order.code}`,
+                                occurredAt: new Date(),
+                            } as unknown as RawMaterialKardex);
+                            tx.persist([lot, kardex]);
+                        }
+                    }
+
+                    for (const [key, consumedQty] of consumedByMaterialWarehouse.entries()) {
+                        const [materialId, warehouseRowId] = key.split('::');
+                        const inventoryRow = await inventoryRepo.findOne({
+                            rawMaterial: materialId,
+                            warehouse: warehouseRowId,
+                        });
+                        if (!inventoryRow) {
+                            throw new AppError(`No existe inventario agregado para material ${materialId} en bodega ${warehouseRowId}`, 400);
+                        }
+                        const currentQty = Number(inventoryRow.quantity);
+                        if (currentQty < consumedQty) {
+                            throw new AppError(`Inconsistencia de inventario para material ${materialId} en bodega ${warehouseRowId}`, 400);
+                        }
+                        inventoryRow.quantity = currentQty - consumedQty;
+                        tx.persist(inventoryRow);
+                    }
+
+                    for (const [materialId, requirement] of materialRequirements.entries()) {
+                        await this.logAudit('raw_material_lot', materialId, 'raw_material_consumed_by_production', {
                             productionOrderId: order.id,
                             productionOrderCode: order.code,
                             rawMaterialId: materialId,
@@ -745,6 +826,48 @@ export class ProductionService {
             await this.logAudit('production_order', order.id, 'status_updated', { status });
             return order;
         });
+    }
+
+    private async ensureLegacyLots(materialIds: string[], em?: EntityManager) {
+        if (materialIds.length === 0) return;
+        const manager = em ?? this.em;
+        const lotRepo = manager.getRepository(RawMaterialLot);
+        const inventoryRepo = manager.getRepository(InventoryItem);
+
+        const inventories = await inventoryRepo.find(
+            {
+                rawMaterial: { $in: materialIds },
+                quantity: { $gt: 0 },
+                warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
+            },
+            { populate: ['rawMaterial', 'warehouse'] }
+        );
+
+        const toPersist: RawMaterialLot[] = [];
+        for (const inv of inventories) {
+            if (!inv.rawMaterial || !inv.warehouse) continue;
+            const code = `LEGACY-${inv.id.slice(0, 8).toUpperCase()}`;
+            const exists = await lotRepo.findOne({
+                rawMaterial: inv.rawMaterial.id,
+                warehouse: inv.warehouse.id,
+                supplierLotCode: code,
+            });
+            if (exists) continue;
+            const lot = lotRepo.create({
+                rawMaterial: inv.rawMaterial,
+                warehouse: inv.warehouse,
+                supplierLotCode: code,
+                quantityInitial: Number(inv.quantity),
+                quantityAvailable: Number(inv.quantity),
+                unitCost: Number(inv.rawMaterial.averageCost || inv.rawMaterial.lastPurchasePrice || 0),
+                receivedAt: inv.lastUpdated || inv.createdAt,
+                notes: 'Lote legacy generado automáticamente para trazabilidad PEPS.',
+            } as unknown as RawMaterialLot);
+            toPersist.push(lot);
+        }
+        if (toPersist.length > 0) {
+            await manager.persistAndFlush(toPersist);
+        }
     }
 
     private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>) {

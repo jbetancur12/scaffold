@@ -33,6 +33,15 @@ interface Requirement {
     required: number;
     available: number;
     potentialSuppliers: SupplierInfo[];
+    pepsLots?: {
+        lotId: string;
+        lotCode: string;
+        warehouseId: string;
+        warehouseName: string;
+        available: number;
+        receivedAt: string;
+        suggestedUse: number;
+    }[];
 }
 
 interface ProductionRequirementsTableProps {
@@ -49,7 +58,7 @@ export function ProductionRequirementsTable({ requirements }: ProductionRequirem
     const handleExport = () => {
         const headers = [
             "Material", "SKU", "Requerido", "Unidad", "Disponible", "Faltante",
-            "Mejor Proveedor", "Precio Ultima Compra", "Fecha Ultima Compra"
+            "Lotes PEPS sugeridos", "Mejor Proveedor", "Precio Ultima Compra", "Fecha Ultima Compra"
         ];
 
         const rows = requirements.map(req => {
@@ -63,6 +72,10 @@ export function ProductionRequirementsTable({ requirements }: ProductionRequirem
                 req.material.unit,
                 req.available,
                 missing,
+                (req.pepsLots || [])
+                    .filter((lot) => lot.suggestedUse > 0)
+                    .map((lot) => `${lot.lotCode} (${lot.suggestedUse})`)
+                    .join(' | '),
                 cheapestSupplier ? cheapestSupplier.supplier.name : "",
                 cheapestSupplier ? cheapestSupplier.lastPrice : "",
                 cheapestSupplier ? new Date(cheapestSupplier.lastDate).toLocaleDateString() : ""
@@ -102,6 +115,7 @@ export function ProductionRequirementsTable({ requirements }: ProductionRequirem
                             <TableHead className="text-right">Requerido</TableHead>
                             <TableHead className="text-right">Disponible</TableHead>
                             <TableHead className="text-right">Faltante</TableHead>
+                            <TableHead>Lotes PEPS sugeridos</TableHead>
                             <TableHead>Proveedores Conocidos</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -126,6 +140,28 @@ export function ProductionRequirementsTable({ requirements }: ProductionRequirem
                                         <Badge variant={isMissing ? "destructive" : "outline"} className={!isMissing ? "bg-green-50 text-green-700 border-green-200" : ""}>
                                             {isMissing ? `-${formatQuantity(missing)}` : "OK"}
                                         </Badge>
+                                    </TableCell>
+                                    <TableCell className="max-w-[320px]">
+                                        {(req.pepsLots || []).length > 0 ? (
+                                            <div className="flex flex-col gap-1">
+                                                {(req.pepsLots || []).filter((lot) => lot.suggestedUse > 0).map((lot) => (
+                                                    <div key={lot.lotId} className="rounded border border-blue-100 bg-blue-50 px-2 py-1 text-xs">
+                                                        <div className="font-medium text-blue-900">{lot.lotCode}</div>
+                                                        <div className="text-blue-700">
+                                                            Sugerido: {formatQuantity(lot.suggestedUse)} / Disp: {formatQuantity(lot.available)} {req.material.unit}
+                                                        </div>
+                                                        <div className="text-blue-600">
+                                                            {lot.warehouseName} | {new Date(lot.receivedAt).toLocaleDateString()}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {(req.pepsLots || []).every((lot) => lot.suggestedUse <= 0) && (
+                                                    <span className="text-xs text-muted-foreground italic">Sin sugerencia PEPS</span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">Sin lotes trazables</span>
+                                        )}
                                     </TableCell>
                                     <TableCell className="max-w-[400px]">
                                         {req.potentialSuppliers.length > 0 ? (

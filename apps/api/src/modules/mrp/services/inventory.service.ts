@@ -2,6 +2,8 @@ import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
+import { RawMaterialLot } from '../entities/raw-material-lot.entity';
+import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { WarehouseSchema, InventoryItemSchema } from '@scaffold/schemas';
 import { WarehouseType } from '@scaffold/types';
 import { z } from 'zod';
@@ -10,11 +12,15 @@ export class InventoryService {
     private readonly em: EntityManager;
     private readonly inventoryRepo: EntityRepository<InventoryItem>;
     private readonly warehouseRepo: EntityRepository<Warehouse>;
+    private readonly rawMaterialLotRepo: EntityRepository<RawMaterialLot>;
+    private readonly rawMaterialKardexRepo: EntityRepository<RawMaterialKardex>;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.inventoryRepo = em.getRepository(InventoryItem);
         this.warehouseRepo = em.getRepository(Warehouse);
+        this.rawMaterialLotRepo = em.getRepository(RawMaterialLot);
+        this.rawMaterialKardexRepo = em.getRepository(RawMaterialKardex);
     }
 
 
@@ -117,8 +123,32 @@ export class InventoryService {
         inventory.quantity += addedQty;
         rawMaterial.averageCost = newAvgCost;
 
+        const supplierLotCode = `MANUAL-${Date.now().toString(36).toUpperCase()}`;
+        const lot = this.rawMaterialLotRepo.create({
+            rawMaterial,
+            warehouse,
+            supplierLotCode,
+            quantityInitial: addedQty,
+            quantityAvailable: addedQty,
+            unitCost: addedCost,
+            receivedAt: new Date(),
+            notes: 'Ingreso manual de inventario',
+        } as unknown as RawMaterialLot);
+
+        const kardex = this.rawMaterialKardexRepo.create({
+            rawMaterial,
+            warehouse,
+            lot,
+            movementType: 'ENTRADA_AJUSTE_MANUAL',
+            quantity: addedQty,
+            balanceAfter: addedQty,
+            referenceType: 'manual_stock',
+            notes: 'Entrada manual de inventario',
+            occurredAt: new Date(),
+        } as unknown as RawMaterialKardex);
+
         // 6. Save
-        await this.em.persistAndFlush([inventory, rawMaterial]);
+        await this.em.persistAndFlush([inventory, rawMaterial, lot, kardex]);
         return inventory;
     }
 

@@ -149,6 +149,15 @@ export interface MaterialRequirement {
         lastDate: string;
         isCheapest: boolean;
     }[];
+    pepsLots?: {
+        lotId: string;
+        lotCode: string;
+        warehouseId: string;
+        warehouseName: string;
+        available: number;
+        receivedAt: string;
+        suggestedUse: number;
+    }[];
 }
 
 export interface RawMaterialSupplier {

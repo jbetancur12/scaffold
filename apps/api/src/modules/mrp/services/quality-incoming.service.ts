@@ -12,6 +12,8 @@ import { IncomingInspection } from '../entities/incoming-inspection.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { ControlledDocument } from '../entities/controlled-document.entity';
+import { RawMaterialLot } from '../entities/raw-material-lot.entity';
+import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { MrpService } from './mrp.service';
 import { ObjectStorageService } from '../../../shared/services/object-storage.service';
 import { extname } from 'node:path';
@@ -31,6 +33,8 @@ export class QualityIncomingService {
     private readonly controlledDocumentRepo: EntityRepository<ControlledDocument>;
     private readonly inventoryRepo: EntityRepository<InventoryItem>;
     private readonly warehouseRepo: EntityRepository<Warehouse>;
+    private readonly rawMaterialLotRepo: EntityRepository<RawMaterialLot>;
+    private readonly rawMaterialKardexRepo: EntityRepository<RawMaterialKardex>;
     private readonly logEvent: QualityAuditLogger;
     private readonly storageService: ObjectStorageService;
 
@@ -41,6 +45,8 @@ export class QualityIncomingService {
         this.controlledDocumentRepo = em.getRepository(ControlledDocument);
         this.inventoryRepo = em.getRepository(InventoryItem);
         this.warehouseRepo = em.getRepository(Warehouse);
+        this.rawMaterialLotRepo = em.getRepository(RawMaterialLot);
+        this.rawMaterialKardexRepo = em.getRepository(RawMaterialKardex);
         this.storageService = new ObjectStorageService();
     }
 
@@ -208,6 +214,31 @@ export class QualityIncomingService {
             const acceptedQty = Number(payload.quantityAccepted);
             releasedInventory.quantity = currentStock + acceptedQty;
 
+            const supplierLotCode = (payload.supplierLotCode || row.supplierLotCode || '').trim();
+            let lot = await this.rawMaterialLotRepo.findOne({
+                rawMaterial: row.rawMaterial.id,
+                warehouse: releasedWarehouse.id,
+                supplierLotCode,
+            });
+            if (!lot) {
+                lot = this.rawMaterialLotRepo.create({
+                    rawMaterial: row.rawMaterial,
+                    warehouse: releasedWarehouse,
+                    incomingInspection: row,
+                    supplierLotCode,
+                    quantityInitial: acceptedQty,
+                    quantityAvailable: acceptedQty,
+                    unitCost: payload.acceptedUnitCost,
+                    receivedAt: new Date(),
+                    notes: `Entrada por inspección ${row.id}`,
+                } as unknown as RawMaterialLot);
+            } else {
+                lot.quantityInitial = Number(lot.quantityInitial) + acceptedQty;
+                lot.quantityAvailable = Number(lot.quantityAvailable) + acceptedQty;
+                lot.unitCost = payload.acceptedUnitCost ?? lot.unitCost;
+                lot.incomingInspection = row;
+            }
+
             const purchasePrice = Number(payload.acceptedUnitCost ?? row.rawMaterial.lastPurchasePrice ?? row.rawMaterial.averageCost ?? 0);
             const currentAvg = Number(row.rawMaterial.averageCost || 0);
             if (currentStock + acceptedQty > 0 && purchasePrice > 0) {
@@ -216,7 +247,20 @@ export class QualityIncomingService {
                 row.rawMaterial.lastPurchaseDate = new Date();
             }
 
-            await this.em.persistAndFlush([releasedInventory, row.rawMaterial]);
+            const kardex = this.rawMaterialKardexRepo.create({
+                rawMaterial: row.rawMaterial,
+                warehouse: releasedWarehouse,
+                lot,
+                movementType: 'ENTRADA_RECEPCION_APROBADA',
+                quantity: acceptedQty,
+                balanceAfter: Number(lot.quantityAvailable),
+                referenceType: 'incoming_inspection',
+                referenceId: row.id,
+                notes: `Ingreso MP por inspección aprobada (${supplierLotCode})`,
+                occurredAt: new Date(),
+            } as unknown as RawMaterialKardex);
+
+            await this.em.persistAndFlush([releasedInventory, lot, kardex, row.rawMaterial]);
             const mrpService = new MrpService(this.em);
             await mrpService.recalculateVariantsByMaterial(row.rawMaterial.id);
         }
