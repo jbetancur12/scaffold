@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ControlledDocument, DocumentCategory, DocumentStatus, IncomingInspectionResult, IncomingInspectionStatus, NonConformityStatus, OperationalConfig, QualitySeverity, UserRole } from '@scaffold/types';
+import { ControlledDocument, DocumentCategory, IncomingInspectionResult, IncomingInspectionStatus, NonConformityStatus, OperationalConfig, QualitySeverity, UserRole } from '@scaffold/types';
 import { TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { IncomingInspectionEvidenceType, mrpApi } from '@/services/mrpApi';
 import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
@@ -38,11 +37,11 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
   const [globalReceptionDocCode, setGlobalReceptionDocCode] = useState('');
   const [expandedIncomingInspectionId, setExpandedIncomingInspectionId] = useState<string | null>(null);
   const [resolverOpenId, setResolverOpenId] = useState<string | null>(null);
+  const [showCostAdjustment, setShowCostAdjustment] = useState(false);
   const [auditFilter, setAuditFilter] = useState<'all' | 'pending' | 'blocked' | 'complete'>('all');
   const [auditSearch, setAuditSearch] = useState('');
   const [resolverForm, setResolverForm] = useState<{
     inspectionResult: IncomingInspectionResult;
-    controlledDocumentId: string;
     quantityAccepted: string;
     supplierLotCode: string;
     certificateRef: string;
@@ -54,7 +53,6 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
     managerApprovedBy: string;
   }>({
     inspectionResult: IncomingInspectionResult.APROBADO,
-    controlledDocumentId: '',
     quantityAccepted: '',
     supplierLotCode: '',
     certificateRef: '',
@@ -68,9 +66,9 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
 
   const openResolver = (inspectionId: string, quantityReceived: number) => {
     setResolverOpenId(inspectionId);
+    setShowCostAdjustment(false);
     setResolverForm({
       inspectionResult: IncomingInspectionResult.APROBADO,
-      controlledDocumentId: '',
       quantityAccepted: String(quantityReceived),
       supplierLotCode: '',
       certificateRef: '',
@@ -82,10 +80,6 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
       managerApprovedBy: '',
     });
   };
-  const { data: controlledDocuments, error: controlledDocumentsError } = useControlledDocumentsQuery({
-    documentCategory: DocumentCategory.FOR,
-    status: DocumentStatus.APROBADO,
-  });
   const { data: controlledDocumentsAll, error: controlledDocumentsAllError } = useControlledDocumentsQuery({
     documentCategory: DocumentCategory.FOR,
   });
@@ -105,24 +99,13 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
     [latestDocByCode]
   );
   useEffect(() => {
-    if (!controlledDocumentsError && !controlledDocumentsAllError) return;
+    if (!controlledDocumentsAllError) return;
     toast({
       title: 'Error',
       description: 'No se pudieron cargar formatos de control documental',
       variant: 'destructive',
     });
-  }, [controlledDocumentsError, controlledDocumentsAllError, toast]);
-  useEffect(() => {
-    if (!controlledDocuments?.length) return;
-    setResolverForm((prev) => {
-      if (prev.controlledDocumentId) return prev;
-      if (operationalConfig?.defaultIncomingInspectionControlledDocumentCode) {
-        const configured = controlledDocuments.find((doc) => doc.code === operationalConfig.defaultIncomingInspectionControlledDocumentCode);
-        if (configured) return { ...prev, controlledDocumentId: configured.id };
-      }
-      return { ...prev, controlledDocumentId: controlledDocuments[0].id };
-    });
-  }, [controlledDocuments, operationalConfig]);
+  }, [controlledDocumentsAllError, toast]);
   useEffect(() => {
     setGlobalReceptionDocCode(operationalConfig?.defaultIncomingInspectionControlledDocumentCode || '');
   }, [operationalConfig]);
@@ -168,7 +151,6 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
       await model.resolveIncomingInspectionWithPayload({
         id: inspectionId,
         inspectionResult: resolverForm.inspectionResult,
-        controlledDocumentId: resolverForm.controlledDocumentId || undefined,
         supplierLotCode: resolverForm.supplierLotCode.trim() || undefined,
         certificateRef: resolverForm.certificateRef.trim() || undefined,
         invoiceNumber: resolverForm.invoiceNumber.trim() || undefined,
@@ -578,135 +560,149 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                             </div>
                                         ) : null}
                                         {resolverOpenId === inspection.id ? (
-                                          <div className="mt-3 rounded-md border bg-slate-50 p-3 space-y-2">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                              <div className="space-y-1">
-                                                <Label>Resultado inspección</Label>
-                                                <select
-                                                  className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                                  value={resolverForm.inspectionResult}
-                                                  onChange={(e) => {
-                                                    const nextResult = e.target.value as IncomingInspectionResult;
-                                                    setResolverForm((p) => ({
-                                                      ...p,
-                                                      inspectionResult: nextResult,
-                                                      quantityAccepted: nextResult === IncomingInspectionResult.CONDICIONAL ? '0' : p.quantityAccepted,
-                                                    }));
-                                                  }}
-                                                >
-                                                  {isConditionalPending(inspection) ? null : (
-                                                  <option value={IncomingInspectionResult.APROBADO}>Aprobado</option>
-                                                  )}
-                                                  <option value={IncomingInspectionResult.CONDICIONAL}>Condicional</option>
-                                                  <option value={IncomingInspectionResult.RECHAZADO}>Rechazado</option>
-                                                </select>
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Formato control documental</Label>
-                                                <select
-                                                  className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                                  value={resolverForm.controlledDocumentId}
-                                                  onChange={(e) => setResolverForm((p) => ({ ...p, controlledDocumentId: e.target.value }))}
-                                                >
-                                                  <option value="">Usar formato vigente</option>
-                                                  {(controlledDocuments ?? []).map((doc) => (
-                                                    <option key={doc.id} value={doc.id}>
-                                                      {doc.code} v{doc.version} - {doc.title}
-                                                    </option>
-                                                  ))}
-                                                </select>
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Cantidad aceptada</Label>
-                                                <Input
-                                                  type="number"
-                                                  min={0}
-                                                  step="0.0001"
-                                                  value={resolverForm.quantityAccepted}
-                                                  disabled={resolverForm.inspectionResult === IncomingInspectionResult.CONDICIONAL}
-                                                  onChange={(e) => setResolverForm((p) => ({ ...p, quantityAccepted: e.target.value }))}
-                                                />
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Cantidad rechazada</Label>
-                                                <Input
-                                                  readOnly
-                                                  value={(() => {
-                                                    if (resolverForm.inspectionResult === IncomingInspectionResult.CONDICIONAL) return '0';
-                                                    const accepted = Number(resolverForm.quantityAccepted);
-                                                    if (Number.isNaN(accepted)) return 'N/A';
-                                                    return String(Number((Number(inspection.quantityReceived) - accepted).toFixed(4)));
-                                                  })()}
-                                                />
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Lote proveedor</Label>
-                                                <Input
-                                                  value={resolverForm.supplierLotCode}
-                                                  onChange={(e) => setResolverForm((p) => ({ ...p, supplierLotCode: e.target.value }))}
-                                                  placeholder="Requerido si hay aceptado"
-                                                />
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Certificado/COA</Label>
-                                                <Input
-                                                  value={resolverForm.certificateRef}
-                                                  onChange={(e) => setResolverForm((p) => ({ ...p, certificateRef: e.target.value }))}
-                                                  placeholder="Requerido para aprobado/condicional"
-                                                />
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Factura N°</Label>
-                                                <Input
-                                                  value={resolverForm.invoiceNumber}
-                                                  onChange={(e) => setResolverForm((p) => ({ ...p, invoiceNumber: e.target.value }))}
-                                                  placeholder="Opcional"
-                                                />
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Costo unitario aceptado</Label>
-                                                <Input
-                                                  type="number"
-                                                  min={0}
-                                                  step="0.0001"
-                                                  value={resolverForm.acceptedUnitCost}
-                                                  onChange={(e) => setResolverForm((p) => ({ ...p, acceptedUnitCost: e.target.value }))}
-                                                  placeholder="Opcional"
-                                                />
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Inspector QA</Label>
-                                                <Input
-                                                  value={resolverForm.inspectedBy}
-                                                  onChange={(e) => setResolverForm((p) => ({ ...p, inspectedBy: e.target.value }))}
-                                                  placeholder="Obligatorio"
-                                                />
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Aprobador QA</Label>
-                                                <Input
-                                                  value={resolverForm.approvedBy}
-                                                  onChange={(e) => setResolverForm((p) => ({ ...p, approvedBy: e.target.value }))}
-                                                  placeholder="Obligatorio"
-                                                />
-                                              </div>
-                                              <div className="space-y-1">
-                                                <Label>Jefe de calidad</Label>
-                                                <Input
-                                                  value={resolverForm.managerApprovedBy}
-                                                  onChange={(e) => setResolverForm((p) => ({ ...p, managerApprovedBy: e.target.value }))}
-                                                  placeholder="Obligatorio en condicional/rechazado"
-                                                />
+                                          <div className="mt-3 rounded-md border bg-slate-50 p-3 space-y-3">
+                                            <div className="rounded-md border bg-white p-3">
+                                              <div className="text-xs font-semibold text-slate-700 mb-2">Decisión de inspección</div>
+                                              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                                <div className="space-y-1">
+                                                  <Label>Resultado inspección</Label>
+                                                  <select
+                                                    className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                                    value={resolverForm.inspectionResult}
+                                                    onChange={(e) => {
+                                                      const nextResult = e.target.value as IncomingInspectionResult;
+                                                      setResolverForm((p) => ({
+                                                        ...p,
+                                                        inspectionResult: nextResult,
+                                                        quantityAccepted: nextResult === IncomingInspectionResult.CONDICIONAL ? '0' : p.quantityAccepted,
+                                                      }));
+                                                    }}
+                                                  >
+                                                    {isConditionalPending(inspection) ? null : (
+                                                      <option value={IncomingInspectionResult.APROBADO}>Aprobado</option>
+                                                    )}
+                                                    <option value={IncomingInspectionResult.CONDICIONAL}>Condicional</option>
+                                                    <option value={IncomingInspectionResult.RECHAZADO}>Rechazado</option>
+                                                  </select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                  <Label>Cantidad aceptada</Label>
+                                                  <Input
+                                                    type="number"
+                                                    min={0}
+                                                    step="0.0001"
+                                                    value={resolverForm.quantityAccepted}
+                                                    disabled={resolverForm.inspectionResult === IncomingInspectionResult.CONDICIONAL}
+                                                    onChange={(e) => setResolverForm((p) => ({ ...p, quantityAccepted: e.target.value }))}
+                                                  />
+                                                </div>
+                                                <div className="space-y-1">
+                                                  <Label>Cantidad rechazada</Label>
+                                                  <Input
+                                                    readOnly
+                                                    value={(() => {
+                                                      if (resolverForm.inspectionResult === IncomingInspectionResult.CONDICIONAL) return '0';
+                                                      const accepted = Number(resolverForm.quantityAccepted);
+                                                      if (Number.isNaN(accepted)) return 'N/A';
+                                                      return String(Number((Number(inspection.quantityReceived) - accepted).toFixed(4)));
+                                                    })()}
+                                                  />
+                                                </div>
+                                                <div className="space-y-1">
+                                                  <Label>Notas de inspección</Label>
+                                                  <Input
+                                                    value={resolverForm.notes}
+                                                    onChange={(e) => setResolverForm((p) => ({ ...p, notes: e.target.value }))}
+                                                    placeholder="Obligatorio en condicional/rechazado"
+                                                  />
+                                                </div>
                                               </div>
                                             </div>
-                                            <div className="space-y-1">
-                                              <Label>Notas de inspección</Label>
-                                              <Textarea
-                                                value={resolverForm.notes}
-                                                onChange={(e) => setResolverForm((p) => ({ ...p, notes: e.target.value }))}
-                                                placeholder="Requerido para condicional/rechazado (mín. 10 caracteres)"
-                                              />
+
+                                            <div className="rounded-md border bg-white p-3">
+                                              <div className="text-xs font-semibold text-slate-700 mb-2">Trazabilidad documental</div>
+                                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                                <div className="space-y-1">
+                                                  <Label>Lote proveedor</Label>
+                                                  <Input
+                                                    value={resolverForm.supplierLotCode}
+                                                    onChange={(e) => setResolverForm((p) => ({ ...p, supplierLotCode: e.target.value }))}
+                                                    placeholder="Requerido si hay aceptado"
+                                                  />
+                                                </div>
+                                                <div className="space-y-1">
+                                                  <Label>Certificado/COA</Label>
+                                                  <Input
+                                                    value={resolverForm.certificateRef}
+                                                    onChange={(e) => setResolverForm((p) => ({ ...p, certificateRef: e.target.value }))}
+                                                    placeholder="Requerido para aprobado/condicional"
+                                                  />
+                                                </div>
+                                                <div className="space-y-1">
+                                                  <Label>Factura N°</Label>
+                                                  <Input
+                                                    value={resolverForm.invoiceNumber}
+                                                    onChange={(e) => setResolverForm((p) => ({ ...p, invoiceNumber: e.target.value }))}
+                                                    placeholder="Opcional"
+                                                  />
+                                                </div>
+                                              </div>
                                             </div>
+
+                                            <div className="rounded-md border bg-white p-3">
+                                              <div className="text-xs font-semibold text-slate-700 mb-2">Firmas y aprobación</div>
+                                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                                <div className="space-y-1">
+                                                  <Label>Inspector QA</Label>
+                                                  <Input
+                                                    value={resolverForm.inspectedBy}
+                                                    onChange={(e) => setResolverForm((p) => ({ ...p, inspectedBy: e.target.value }))}
+                                                    placeholder="Obligatorio"
+                                                  />
+                                                </div>
+                                                <div className="space-y-1">
+                                                  <Label>Aprobador QA</Label>
+                                                  <Input
+                                                    value={resolverForm.approvedBy}
+                                                    onChange={(e) => setResolverForm((p) => ({ ...p, approvedBy: e.target.value }))}
+                                                    placeholder="Obligatorio"
+                                                  />
+                                                </div>
+                                                <div className="space-y-1">
+                                                  <Label>Jefe de calidad</Label>
+                                                  <Input
+                                                    value={resolverForm.managerApprovedBy}
+                                                    onChange={(e) => setResolverForm((p) => ({ ...p, managerApprovedBy: e.target.value }))}
+                                                    placeholder="Obligatorio en condicional/rechazado"
+                                                  />
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="rounded-md border bg-white p-3">
+                                              <label className="flex items-center gap-2 text-sm">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={showCostAdjustment}
+                                                  onChange={(e) => setShowCostAdjustment(e.target.checked)}
+                                                />
+                                                Ajustar costo unitario aceptado (opcional)
+                                              </label>
+                                              {showCostAdjustment ? (
+                                                <div className="mt-2 max-w-xs">
+                                                  <Label>Costo unitario aceptado</Label>
+                                                  <Input
+                                                    type="number"
+                                                    min={0}
+                                                    step="0.0001"
+                                                    value={resolverForm.acceptedUnitCost}
+                                                    onChange={(e) => setResolverForm((p) => ({ ...p, acceptedUnitCost: e.target.value }))}
+                                                    placeholder="Opcional"
+                                                  />
+                                                </div>
+                                              ) : null}
+                                            </div>
+
                                             <div className="flex justify-end gap-2">
                                               <Button type="button" variant="outline" onClick={() => setResolverOpenId(null)}>
                                                 Cancelar

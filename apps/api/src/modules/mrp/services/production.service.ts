@@ -145,6 +145,18 @@ export class ProductionService {
         if (!hasVariantInOrder) {
             throw new AppError('La variante no pertenece a la orden', 400);
         }
+        const targetOrderItem = order.items.getItems().find((i) => i.variant.id === payload.variantId);
+        const orderedQty = Number(targetOrderItem?.quantity || 0);
+        const existingBatches = await this.batchRepo.find({ productionOrder: orderId, variant: payload.variantId });
+        const alreadyPlanned = existingBatches.reduce((acc, row) => acc + Number(row.plannedQty || 0), 0);
+        const nextTotalPlanned = alreadyPlanned + Number(payload.plannedQty || 0);
+        if (orderedQty > 0 && nextTotalPlanned > orderedQty) {
+            const remaining = Math.max(orderedQty - alreadyPlanned, 0);
+            throw new AppError(
+                `No puedes exceder la cantidad de la OP para esta variante. Pendiente disponible: ${remaining}`,
+                400
+            );
+        }
 
         const code = payload.code || `LOT-${Date.now().toString(36).toUpperCase()}`;
         const exists = await this.batchRepo.findOne({ code });
@@ -157,7 +169,7 @@ export class ProductionService {
             variant: this.em.getReference(ProductVariant, payload.variantId),
             code,
             plannedQty: payload.plannedQty,
-            producedQty: payload.plannedQty,
+            producedQty: 0,
             notes: payload.notes,
             qcStatus: ProductionBatchQcStatus.PENDING,
             packagingStatus: ProductionBatchPackagingStatus.PENDING,
@@ -184,6 +196,10 @@ export class ProductionService {
     }
 
     async addBatchUnits(batchId: string, quantity: number) {
+        const mode = await this.getTraceabilityMode();
+        if (mode === 'lote') {
+            throw new AppError('La generación de unidades seriales está deshabilitada en modo lote', 400);
+        }
         const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units'] });
         if (quantity <= 0) {
             throw new AppError('La cantidad debe ser mayor a 0', 400);
@@ -202,7 +218,7 @@ export class ProductionService {
             batch.units.add(unit);
         }
 
-        batch.producedQty = Math.max(batch.producedQty, batch.units.length);
+        batch.producedQty = this.calculateProducedQtyFromUnits(batch);
         await this.em.persistAndFlush(batch);
         await this.logAudit('production_batch', batch.id, 'units_added', { quantity });
         return this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['variant', 'units'] });
@@ -222,6 +238,7 @@ export class ProductionService {
     }
 
     async setBatchPackaging(batchId: string, packed: boolean) {
+        const mode = await this.getTraceabilityMode();
         const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units', 'productionOrder'] });
         this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'empacar lote');
         if (packed && !batch.packagingFormCompleted) {
@@ -231,11 +248,23 @@ export class ProductionService {
             throw new AppError('Debes aprobar QC antes de empacar', 400);
         }
 
-        if (packed && batch.units.length > 0) {
+        if (packed && mode === 'serial' && batch.units.length > 0) {
             const allPacked = batch.units.getItems().every((u) => u.rejected || (u.qcPassed && u.packaged));
             if (!allPacked) {
                 throw new AppError('Todas las unidades deben estar aprobadas y empacadas', 400);
             }
+            batch.producedQty = this.calculateProducedQtyFromUnits(batch);
+        }
+        if (packed && (mode === 'lote' || batch.units.length === 0)) {
+            const formData = (batch.packagingFormData || {}) as Record<string, unknown>;
+            const packedQtyFromForm = Number(formData.quantityPacked || batch.producedQty || 0);
+            if (packedQtyFromForm <= 0) {
+                throw new AppError('Debes registrar cantidad empacada mayor a 0 en el FOR', 400);
+            }
+            if (packedQtyFromForm > batch.plannedQty) {
+                throw new AppError(`Cantidad empacada no puede superar el plan del lote (${batch.plannedQty})`, 400);
+            }
+            batch.producedQty = packedQtyFromForm;
         }
         if (packed) {
             await this.assertRegulatoryLabelingReady(batch);
@@ -252,6 +281,7 @@ export class ProductionService {
     }
 
     private async assertRegulatoryLabelingReady(batch: ProductionBatch) {
+        const mode = await this.getTraceabilityMode();
         const labels = await this.regulatoryLabelRepo.find({ productionBatch: batch.id }, { populate: ['productionBatchUnit'] });
 
         const lotLabel = labels.find((label) =>
@@ -261,6 +291,9 @@ export class ProductionService {
         );
         if (!lotLabel) {
             throw new AppError('No puedes despachar: falta etiqueta regulatoria de lote validada', 400);
+        }
+        if (mode === 'lote') {
+            return;
         }
 
         const unitsRequiringLabel = batch.units.getItems().filter((unit) => !unit.rejected && unit.qcPassed && unit.packaged);
@@ -280,6 +313,10 @@ export class ProductionService {
     }
 
     async setBatchUnitQc(unitId: string, passed: boolean) {
+        const mode = await this.getTraceabilityMode();
+        if (mode === 'lote') {
+            throw new AppError('El QC por unidad serial está deshabilitado en modo lote', 400);
+        }
         const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch', 'batch.productionOrder'] });
         this.assertOrderInProgressForBatchActions(unit.batch.productionOrder.status, 'aprobar QC de unidad');
         unit.qcPassed = passed;
@@ -295,12 +332,17 @@ export class ProductionService {
     }
 
     async setBatchUnitPackaging(unitId: string, packaged: boolean) {
-        const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch', 'batch.productionOrder'] });
+        const mode = await this.getTraceabilityMode();
+        if (mode === 'lote') {
+            throw new AppError('El empaque por unidad serial está deshabilitado en modo lote', 400);
+        }
+        const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch', 'batch.productionOrder', 'batch.units'] });
         this.assertOrderInProgressForBatchActions(unit.batch.productionOrder.status, 'empacar unidad');
         if (!unit.qcPassed && !unit.rejected) {
             throw new AppError('La unidad debe pasar QC antes de empacar', 400);
         }
         unit.packaged = packaged;
+        unit.batch.producedQty = this.calculateProducedQtyFromUnits(unit.batch);
         await this.em.persistAndFlush(unit);
         if (!packaged) {
             await this.reopenBatchReleaseIfNeeded(unit.batch.id, 'Cambio de empaque en unidad serial');
@@ -327,8 +369,27 @@ export class ProductionService {
         controlledDocumentId?: string;
         actor?: string;
     }) {
-        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['productionOrder'] });
+        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['productionOrder', 'units'] });
         this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'diligenciar FOR de empaque');
+        if (payload.quantityToPack <= 0) {
+            throw new AppError('Cantidad a empacar debe ser mayor a 0', 400);
+        }
+        if (payload.quantityPacked < 0) {
+            throw new AppError('Cantidad empacada no puede ser negativa', 400);
+        }
+        if (payload.quantityToPack > batch.plannedQty) {
+            throw new AppError(`Cantidad a empacar no puede superar el plan del lote (${batch.plannedQty})`, 400);
+        }
+        if (payload.quantityPacked > payload.quantityToPack) {
+            throw new AppError('Cantidad empacada no puede superar la cantidad a empacar', 400);
+        }
+        if (payload.quantityPacked > batch.plannedQty) {
+            throw new AppError(`Cantidad empacada no puede superar el plan del lote (${batch.plannedQty})`, 400);
+        }
+        const nonRejectedUnitCount = batch.units.getItems().filter((unit) => !unit.rejected).length;
+        if (nonRejectedUnitCount > 0 && payload.quantityPacked > nonRejectedUnitCount) {
+            throw new AppError(`Cantidad empacada no puede superar unidades válidas del lote (${nonRejectedUnitCount})`, 400);
+        }
 
         const controlledDoc = await this.resolvePackagingControlledDocument(payload.controlledDocumentId);
         batch.packagingFormData = {
@@ -355,6 +416,9 @@ export class ProductionService {
         batch.packagingFormDocumentTitle = controlledDoc.title;
         batch.packagingFormDocumentVersion = controlledDoc.version;
         batch.packagingFormDocumentDate = controlledDoc.effectiveDate || controlledDoc.approvedAt || controlledDoc.updatedAt;
+        batch.producedQty = nonRejectedUnitCount > 0
+            ? this.calculateProducedQtyFromUnits(batch)
+            : Number(payload.quantityPacked || 0);
         await this.em.persistAndFlush(batch);
         await this.logAudit('production_batch', batch.id, 'packaging_form_updated', {
             controlledDocumentCode: batch.packagingFormDocumentCode,
@@ -362,6 +426,13 @@ export class ProductionService {
             actor: payload.actor || payload.operatorName,
         });
         return batch;
+    }
+
+    private calculateProducedQtyFromUnits(batch: ProductionBatch): number {
+        return batch.units
+            .getItems()
+            .filter((unit) => !unit.rejected && unit.packaged)
+            .length;
     }
 
     async getBatchPackagingForm(batchId: string) {
@@ -632,6 +703,12 @@ export class ProductionService {
             throw new AppError(`El formato global de empaque configurado (${configuredCode}) no está aprobado/vigente`, 400);
         }
         return configured;
+    }
+
+    private async getTraceabilityMode(): Promise<'lote' | 'serial'> {
+        const configs = await this.operationalConfigRepo.findAll({ limit: 1, orderBy: { createdAt: 'DESC' } });
+        const mode = configs[0]?.operationMode;
+        return mode === 'serial' ? 'serial' : 'lote';
     }
 
     private assertOrderInProgressForBatchActions(orderStatus: ProductionOrderStatus, action: string) {

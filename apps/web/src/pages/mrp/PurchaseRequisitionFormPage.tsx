@@ -10,7 +10,9 @@ import { getErrorMessage } from '@/lib/api-error';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
 import { useCreatePurchaseRequisitionMutation, useCreatePurchaseRequisitionFromProductionOrderMutation } from '@/hooks/mrp/usePurchaseRequisitions';
+import { useProductionOrdersQuery } from '@/hooks/mrp/useProductionOrders';
 import { mrpApi } from '@/services/mrpApi';
+import { ProductionOrderStatus } from '@scaffold/types';
 
 interface RequisitionItemForm {
     rawMaterialId: string;
@@ -37,11 +39,28 @@ export default function PurchaseRequisitionFormPage() {
 
     const { materials } = useRawMaterialsQuery(1, 200, '');
     const { data: suppliersResponse } = useSuppliersQuery(1, 200);
+    const { data: productionOrdersResponse } = useProductionOrdersQuery(1, 200);
     const suppliers = suppliersResponse?.suppliers ?? [];
+    const productionOrders = productionOrdersResponse?.orders ?? [];
     const { execute: createRequisition, loading: creatingRequisition } = useCreatePurchaseRequisitionMutation();
     const { execute: createFromProductionOrder, loading: creatingFromProductionOrder } = useCreatePurchaseRequisitionFromProductionOrderMutation();
 
     const canAutoGenerateFromOrder = useMemo(() => form.productionOrderId.trim().length > 0 && form.requestedBy.trim().length >= 2, [form]);
+    const selectedProductionOrder = useMemo(
+        () => productionOrders.find((order) => order.id === form.productionOrderId),
+        [productionOrders, form.productionOrderId]
+    );
+
+    const getStatusLabel = (status: ProductionOrderStatus) => {
+        switch (status) {
+            case ProductionOrderStatus.DRAFT: return 'Borrador';
+            case ProductionOrderStatus.PLANNED: return 'Planificada';
+            case ProductionOrderStatus.IN_PROGRESS: return 'En Progreso';
+            case ProductionOrderStatus.COMPLETED: return 'Completada';
+            case ProductionOrderStatus.CANCELLED: return 'Cancelada';
+            default: return status;
+        }
+    };
 
     const addItem = () => {
         setItems((prev) => [...prev, { rawMaterialId: '', quantity: 0, suggestedSupplierId: '', notes: '' }]);
@@ -57,7 +76,7 @@ export default function PurchaseRequisitionFormPage() {
 
     const loadShortagesPreview = async () => {
         if (!form.productionOrderId.trim()) {
-            toast({ title: 'Error', description: 'Ingresa la orden de producción', variant: 'destructive' });
+            toast({ title: 'Error', description: 'Selecciona una orden de producción', variant: 'destructive' });
             return;
         }
         try {
@@ -155,7 +174,23 @@ export default function PurchaseRequisitionFormPage() {
                         </div>
                         <div>
                             <Label>Orden de producción (opcional)</Label>
-                            <Input value={form.productionOrderId} onChange={(e) => setForm((p) => ({ ...p, productionOrderId: e.target.value }))} />
+                            <select
+                                className="w-full mt-1 h-10 rounded-md border border-slate-300 px-3 text-sm bg-white"
+                                value={form.productionOrderId}
+                                onChange={(e) => setForm((p) => ({ ...p, productionOrderId: e.target.value }))}
+                            >
+                                <option value="">Sin asociar OP (requisición manual)</option>
+                                {productionOrders.map((order) => (
+                                    <option key={order.id} value={order.id}>
+                                        {order.code} - {getStatusLabel(order.status)}
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-slate-500">
+                                {selectedProductionOrder
+                                    ? `Asociada a ${selectedProductionOrder.code}. Puedes cargar faltantes automáticamente.`
+                                    : 'Si no asocias OP, la requisición se crea manualmente.'}
+                            </p>
                         </div>
                         <div>
                             <Label>Necesario para</Label>

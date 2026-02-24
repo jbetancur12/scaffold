@@ -669,6 +669,10 @@ export const mrpApi = {
         const response = await api.get<RegulatoryLabel[]>('/mrp/quality/regulatory-labels', { params: filters });
         return response.data;
     },
+    getRegulatoryLabelPdf: async (productionBatchId: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/quality/regulatory-labels/${productionBatchId}/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
+    },
     validateDispatchReadiness: async (data: ValidateDispatchReadinessPayload): Promise<DispatchValidationResult> => {
         const response = await api.post<DispatchValidationResult>('/mrp/quality/regulatory-labels/validate-dispatch', data);
         return response.data;
@@ -749,6 +753,10 @@ export const mrpApi = {
     listBatchReleases: async (filters?: { productionBatchId?: string; status?: BatchReleaseStatus }): Promise<BatchRelease[]> => {
         const response = await api.get<BatchRelease[]>('/mrp/quality/batch-releases', { params: filters });
         return response.data;
+    },
+    getBatchReleasePdf: async (productionBatchId: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/quality/batch-releases/${productionBatchId}/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
     },
     signBatchRelease: async (
         productionBatchId: string,

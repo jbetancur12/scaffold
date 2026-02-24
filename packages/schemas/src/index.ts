@@ -319,7 +319,7 @@ export const UpsertProductionBatchPackagingFormSchema = z.object({
     operatorName: z.string().min(2),
     verifierName: z.string().min(2),
     quantityToPack: z.number().positive(),
-    quantityPacked: z.number().positive(),
+    quantityPacked: z.number().nonnegative(),
     lotLabel: z.string().min(4),
     hasTechnicalSheet: z.boolean(),
     hasLabels: z.boolean(),
@@ -1058,6 +1058,9 @@ export const OperationalConfigSchema = z.object({
     defaultPurchaseOrderControlledDocumentCode: z.string().min(1).optional(),
     defaultIncomingInspectionControlledDocumentCode: z.string().min(1).optional(),
     defaultPackagingControlledDocumentCode: z.string().min(1).optional(),
+    defaultLabelingControlledDocumentCode: z.string().min(1).optional(),
+    defaultBatchReleaseControlledDocumentCode: z.string().min(1).optional(),
+    operationMode: z.enum(['lote', 'serial']).optional(),
     purchaseWithholdingRules: z.array(
         z.object({
             key: z.string().min(1),

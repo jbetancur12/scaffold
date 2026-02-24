@@ -1696,6 +1696,8 @@ export interface UpdateInvimaRegistrationPayload {
     notes?: string;
 }
 
+export type ProductionTraceabilityMode = 'lote' | 'serial';
+
 export interface OperationalConfig {
     id: string;
     // MOD (Mano de Obra Directa)
@@ -1725,6 +1727,9 @@ export interface OperationalConfig {
     defaultPurchaseOrderControlledDocumentCode?: string;
     defaultIncomingInspectionControlledDocumentCode?: string;
     defaultPackagingControlledDocumentCode?: string;
+    defaultLabelingControlledDocumentCode?: string;
+    defaultBatchReleaseControlledDocumentCode?: string;
+    operationMode?: ProductionTraceabilityMode;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

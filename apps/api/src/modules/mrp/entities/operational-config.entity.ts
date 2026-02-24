@@ -52,6 +52,15 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
     @Property({ nullable: true })
     defaultPackagingControlledDocumentCode?: string;
 
+    @Property({ nullable: true })
+    defaultLabelingControlledDocumentCode?: string;
+
+    @Property({ nullable: true })
+    defaultBatchReleaseControlledDocumentCode?: string;
+
+    @Property({ nullable: true })
+    operationMode?: 'lote' | 'serial';
+
     @Property({ type: 'json', nullable: true })
     purchaseWithholdingRules: Array<{ key: string; label: string; rate: number; active: boolean }> = [];
 }

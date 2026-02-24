@@ -117,6 +117,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/quality/recalls/:id/close', (req, res, next) => mrpController.closeRecallCase(req, res, next));
     router.post('/quality/regulatory-labels', (req, res, next) => mrpController.upsertRegulatoryLabel(req, res, next));
     router.get('/quality/regulatory-labels', (req, res, next) => mrpController.listRegulatoryLabels(req, res, next));
+    router.get('/quality/regulatory-labels/:productionBatchId/pdf', (req, res, next) => mrpController.downloadRegulatoryLabelPdf(req, res, next));
     router.post('/quality/regulatory-labels/validate-dispatch', (req, res, next) => mrpController.validateDispatchReadiness(req, res, next));
     router.get('/quality/compliance-dashboard', (req, res, next) => mrpController.getComplianceDashboard(req, res, next));
     router.get('/quality/compliance-export', (req, res, next) => mrpController.exportCompliance(req, res, next));
@@ -135,6 +136,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/quality/batch-releases', (req, res, next) => mrpController.upsertBatchReleaseChecklist(req, res, next));
     router.get('/quality/batch-releases', (req, res, next) => mrpController.listBatchReleases(req, res, next));
     router.post('/quality/batch-releases/:productionBatchId/sign', (req, res, next) => mrpController.signBatchRelease(req, res, next));
+    router.get('/quality/batch-releases/:productionBatchId/pdf', (req, res, next) => mrpController.downloadBatchReleasePdf(req, res, next));
     router.post('/quality/documents', (req, res, next) => mrpController.createControlledDocument(req, res, next));
     router.get('/quality/documents', (req, res, next) => mrpController.listControlledDocuments(req, res, next));
     router.post('/quality/documents/:id/submit-review', (req, res, next) => mrpController.submitControlledDocument(req, res, next));

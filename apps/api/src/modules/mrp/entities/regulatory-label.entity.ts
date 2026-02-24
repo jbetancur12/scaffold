@@ -82,4 +82,19 @@ export class RegulatoryLabel extends BaseEntity implements IRegulatoryLabel {
 
     @Property({ nullable: true })
     createdBy?: string;
+
+    @Property({ nullable: true })
+    documentControlId?: string;
+
+    @Property({ nullable: true })
+    documentControlCode?: string;
+
+    @Property({ nullable: true })
+    documentControlTitle?: string;
+
+    @Property({ nullable: true })
+    documentControlVersion?: number;
+
+    @Property({ nullable: true })
+    documentControlDate?: Date;
 }

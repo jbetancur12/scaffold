@@ -12,6 +12,8 @@ import { PurchaseRequisitionService } from './services/purchase-requisition.serv
 import { QualityService } from './services/quality.service';
 import { DocumentControlService } from './services/document-control.service';
 import { QualityIncomingPdfService } from './services/quality-incoming-pdf.service';
+import { QualityLabelingPdfService } from './services/quality-labeling-pdf.service';
+import { QualityBatchReleasePdfService } from './services/quality-batch-release-pdf.service';
 import {
     ProductSchema,
     UpdateProductSchema,
@@ -140,6 +142,8 @@ export class MrpController {
     private get purchaseOrderPdfService() { return new PurchaseOrderPdfService(this.em); }
     private get packagingFormPdfService() { return new PackagingFormPdfService(this.em); }
     private get qualityIncomingPdfService() { return new QualityIncomingPdfService(this.em); }
+    private get qualityLabelingPdfService() { return new QualityLabelingPdfService(this.em); }
+    private get qualityBatchReleasePdfService() { return new QualityBatchReleasePdfService(this.em); }
     private get purchaseRequisitionService() { return new PurchaseRequisitionService(this.em); }
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
@@ -1106,6 +1110,18 @@ export class MrpController {
         }
     }
 
+    async downloadRegulatoryLabelPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productionBatchId } = req.params;
+            const file = await this.qualityLabelingPdfService.generateLabelPdf(productionBatchId);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async validateDispatchReadiness(req: Request, res: Response, next: NextFunction) {
         try {
             const payload = ValidateDispatchReadinessSchema.parse(req.body);
@@ -1290,6 +1306,18 @@ export class MrpController {
             const filters = ListBatchReleasesQuerySchema.parse(req.query);
             const rows = await this.qualityService.listBatchReleases(filters);
             return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadBatchReleasePdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productionBatchId } = req.params;
+            const file = await this.qualityBatchReleasePdfService.generateBatchReleasePdf(productionBatchId);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.buffer);
         } catch (error) {
             next(error);
         }

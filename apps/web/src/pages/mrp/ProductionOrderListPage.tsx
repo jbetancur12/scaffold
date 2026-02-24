@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { DocumentCategory, OperationalConfig, ProductionOrderStatus } from '@scaffold/types';
+import { DocumentCategory, DocumentStatus, OperationalConfig, ProductionOrderStatus } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -29,14 +29,20 @@ export default function ProductionOrderListPage() {
     const { execute: saveOperationalConfig, loading: savingConfig } = useSaveOperationalConfigMutation();
     const { data: packagingDocs } = useControlledDocumentsQuery({
         documentCategory: DocumentCategory.FOR,
+        status: DocumentStatus.APROBADO,
     });
     const [selectedPackagingDocCode, setSelectedPackagingDocCode] = useState<string>('');
+    const [selectedLabelingDocCode, setSelectedLabelingDocCode] = useState<string>('');
+    const [selectedBatchReleaseDocCode, setSelectedBatchReleaseDocCode] = useState<string>('');
     const orders = ordersResponse?.orders ?? [];
 
     useMrpQueryErrorToast(error, 'No se pudieron cargar las órdenes de producción');
 
     const packagingOptions = packagingDocs ?? [];
-    const currentConfigured = selectedPackagingDocCode || operationalConfig?.defaultPackagingControlledDocumentCode || '';
+    const currentPackagingConfigured = selectedPackagingDocCode || operationalConfig?.defaultPackagingControlledDocumentCode || '';
+    const currentLabelingConfigured = selectedLabelingDocCode || operationalConfig?.defaultLabelingControlledDocumentCode || '';
+    const currentBatchReleaseConfigured = selectedBatchReleaseDocCode || operationalConfig?.defaultBatchReleaseControlledDocumentCode || '';
+    const currentOperationMode: 'lote' | 'serial' = 'lote';
 
     const handleSavePackagingConfig = async () => {
         if (!operationalConfig) return;
@@ -46,12 +52,15 @@ export default function ProductionOrderListPage() {
                 defaultPurchaseOrderControlledDocumentId: operationalConfig.defaultPurchaseOrderControlledDocumentId || undefined,
                 defaultPurchaseOrderControlledDocumentCode: operationalConfig.defaultPurchaseOrderControlledDocumentCode || undefined,
                 defaultIncomingInspectionControlledDocumentCode: operationalConfig.defaultIncomingInspectionControlledDocumentCode || undefined,
-                defaultPackagingControlledDocumentCode: currentConfigured || undefined,
+                defaultPackagingControlledDocumentCode: currentPackagingConfigured || undefined,
+                defaultLabelingControlledDocumentCode: currentLabelingConfigured || undefined,
+                defaultBatchReleaseControlledDocumentCode: currentBatchReleaseConfigured || undefined,
+                operationMode: 'lote',
             };
             await saveOperationalConfig(payload);
-            toast({ title: 'Configuración guardada', description: 'Formato global de empaque actualizado.' });
+            toast({ title: 'Configuración guardada', description: 'Formatos globales de lote actualizados.' });
         } catch (err) {
-            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo guardar la configuración de empaque'), variant: 'destructive' });
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo guardar la configuración global'), variant: 'destructive' });
         }
     };
 
@@ -103,12 +112,21 @@ export default function ProductionOrderListPage() {
             {showPackagingSettings ? (
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
                     <div className="text-sm text-slate-600">
-                        Selecciona el documento global de control para empaque. Este código FOR se aplicará por defecto a todos los registros de empaque.
+                        Configura los documentos globales (FOR) para el flujo de lote: empaque, etiquetado y liberación QA.
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                    <div className="grid grid-cols-1 gap-2">
+                        <label className="text-sm font-medium">Modo de trazabilidad de producción</label>
                         <select
                             className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                            value={currentConfigured}
+                            value={currentOperationMode}
+                            disabled
+                        >
+                            <option value="lote">Lote (fijo)</option>
+                        </select>
+                        <label className="text-sm font-medium">Formato global de Empaque</label>
+                        <select
+                            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            value={currentPackagingConfigured}
                             onChange={(e) => setSelectedPackagingDocCode(e.target.value)}
                         >
                             <option value="">Selecciona formato de empaque...</option>
@@ -118,13 +136,41 @@ export default function ProductionOrderListPage() {
                                 </option>
                             ))}
                         </select>
+                        <label className="text-sm font-medium">Formato global de Etiquetado</label>
+                        <select
+                            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            value={currentLabelingConfigured}
+                            onChange={(e) => setSelectedLabelingDocCode(e.target.value)}
+                        >
+                            <option value="">Selecciona formato de etiquetado...</option>
+                            {packagingOptions.map((doc) => (
+                                <option key={`${doc.id}-lbl`} value={doc.code}>
+                                    {doc.code} v{doc.version} - {doc.title} ({doc.status})
+                                </option>
+                            ))}
+                        </select>
+                        <label className="text-sm font-medium">Formato global de Liberación QA</label>
+                        <select
+                            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                            value={currentBatchReleaseConfigured}
+                            onChange={(e) => setSelectedBatchReleaseDocCode(e.target.value)}
+                        >
+                            <option value="">Selecciona formato de liberación QA...</option>
+                            {packagingOptions.map((doc) => (
+                                <option key={`${doc.id}-qa`} value={doc.code}>
+                                    {doc.code} v{doc.version} - {doc.title} ({doc.status})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="flex justify-end">
                         <Button onClick={handleSavePackagingConfig} disabled={savingConfig}>
                             {savingConfig ? 'Guardando...' : 'Guardar'}
                         </Button>
                     </div>
-                    {!currentConfigured ? (
+                    {!currentPackagingConfigured || !currentLabelingConfigured || !currentBatchReleaseConfigured ? (
                         <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                            Debes configurar este formato para poder diligenciar y cerrar empaque en lotes.
+                            Debes configurar los tres formatos para completar el flujo unificado del lote.
                         </div>
                     ) : null}
                 </div>

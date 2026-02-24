@@ -1,5 +1,7 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import {
+    DocumentCategory,
+    DocumentStatus,
     DispatchValidationResult,
     InvimaRegistrationStatus,
     RegulatoryCodingStandard,
@@ -11,6 +13,8 @@ import { AppError } from '../../../shared/utils/response';
 import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
+import { ControlledDocument } from '../entities/controlled-document.entity';
+import { OperationalConfig } from '../entities/operational-config.entity';
 
 type QualityAuditLogger = (payload: {
     entityType: string;
@@ -24,12 +28,16 @@ type QualityAuditLogger = (payload: {
 export class QualityLabelingService {
     private readonly em: EntityManager;
     private readonly regulatoryLabelRepo: EntityRepository<RegulatoryLabel>;
+    private readonly operationalConfigRepo: EntityRepository<OperationalConfig>;
+    private readonly controlledDocRepo: EntityRepository<ControlledDocument>;
     private readonly logEvent: QualityAuditLogger;
 
     constructor(em: EntityManager, logEvent: QualityAuditLogger) {
         this.em = em;
         this.logEvent = logEvent;
         this.regulatoryLabelRepo = em.getRepository(RegulatoryLabel);
+        this.operationalConfigRepo = em.getRepository(OperationalConfig);
+        this.controlledDocRepo = em.getRepository(ControlledDocument);
     }
 
     async upsertRegulatoryLabel(payload: {
@@ -51,6 +59,12 @@ export class QualityLabelingService {
         internalCode?: string;
         actor?: string;
     }) {
+        const controlledDoc = await this.resolveLabelingControlledDocument();
+        const configs = await this.operationalConfigRepo.findAll({ limit: 1, orderBy: { createdAt: 'DESC' } });
+        const mode = configs[0]?.operationMode === 'serial' ? 'serial' : 'lote';
+        if (mode === 'lote' && payload.scopeType === RegulatoryLabelScopeType.SERIAL) {
+            throw new AppError('El etiquetado serial está deshabilitado en modo lote', 400);
+        }
         const batch = await this.em.findOneOrFail(
             ProductionBatch,
             { id: payload.productionBatchId },
@@ -155,6 +169,11 @@ export class QualityLabelingService {
                 udiPi: payload.udiPi,
                 internalCode: effectiveInternalCode,
             }),
+            documentControlId: controlledDoc.id,
+            documentControlCode: controlledDoc.code,
+            documentControlTitle: controlledDoc.title,
+            documentControlVersion: controlledDoc.version,
+            documentControlDate: controlledDoc.effectiveDate || controlledDoc.approvedAt || controlledDoc.updatedAt,
         });
 
         const errors = this.validateRegulatoryLabel({
@@ -190,6 +209,26 @@ export class QualityLabelingService {
         return row;
     }
 
+    private async resolveLabelingControlledDocument() {
+        const configs = await this.operationalConfigRepo.findAll({ limit: 1, orderBy: { createdAt: 'DESC' } });
+        const code = configs[0]?.defaultLabelingControlledDocumentCode?.trim();
+        if (!code) {
+            throw new AppError('Debes configurar el formato global de etiquetado', 400);
+        }
+        const now = new Date();
+        const doc = await this.controlledDocRepo.findOne({
+            code,
+            documentCategory: DocumentCategory.FOR,
+            status: DocumentStatus.APROBADO,
+            $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+            $and: [{ $or: [{ effectiveDate: null }, { effectiveDate: { $lte: now } }] }],
+        }, { orderBy: { version: 'DESC' } });
+        if (!doc) {
+            throw new AppError(`El formato global de etiquetado (${code}) no está aprobado/vigente`, 400);
+        }
+        return doc;
+    }
+
     async listRegulatoryLabels(filters: {
         productionBatchId?: string;
         scopeType?: RegulatoryLabelScopeType;
@@ -208,6 +247,8 @@ export class QualityLabelingService {
     async validateDispatchReadiness(productionBatchId: string, actor?: string): Promise<DispatchValidationResult> {
         const batch = await this.em.findOneOrFail(ProductionBatch, { id: productionBatchId }, { populate: ['units'] });
         const labels = await this.regulatoryLabelRepo.find({ productionBatch: productionBatchId }, { populate: ['productionBatchUnit'] });
+        const configs = await this.operationalConfigRepo.findAll({ limit: 1, orderBy: { createdAt: 'DESC' } });
+        const mode = configs[0]?.operationMode === 'serial' ? 'serial' : 'lote';
         const errors: string[] = [];
 
         const lotLabel = labels.find((label) =>
@@ -219,21 +260,27 @@ export class QualityLabelingService {
             errors.push('Falta etiqueta regulatoria de lote en estado validada');
         }
 
-        const unitsRequiringLabel = batch.units
+        let unitsRequiringLabel = batch.units
             .getItems()
             .filter((unit) => !unit.rejected && unit.qcPassed && unit.packaged);
-        const validSerialLabelUnitIds = new Set(
-            labels
-                .filter((label) =>
-                    label.scopeType === RegulatoryLabelScopeType.SERIAL &&
-                    label.status === RegulatoryLabelStatus.VALIDADA &&
-                    !!label.productionBatchUnit
-                )
-                .map((label) => label.productionBatchUnit!.id)
-        );
-        const missingUnits = unitsRequiringLabel.filter((unit) => !validSerialLabelUnitIds.has(unit.id));
-        if (missingUnits.length > 0) {
-            errors.push(`Faltan etiquetas seriales validadas para ${missingUnits.length} unidad(es) empacada(s)`);
+        let missingUnits: typeof unitsRequiringLabel = [];
+        if (mode === 'serial') {
+            const validSerialLabelUnitIds = new Set(
+                labels
+                    .filter((label) =>
+                        label.scopeType === RegulatoryLabelScopeType.SERIAL &&
+                        label.status === RegulatoryLabelStatus.VALIDADA &&
+                        !!label.productionBatchUnit
+                    )
+                    .map((label) => label.productionBatchUnit!.id)
+            );
+            missingUnits = unitsRequiringLabel.filter((unit) => !validSerialLabelUnitIds.has(unit.id));
+            if (missingUnits.length > 0) {
+                errors.push(`Faltan etiquetas seriales validadas para ${missingUnits.length} unidad(es) empacada(s)`);
+            }
+        } else {
+            unitsRequiringLabel = [];
+            missingUnits = [];
         }
 
         const result: DispatchValidationResult = {

@@ -63,6 +63,9 @@ export class OperationalConfigService {
         config.defaultPurchaseOrderControlledDocumentCode = undefined;
         config.defaultIncomingInspectionControlledDocumentCode = undefined;
         config.defaultPackagingControlledDocumentCode = undefined;
+        config.defaultLabelingControlledDocumentCode = undefined;
+        config.defaultBatchReleaseControlledDocumentCode = undefined;
+        config.operationMode = 'lote';
         config.purchaseWithholdingRules = [
             { key: 'compra', label: 'Compra', rate: 2.5, active: true },
             { key: 'servicio', label: 'Servicio', rate: 4, active: true },
@@ -104,6 +107,15 @@ export class OperationalConfigService {
         }
         if (data.defaultPackagingControlledDocumentCode !== undefined) {
             config.defaultPackagingControlledDocumentCode = data.defaultPackagingControlledDocumentCode?.trim() || undefined;
+        }
+        if (data.defaultLabelingControlledDocumentCode !== undefined) {
+            config.defaultLabelingControlledDocumentCode = data.defaultLabelingControlledDocumentCode?.trim() || undefined;
+        }
+        if (data.defaultBatchReleaseControlledDocumentCode !== undefined) {
+            config.defaultBatchReleaseControlledDocumentCode = data.defaultBatchReleaseControlledDocumentCode?.trim() || undefined;
+        }
+        if (data.operationMode !== undefined) {
+            config.operationMode = data.operationMode;
         }
         if (data.purchaseWithholdingRules !== undefined) {
             config.purchaseWithholdingRules = data.purchaseWithholdingRules.map((rule) => ({

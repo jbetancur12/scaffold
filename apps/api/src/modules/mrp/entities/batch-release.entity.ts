@@ -49,4 +49,19 @@ export class BatchRelease extends BaseEntity implements IBatchRelease {
 
     @Property({ nullable: true })
     reviewedBy?: string;
+
+    @Property({ nullable: true })
+    documentControlId?: string;
+
+    @Property({ nullable: true })
+    documentControlCode?: string;
+
+    @Property({ nullable: true })
+    documentControlTitle?: string;
+
+    @Property({ nullable: true })
+    documentControlVersion?: number;
+
+    @Property({ nullable: true })
+    documentControlDate?: Date;
 }
