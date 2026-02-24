@@ -356,6 +356,7 @@ export interface RawMaterial {
     stock?: number; // Virtual field for total stock
     minStockLevel?: number;
     supplierId?: string; // Preferred supplier
+    supplierName?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -572,6 +573,15 @@ export interface ProductionBatch {
     packagingStatus: ProductionBatchPackagingStatus;
     status: ProductionBatchStatus;
     notes?: string;
+    packagingFormData?: Record<string, unknown>;
+    packagingFormCompleted?: boolean;
+    packagingFormFilledBy?: string;
+    packagingFormFilledAt?: string | Date;
+    packagingFormDocumentId?: string;
+    packagingFormDocumentCode?: string;
+    packagingFormDocumentTitle?: string;
+    packagingFormDocumentVersion?: number;
+    packagingFormDocumentDate?: string | Date;
     variant?: ProductVariant & { product?: Product };
     units?: ProductionBatchUnit[];
     createdAt: string | Date;
@@ -599,6 +609,7 @@ export interface NonConformity {
     productionOrderId?: string;
     productionBatchId?: string;
     productionBatchUnitId?: string;
+    incomingInspectionId?: string;
     rootCause?: string;
     correctiveAction?: string;
     createdBy?: string;
@@ -1017,7 +1028,11 @@ export interface IncomingInspection {
     inspectionResult?: IncomingInspectionResult;
     supplierLotCode?: string;
     certificateRef?: string;
+    certificateFileName?: string;
+    certificateFileMime?: string;
     invoiceNumber?: string;
+    invoiceFileName?: string;
+    invoiceFileMime?: string;
     documentControlCode?: string;
     documentControlTitle?: string;
     documentControlVersion?: number;
@@ -1217,6 +1232,7 @@ export interface CreateNonConformityPayload {
     productionOrderId?: string;
     productionBatchId?: string;
     productionBatchUnitId?: string;
+    incomingInspectionId?: string;
     createdBy?: string;
 }
 
@@ -1629,6 +1645,25 @@ export interface UpsertBatchReleaseChecklistPayload {
     actor?: string;
 }
 
+export interface UpsertProductionBatchPackagingFormPayload {
+    operatorName: string;
+    verifierName: string;
+    quantityToPack: number;
+    quantityPacked: number;
+    lotLabel: string;
+    hasTechnicalSheet: boolean;
+    hasLabels: boolean;
+    hasPackagingMaterial: boolean;
+    hasTools: boolean;
+    inventoryRecorded: boolean;
+    observations?: string;
+    nonConformity?: string;
+    correctiveAction?: string;
+    preventiveAction?: string;
+    controlledDocumentId?: string;
+    actor?: string;
+}
+
 export interface SignBatchReleasePayload {
     actor: string;
     approvalMethod: DocumentApprovalMethod;
@@ -1689,6 +1724,7 @@ export interface OperationalConfig {
     defaultPurchaseOrderControlledDocumentId?: string;
     defaultPurchaseOrderControlledDocumentCode?: string;
     defaultIncomingInspectionControlledDocumentCode?: string;
+    defaultPackagingControlledDocumentCode?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

@@ -33,7 +33,9 @@ export class PurchaseRequisitionService {
             const rawMaterial = await this.em.findOneOrFail(RawMaterial, { id: itemData.rawMaterialId });
             const suggestedSupplier = itemData.suggestedSupplierId
                 ? await this.em.findOne(Supplier, { id: itemData.suggestedSupplierId })
-                : undefined;
+                : (rawMaterial.supplier
+                    ? await this.em.findOne(Supplier, { id: rawMaterial.supplier.id })
+                    : undefined);
             const item = this.em.create(PurchaseRequisitionItem, {
                 requisition,
                 rawMaterial,

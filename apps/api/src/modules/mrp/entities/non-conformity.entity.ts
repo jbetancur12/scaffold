@@ -4,6 +4,7 @@ import { BaseEntity } from '../../../shared/entities/base.entity';
 import { ProductionBatch } from './production-batch.entity';
 import { ProductionBatchUnit } from './production-batch-unit.entity';
 import { ProductionOrder } from './production-order.entity';
+import { IncomingInspection } from './incoming-inspection.entity';
 
 @Entity()
 export class NonConformity extends BaseEntity implements INonConformity {
@@ -54,4 +55,12 @@ export class NonConformity extends BaseEntity implements INonConformity {
 
     @Property({ nullable: true })
     createdBy?: string;
+
+    @ManyToOne(() => IncomingInspection, { nullable: true })
+    incomingInspection?: IncomingInspection;
+
+    @Property({ persist: false })
+    get incomingInspectionId() {
+        return this.incomingInspection?.id;
+    }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ControlledDocument, DocumentCategory, DocumentStatus, IncomingInspectionResult, IncomingInspectionStatus, OperationalConfig } from '@scaffold/types';
+import { ControlledDocument, DocumentCategory, DocumentStatus, IncomingInspectionResult, IncomingInspectionStatus, NonConformityStatus, OperationalConfig, QualitySeverity, UserRole } from '@scaffold/types';
 import { TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,11 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { mrpApi } from '@/services/mrpApi';
+import { IncomingInspectionEvidenceType, mrpApi } from '@/services/mrpApi';
 import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
 import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/hooks/mrp/useOperationalConfig';
 import { Settings } from 'lucide-react';
 import { getErrorMessage } from '@/lib/api-error';
+import { useHasRole } from '@/components/auth/RoleGuard';
 import type { QualityComplianceModel } from '../types';
 
 const shortId = (value?: string) => {
@@ -21,13 +22,24 @@ const shortId = (value?: string) => {
   return value.length > 12 ? `${value.slice(0, 8)}...` : value;
 };
 
+type AuditStageStatus = 'ok' | 'pending';
+
+const auditStageClassName: Record<AuditStageStatus, string> = {
+  ok: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  pending: 'bg-amber-100 text-amber-800 border-amber-200',
+};
+
 export function QualityIncomingTab({ model }: { model: QualityComplianceModel }) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { hasRole } = useHasRole();
+  const canManageIncoming = Boolean(hasRole([UserRole.ADMIN, UserRole.SUPERADMIN]));
   const [showReceptionDocSettings, setShowReceptionDocSettings] = useState(false);
   const [globalReceptionDocCode, setGlobalReceptionDocCode] = useState('');
   const [expandedIncomingInspectionId, setExpandedIncomingInspectionId] = useState<string | null>(null);
   const [resolverOpenId, setResolverOpenId] = useState<string | null>(null);
+  const [auditFilter, setAuditFilter] = useState<'all' | 'pending' | 'blocked' | 'complete'>('all');
+  const [auditSearch, setAuditSearch] = useState('');
   const [resolverForm, setResolverForm] = useState<{
     inspectionResult: IncomingInspectionResult;
     controlledDocumentId: string;
@@ -197,6 +209,167 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
       });
     }
   };
+
+  const toBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+      reader.readAsDataURL(file);
+    });
+
+  const promptAndUploadEvidence = async (
+    inspectionId: string,
+    evidenceType: IncomingInspectionEvidenceType
+  ) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.png,.jpg,.jpeg,.webp';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const base64Data = await toBase64(file);
+        await mrpApi.uploadIncomingInspectionEvidence(inspectionId, evidenceType, {
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          base64Data,
+          actor: 'sistema-web',
+        });
+        toast({
+          title: 'Adjunto cargado',
+          description: evidenceType === 'invoice' ? 'Factura adjuntada correctamente.' : 'Certificado adjuntado correctamente.',
+        });
+        await model.refetchIncomingInspections();
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: getErrorMessage(error, 'No se pudo cargar el archivo'),
+          variant: 'destructive',
+        });
+      }
+    };
+    input.click();
+  };
+
+  const downloadEvidence = async (
+    inspectionId: string,
+    evidenceType: IncomingInspectionEvidenceType
+  ) => {
+    try {
+      const blob = await mrpApi.downloadIncomingInspectionEvidence(inspectionId, evidenceType);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${evidenceType}-${inspectionId.slice(0, 8).toUpperCase()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: getErrorMessage(error, 'No se pudo descargar el adjunto'),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const goCreateNcFromInspection = (inspection: NonNullable<typeof model.incomingInspections>[number]) => {
+    const materialLabel = inspection.rawMaterial?.name || inspection.rawMaterial?.sku || inspection.rawMaterialId;
+    const supplierLabel = inspection.purchaseOrder?.supplier?.name || 'N/A';
+    const lotLabel = inspection.supplierLotCode || 'N/A';
+    const invoiceLabel = inspection.invoiceNumber || 'N/A';
+    const description = [
+      'No conformidad detectada en recepción de materia prima.',
+      `Materia prima: ${materialLabel}`,
+      `Proveedor: ${supplierLabel}`,
+      `Lote: ${lotLabel}`,
+      `Factura: ${invoiceLabel}`,
+      `Resultado inspección: ${inspection.inspectionResult || 'rechazado'}`,
+      `Notas: ${inspection.notes || 'Sin notas registradas'}`,
+    ].join('\n');
+
+    navigate('/quality/nc', {
+      state: {
+        prefillNc: {
+          title: `NC Recepción - ${materialLabel}`,
+          description,
+          severity: QualitySeverity.ALTA,
+          source: 'recepcion_materia_prima',
+          incomingInspectionId: inspection.id,
+        },
+      },
+    });
+  };
+
+  const linkedNcInspectionIds = useMemo(
+    () =>
+      new Set(
+        (model.nonConformities ?? [])
+          .filter((nc) => nc.incomingInspectionId && nc.status !== NonConformityStatus.CERRADA)
+          .map((nc) => nc.incomingInspectionId as string)
+      ),
+    [model.nonConformities]
+  );
+  const hasLinkedNc = (inspectionId: string) => linkedNcInspectionIds.has(inspectionId);
+
+  const auditedInspections = useMemo(() => {
+    return (model.incomingInspections ?? []).map((inspection) => {
+      const stages = [
+        { key: 'oc', label: 'OC', status: inspection.purchaseOrderId ? 'ok' : 'pending' as AuditStageStatus },
+        { key: 'recepcion', label: 'Recepción', status: 'ok' as AuditStageStatus },
+        { key: 'for28', label: 'FOR-28', status: inspection.documentControlCode ? 'ok' : 'pending' as AuditStageStatus },
+        { key: 'resultado', label: 'Resultado', status: inspection.status !== IncomingInspectionStatus.PENDIENTE ? 'ok' : 'pending' as AuditStageStatus },
+      ];
+      const needsNc = inspection.status === IncomingInspectionStatus.RECHAZADO;
+      stages.push({
+        key: 'nc',
+        label: 'NC',
+        status: needsNc ? (hasLinkedNc(inspection.id) ? 'ok' : 'pending') : 'ok',
+      });
+
+      const pendingStages = stages.filter((stage) => stage.status === 'pending').length;
+      const blocked = inspection.status === IncomingInspectionStatus.PENDIENTE || (needsNc && !hasLinkedNc(inspection.id));
+      const complete = pendingStages === 0 && !blocked;
+      return { inspection, stages, pendingStages, blocked, complete };
+    });
+  }, [model.incomingInspections, linkedNcInspectionIds]);
+
+  const filteredInspections = useMemo(() => {
+    const search = auditSearch.trim().toLowerCase();
+    return auditedInspections.filter((row) => {
+      const byFilter =
+        auditFilter === 'all'
+          ? true
+          : auditFilter === 'pending'
+            ? row.pendingStages > 0
+            : auditFilter === 'blocked'
+              ? row.blocked
+              : row.complete;
+      if (!byFilter) return false;
+      if (!search) return true;
+      const haystack = [
+        row.inspection.id,
+        row.inspection.rawMaterial?.name || '',
+        row.inspection.rawMaterial?.sku || '',
+        row.inspection.documentControlCode || '',
+        row.inspection.purchaseOrder?.supplier?.name || '',
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(search);
+    });
+  }, [auditedInspections, auditFilter, auditSearch]);
+
+  const auditSummary = useMemo(() => {
+    const total = auditedInspections.length;
+    const blocked = auditedInspections.filter((row) => row.blocked).length;
+    const complete = auditedInspections.filter((row) => row.complete).length;
+    const pending = auditedInspections.filter((row) => row.pendingStages > 0).length;
+    return { total, blocked, complete, pending };
+  }, [auditedInspections]);
+
   const saveGlobalReceptionDoc = async () => {
     if (!operationalConfig) {
       toast({ title: 'Error', description: 'Configuración operativa no cargada todavía', variant: 'destructive' });
@@ -257,6 +430,8 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                               variant="outline"
                               size="sm"
                               onClick={() => setShowReceptionDocSettings((prev) => !prev)}
+                              disabled={!canManageIncoming}
+                              title={!canManageIncoming ? 'Solo administrador/superadmin' : undefined}
                             >
                               <Settings className="h-4 w-4 mr-2" />
                               Formato global
@@ -286,7 +461,7 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                 <Button
                                   type="button"
                                   onClick={saveGlobalReceptionDoc}
-                                  disabled={savingReceptionDocSetting}
+                                  disabled={!canManageIncoming || savingReceptionDocSetting}
                                 >
                                   {savingReceptionDocSetting ? 'Guardando...' : 'Guardar'}
                                 </Button>
@@ -295,7 +470,36 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                           ) : null}
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            {model.loadingIncomingInspections ? <div>Cargando...</div> : model.incomingInspections.length === 0 ? <div className="text-sm text-slate-500">Sin inspecciones.</div> : model.incomingInspections.map((inspection) => (
+                            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-2">
+                              <div className="text-sm font-medium">Checklist auditable por etapa</div>
+                              <div className="text-xs text-slate-600">
+                                Total: {auditSummary.total} | Pendientes: {auditSummary.pending} | Bloqueadas: {auditSummary.blocked} | Completas: {auditSummary.complete}
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                                <div className="space-y-1">
+                                  <Label>Filtro operativo</Label>
+                                  <select
+                                    className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                    value={auditFilter}
+                                    onChange={(e) => setAuditFilter(e.target.value as typeof auditFilter)}
+                                  >
+                                    <option value="all">Todas</option>
+                                    <option value="pending">Con pendientes</option>
+                                    <option value="blocked">Bloqueadas</option>
+                                    <option value="complete">Completas</option>
+                                  </select>
+                                </div>
+                                <div className="md:col-span-2 space-y-1">
+                                  <Label>Buscar inspección</Label>
+                                  <Input
+                                    value={auditSearch}
+                                    onChange={(e) => setAuditSearch(e.target.value)}
+                                    placeholder="Material, SKU, proveedor, código documental o ID"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            {model.loadingIncomingInspections ? <div>Cargando...</div> : filteredInspections.length === 0 ? <div className="text-sm text-slate-500">Sin inspecciones para el filtro actual.</div> : filteredInspections.map(({ inspection, stages }) => (
                                 <div key={inspection.id} className="border rounded-md p-3 flex items-start justify-between gap-3">
                                     <div>
                                         <div className="font-medium">
@@ -338,6 +542,16 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                             ) : (inspection.purchaseOrder?.supplier?.name || 'N/A')}
                                             {' '}| Certificado: {inspection.certificateRef || 'Sin certificado cargado'}
                                         </div>
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                          {stages.map((stage) => (
+                                            <span
+                                              key={stage.key}
+                                              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] ${auditStageClassName[stage.status]}`}
+                                            >
+                                              {stage.status === 'ok' ? '●' : '◐'} {stage.label}
+                                            </span>
+                                          ))}
+                                        </div>
                                         {expandedIncomingInspectionId === inspection.id ? (
                                             <div className="text-xs text-slate-600 mt-2 border rounded-md p-2 bg-slate-50 space-y-1">
                                                 <div>Resultado inspección: {inspection.inspectionResult || 'N/A'}</div>
@@ -345,6 +559,8 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                                 <div>Costo unitario aceptado: {inspection.acceptedUnitCost ?? 'N/A'}</div>
                                                 <div>Lote proveedor: {inspection.supplierLotCode || 'N/A'}</div>
                                                 <div>Factura N°: {inspection.invoiceNumber || 'N/A'}</div>
+                                                <div>Archivo factura: {inspection.invoiceFileName || 'Sin adjunto'}</div>
+                                                <div>Archivo certificado: {inspection.certificateFileName || 'Sin adjunto'}</div>
                                                 <div>Notas: {inspection.notes || 'Sin notas'}</div>
                                                 <div>Inspeccionado por: {inspection.inspectedBy || 'N/A'}</div>
                                                 <div>Fecha inspección: {inspection.inspectedAt ? new Date(inspection.inspectedAt).toLocaleString() : 'N/A'}</div>
@@ -522,10 +738,45 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                         >
                                             Descargar FOR-28
                                         </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => promptAndUploadEvidence(inspection.id, 'invoice')}
+                                            disabled={!canManageIncoming}
+                                        >
+                                            Adjuntar factura
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => promptAndUploadEvidence(inspection.id, 'certificate')}
+                                            disabled={!canManageIncoming}
+                                        >
+                                            Adjuntar certificado
+                                        </Button>
+                                        {inspection.invoiceFileName ? (
+                                          <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => downloadEvidence(inspection.id, 'invoice')}
+                                          >
+                                              Descargar factura
+                                          </Button>
+                                        ) : null}
+                                        {inspection.certificateFileName ? (
+                                          <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => downloadEvidence(inspection.id, 'certificate')}
+                                          >
+                                              Descargar certificado
+                                          </Button>
+                                        ) : null}
                                         {inspection.status === IncomingInspectionStatus.PENDIENTE ? (
                                             <Button
                                                 size="sm"
                                                 onClick={() => openResolver(inspection.id, Number(inspection.quantityReceived))}
+                                                disabled={!canManageIncoming}
                                             >
                                                 {isConditionalPending(inspection) ? 'Cerrar condicional' : 'Resolver QA'}
                                             </Button>
@@ -534,12 +785,22 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                                                 size="sm"
                                                 variant="outline"
                                                 onClick={() => model.quickCorrectIncomingInspectionCost(inspection.id)}
-                                                disabled={Number(inspection.quantityAccepted) <= 0}
+                                                disabled={!canManageIncoming || Number(inspection.quantityAccepted) <= 0}
                                                 title={Number(inspection.quantityAccepted) <= 0 ? 'No aplica: inspección sin cantidad aceptada' : undefined}
                                             >
                                                 Corregir costo
                                             </Button>
                                         )}
+                                        {inspection.status === IncomingInspectionStatus.RECHAZADO ? (
+                                          <Button
+                                              size="sm"
+                                              variant="outline"
+                                              disabled={!canManageIncoming || hasLinkedNc(inspection.id)}
+                                              onClick={() => goCreateNcFromInspection(inspection)}
+                                          >
+                                              {hasLinkedNc(inspection.id) ? 'NC ya creada' : 'Crear NC'}
+                                          </Button>
+                                        ) : null}
                                     </div>
                                 </div>
                             ))}

@@ -7,6 +7,7 @@ import { InventoryService } from './services/inventory.service';
 import { ProductionService } from './services/production.service';
 import { PurchaseOrderService } from './services/purchase-order.service';
 import { PurchaseOrderPdfService } from './services/purchase-order-pdf.service';
+import { PackagingFormPdfService } from './services/packaging-form-pdf.service';
 import { PurchaseRequisitionService } from './services/purchase-requisition.service';
 import { QualityService } from './services/quality.service';
 import { DocumentControlService } from './services/document-control.service';
@@ -95,6 +96,8 @@ import {
     ListIncomingInspectionsQuerySchema,
     ResolveIncomingInspectionSchema,
     CorrectIncomingInspectionCostSchema,
+    IncomingInspectionEvidenceTypeSchema,
+    UploadIncomingInspectionEvidenceSchema,
     UpsertBatchReleaseChecklistSchema,
     SignBatchReleaseSchema,
     ListBatchReleasesQuerySchema,
@@ -110,6 +113,7 @@ import {
     UpdateProductionBatchPackagingSchema,
     UpdateProductionBatchUnitQcSchema,
     UpdateProductionBatchUnitPackagingSchema,
+    UpsertProductionBatchPackagingFormSchema,
 } from '@scaffold/schemas';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -134,6 +138,7 @@ export class MrpController {
     private get productionService() { return new ProductionService(this.em); }
     private get purchaseOrderService() { return new PurchaseOrderService(this.em); }
     private get purchaseOrderPdfService() { return new PurchaseOrderPdfService(this.em); }
+    private get packagingFormPdfService() { return new PackagingFormPdfService(this.em); }
     private get qualityIncomingPdfService() { return new QualityIncomingPdfService(this.em); }
     private get purchaseRequisitionService() { return new PurchaseRequisitionService(this.em); }
     private get qualityService() { return new QualityService(this.em); }
@@ -570,6 +575,39 @@ export class MrpController {
             const payload = UpdateProductionBatchUnitPackagingSchema.parse(req.body);
             const unit = await this.productionService.setBatchUnitPackaging(unitId, payload.packaged);
             return ApiResponse.success(res, unit, 'Empaque de unidad actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async upsertProductionBatchPackagingForm(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { batchId } = req.params;
+            const payload = UpsertProductionBatchPackagingFormSchema.parse(req.body);
+            const batch = await this.productionService.upsertBatchPackagingForm(batchId, payload);
+            return ApiResponse.success(res, batch, 'FOR de empaque guardado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionBatchPackagingForm(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { batchId } = req.params;
+            const form = await this.productionService.getBatchPackagingForm(batchId);
+            return ApiResponse.success(res, form);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadProductionBatchPackagingFormPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { batchId } = req.params;
+            const pdf = await this.packagingFormPdfService.generatePackagingFormPdf(batchId);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
+            return res.send(pdf.buffer);
         } catch (error) {
             next(error);
         }
@@ -1184,6 +1222,31 @@ export class MrpController {
             const payload = CorrectIncomingInspectionCostSchema.parse(req.body);
             const row = await this.qualityService.correctResolvedIncomingInspectionCost(id, payload);
             return ApiResponse.success(res, row, 'Costo de recepción corregido');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async uploadIncomingInspectionEvidence(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const evidenceType = IncomingInspectionEvidenceTypeSchema.parse(req.params.evidenceType);
+            const payload = UploadIncomingInspectionEvidenceSchema.parse(req.body);
+            const row = await this.qualityService.uploadIncomingInspectionEvidence(id, evidenceType, payload);
+            return ApiResponse.success(res, row, 'Adjunto de inspección cargado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadIncomingInspectionEvidence(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const evidenceType = IncomingInspectionEvidenceTypeSchema.parse(req.params.evidenceType);
+            const file = await this.qualityService.readIncomingInspectionEvidence(id, evidenceType);
+            res.setHeader('Content-Type', file.mimeType);
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.buffer);
         } catch (error) {
             next(error);
         }

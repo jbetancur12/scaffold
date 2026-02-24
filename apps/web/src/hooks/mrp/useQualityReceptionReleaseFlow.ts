@@ -13,7 +13,7 @@ import {
 
 export const useQualityReceptionReleaseFlow = () => {
     const { toast } = useToast();
-    const { data: incomingInspectionsData, loading: loadingIncomingInspections } = useIncomingInspectionsQuery();
+    const { data: incomingInspectionsData, loading: loadingIncomingInspections, execute: refetchIncomingInspections } = useIncomingInspectionsQuery();
     const { data: batchReleasesData, loading: loadingBatchReleases } = useBatchReleasesQuery();
     const { execute: resolveIncomingInspection, loading: resolvingIncomingInspection } = useResolveIncomingInspectionMutation();
     const { execute: correctIncomingInspectionCost } = useCorrectIncomingInspectionCostMutation();
@@ -223,6 +223,7 @@ export const useQualityReceptionReleaseFlow = () => {
         batchReleaseForm,
         setBatchReleaseForm,
         loadingIncomingInspections,
+        refetchIncomingInspections,
         loadingBatchReleases,
         savingBatchReleaseChecklist,
         signingBatchRelease,

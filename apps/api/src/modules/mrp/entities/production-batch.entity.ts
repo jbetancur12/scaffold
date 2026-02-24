@@ -48,6 +48,33 @@ export class ProductionBatch extends BaseEntity {
     @Property({ nullable: true })
     notes?: string;
 
+    @Property({ type: 'json', nullable: true })
+    packagingFormData?: Record<string, unknown>;
+
+    @Property({ default: false })
+    packagingFormCompleted: boolean = false;
+
+    @Property({ nullable: true })
+    packagingFormFilledBy?: string;
+
+    @Property({ nullable: true })
+    packagingFormFilledAt?: Date;
+
+    @Property({ nullable: true })
+    packagingFormDocumentId?: string;
+
+    @Property({ nullable: true })
+    packagingFormDocumentCode?: string;
+
+    @Property({ nullable: true })
+    packagingFormDocumentTitle?: string;
+
+    @Property({ nullable: true })
+    packagingFormDocumentVersion?: number;
+
+    @Property({ nullable: true })
+    packagingFormDocumentDate?: Date;
+
     @OneToMany(() => ProductionBatchUnit, (unit) => unit.batch)
     units = new Collection<ProductionBatchUnit>(this);
 }

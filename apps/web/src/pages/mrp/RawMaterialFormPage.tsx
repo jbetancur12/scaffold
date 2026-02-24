@@ -20,6 +20,7 @@ import { RawMaterialSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
 import { useRawMaterialQuery, useSaveRawMaterialMutation } from '@/hooks/mrp/useRawMaterials';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
+import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
 
 export default function RawMaterialFormPage() {
     const { id } = useParams();
@@ -35,6 +36,7 @@ export default function RawMaterialFormPage() {
         unit: UnitType.UNIT,
         cost: 0,
         minStockLevel: 0,
+        supplierId: '',
     });
 
     // IVA Calculator State
@@ -63,7 +65,9 @@ export default function RawMaterialFormPage() {
     }, [formData.name, isEditing, skuManuallyEdited]);
 
     const { data: materialData, loading: loadingMaterial, error: materialError } = useRawMaterialQuery(isEditing ? id : undefined);
+    const { data: suppliersResponse } = useSuppliersQuery(1, 200);
     const { execute: saveRawMaterial } = useSaveRawMaterialMutation();
+    const suppliers = suppliersResponse?.suppliers ?? [];
 
     useEffect(() => {
         if (isEditing) {
@@ -74,6 +78,7 @@ export default function RawMaterialFormPage() {
                     unit: materialData.unit as UnitType,
                     cost: materialData.cost,
                     minStockLevel: materialData.minStockLevel || 0,
+                    supplierId: materialData.supplierId || '',
                 });
             }
         } else {
@@ -86,6 +91,7 @@ export default function RawMaterialFormPage() {
                     unit: state.initialData.unit as UnitType,
                     cost: state.initialData.cost || 0,
                     minStockLevel: state.initialData.minStockLevel || 0,
+                    supplierId: state.initialData.supplierId || '',
                 });
                 if (state.initialData.sku) {
                     setSkuManuallyEdited(true); // Treat as manually edited if we passed a SKU (though list page clears it usually)
@@ -123,6 +129,7 @@ export default function RawMaterialFormPage() {
                 ...formData,
                 cost: Number(formData.cost),
                 minStockLevel: Number(formData.minStockLevel || 0),
+                supplierId: formData.supplierId || undefined,
             };
             RawMaterialSchema.parse(payload);
 
@@ -231,6 +238,26 @@ export default function RawMaterialFormPage() {
                                     {Object.values(UnitType).map((unit) => (
                                         <SelectItem key={unit} value={unit}>
                                             {unit.toUpperCase()}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="supplierId">Proveedor preferido (opcional)</Label>
+                            <Select
+                                value={formData.supplierId || '__none__'}
+                                onValueChange={(value: string) => setFormData({ ...formData, supplierId: value === '__none__' ? '' : value })}
+                            >
+                                <SelectTrigger id="supplierId">
+                                    <SelectValue placeholder="Selecciona un proveedor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__none__">Sin proveedor preferido</SelectItem>
+                                    {suppliers.map((supplier) => (
+                                        <SelectItem key={supplier.id} value={supplier.id}>
+                                            {supplier.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

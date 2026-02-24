@@ -74,6 +74,7 @@ export default function RawMaterialListPage() {
                                     <TableHead className="font-bold text-slate-900">Nombre</TableHead>
                                     <TableHead className="font-bold text-slate-900">SKU</TableHead>
                                     <TableHead className="font-bold text-slate-900">Unidad</TableHead>
+                                    <TableHead className="font-bold text-slate-900">Proveedor Preferido</TableHead>
                                     <TableHead className="font-bold text-slate-900">Costo Ref. (Anual)</TableHead>
                                     <TableHead className="font-bold text-slate-900">Costo Promedio</TableHead>
                                     <TableHead className="font-bold text-slate-900">Última Compra</TableHead>
@@ -97,6 +98,7 @@ export default function RawMaterialListPage() {
                                         </TableCell>
                                         <TableCell>{material.sku}</TableCell>
                                         <TableCell>{material.unit}</TableCell>
+                                        <TableCell>{material.supplierName || 'Sin definir'}</TableCell>
                                         <TableCell className="font-semibold text-slate-600">{formatCurrency(material.cost)}</TableCell>
                                         <TableCell className="font-bold text-primary">{formatCurrency(material.averageCost)}</TableCell>
                                         <TableCell>
@@ -150,7 +152,7 @@ export default function RawMaterialListPage() {
                                 ))}
                                 {materials.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-10 text-slate-500">
+                                        <TableCell colSpan={8} className="text-center py-10 text-slate-500">
                                             No hay materiales registrados.
                                         </TableCell>
                                     </TableRow>

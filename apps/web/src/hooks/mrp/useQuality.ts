@@ -84,7 +84,17 @@ export const useNonConformitiesQuery = (filters?: { status?: NonConformityStatus
 
 export const useCreateNonConformityMutation = () => {
     return useMrpMutation<
-        { title: string; description: string; severity?: QualitySeverity; source?: string; productionOrderId?: string; productionBatchId?: string; productionBatchUnitId?: string; createdBy?: string },
+        {
+            title: string;
+            description: string;
+            severity?: QualitySeverity;
+            source?: string;
+            productionOrderId?: string;
+            productionBatchId?: string;
+            productionBatchUnitId?: string;
+            incomingInspectionId?: string;
+            createdBy?: string;
+        },
         NonConformity
     >(
         async (payload) => mrpApi.createNonConformity(payload),
@@ -1005,8 +1015,10 @@ export const useResolveIncomingInspectionMutation = () => {
     return useMrpMutation<{
         id: string;
         inspectionResult: IncomingInspectionResult;
+        controlledDocumentId?: string;
         supplierLotCode?: string;
         certificateRef?: string;
+        invoiceNumber?: string;
         notes?: string;
         quantityAccepted: number;
         quantityRejected: number;

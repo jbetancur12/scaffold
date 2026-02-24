@@ -13,6 +13,8 @@ import { InventoryItem } from '../entities/inventory-item.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { ControlledDocument } from '../entities/controlled-document.entity';
 import { MrpService } from './mrp.service';
+import { ObjectStorageService } from '../../../shared/services/object-storage.service';
+import { extname } from 'node:path';
 
 type QualityAuditLogger = (payload: {
     entityType: string;
@@ -30,6 +32,7 @@ export class QualityIncomingService {
     private readonly inventoryRepo: EntityRepository<InventoryItem>;
     private readonly warehouseRepo: EntityRepository<Warehouse>;
     private readonly logEvent: QualityAuditLogger;
+    private readonly storageService: ObjectStorageService;
 
     constructor(em: EntityManager, logEvent: QualityAuditLogger) {
         this.em = em;
@@ -38,6 +41,26 @@ export class QualityIncomingService {
         this.controlledDocumentRepo = em.getRepository(ControlledDocument);
         this.inventoryRepo = em.getRepository(InventoryItem);
         this.warehouseRepo = em.getRepository(Warehouse);
+        this.storageService = new ObjectStorageService();
+    }
+
+    private decodeBase64Data(base64Data: string): Buffer {
+        const normalized = base64Data.includes(',') ? (base64Data.split(',').pop() ?? '') : base64Data;
+        if (!normalized) {
+            throw new AppError('Archivo base64 inválido', 400);
+        }
+        return Buffer.from(normalized, 'base64');
+    }
+
+    private buildEvidenceDownloadFileName(row: IncomingInspection, evidenceType: 'invoice' | 'certificate', originalFileName: string) {
+        const extension = extname(originalFileName) || '';
+        const typeLabel = evidenceType === 'invoice' ? 'Factura' : 'Certificado';
+        const materialCode = row.rawMaterial?.sku || row.rawMaterial?.name || 'MateriaPrima';
+        const base = `${typeLabel} ${materialCode} ${row.id.slice(0, 8).toUpperCase()}`
+            .replace(/[^a-zA-Z0-9 _().-]/g, '_')
+            .replace(/\s+/g, ' ')
+            .trim();
+        return `${base}${extension}`;
     }
 
     async listIncomingInspections(filters: {
@@ -297,5 +320,73 @@ export class QualityIncomingService {
         });
 
         return row;
+    }
+
+    async uploadIncomingInspectionEvidence(id: string, evidenceType: 'invoice' | 'certificate', payload: {
+        fileName: string;
+        mimeType: string;
+        base64Data: string;
+        actor?: string;
+    }) {
+        const row = await this.incomingInspectionRepo.findOneOrFail({ id }, { populate: ['rawMaterial'] });
+        const buffer = this.decodeBase64Data(payload.base64Data);
+        const maxBytes = 8 * 1024 * 1024; // 8 MB
+        if (buffer.length === 0 || buffer.length > maxBytes) {
+            throw new AppError('El archivo debe tener entre 1 byte y 8 MB', 400);
+        }
+
+        const existingPath = evidenceType === 'invoice' ? row.invoiceFilePath : row.certificateFilePath;
+        await this.storageService.deleteObject(existingPath);
+
+        const folderPrefix = `quality/incoming/${evidenceType}`;
+        const persisted = await this.storageService.saveObject({
+            fileName: payload.fileName,
+            mimeType: payload.mimeType,
+            buffer,
+            folderPrefix,
+        });
+        const downloadName = this.buildEvidenceDownloadFileName(row, evidenceType, payload.fileName);
+
+        if (evidenceType === 'invoice') {
+            row.invoiceFileName = downloadName;
+            row.invoiceFileMime = payload.mimeType;
+            row.invoiceFilePath = persisted.storagePath;
+        } else {
+            row.certificateFileName = downloadName;
+            row.certificateFileMime = payload.mimeType;
+            row.certificateFilePath = persisted.storagePath;
+        }
+
+        await this.em.persistAndFlush(row);
+        await this.logEvent({
+            entityType: 'incoming_inspection',
+            entityId: row.id,
+            action: 'evidence_uploaded',
+            actor: payload.actor,
+            metadata: {
+                evidenceType,
+                fileName: downloadName,
+                mimeType: payload.mimeType,
+                size: buffer.length,
+            },
+        });
+        return row;
+    }
+
+    async readIncomingInspectionEvidence(id: string, evidenceType: 'invoice' | 'certificate') {
+        const row = await this.incomingInspectionRepo.findOneOrFail({ id }, { populate: ['rawMaterial'] });
+        const filePath = evidenceType === 'invoice' ? row.invoiceFilePath : row.certificateFilePath;
+        const fileName = evidenceType === 'invoice' ? row.invoiceFileName : row.certificateFileName;
+        const mimeType = evidenceType === 'invoice' ? row.invoiceFileMime : row.certificateFileMime;
+
+        if (!filePath || !fileName) {
+            throw new AppError('No hay archivo adjunto para este tipo de evidencia', 404);
+        }
+        const buffer = await this.storageService.readObject(filePath);
+        return {
+            fileName,
+            mimeType: mimeType || 'application/octet-stream',
+            buffer,
+        };
     }
 }

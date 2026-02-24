@@ -25,6 +25,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { getErrorMessage } from '@/lib/api-error';
+import { mrpApi } from '@/services/mrpApi';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
@@ -39,6 +40,7 @@ import {
     useUpdateProductionBatchUnitPackagingMutation,
     useUpdateProductionBatchUnitQcMutation,
     useUpdateProductionOrderStatusMutation,
+    useUpsertProductionBatchPackagingFormMutation,
 } from '@/hooks/mrp/useProductionOrders';
 
 export default function ProductionOrderDetailPage() {
@@ -52,6 +54,23 @@ export default function ProductionOrderDetailPage() {
     const [newBatchVariantId, setNewBatchVariantId] = useState<string>('');
     const [newBatchQty, setNewBatchQty] = useState<number>(1);
     const [newBatchCode, setNewBatchCode] = useState<string>('');
+    const [packagingFormBatchId, setPackagingFormBatchId] = useState<string | null>(null);
+    const [packagingForm, setPackagingForm] = useState({
+        operatorName: '',
+        verifierName: '',
+        quantityToPack: '0',
+        quantityPacked: '0',
+        lotLabel: '',
+        hasTechnicalSheet: false,
+        hasLabels: false,
+        hasPackagingMaterial: false,
+        hasTools: false,
+        inventoryRecorded: false,
+        observations: '',
+        nonConformity: '',
+        correctiveAction: '',
+        preventiveAction: '',
+    });
 
     const { data: order, loading, error, execute: reloadOrder } = useProductionOrderQuery(id);
     const { data: requirementsData, loading: loadingReqs, error: requirementsError } = useProductionRequirementsQuery(id);
@@ -67,6 +86,7 @@ export default function ProductionOrderDetailPage() {
     const { execute: updateBatchPackaging } = useUpdateProductionBatchPackagingMutation();
     const { execute: updateUnitQc } = useUpdateProductionBatchUnitQcMutation();
     const { execute: updateUnitPackaging } = useUpdateProductionBatchUnitPackagingMutation();
+    const { execute: upsertPackagingForm, loading: savingPackagingForm } = useUpsertProductionBatchPackagingFormMutation();
 
     useMrpQueryErrorRedirect(error, 'No se pudo cargar la orden de producción', '/mrp/production-orders');
     useMrpQueryErrorToast(requirementsError, 'No se pudieron calcular los requerimientos');
@@ -194,6 +214,78 @@ export default function ProductionOrderDetailPage() {
         }
     };
 
+    const openPackagingFormDialog = (batchId: string) => {
+        const batch = batches.find((b) => b.id === batchId);
+        const data = (batch?.packagingFormData || {}) as Record<string, unknown>;
+        setPackagingFormBatchId(batchId);
+        setPackagingForm({
+            operatorName: String(data.operatorName || ''),
+            verifierName: String(data.verifierName || ''),
+            quantityToPack: String(data.quantityToPack || batch?.plannedQty || 0),
+            quantityPacked: String(data.quantityPacked || batch?.producedQty || 0),
+            lotLabel: String(data.lotLabel || batch?.code || ''),
+            hasTechnicalSheet: Boolean(data.hasTechnicalSheet),
+            hasLabels: Boolean(data.hasLabels),
+            hasPackagingMaterial: Boolean(data.hasPackagingMaterial),
+            hasTools: Boolean(data.hasTools),
+            inventoryRecorded: Boolean(data.inventoryRecorded),
+            observations: String(data.observations || ''),
+            nonConformity: String(data.nonConformity || ''),
+            correctiveAction: String(data.correctiveAction || ''),
+            preventiveAction: String(data.preventiveAction || ''),
+        });
+    };
+
+    const closePackagingFormDialog = () => setPackagingFormBatchId(null);
+
+    const submitPackagingForm = async () => {
+        if (!id || !packagingFormBatchId) return;
+        try {
+            await upsertPackagingForm({
+                orderId: id,
+                batchId: packagingFormBatchId,
+                payload: {
+                    operatorName: packagingForm.operatorName.trim(),
+                    verifierName: packagingForm.verifierName.trim(),
+                    quantityToPack: Number(packagingForm.quantityToPack || 0),
+                    quantityPacked: Number(packagingForm.quantityPacked || 0),
+                    lotLabel: packagingForm.lotLabel.trim(),
+                    hasTechnicalSheet: packagingForm.hasTechnicalSheet,
+                    hasLabels: packagingForm.hasLabels,
+                    hasPackagingMaterial: packagingForm.hasPackagingMaterial,
+                    hasTools: packagingForm.hasTools,
+                    inventoryRecorded: packagingForm.inventoryRecorded,
+                    observations: packagingForm.observations.trim() || undefined,
+                    nonConformity: packagingForm.nonConformity.trim() || undefined,
+                    correctiveAction: packagingForm.correctiveAction.trim() || undefined,
+                    preventiveAction: packagingForm.preventiveAction.trim() || undefined,
+                    actor: 'sistema-web',
+                },
+            });
+            toast({ title: 'FOR guardado', description: 'Formato de empaque guardado correctamente.' });
+            closePackagingFormDialog();
+            await reloadBatches({ force: true });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo guardar el FOR de empaque'), variant: 'destructive' });
+        }
+    };
+
+    const downloadPackagingFormPdf = async (batchId: string) => {
+        try {
+            const blob = await mrpApi.getProductionBatchPackagingFormPdf(batchId);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `FOR-EMPAQUE-${batchId.slice(0, 8).toUpperCase()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo descargar el FOR de empaque'), variant: 'destructive' });
+        }
+    };
+
     const getQcStatusLabel = (status?: string) => {
         switch (status) {
             case 'passed':
@@ -260,6 +352,9 @@ export default function ProductionOrderDetailPage() {
     if (!order) {
         return <div className="p-8">Orden no encontrada</div>;
     }
+
+    const lotExecutionEnabled = order.status === ProductionOrderStatus.IN_PROGRESS;
+    const lotExecutionDisabledReason = 'Debes planificar e iniciar la orden para ejecutar QC y empaque.';
 
     return (
         <div className="space-y-6">
@@ -364,6 +459,11 @@ export default function ProductionOrderDetailPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            {!lotExecutionEnabled ? (
+                                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                    QC y empaque se habilitan cuando la orden esté en "in_progress".
+                                </p>
+                            ) : null}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                                 <Select value={newBatchVariantId} onValueChange={setNewBatchVariantId}>
                                     <SelectTrigger className="md:col-span-2">
@@ -409,11 +509,15 @@ export default function ProductionOrderDetailPage() {
                                                 const units = batch.units ?? [];
                                                 const hasUnits = units.length > 0;
                                                 const allUnitsQcPassed = hasUnits ? units.every((u) => u.rejected || u.qcPassed) : true;
+                                                const hasPackagingForm = Boolean(batch.packagingFormCompleted);
                                                 const canPackBatch = batch.qcStatus === 'passed'
                                                     && batch.packagingStatus !== 'packed'
+                                                    && hasPackagingForm
                                                     && allUnitsQcPassed;
                                                 const packDisabledReason = batch.qcStatus !== 'passed'
                                                     ? 'Debes aprobar QC del lote antes de empacar.'
+                                                    : !hasPackagingForm
+                                                        ? 'Debes diligenciar el FOR de empaque antes de empacar.'
                                                     : !allUnitsQcPassed
                                                         ? 'Todas las unidades deben pasar QC antes de empacar el lote.'
                                                         : null;
@@ -448,11 +552,33 @@ export default function ProductionOrderDetailPage() {
                                                     <Badge variant="outline" className={getPackagingBadgeClass(batch.packagingStatus)}>
                                                         Empaque: {getPackagingStatusLabel(batch.packagingStatus)}
                                                     </Badge>
+                                                    <Badge variant="outline" className={hasPackagingForm ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-700'}>
+                                                        FOR Empaque: {hasPackagingForm ? 'Listo' : 'Pendiente'}
+                                                    </Badge>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => openPackagingFormDialog(batch.id)}
+                                                        disabled={!lotExecutionEnabled}
+                                                        title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
+                                                    >
+                                                        FOR Empaque
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => downloadPackagingFormPdf(batch.id)}
+                                                        disabled={!hasPackagingForm}
+                                                        title={!hasPackagingForm ? 'Primero diligencia el FOR de empaque' : ''}
+                                                    >
+                                                        PDF FOR
+                                                    </Button>
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
                                                         onClick={() => handleAddUnits(batch.id)}
-                                                        disabled={batch.packagingStatus === 'packed'}
+                                                        disabled={batch.packagingStatus === 'packed' || !lotExecutionEnabled}
+                                                        title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
                                                     >
                                                         + Unidades
                                                     </Button>
@@ -460,15 +586,16 @@ export default function ProductionOrderDetailPage() {
                                                         size="sm"
                                                         variant="outline"
                                                         onClick={() => handleBatchQc(batch.id, true)}
-                                                        disabled={batch.qcStatus === 'passed'}
+                                                        disabled={batch.qcStatus === 'passed' || !lotExecutionEnabled}
+                                                        title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
                                                     >
                                                         Aprobar QC
                                                     </Button>
                                                     <Button
                                                         size="sm"
                                                         onClick={() => handleBatchPackaging(batch.id, true)}
-                                                        disabled={!canPackBatch}
-                                                        title={packDisabledReason || ''}
+                                                        disabled={!lotExecutionEnabled || !canPackBatch}
+                                                        title={!lotExecutionEnabled ? lotExecutionDisabledReason : (packDisabledReason || '')}
                                                     >
                                                         Empacar Lote
                                                     </Button>
@@ -481,11 +608,15 @@ export default function ProductionOrderDetailPage() {
                                                 const units = batch.units ?? [];
                                                 const hasUnits = units.length > 0;
                                                 const allUnitsQcPassed = hasUnits ? units.every((u) => u.rejected || u.qcPassed) : true;
+                                                const hasPackagingForm = Boolean(batch.packagingFormCompleted);
                                                 const canPackBatch = batch.qcStatus === 'passed'
                                                     && batch.packagingStatus !== 'packed'
+                                                    && hasPackagingForm
                                                     && allUnitsQcPassed;
                                                 const packDisabledReason = batch.qcStatus !== 'passed'
                                                     ? 'Debes aprobar QC del lote antes de empacar.'
+                                                    : !hasPackagingForm
+                                                        ? 'Debes diligenciar el FOR de empaque antes de empacar.'
                                                     : !allUnitsQcPassed
                                                         ? 'Todas las unidades deben pasar QC antes de empacar el lote.'
                                                         : null;
@@ -518,7 +649,8 @@ export default function ProductionOrderDetailPage() {
                                                                             size="sm"
                                                                             variant="ghost"
                                                                             onClick={() => handleUnitQc(unit.id, true)}
-                                                                            disabled={unit.qcPassed}
+                                                                            disabled={unit.qcPassed || !lotExecutionEnabled}
+                                                                            title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
                                                                         >
                                                                             QC
                                                                         </Button>
@@ -526,7 +658,8 @@ export default function ProductionOrderDetailPage() {
                                                                             size="sm"
                                                                             variant="ghost"
                                                                             onClick={() => handleUnitPackaging(unit.id, true)}
-                                                                            disabled={!unit.qcPassed || unit.packaged}
+                                                                            disabled={!unit.qcPassed || unit.packaged || !lotExecutionEnabled}
+                                                                            title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
                                                                         >
                                                                             Empacar
                                                                         </Button>
@@ -563,6 +696,117 @@ export default function ProductionOrderDetailPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            <Dialog open={Boolean(packagingFormBatchId)} onOpenChange={(open) => !open && closePackagingFormDialog()}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>FOR de Empaque por Lote</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-1 max-h-[65vh] overflow-y-auto">
+                        <div className="space-y-1">
+                            <Label>Operario</Label>
+                            <input
+                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                value={packagingForm.operatorName}
+                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, operatorName: e.target.value }))}
+                                placeholder="Nombre del operario"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Verificador</Label>
+                            <input
+                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                value={packagingForm.verifierName}
+                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, verifierName: e.target.value }))}
+                                placeholder="Nombre del verificador"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Cantidad a empacar</Label>
+                            <input
+                                type="number"
+                                min={0}
+                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                value={packagingForm.quantityToPack}
+                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, quantityToPack: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Cantidad empacada</Label>
+                            <input
+                                type="number"
+                                min={0}
+                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                value={packagingForm.quantityPacked}
+                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, quantityPacked: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                            <Label>Etiqueta de lote</Label>
+                            <input
+                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
+                                value={packagingForm.lotLabel}
+                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, lotLabel: e.target.value }))}
+                                placeholder="Ej: LOTE-20260224"
+                            />
+                        </div>
+                        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <label className="flex items-center gap-2"><input type="checkbox" checked={packagingForm.hasTechnicalSheet} onChange={(e) => setPackagingForm((prev) => ({ ...prev, hasTechnicalSheet: e.target.checked }))} />Ficha técnica disponible</label>
+                            <label className="flex items-center gap-2"><input type="checkbox" checked={packagingForm.hasLabels} onChange={(e) => setPackagingForm((prev) => ({ ...prev, hasLabels: e.target.checked }))} />Etiquetas disponibles</label>
+                            <label className="flex items-center gap-2"><input type="checkbox" checked={packagingForm.hasPackagingMaterial} onChange={(e) => setPackagingForm((prev) => ({ ...prev, hasPackagingMaterial: e.target.checked }))} />Material de empaque disponible</label>
+                            <label className="flex items-center gap-2"><input type="checkbox" checked={packagingForm.hasTools} onChange={(e) => setPackagingForm((prev) => ({ ...prev, hasTools: e.target.checked }))} />Herramientas listas</label>
+                            <label className="flex items-center gap-2 md:col-span-2"><input type="checkbox" checked={packagingForm.inventoryRecorded} onChange={(e) => setPackagingForm((prev) => ({ ...prev, inventoryRecorded: e.target.checked }))} />Registro en inventario realizado</label>
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                            <Label>Observaciones</Label>
+                            <textarea
+                                className="min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full"
+                                value={packagingForm.observations}
+                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, observations: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-1 md:col-span-2">
+                            <Label>No conformidad (si aplica)</Label>
+                            <textarea
+                                className="min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full"
+                                value={packagingForm.nonConformity}
+                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, nonConformity: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Acción correctiva</Label>
+                            <textarea
+                                className="min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full"
+                                value={packagingForm.correctiveAction}
+                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, correctiveAction: e.target.value }))}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Acción preventiva</Label>
+                            <textarea
+                                className="min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full"
+                                value={packagingForm.preventiveAction}
+                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, preventiveAction: e.target.value }))}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={closePackagingFormDialog}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={submitPackagingForm} disabled={savingPackagingForm}>
+                            {savingPackagingForm ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Guardando...
+                                </>
+                            ) : (
+                                'Guardar FOR'
+                            )}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
                 <DialogContent>

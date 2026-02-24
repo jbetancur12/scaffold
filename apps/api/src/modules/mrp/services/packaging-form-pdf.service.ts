@@ -2,7 +2,7 @@ import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import fs from 'node:fs';
 import path from 'node:path';
 import { AppError } from '../../../shared/utils/response';
-import { IncomingInspection } from '../entities/incoming-inspection.entity';
+import { ProductionBatch } from '../entities/production-batch.entity';
 
 type PugModule = {
     compile: (template: string, options?: { pretty?: boolean }) => (locals: Record<string, unknown>) => string;
@@ -20,92 +20,112 @@ type PlaywrightModule = {
     };
 };
 
-const incomingInspectionPdfTemplate = `
+const packagingFormPdfTemplate = `
 doctype html
 html(lang="es")
   head
     meta(charset="UTF-8")
     meta(name="viewport" content="width=device-width, initial-scale=1.0")
-    title= docCode + ' - ' + title
+    title= docCode + ' - Registro de Empaque'
     style.
       * { box-sizing: border-box; }
       body { font-family: Arial, sans-serif; color: #0f172a; font-size: 12px; margin: 0; }
       .section { margin-top: 12px; }
       .section h3 { margin: 0 0 8px 0; font-size: 13px; }
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
       .field { border: 1px solid #cbd5e1; border-radius: 6px; padding: 6px 8px; min-height: 34px; }
       .field .k { font-size: 10px; text-transform: uppercase; color: #475569; }
       .field .v { font-size: 12px; font-weight: 600; margin-top: 2px; }
-      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-      table.form28 { width: 100%; border-collapse: collapse; margin-top: 6px; }
-      table.form28 th, table.form28 td { border: 1px solid #0f172a; padding: 6px; font-size: 11px; vertical-align: middle; }
-      table.form28 th { background: #dbeafe; text-transform: uppercase; font-size: 10px; letter-spacing: .04em; }
+      table.chk { width: 100%; border-collapse: collapse; margin-top: 6px; }
+      table.chk th, table.chk td { border: 1px solid #0f172a; padding: 6px; font-size: 11px; }
+      table.chk th { background: #dbeafe; text-transform: uppercase; font-size: 10px; }
+      .yes { color: #065f46; font-weight: 700; }
+      .no { color: #991b1b; font-weight: 700; }
   body
     .section
-      h3 RECEPCIÓN MATERIA PRIMA
-      table.form28
-        thead
-          tr
-            th(style='width:14%') Materia Prima
-            th(style='width:16%') Descripción
-            th(style='width:10%') Lote
-            th(style='width:14%') Proveedor
-            th(style='width:10%') Factura N°
-            th(style='width:8%') Unidades
-            th(style='width:9%') Cantidad
-            th(style='width:10%') Fecha Entrada
-            th(style='width:9%') Firma Responsable
-        tbody
-          tr
-            td= rawMaterialName
-            td= rawMaterialDescription
-            td= supplierLotCode
-            td= supplierName
-            td= invoiceNumber
-            td= unit
-            td= quantityReceived
-            td= receivedAt
-            td= responsibleSignature
-    .section
-      h3 Resultado de Inspección
+      h3 DATOS GENERALES
       .grid-2
         .field
-          .k Resultado
-          .v= inspectionResult
+          .k Orden de producción
+          .v= productionOrderCode
         .field
-          .k Estado
-          .v= status
+          .k Lote
+          .v= batchCode
         .field
-          .k Certificado / CoA
-          .v= certificateRef
+          .k Producto
+          .v= productName
         .field
-          .k Archivo certificado
-          .v= certificateFileAttached
+          .k Variante
+          .v= variantName
         .field
-          .k Archivo factura
-          .v= invoiceFileAttached
+          .k Operario
+          .v= operatorName
         .field
-          .k Costo unitario aceptado
-          .v= acceptedUnitCost
-    if notes
+          .k Verificador
+          .v= verifierName
+        .field
+          .k Cantidad a empacar
+          .v= quantityToPack
+        .field
+          .k Cantidad empacada
+          .v= quantityPacked
+        .field
+          .k Etiqueta de lote
+          .v= lotLabel
+        .field
+          .k Registro inventario
+          .v= inventoryRecorded
+    .section
+      h3 CHECKLIST PREVIO
+      table.chk
+        thead
+          tr
+            th Criterio
+            th Cumple
+        tbody
+          tr
+            td Ficha técnica disponible
+            td(class=hasTechnicalSheetClass)= hasTechnicalSheet
+          tr
+            td Etiquetas disponibles
+            td(class=hasLabelsClass)= hasLabels
+          tr
+            td Material de empaque disponible
+            td(class=hasPackagingMaterialClass)= hasPackagingMaterial
+          tr
+            td Herramientas listas
+            td(class=hasToolsClass)= hasTools
+    if observations
       .section
         h3 Observaciones
         .field
-          .v(style='white-space: pre-wrap; font-weight: 400')= notes
+          .v(style='white-space: pre-wrap; font-weight: 400')= observations
+    if nonConformity
+      .section
+        h3 No conformidad / Acciones
+        .grid-2
+          .field
+            .k No conformidad
+            .v(style='white-space: pre-wrap; font-weight: 400')= nonConformity
+          .field
+            .k Acción correctiva
+            .v(style='white-space: pre-wrap; font-weight: 400')= correctiveAction
+          .field
+            .k Acción preventiva
+            .v(style='white-space: pre-wrap; font-weight: 400')= preventiveAction
+          .field
+            .k Diligenciado por
+            .v= formFilledBy
 `;
 
-export class QualityIncomingPdfService {
-    private readonly incomingRepo: EntityRepository<IncomingInspection>;
+export class PackagingFormPdfService {
+    private readonly batchRepo: EntityRepository<ProductionBatch>;
 
     constructor(em: EntityManager) {
-        this.incomingRepo = em.getRepository(IncomingInspection);
+        this.batchRepo = em.getRepository(ProductionBatch);
     }
 
     private formatDate(value?: Date | string | null) {
-        if (!value) return 'N/A';
-        return new Date(value).toLocaleDateString('es-CO');
-    }
-
-    private formatHeaderDate(value?: Date | string | null) {
         if (!value) return 'N/A';
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return 'N/A';
@@ -113,16 +133,6 @@ export class QualityIncomingPdfService {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
-    }
-
-    private formatCurrency(value?: number | null) {
-        const numeric = Number(value || 0);
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 4,
-        }).format(numeric);
     }
 
     private resolveProcessLabelByDocCode(code?: string | null) {
@@ -136,7 +146,7 @@ export class QualityIncomingPdfService {
             GS: 'Proceso de Gestión de Seguridad',
             GM: 'Proceso de Gestión de Mantenimiento',
         };
-        return map[prefix] || 'Proceso de Gestión de Calidad';
+        return map[prefix] || 'Proceso de Gestión de Producción';
     }
 
     private escapeHtml(value: string) {
@@ -255,47 +265,55 @@ export class QualityIncomingPdfService {
         return undefined;
     }
 
-    async generateIncomingInspectionPdf(id: string) {
-        const inspection = await this.incomingRepo.findOne(
-            { id },
-            {
-                populate: ['rawMaterial', 'purchaseOrder', 'purchaseOrder.supplier'],
-            }
+    async generatePackagingFormPdf(batchId: string) {
+        const batch = await this.batchRepo.findOne(
+            { id: batchId },
+            { populate: ['productionOrder', 'variant', 'variant.product'] }
         );
-        if (!inspection) throw new AppError('Inspección de recepción no encontrada', 404);
+        if (!batch) throw new AppError('Lote no encontrado', 404);
+        if (!batch.packagingFormCompleted || !batch.packagingFormData) {
+            throw new AppError('El lote no tiene FOR de empaque diligenciado', 400);
+        }
+
+        const form = batch.packagingFormData as Record<string, unknown>;
+        const docCode = batch.packagingFormDocumentCode || 'GP-FOR-EMPAQUE';
+        const docVersion = batch.packagingFormDocumentVersion || 1;
+        const docDate = this.formatDate(batch.packagingFormDocumentDate || batch.createdAt);
+        const title = batch.packagingFormDocumentTitle || 'Registro de Empaque y Acondicionamiento';
+        const processLabel = this.resolveProcessLabelByDocCode(docCode);
+
+        const asYesNo = (value: unknown) => (value ? 'SI' : 'NO');
+        const asClass = (value: unknown) => (value ? 'yes' : 'no');
 
         const pug = this.loadPug();
         const playwright = this.loadPlaywright();
-        const compile = pug.compile(incomingInspectionPdfTemplate);
+        const compile = pug.compile(packagingFormPdfTemplate);
         const logoDataUrl = this.getLogoDataUrl();
-
-        const docCode = inspection.documentControlCode || 'GC-FOR-28';
-        const docVersion = inspection.documentControlVersion || 1;
-        const docDate = this.formatHeaderDate(inspection.documentControlDate || inspection.createdAt);
-        const processLabel = this.resolveProcessLabelByDocCode(docCode);
-        const title = inspection.documentControlTitle || 'Recepción de Materias Primas';
-
         const html = compile({
-            title,
             docCode,
-            docVersion,
-            docDate,
-            rawMaterialName: inspection.rawMaterial?.name || 'N/A',
-            rawMaterialDescription: inspection.rawMaterial?.sku || inspection.rawMaterial?.name || 'N/A',
-            supplierLotCode: inspection.supplierLotCode || 'N/A',
-            supplierName: inspection.purchaseOrder?.supplier?.name || 'N/A',
-            invoiceNumber: inspection.invoiceNumber || 'N/A',
-            unit: inspection.rawMaterial?.unit || 'N/A',
-            quantityReceived: Number(inspection.quantityReceived || 0).toLocaleString('es-CO'),
-            receivedAt: this.formatDate(inspection.createdAt),
-            responsibleSignature: inspection.releasedBy || inspection.inspectedBy || 'N/A',
-            inspectionResult: inspection.inspectionResult || 'N/A',
-            status: inspection.status || 'N/A',
-            certificateRef: inspection.certificateRef || 'N/A',
-            certificateFileAttached: inspection.certificateFileName ? `Adjunto: ${inspection.certificateFileName}` : 'Sin adjunto',
-            invoiceFileAttached: inspection.invoiceFileName ? `Adjunto: ${inspection.invoiceFileName}` : 'Sin adjunto',
-            acceptedUnitCost: inspection.acceptedUnitCost ? this.formatCurrency(Number(inspection.acceptedUnitCost)) : 'N/A',
-            notes: inspection.notes || '',
+            productionOrderCode: batch.productionOrder.code,
+            batchCode: batch.code,
+            productName: batch.variant?.product?.name || 'N/A',
+            variantName: batch.variant?.name || 'N/A',
+            operatorName: String(form.operatorName || 'N/A'),
+            verifierName: String(form.verifierName || 'N/A'),
+            quantityToPack: Number(form.quantityToPack || 0).toLocaleString('es-CO'),
+            quantityPacked: Number(form.quantityPacked || 0).toLocaleString('es-CO'),
+            lotLabel: String(form.lotLabel || 'N/A'),
+            inventoryRecorded: asYesNo(form.inventoryRecorded),
+            hasTechnicalSheet: asYesNo(form.hasTechnicalSheet),
+            hasTechnicalSheetClass: asClass(form.hasTechnicalSheet),
+            hasLabels: asYesNo(form.hasLabels),
+            hasLabelsClass: asClass(form.hasLabels),
+            hasPackagingMaterial: asYesNo(form.hasPackagingMaterial),
+            hasPackagingMaterialClass: asClass(form.hasPackagingMaterial),
+            hasTools: asYesNo(form.hasTools),
+            hasToolsClass: asClass(form.hasTools),
+            observations: String(form.observations || ''),
+            nonConformity: String(form.nonConformity || ''),
+            correctiveAction: String(form.correctiveAction || ''),
+            preventiveAction: String(form.preventiveAction || ''),
+            formFilledBy: batch.packagingFormFilledBy || 'N/A',
         });
 
         const browser = await playwright.chromium.launch({
@@ -326,7 +344,7 @@ export class QualityIncomingPdfService {
                 },
             });
             return {
-                fileName: `${docCode}-${inspection.id.slice(0, 8).toUpperCase()}-v${docVersion}.pdf`,
+                fileName: `${docCode}-${batch.code}-v${docVersion}.pdf`,
                 buffer: pdfBuffer,
             };
         } finally {

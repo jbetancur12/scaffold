@@ -4,6 +4,7 @@ import { BOMItem } from '../entities/bom-item.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
+import { Supplier } from '../entities/supplier.entity';
 import { RawMaterialSchema, BOMItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 
@@ -21,7 +22,11 @@ export class MrpService {
     }
 
     async createRawMaterial(data: z.infer<typeof RawMaterialSchema>): Promise<RawMaterial> {
-        const material = this.rawMaterialRepo.create(data as unknown as RawMaterial);
+        const { supplierId, ...rest } = data;
+        const material = this.rawMaterialRepo.create(rest as unknown as RawMaterial);
+        if (supplierId) {
+            material.supplier = await this.em.findOneOrFail(Supplier, { id: supplierId });
+        }
         await this.em.persistAndFlush(material);
 
         if (material.supplier) {
@@ -46,10 +51,33 @@ export class MrpService {
     async updateRawMaterial(id: string, data: Partial<z.infer<typeof RawMaterialSchema>>): Promise<RawMaterial> {
         const material = await this.getRawMaterial(id);
         const oldCost = material.cost;
+        const { supplierId, ...rest } = data;
+        Object.assign(material, rest);
 
-        Object.assign(material, data);
+        if (supplierId !== undefined) {
+            material.supplier = supplierId
+                ? await this.em.findOneOrFail(Supplier, { id: supplierId })
+                : undefined;
+        }
 
         await this.em.persistAndFlush(material);
+
+        if (material.supplier) {
+            const supplierMaterialRepo = this.em.getRepository(SupplierMaterial);
+            let link = await supplierMaterialRepo.findOne({
+                supplier: material.supplier.id,
+                rawMaterial: material.id,
+            });
+            if (!link) {
+                link = supplierMaterialRepo.create({
+                    supplier: material.supplier,
+                    rawMaterial: material,
+                    lastPurchasePrice: material.lastPurchasePrice ?? material.cost,
+                    lastPurchaseDate: material.lastPurchaseDate ?? new Date(),
+                } as unknown as SupplierMaterial);
+                await this.em.persistAndFlush(link);
+            }
+        }
 
         // If cost changed, recalculate affected variants
         if (data.cost !== undefined && data.cost !== oldCost) {

@@ -3,10 +3,17 @@ import { MikroORM } from '@mikro-orm/core';
 import { MrpController } from './mrp.controller';
 import { OperationalConfigService } from './services/operational-config.service';
 import { OperationalConfigController } from './operational-config.controller';
+import { authenticateToken } from '../../middleware/auth.middleware';
+import { requireRole } from '../../middleware/role.middleware';
+import { UserRole } from '@scaffold/types';
 
 export const createMrpRoutes = (orm: MikroORM) => {
     const router = Router();
     const mrpController = new MrpController(orm);
+    const qualityEditors = [UserRole.ADMIN, UserRole.SUPERADMIN];
+
+    // All MRP routes require authenticated user
+    router.use(authenticateToken);
 
     // Products
     router.post('/products', (req, res, next) => mrpController.createProduct(req, res, next));
@@ -56,11 +63,14 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/production-batches/:batchId/units', (req, res, next) => mrpController.addProductionBatchUnits(req, res, next));
     router.patch('/production-batches/:batchId/qc', (req, res, next) => mrpController.updateProductionBatchQc(req, res, next));
     router.patch('/production-batches/:batchId/packaging', (req, res, next) => mrpController.updateProductionBatchPackaging(req, res, next));
+    router.post('/production-batches/:batchId/packaging-form', (req, res, next) => mrpController.upsertProductionBatchPackagingForm(req, res, next));
+    router.get('/production-batches/:batchId/packaging-form', (req, res, next) => mrpController.getProductionBatchPackagingForm(req, res, next));
+    router.get('/production-batches/:batchId/packaging-form/pdf', (req, res, next) => mrpController.downloadProductionBatchPackagingFormPdf(req, res, next));
     router.patch('/production-batch-units/:unitId/qc', (req, res, next) => mrpController.updateProductionBatchUnitQc(req, res, next));
     router.patch('/production-batch-units/:unitId/packaging', (req, res, next) => mrpController.updateProductionBatchUnitPackaging(req, res, next));
 
     // Quality / INVIMA
-    router.post('/quality/non-conformities', (req, res, next) => mrpController.createNonConformity(req, res, next));
+    router.post('/quality/non-conformities', requireRole(qualityEditors), (req, res, next) => mrpController.createNonConformity(req, res, next));
     router.get('/quality/non-conformities', (req, res, next) => mrpController.listNonConformities(req, res, next));
     router.patch('/quality/non-conformities/:id', (req, res, next) => mrpController.updateNonConformity(req, res, next));
     router.post('/quality/capa-actions', (req, res, next) => mrpController.createCapa(req, res, next));
@@ -118,8 +128,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/training-evidence', (req, res, next) => mrpController.listQualityTrainingEvidence(req, res, next));
     router.get('/quality/incoming-inspections', (req, res, next) => mrpController.listIncomingInspections(req, res, next));
     router.get('/quality/incoming-inspections/:id/pdf', (req, res, next) => mrpController.downloadIncomingInspectionPdf(req, res, next));
-    router.patch('/quality/incoming-inspections/:id/resolve', (req, res, next) => mrpController.resolveIncomingInspection(req, res, next));
-    router.patch('/quality/incoming-inspections/:id/correct-cost', (req, res, next) => mrpController.correctResolvedIncomingInspectionCost(req, res, next));
+    router.post('/quality/incoming-inspections/:id/evidence/:evidenceType', requireRole(qualityEditors), (req, res, next) => mrpController.uploadIncomingInspectionEvidence(req, res, next));
+    router.get('/quality/incoming-inspections/:id/evidence/:evidenceType', (req, res, next) => mrpController.downloadIncomingInspectionEvidence(req, res, next));
+    router.patch('/quality/incoming-inspections/:id/resolve', requireRole(qualityEditors), (req, res, next) => mrpController.resolveIncomingInspection(req, res, next));
+    router.patch('/quality/incoming-inspections/:id/correct-cost', requireRole(qualityEditors), (req, res, next) => mrpController.correctResolvedIncomingInspectionCost(req, res, next));
     router.post('/quality/batch-releases', (req, res, next) => mrpController.upsertBatchReleaseChecklist(req, res, next));
     router.get('/quality/batch-releases', (req, res, next) => mrpController.listBatchReleases(req, res, next));
     router.post('/quality/batch-releases/:productionBatchId/sign', (req, res, next) => mrpController.signBatchRelease(req, res, next));
@@ -166,7 +178,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     const configController = new OperationalConfigController(configService);
 
     router.get('/operational-config', (req, res, next) => configController.getConfig(req, res, next));
-    router.put('/operational-config', (req, res, next) => configController.updateConfig(req, res, next));
+    router.put('/operational-config', requireRole([UserRole.ADMIN, UserRole.SUPERADMIN]), (req, res, next) => configController.updateConfig(req, res, next));
 
     return router;
 };

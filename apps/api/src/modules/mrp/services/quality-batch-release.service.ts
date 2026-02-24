@@ -3,14 +3,12 @@ import {
     BatchReleaseStatus,
     DispatchValidationResult,
     DocumentApprovalMethod,
-    DocumentProcess,
     ProductionBatchPackagingStatus,
     ProductionBatchQcStatus,
 } from '@scaffold/types';
 import { AppError } from '../../../shared/utils/response';
 import { BatchRelease } from '../entities/batch-release.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
-import { DocumentControlService } from './document-control.service';
 
 type QualityAuditLogger = (payload: {
     entityType: string;
@@ -112,11 +110,6 @@ export class QualityBatchReleaseService {
         ) {
             throw new AppError('El lote debe estar con QC y empaque aprobados', 400);
         }
-
-        const docService = new DocumentControlService(this.em);
-        await docService.assertActiveProcessDocument(DocumentProcess.PRODUCCION);
-        await docService.assertActiveProcessDocument(DocumentProcess.CONTROL_CALIDAD);
-        await docService.assertActiveProcessDocument(DocumentProcess.EMPAQUE);
 
         const dispatchValidation = await this.validateDispatchReadiness(batch.id, payload.actor);
         if (!dispatchValidation.eligible) {

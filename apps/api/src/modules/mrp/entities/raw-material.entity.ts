@@ -36,4 +36,9 @@ export class RawMaterial extends BaseEntity implements IRawMaterial {
     get supplierId() {
         return this.supplier?.id;
     }
+
+    @Property({ persist: false })
+    get supplierName() {
+        return this.supplier?.name;
+    }
 }

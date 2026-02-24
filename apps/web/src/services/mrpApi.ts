@@ -75,6 +75,7 @@ import {
     PurchaseRequisition,
     PurchaseRequisitionListResponse,
     PurchaseRequisitionStatus,
+    UpsertProductionBatchPackagingFormPayload,
 } from '@scaffold/types';
 import type {
     CreatePurchaseOrderDto,
@@ -123,6 +124,7 @@ import type {
     CreateQualityTrainingEvidencePayload,
     ResolveIncomingInspectionPayload,
     CorrectIncomingInspectionCostPayload,
+    UploadIncomingInspectionEvidencePayload,
     UpsertBatchReleaseChecklistPayload,
     SignBatchReleasePayload,
     ApproveControlledDocumentPayload,
@@ -154,6 +156,8 @@ export interface RawMaterialSupplier {
     lastPurchasePrice: number;
     lastPurchaseDate: string;
 }
+
+export type IncomingInspectionEvidenceType = 'invoice' | 'certificate';
 
 export interface ListResponse<T> {
     [key: string]: T[] | number; // Dynamic key based on return type (products, materials, etc)
@@ -414,6 +418,32 @@ export const mrpApi = {
     updateProductionBatchUnitPackaging: async (unitId: string, packaged: boolean): Promise<ProductionBatchUnit> => {
         const response = await api.patch<ProductionBatchUnit>(`/mrp/production-batch-units/${unitId}/packaging`, { packaged });
         return response.data;
+    },
+    upsertProductionBatchPackagingForm: async (batchId: string, payload: UpsertProductionBatchPackagingFormPayload): Promise<ProductionBatch> => {
+        const response = await api.post<ProductionBatch>(`/mrp/production-batches/${batchId}/packaging-form`, payload);
+        return response.data;
+    },
+    getProductionBatchPackagingForm: async (batchId: string): Promise<{
+        batchId: string;
+        batchCode: string;
+        productionOrderCode: string;
+        productName: string;
+        variantName: string;
+        formCompleted: boolean;
+        formFilledBy?: string;
+        formFilledAt?: string;
+        documentControlCode?: string;
+        documentControlTitle?: string;
+        documentControlVersion?: number;
+        documentControlDate?: string;
+        data: Record<string, unknown> | null;
+    }> => {
+        const response = await api.get(`/mrp/production-batches/${batchId}/packaging-form`);
+        return response.data;
+    },
+    getProductionBatchPackagingFormPdf: async (batchId: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/production-batches/${batchId}/packaging-form/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
     },
 
     // Quality / INVIMA
@@ -690,6 +720,18 @@ export const mrpApi = {
     },
     getIncomingInspectionPdf: async (id: string): Promise<Blob> => {
         const response = await api.get(`/mrp/quality/incoming-inspections/${id}/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    uploadIncomingInspectionEvidence: async (
+        id: string,
+        evidenceType: IncomingInspectionEvidenceType,
+        payload: UploadIncomingInspectionEvidencePayload
+    ): Promise<IncomingInspection> => {
+        const response = await api.post<IncomingInspection>(`/mrp/quality/incoming-inspections/${id}/evidence/${evidenceType}`, payload);
+        return response.data;
+    },
+    downloadIncomingInspectionEvidence: async (id: string, evidenceType: IncomingInspectionEvidenceType): Promise<Blob> => {
+        const response = await api.get(`/mrp/quality/incoming-inspections/${id}/evidence/${evidenceType}`, { responseType: 'blob' });
         return response.data as Blob;
     },
     resolveIncomingInspection: async (id: string, data: ResolveIncomingInspectionPayload): Promise<IncomingInspection> => {

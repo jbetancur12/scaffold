@@ -40,6 +40,48 @@ const statusColors = {
     CANCELLED: 'bg-red-100 text-red-800',
 };
 
+const formatTraceReference = (prefix: 'REQ' | 'OP', rawId: string) => {
+    const clean = rawId.trim();
+    if (!clean) return `${prefix}-N/A`;
+    return `${prefix}-${clean.slice(0, 8).toUpperCase()}`;
+};
+
+const prettifyOrderNotes = (notes: string) => {
+    let text = notes.trim();
+    if (!text) return text;
+
+    // Recover readability for legacy notes persisted in one line.
+    const markers = [
+        'Tipo de compra:',
+        'Lugar de entrega:',
+        'Forma de pago:',
+        'Moneda:',
+        'Aprobador:',
+        'Requisitos de calidad:',
+        'Descuento:',
+        'Retención',
+        'Otros cargos:',
+        'Total neto estimado:',
+        'Requisicion origen:',
+        'Requisición origen:',
+        'OP origen:',
+    ];
+    for (const marker of markers) {
+        const rx = new RegExp(`\\s(${marker.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')})`, 'g');
+        text = text.replace(rx, `\n$1`);
+    }
+
+    // Make origin IDs human-readable without losing full traceability.
+    text = text.replace(/Requisici(?:o|ó)n origen:\s*([a-f0-9-]{36})/gi, (_m, id: string) =>
+        `Requisición origen: ${formatTraceReference('REQ', id)} (${id})`
+    );
+    text = text.replace(/OP origen:\s*([a-f0-9-]{36})/gi, (_m, id: string) =>
+        `OP origen: ${formatTraceReference('OP', id)} (${id})`
+    );
+
+    return text;
+};
+
 export default function PurchaseOrderDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -238,7 +280,53 @@ export default function PurchaseOrderDetailPage() {
                     {order.notes && (
                         <div className="mt-4">
                             <div className="text-sm text-slate-600">Notas</div>
-                            <div className="mt-1 text-sm">{order.notes}</div>
+                            <div className="mt-1 text-sm rounded-md border border-slate-200 bg-slate-50 p-3 space-y-1">
+                                {prettifyOrderNotes(order.notes)
+                                    .split('\n')
+                                    .map((line) => line.trim())
+                                    .filter((line) => line.length > 0)
+                                    .map((line, index) => {
+                                        const requisitionMatch = line.match(/^Requisición origen:\s*(REQ-[A-Z0-9]+)\s*\(([a-f0-9-]{36})\)$/i);
+                                        if (requisitionMatch) {
+                                            const ref = requisitionMatch[1];
+                                            const id = requisitionMatch[2];
+                                            return (
+                                                <div key={`note-${index}`}>
+                                                    Requisición origen:{' '}
+                                                    <button
+                                                        type="button"
+                                                        className="underline text-blue-700 hover:text-blue-900"
+                                                        onClick={() => navigate(`/mrp/purchase-requisitions?highlight=${id}`)}
+                                                        title={id}
+                                                    >
+                                                        {ref}
+                                                    </button>
+                                                </div>
+                                            );
+                                        }
+
+                                        const productionOrderMatch = line.match(/^OP origen:\s*(OP-[A-Z0-9]+)\s*\(([a-f0-9-]{36})\)$/i);
+                                        if (productionOrderMatch) {
+                                            const ref = productionOrderMatch[1];
+                                            const id = productionOrderMatch[2];
+                                            return (
+                                                <div key={`note-${index}`}>
+                                                    OP origen:{' '}
+                                                    <button
+                                                        type="button"
+                                                        className="underline text-blue-700 hover:text-blue-900"
+                                                        onClick={() => navigate(`/mrp/production-orders/${id}`)}
+                                                        title={id}
+                                                    >
+                                                        {ref}
+                                                    </button>
+                                                </div>
+                                            );
+                                        }
+
+                                        return <div key={`note-${index}`}>{line}</div>;
+                                    })}
+                            </div>
                         </div>
                     )}
                 </div>

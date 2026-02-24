@@ -72,7 +72,7 @@ export class PurchaseOrder {
     @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
     subtotalBase: number = 0;
 
-    @Property({ nullable: true })
+    @Property({ type: 'text', nullable: true })
     notes?: string;
 
     @OneToMany(() => PurchaseOrderItem, item => item.purchaseOrder, { orphanRemoval: true })

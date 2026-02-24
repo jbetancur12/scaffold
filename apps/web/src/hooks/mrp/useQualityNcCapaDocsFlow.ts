@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
     CapaStatus,
     DocumentCategory,
@@ -25,9 +25,22 @@ import {
     useUpdateNonConformityMutation,
 } from '@/hooks/mrp/useQuality';
 import { mrpApi } from '@/services/mrpApi';
+import { useLocation } from 'react-router-dom';
+
+type NcPrefillState = {
+    prefillNc?: {
+        title?: string;
+        description?: string;
+        severity?: QualitySeverity;
+        source?: string;
+        incomingInspectionId?: string;
+    };
+};
 
 export const useQualityNcCapaDocsFlow = () => {
     const { toast } = useToast();
+    const location = useLocation();
+    const lastPrefillInspectionIdRef = useRef<string | null>(null);
 
     const { data: nonConformitiesData, loading: loadingNc } = useNonConformitiesQuery();
     const { data: capasData, loading: loadingCapas } = useCapasQuery();
@@ -48,6 +61,7 @@ export const useQualityNcCapaDocsFlow = () => {
         description: '',
         severity: QualitySeverity.MEDIA,
         source: 'produccion',
+        incomingInspectionId: '',
     });
     const [capaForm, setCapaForm] = useState({
         nonConformityId: '',
@@ -74,11 +88,29 @@ export const useQualityNcCapaDocsFlow = () => {
     const requiresInitialControlDocument = documents.length === 0;
     const openNc = nonConformities.filter((n) => n.status !== NonConformityStatus.CERRADA);
 
+    useEffect(() => {
+        const state = location.state as NcPrefillState | null;
+        const prefill = state?.prefillNc;
+        if (!prefill) return;
+        const incomingInspectionId = prefill.incomingInspectionId || '';
+        if (incomingInspectionId && lastPrefillInspectionIdRef.current === incomingInspectionId) return;
+
+        setNcForm((prev) => ({
+            ...prev,
+            title: prefill.title || prev.title,
+            description: prefill.description || prev.description,
+            severity: prefill.severity || prev.severity,
+            source: prefill.source || prev.source,
+            incomingInspectionId: incomingInspectionId || prev.incomingInspectionId,
+        }));
+        lastPrefillInspectionIdRef.current = incomingInspectionId || null;
+    }, [location.state]);
+
     const handleCreateNc = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             await createNc(ncForm);
-            setNcForm({ title: '', description: '', severity: QualitySeverity.MEDIA, source: 'produccion' });
+            setNcForm({ title: '', description: '', severity: QualitySeverity.MEDIA, source: 'produccion', incomingInspectionId: '' });
             toast({ title: 'No conformidad creada', description: 'Registro creado correctamente.' });
         } catch (err) {
             toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear la no conformidad'), variant: 'destructive' });

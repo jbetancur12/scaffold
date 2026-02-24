@@ -62,6 +62,7 @@ export class OperationalConfigService {
         config.defaultPurchaseOrderControlledDocumentId = undefined;
         config.defaultPurchaseOrderControlledDocumentCode = undefined;
         config.defaultIncomingInspectionControlledDocumentCode = undefined;
+        config.defaultPackagingControlledDocumentCode = undefined;
         config.purchaseWithholdingRules = [
             { key: 'compra', label: 'Compra', rate: 2.5, active: true },
             { key: 'servicio', label: 'Servicio', rate: 4, active: true },
@@ -100,6 +101,9 @@ export class OperationalConfigService {
         }
         if (data.defaultIncomingInspectionControlledDocumentCode !== undefined) {
             config.defaultIncomingInspectionControlledDocumentCode = data.defaultIncomingInspectionControlledDocumentCode?.trim() || undefined;
+        }
+        if (data.defaultPackagingControlledDocumentCode !== undefined) {
+            config.defaultPackagingControlledDocumentCode = data.defaultPackagingControlledDocumentCode?.trim() || undefined;
         }
         if (data.purchaseWithholdingRules !== undefined) {
             config.purchaseWithholdingRules = data.purchaseWithholdingRules.map((rule) => ({

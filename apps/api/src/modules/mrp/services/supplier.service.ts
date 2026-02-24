@@ -44,15 +44,35 @@ export class SupplierService {
     }
 
     async getSuppliersForMaterial(materialId: string) {
-        // We need to access SupplierMaterial repo. Best to do it via EM to avoid circular deps or just simple usage.
+        const rawMaterial = await this.em.findOne(RawMaterial, { id: materialId }, { populate: ['supplier'] });
         const supplierMaterialRepo = this.em.getRepository(SupplierMaterial);
-        return supplierMaterialRepo.find(
+        const rows = await supplierMaterialRepo.find(
             { rawMaterial: materialId },
             {
                 populate: ['supplier'],
                 orderBy: { lastPurchaseDate: 'DESC' }
             }
         );
+
+        const preferredSupplierId = rawMaterial?.supplier?.id;
+        if (!preferredSupplierId) return rows;
+
+        const preferredRowIndex = rows.findIndex((row) => row.supplier.id === preferredSupplierId);
+        if (preferredRowIndex >= 0) {
+            const [preferredRow] = rows.splice(preferredRowIndex, 1);
+            return [preferredRow, ...rows];
+        }
+
+        // If preferred supplier has no purchase history yet, still return it as first suggestion.
+        return [
+            supplierMaterialRepo.create({
+                supplier: rawMaterial!.supplier,
+                rawMaterial: rawMaterial!,
+                lastPurchasePrice: rawMaterial?.lastPurchasePrice ?? rawMaterial?.cost ?? 0,
+                lastPurchaseDate: rawMaterial?.lastPurchaseDate ?? new Date(),
+            } as unknown as SupplierMaterial),
+            ...rows,
+        ];
     }
 
     async getSupplierMaterials(supplierId: string) {

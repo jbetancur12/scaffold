@@ -440,6 +440,12 @@ export default function PurchaseOrderFormPage() {
     };
     const selectedSupplier = getSupplierById(formData.supplierId);
 
+    const formatReferenceCode = (prefix: 'REQ' | 'OP', id?: string) => {
+        if (!id) return 'N/A';
+        const short = id.slice(0, 8).toUpperCase();
+        return `${prefix}-${short}`;
+    };
+
     const buildStructuredNotes = () => {
         const blocks: string[] = [];
         const purchaseTypeLabel = activeWithholdingRules.find((rule) => rule.key === purchaseConditions.purchaseType)?.label || purchaseConditions.purchaseType;
@@ -458,8 +464,10 @@ export default function PurchaseOrderFormPage() {
             `Retención (${withholdingRate}%): ${withholdingAmount.toFixed(2)}`,
             `Otros cargos: ${otherChargesAmount.toFixed(2)}`,
             `Total neto estimado: ${netTotal.toFixed(2)}`,
-            requisition ? `Requisicion origen: ${requisition.id}` : '',
-            requisition?.productionOrderId ? `OP origen: ${requisition.productionOrderId}` : '',
+            requisition ? `Requisición origen: ${formatReferenceCode('REQ', requisition.id)} (${requisition.id})` : '',
+            requisition?.productionOrderId
+                ? `OP origen: ${formatReferenceCode('OP', requisition.productionOrderId)} (${requisition.productionOrderId})`
+                : '',
         ].filter(Boolean);
 
         if (structuredLines.length > 0) {

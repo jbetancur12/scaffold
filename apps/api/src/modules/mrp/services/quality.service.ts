@@ -45,6 +45,7 @@ import { NonConformity } from '../entities/non-conformity.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { ProductionOrder } from '../entities/production-order.entity';
+import { IncomingInspection } from '../entities/incoming-inspection.entity';
 import { ControlledDocument } from '../entities/controlled-document.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RecallCase } from '../entities/recall-case.entity';
@@ -138,8 +139,16 @@ export class QualityService {
         productionOrderId?: string;
         productionBatchId?: string;
         productionBatchUnitId?: string;
+        incomingInspectionId?: string;
         createdBy?: string;
     }) {
+        if (payload.incomingInspectionId) {
+            const inspection = await this.em.findOne(IncomingInspection, { id: payload.incomingInspectionId });
+            if (!inspection) {
+                throw new AppError('La inspección de recepción asociada no existe', 404);
+            }
+        }
+
         const nc = this.ncRepo.create({
             title: payload.title,
             description: payload.description,
@@ -150,6 +159,7 @@ export class QualityService {
             productionOrder: payload.productionOrderId ? this.em.getReference(ProductionOrder, payload.productionOrderId) : undefined,
             productionBatch: payload.productionBatchId ? this.em.getReference(ProductionBatch, payload.productionBatchId) : undefined,
             productionBatchUnit: payload.productionBatchUnitId ? this.em.getReference(ProductionBatchUnit, payload.productionBatchUnitId) : undefined,
+            incomingInspection: payload.incomingInspectionId ? this.em.getReference(IncomingInspection, payload.incomingInspectionId) : undefined,
         } as unknown as NonConformity);
 
         await this.em.persistAndFlush(nc);
@@ -163,7 +173,7 @@ export class QualityService {
 
         return this.ncRepo.findOneOrFail(
             { id: nc.id },
-            { populate: ['productionOrder', 'productionBatch', 'productionBatchUnit'] }
+            { populate: ['productionOrder', 'productionBatch', 'productionBatchUnit', 'incomingInspection'] }
         );
     }
 
@@ -174,7 +184,7 @@ export class QualityService {
         if (filters.source) query.source = filters.source;
 
         return this.ncRepo.find(query, {
-            populate: ['productionOrder', 'productionBatch', 'productionBatchUnit'],
+            populate: ['productionOrder', 'productionBatch', 'productionBatchUnit', 'incomingInspection'],
             orderBy: { createdAt: 'DESC' },
         });
     }
@@ -665,6 +675,19 @@ export class QualityService {
         actor?: string;
     }) {
         return this.incomingService.correctResolvedIncomingInspectionCost(id, payload);
+    }
+
+    async uploadIncomingInspectionEvidence(id: string, evidenceType: 'invoice' | 'certificate', payload: {
+        fileName: string;
+        mimeType: string;
+        base64Data: string;
+        actor?: string;
+    }) {
+        return this.incomingService.uploadIncomingInspectionEvidence(id, evidenceType, payload);
+    }
+
+    async readIncomingInspectionEvidence(id: string, evidenceType: 'invoice' | 'certificate') {
+        return this.incomingService.readIncomingInspectionEvidence(id, evidenceType);
     }
 
     async upsertBatchReleaseChecklist(payload: {

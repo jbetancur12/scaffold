@@ -2,7 +2,9 @@ import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import {
     ChangeControlStatus,
     ChangeImpactLevel,
+    DocumentCategory,
     DocumentProcess,
+    DocumentStatus,
     ProductionBatchPackagingStatus,
     ProductionBatchQcStatus,
     ProductionBatchStatus,
@@ -26,6 +28,8 @@ import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
 import { BatchRelease } from '../entities/batch-release.entity';
 import { ChangeControl } from '../entities/change-control.entity';
+import { ControlledDocument } from '../entities/controlled-document.entity';
+import { OperationalConfig } from '../entities/operational-config.entity';
 import { DocumentControlService } from './document-control.service';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema } from '@scaffold/schemas';
 import { z } from 'zod';
@@ -41,6 +45,7 @@ export class ProductionService {
     private readonly regulatoryLabelRepo: EntityRepository<RegulatoryLabel>;
     private readonly batchReleaseRepo: EntityRepository<BatchRelease>;
     private readonly changeControlRepo: EntityRepository<ChangeControl>;
+    private readonly operationalConfigRepo: EntityRepository<OperationalConfig>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -52,6 +57,7 @@ export class ProductionService {
         this.regulatoryLabelRepo = em.getRepository(RegulatoryLabel);
         this.batchReleaseRepo = em.getRepository(BatchRelease);
         this.changeControlRepo = em.getRepository(ChangeControl);
+        this.operationalConfigRepo = em.getRepository(OperationalConfig);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
@@ -203,8 +209,8 @@ export class ProductionService {
     }
 
     async setBatchQc(batchId: string, passed: boolean) {
-        await this.assertProcessDocument(DocumentProcess.CONTROL_CALIDAD);
-        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units'] });
+        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units', 'productionOrder'] });
+        this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'aprobar QC de lote');
         batch.qcStatus = passed ? ProductionBatchQcStatus.PASSED : ProductionBatchQcStatus.FAILED;
         batch.status = passed ? ProductionBatchStatus.QC_PASSED : ProductionBatchStatus.QC_PENDING;
         await this.em.persistAndFlush(batch);
@@ -216,8 +222,11 @@ export class ProductionService {
     }
 
     async setBatchPackaging(batchId: string, packed: boolean) {
-        await this.assertProcessDocument(DocumentProcess.EMPAQUE);
-        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units'] });
+        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units', 'productionOrder'] });
+        this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'empacar lote');
+        if (packed && !batch.packagingFormCompleted) {
+            throw new AppError('Debes diligenciar el FOR de empaque antes de empacar', 400);
+        }
         if (batch.qcStatus !== ProductionBatchQcStatus.PASSED) {
             throw new AppError('Debes aprobar QC antes de empacar', 400);
         }
@@ -271,8 +280,8 @@ export class ProductionService {
     }
 
     async setBatchUnitQc(unitId: string, passed: boolean) {
-        await this.assertProcessDocument(DocumentProcess.CONTROL_CALIDAD);
-        const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch'] });
+        const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch', 'batch.productionOrder'] });
+        this.assertOrderInProgressForBatchActions(unit.batch.productionOrder.status, 'aprobar QC de unidad');
         unit.qcPassed = passed;
         if (!passed) {
             unit.packaged = false;
@@ -286,8 +295,8 @@ export class ProductionService {
     }
 
     async setBatchUnitPackaging(unitId: string, packaged: boolean) {
-        await this.assertProcessDocument(DocumentProcess.EMPAQUE);
-        const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch'] });
+        const unit = await this.batchUnitRepo.findOneOrFail({ id: unitId }, { populate: ['batch', 'batch.productionOrder'] });
+        this.assertOrderInProgressForBatchActions(unit.batch.productionOrder.status, 'empacar unidad');
         if (!unit.qcPassed && !unit.rejected) {
             throw new AppError('La unidad debe pasar QC antes de empacar', 400);
         }
@@ -298,6 +307,83 @@ export class ProductionService {
         }
         await this.logAudit('production_batch_unit', unit.id, 'packaging_updated', { packaged });
         return unit;
+    }
+
+    async upsertBatchPackagingForm(batchId: string, payload: {
+        operatorName: string;
+        verifierName: string;
+        quantityToPack: number;
+        quantityPacked: number;
+        lotLabel: string;
+        hasTechnicalSheet: boolean;
+        hasLabels: boolean;
+        hasPackagingMaterial: boolean;
+        hasTools: boolean;
+        inventoryRecorded: boolean;
+        observations?: string;
+        nonConformity?: string;
+        correctiveAction?: string;
+        preventiveAction?: string;
+        controlledDocumentId?: string;
+        actor?: string;
+    }) {
+        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['productionOrder'] });
+        this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'diligenciar FOR de empaque');
+
+        const controlledDoc = await this.resolvePackagingControlledDocument(payload.controlledDocumentId);
+        batch.packagingFormData = {
+            operatorName: payload.operatorName,
+            verifierName: payload.verifierName,
+            quantityToPack: payload.quantityToPack,
+            quantityPacked: payload.quantityPacked,
+            lotLabel: payload.lotLabel,
+            hasTechnicalSheet: payload.hasTechnicalSheet,
+            hasLabels: payload.hasLabels,
+            hasPackagingMaterial: payload.hasPackagingMaterial,
+            hasTools: payload.hasTools,
+            inventoryRecorded: payload.inventoryRecorded,
+            observations: payload.observations?.trim() || undefined,
+            nonConformity: payload.nonConformity?.trim() || undefined,
+            correctiveAction: payload.correctiveAction?.trim() || undefined,
+            preventiveAction: payload.preventiveAction?.trim() || undefined,
+        };
+        batch.packagingFormCompleted = true;
+        batch.packagingFormFilledBy = payload.actor?.trim() || payload.operatorName.trim();
+        batch.packagingFormFilledAt = new Date();
+        batch.packagingFormDocumentId = controlledDoc.id;
+        batch.packagingFormDocumentCode = controlledDoc.code;
+        batch.packagingFormDocumentTitle = controlledDoc.title;
+        batch.packagingFormDocumentVersion = controlledDoc.version;
+        batch.packagingFormDocumentDate = controlledDoc.effectiveDate || controlledDoc.approvedAt || controlledDoc.updatedAt;
+        await this.em.persistAndFlush(batch);
+        await this.logAudit('production_batch', batch.id, 'packaging_form_updated', {
+            controlledDocumentCode: batch.packagingFormDocumentCode,
+            controlledDocumentVersion: batch.packagingFormDocumentVersion,
+            actor: payload.actor || payload.operatorName,
+        });
+        return batch;
+    }
+
+    async getBatchPackagingForm(batchId: string) {
+        const batch = await this.batchRepo.findOneOrFail(
+            { id: batchId },
+            { populate: ['variant', 'variant.product', 'productionOrder'] }
+        );
+        return {
+            batchId: batch.id,
+            batchCode: batch.code,
+            productionOrderCode: batch.productionOrder.code,
+            productName: batch.variant?.product?.name || 'N/A',
+            variantName: batch.variant?.name || 'N/A',
+            formCompleted: Boolean(batch.packagingFormCompleted),
+            formFilledBy: batch.packagingFormFilledBy,
+            formFilledAt: batch.packagingFormFilledAt,
+            documentControlCode: batch.packagingFormDocumentCode,
+            documentControlTitle: batch.packagingFormDocumentTitle,
+            documentControlVersion: batch.packagingFormDocumentVersion,
+            documentControlDate: batch.packagingFormDocumentDate,
+            data: batch.packagingFormData || null,
+        };
     }
 
 
@@ -513,6 +599,45 @@ export class ProductionService {
     private async assertProcessDocument(process: DocumentProcess) {
         const service = new DocumentControlService(this.em);
         await service.assertActiveProcessDocument(process);
+    }
+
+    private async resolvePackagingControlledDocument(controlledDocumentId?: string) {
+        const docRepo = this.em.getRepository(ControlledDocument);
+        if (controlledDocumentId) {
+            const selected = await docRepo.findOne({ id: controlledDocumentId });
+            if (!selected) {
+                throw new AppError('Documento controlado no encontrado para FOR de empaque', 404);
+            }
+            if (selected.process !== DocumentProcess.EMPAQUE || selected.status !== DocumentStatus.APROBADO) {
+                throw new AppError('El documento seleccionado debe estar aprobado y pertenecer a Empaque', 400);
+            }
+            return selected;
+        }
+
+        const configs = await this.operationalConfigRepo.findAll({ limit: 1, orderBy: { createdAt: 'DESC' } });
+        const config = configs[0];
+        const configuredCode = config?.defaultPackagingControlledDocumentCode?.trim();
+        if (!configuredCode) {
+            throw new AppError('Debes configurar el formato global de empaque en Órdenes de Producción (engranaje)', 400);
+        }
+        const now = new Date();
+        const configured = await docRepo.findOne({
+            code: configuredCode,
+            documentCategory: DocumentCategory.FOR,
+            status: DocumentStatus.APROBADO,
+            $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+            $and: [{ $or: [{ effectiveDate: null }, { effectiveDate: { $lte: now } }] }],
+        }, { orderBy: { version: 'DESC' } });
+        if (!configured) {
+            throw new AppError(`El formato global de empaque configurado (${configuredCode}) no está aprobado/vigente`, 400);
+        }
+        return configured;
+    }
+
+    private assertOrderInProgressForBatchActions(orderStatus: ProductionOrderStatus, action: string) {
+        if (orderStatus !== ProductionOrderStatus.IN_PROGRESS) {
+            throw new AppError(`No puedes ${action} hasta iniciar producción`, 400);
+        }
     }
 
     private async reopenBatchReleaseIfNeeded(productionBatchId: string, reason: string) {

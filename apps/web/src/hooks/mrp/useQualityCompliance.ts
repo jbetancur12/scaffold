@@ -39,6 +39,7 @@ export const useQualityCompliance = () => {
         setInvimaRegistrationForm: regulatoryFlow.setInvimaRegistrationForm,
         loadingRegulatoryLabels: regulatoryFlow.loadingRegulatoryLabels,
         loadingIncomingInspections: receptionReleaseFlow.loadingIncomingInspections,
+        refetchIncomingInspections: receptionReleaseFlow.refetchIncomingInspections,
         loadingBatchReleases: receptionReleaseFlow.loadingBatchReleases,
         loadingInvimaRegistrations: regulatoryFlow.loadingInvimaRegistrations,
         savingRegulatoryLabel: regulatoryFlow.savingRegulatoryLabel,

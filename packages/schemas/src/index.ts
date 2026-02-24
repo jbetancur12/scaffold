@@ -315,6 +315,25 @@ export const UpdateProductionBatchUnitPackagingSchema = z.object({
     packaged: z.boolean(),
 });
 
+export const UpsertProductionBatchPackagingFormSchema = z.object({
+    operatorName: z.string().min(2),
+    verifierName: z.string().min(2),
+    quantityToPack: z.number().positive(),
+    quantityPacked: z.number().positive(),
+    lotLabel: z.string().min(4),
+    hasTechnicalSheet: z.boolean(),
+    hasLabels: z.boolean(),
+    hasPackagingMaterial: z.boolean(),
+    hasTools: z.boolean(),
+    inventoryRecorded: z.boolean(),
+    observations: z.string().optional(),
+    nonConformity: z.string().optional(),
+    correctiveAction: z.string().optional(),
+    preventiveAction: z.string().optional(),
+    controlledDocumentId: z.string().uuid().optional(),
+    actor: z.string().optional(),
+});
+
 export const PaginationQuerySchema = z.object({
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().optional(),
@@ -378,6 +397,7 @@ export const CreateNonConformitySchema = z.object({
     productionOrderId: z.string().uuid().optional(),
     productionBatchId: z.string().uuid().optional(),
     productionBatchUnitId: z.string().uuid().optional(),
+    incomingInspectionId: z.string().uuid().optional(),
     createdBy: z.string().optional(),
 });
 
@@ -919,6 +939,15 @@ export const CorrectIncomingInspectionCostSchema = z.object({
     actor: z.string().optional(),
 });
 
+export const IncomingInspectionEvidenceTypeSchema = z.enum(['invoice', 'certificate']);
+
+export const UploadIncomingInspectionEvidenceSchema = z.object({
+    fileName: z.string().min(1),
+    mimeType: z.string().min(3),
+    base64Data: z.string().min(8),
+    actor: z.string().optional(),
+});
+
 export const UpsertBatchReleaseChecklistSchema = z.object({
     productionBatchId: z.string().uuid(),
     qcApproved: z.boolean(),
@@ -1028,6 +1057,7 @@ export const OperationalConfigSchema = z.object({
     defaultPurchaseOrderControlledDocumentId: z.string().uuid().optional(),
     defaultPurchaseOrderControlledDocumentCode: z.string().min(1).optional(),
     defaultIncomingInspectionControlledDocumentCode: z.string().min(1).optional(),
+    defaultPackagingControlledDocumentCode: z.string().min(1).optional(),
     purchaseWithholdingRules: z.array(
         z.object({
             key: z.string().min(1),
@@ -1057,6 +1087,7 @@ type DateInputValue<T> = T extends Date
 
 // MRP/Quality API input contracts (schema-driven)
 export type CreateProductionBatchPayload = DateInputValue<z.input<typeof CreateProductionBatchSchema>>;
+export type UpsertProductionBatchPackagingFormPayload = DateInputValue<z.input<typeof UpsertProductionBatchPackagingFormSchema>>;
 export type CreateNonConformityPayload = DateInputValue<z.input<typeof CreateNonConformitySchema>>;
 export type UpdateNonConformityPayload = DateInputValue<z.input<typeof UpdateNonConformitySchema>>;
 export type CreateCapaPayload = DateInputValue<z.input<typeof CreateCapaSchema>>;
@@ -1091,6 +1122,7 @@ export type CreateQualityRiskControlPayload = DateInputValue<z.input<typeof Crea
 export type CreateQualityTrainingEvidencePayload = DateInputValue<z.input<typeof CreateQualityTrainingEvidenceSchema>>;
 export type ResolveIncomingInspectionPayload = DateInputValue<z.input<typeof ResolveIncomingInspectionSchema>>;
 export type CorrectIncomingInspectionCostPayload = DateInputValue<z.input<typeof CorrectIncomingInspectionCostSchema>>;
+export type UploadIncomingInspectionEvidencePayload = DateInputValue<z.input<typeof UploadIncomingInspectionEvidenceSchema>>;
 export type UpsertBatchReleaseChecklistPayload = DateInputValue<z.input<typeof UpsertBatchReleaseChecklistSchema>>;
 export type SignBatchReleasePayload = DateInputValue<z.input<typeof SignBatchReleaseSchema>>;
 export type ApproveControlledDocumentPayload = DateInputValue<z.input<typeof ApproveControlledDocumentSchema>>;
