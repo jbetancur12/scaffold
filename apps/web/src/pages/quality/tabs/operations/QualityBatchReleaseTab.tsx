@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { BatchReleaseStatus } from '@scaffold/types';
 import { TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DocumentApprovalMethod } from '@scaffold/types';
 import type { QualityComplianceModel } from '../types';
 
 const shortId = (value?: string) => {
@@ -14,6 +17,30 @@ const shortId = (value?: string) => {
 };
 
 export function QualityBatchReleaseTab({ model }: { model: QualityComplianceModel }) {
+  const [signModalOpen, setSignModalOpen] = useState(false);
+  const [signingBatchId, setSigningBatchId] = useState('');
+  const [signerName, setSignerName] = useState('sistema-web');
+  const [signMethod, setSignMethod] = useState<DocumentApprovalMethod>(DocumentApprovalMethod.FIRMA_MANUAL);
+
+  const openSignModal = (productionBatchId: string) => {
+    setSigningBatchId(productionBatchId);
+    setSignerName('sistema-web');
+    setSignMethod(DocumentApprovalMethod.FIRMA_MANUAL);
+    setSignModalOpen(true);
+  };
+
+  const submitSign = async () => {
+    if (!signingBatchId) return;
+    if (!signerName.trim() || signerName.trim().length < 2) return;
+    await model.signBatchReleaseWithPayload({
+      productionBatchId: signingBatchId,
+      actor: 'sistema-web',
+      approvalMethod: signMethod,
+      approvalSignature: signerName.trim(),
+    });
+    setSignModalOpen(false);
+  };
+
   return (
                 <TabsContent value="batch-release" className="space-y-4">
                     <Card>
@@ -119,7 +146,7 @@ export function QualityBatchReleaseTab({ model }: { model: QualityComplianceMode
                                             <Button
                                                 size="sm"
                                                 disabled={model.signingBatchRelease}
-                                                onClick={() => model.quickSignBatchRelease(release.productionBatchId)}
+                                                onClick={() => openSignModal(release.productionBatchId)}
                                             >
                                                 {model.signingBatchRelease ? 'Firmando...' : 'Firmar liberación'}
                                             </Button>
@@ -129,6 +156,44 @@ export function QualityBatchReleaseTab({ model }: { model: QualityComplianceMode
                             ))}
                         </CardContent>
                     </Card>
+                    <Dialog open={signModalOpen} onOpenChange={setSignModalOpen}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Firmar liberación QA</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <Label>ID Lote</Label>
+                            <Input value={signingBatchId} readOnly />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Firmado por</Label>
+                            <Input
+                              value={signerName}
+                              onChange={(e) => setSignerName(e.target.value)}
+                              placeholder="Nombre del firmante"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Método de firma</Label>
+                            <select
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                              value={signMethod}
+                              onChange={(e) => setSignMethod(e.target.value as DocumentApprovalMethod)}
+                            >
+                              <option value={DocumentApprovalMethod.FIRMA_MANUAL}>Firma manual</option>
+                              <option value={DocumentApprovalMethod.FIRMA_DIGITAL}>Firma digital</option>
+                            </select>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setSignModalOpen(false)}>Cancelar</Button>
+                          <Button onClick={submitSign} disabled={model.signingBatchRelease || signerName.trim().length < 2}>
+                            {model.signingBatchRelease ? 'Firmando...' : 'Confirmar firma'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                 </TabsContent>
   );
 }

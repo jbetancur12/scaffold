@@ -212,9 +212,9 @@ export class QualityBatchReleasePdfService {
             <div class="footer-wrap">
               <div class="footer-line"></div>
               <div class="footer-text">
-                <div>Calle 35 13-46 Guadalupe Dosquebradas - Risaralda</div>
-                <div>Contáctenos: 3113441682 - 3425070 comercial@metromedicslab.com.co</div>
-                <div>www.metromedics.co</div>
+                <div>Carrera 14 35-27 Guadalupe Dosquebradas - Risaralda</div>
+                <div>Contáctenos: 3138124282 colortopedicassas@gmail.com</div>
+                <div>www.colortopedicas.com</div>
               </div>
             </div>
         `;

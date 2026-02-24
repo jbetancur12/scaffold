@@ -54,7 +54,7 @@ export const useQualityCompliance = () => {
         resolveIncomingInspectionWithPayload: receptionReleaseFlow.resolveIncomingInspectionWithPayload,
         quickCorrectIncomingInspectionCost: receptionReleaseFlow.quickCorrectIncomingInspectionCost,
         handleUpsertBatchReleaseChecklist: receptionReleaseFlow.handleUpsertBatchReleaseChecklist,
-        quickSignBatchRelease: receptionReleaseFlow.quickSignBatchRelease,
+        signBatchReleaseWithPayload: receptionReleaseFlow.signBatchReleaseWithPayload,
         handleCreateInvimaRegistration: regulatoryFlow.handleCreateInvimaRegistration,
     };
 };

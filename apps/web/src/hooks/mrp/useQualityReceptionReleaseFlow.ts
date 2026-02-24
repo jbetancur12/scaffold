@@ -188,27 +188,18 @@ export const useQualityReceptionReleaseFlow = () => {
         }
     };
 
-    const quickSignBatchRelease = async (productionBatchId: string) => {
+    const signBatchReleaseWithPayload = async (payload: {
+        productionBatchId: string;
+        actor: string;
+        approvalMethod: DocumentApprovalMethod;
+        approvalSignature: string;
+    }) => {
         try {
-            const approvalSignature = window.prompt('Firma de aprobación QA (nombre completo o identificador)');
-            if (!approvalSignature) return;
-
-            const methodRaw = window.prompt(
-                'Método de firma (firma_manual, firma_digital)',
-                DocumentApprovalMethod.FIRMA_MANUAL
-            );
-            if (!methodRaw) return;
-
-            if (!Object.values(DocumentApprovalMethod).includes(methodRaw as DocumentApprovalMethod)) {
-                toast({ title: 'Error', description: 'Método de firma inválido', variant: 'destructive' });
-                return;
-            }
-
             await signBatchRelease({
-                productionBatchId,
-                actor: 'sistema-web',
-                approvalMethod: methodRaw as DocumentApprovalMethod,
-                approvalSignature,
+                productionBatchId: payload.productionBatchId,
+                actor: payload.actor,
+                approvalMethod: payload.approvalMethod,
+                approvalSignature: payload.approvalSignature,
             });
             toast({ title: 'Lote liberado', description: 'La liberación QA quedó firmada.' });
         } catch (err) {
@@ -231,6 +222,6 @@ export const useQualityReceptionReleaseFlow = () => {
         resolveIncomingInspectionWithPayload,
         quickCorrectIncomingInspectionCost,
         handleUpsertBatchReleaseChecklist,
-        quickSignBatchRelease,
+        signBatchReleaseWithPayload,
     };
 };
