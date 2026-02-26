@@ -116,6 +116,7 @@ import {
     UpdateProductionBatchUnitQcSchema,
     UpdateProductionBatchUnitPackagingSchema,
     UpsertProductionBatchPackagingFormSchema,
+    UpsertProductionMaterialAllocationSchema,
 } from '@scaffold/schemas';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -502,6 +503,17 @@ export class MrpController {
             const { id } = req.params;
             const requirements = await this.productionService.calculateMaterialRequirements(id);
             return ApiResponse.success(res, requirements);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async upsertProductionMaterialAllocation(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpsertProductionMaterialAllocationSchema.parse(req.body);
+            const row = await this.productionService.upsertMaterialAllocation(id, payload);
+            return ApiResponse.success(res, row, 'Asignación de lote para producción actualizada');
         } catch (error) {
             next(error);
         }

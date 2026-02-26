@@ -272,7 +272,12 @@ export default function PurchaseOrderFormPage() {
     const discountAmount = Number(purchaseConditions.discountAmount || 0);
     const otherChargesAmount = Number(purchaseConditions.otherChargesAmount || 0);
     const taxableBase = Math.max(0, totals.subtotal - discountAmount);
-    const withholdingAmount = taxableBase * (withholdingRate / 100);
+
+    const baseUvtLimit = withholdingRule?.baseUvtLimit ?? 0;
+    const uvtValue = operationalConfig?.uvtValue ?? 0;
+    const thresholdAmount = baseUvtLimit * uvtValue;
+
+    const withholdingAmount = taxableBase >= thresholdAmount ? taxableBase * (withholdingRate / 100) : 0;
     const grossTotal = Math.max(0, totals.total - discountAmount + otherChargesAmount);
     const netTotal = Math.max(0, grossTotal - withholdingAmount);
 
@@ -319,40 +324,40 @@ export default function PurchaseOrderFormPage() {
                 items: items.map(item => ({
                     ...(item.isCatalogItem ? (
                         item.hasIva && item.ivaIncluded
-                        ? {
-                            isCatalogItem: true,
-                            rawMaterialId: item.rawMaterialId,
-                            quantity: item.quantity,
-                            unitPrice: item.quantity > 0 ? ((item.quantity * item.unitPrice) / 1.19) / item.quantity : 0,
-                            taxAmount: (item.quantity * item.unitPrice) - ((item.quantity * item.unitPrice) / 1.19),
-                        }
-                        : {
-                            isCatalogItem: true,
-                            rawMaterialId: item.rawMaterialId,
-                            quantity: item.quantity,
-                            unitPrice: item.unitPrice,
-                            taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0,
-                        }
+                            ? {
+                                isCatalogItem: true,
+                                rawMaterialId: item.rawMaterialId,
+                                quantity: item.quantity,
+                                unitPrice: item.quantity > 0 ? ((item.quantity * item.unitPrice) / 1.19) / item.quantity : 0,
+                                taxAmount: (item.quantity * item.unitPrice) - ((item.quantity * item.unitPrice) / 1.19),
+                            }
+                            : {
+                                isCatalogItem: true,
+                                rawMaterialId: item.rawMaterialId,
+                                quantity: item.quantity,
+                                unitPrice: item.unitPrice,
+                                taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0,
+                            }
                     ) : (
                         item.hasIva && item.ivaIncluded
-                        ? {
-                            isCatalogItem: false,
-                            customDescription: item.customDescription.trim(),
-                            customUnit: item.customUnit.trim(),
-                            isInventoriable: item.isInventoriable,
-                            quantity: item.quantity,
-                            unitPrice: item.quantity > 0 ? ((item.quantity * item.unitPrice) / 1.19) / item.quantity : 0,
-                            taxAmount: (item.quantity * item.unitPrice) - ((item.quantity * item.unitPrice) / 1.19),
-                        }
-                        : {
-                            isCatalogItem: false,
-                            customDescription: item.customDescription.trim(),
-                            customUnit: item.customUnit.trim(),
-                            isInventoriable: item.isInventoriable,
-                            quantity: item.quantity,
-                            unitPrice: item.unitPrice,
-                            taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0,
-                        }
+                            ? {
+                                isCatalogItem: false,
+                                customDescription: item.customDescription.trim(),
+                                customUnit: item.customUnit.trim(),
+                                isInventoriable: item.isInventoriable,
+                                quantity: item.quantity,
+                                unitPrice: item.quantity > 0 ? ((item.quantity * item.unitPrice) / 1.19) / item.quantity : 0,
+                                taxAmount: (item.quantity * item.unitPrice) - ((item.quantity * item.unitPrice) / 1.19),
+                            }
+                            : {
+                                isCatalogItem: false,
+                                customDescription: item.customDescription.trim(),
+                                customUnit: item.customUnit.trim(),
+                                isInventoriable: item.isInventoriable,
+                                quantity: item.quantity,
+                                unitPrice: item.unitPrice,
+                                taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0,
+                            }
                     )),
                 })),
             };
@@ -622,10 +627,10 @@ export default function PurchaseOrderFormPage() {
                                 {(operationalConfig?.purchasePaymentMethods?.length
                                     ? operationalConfig.purchasePaymentMethods
                                     : ['Contado']).map((method) => (
-                                    <option key={method} value={method}>
-                                        {method}
-                                    </option>
-                                ))}
+                                        <option key={method} value={method}>
+                                            {method}
+                                        </option>
+                                    ))}
                             </select>
                         </div>
                         <div>
@@ -675,8 +680,15 @@ export default function PurchaseOrderFormPage() {
                         </div>
                         <div>
                             <Label>Retención aplicada</Label>
-                            <div className="mt-1 h-10 px-3 flex items-center rounded-md border border-slate-300 bg-slate-50 text-sm text-slate-700">
-                                {withholdingRule ? `${withholdingRule.label} (${withholdingRate}%)` : 'Sin regla activa'}
+                            <div className="mt-1 h-10 px-3 flex flex-col justify-center rounded-md border border-slate-300 bg-slate-50 text-xs text-slate-700">
+                                <span className="font-medium text-sm">
+                                    {withholdingRule ? `${withholdingRule.label} (${withholdingRate}%)` : 'Sin regla activa'}
+                                </span>
+                                {withholdingRule && thresholdAmount > 0 && (
+                                    <span className={taxableBase >= thresholdAmount ? "text-blue-600" : "text-slate-400"}>
+                                        Aplica desde {formatCurrency(thresholdAmount)}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -782,311 +794,311 @@ export default function PurchaseOrderFormPage() {
 
                                     {isExpanded ? (
                                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-5 items-start xl:items-center pt-4">
-                                        <div className="xl:col-span-12">
-                                            <Label>Tipo de línea</Label>
-                                            <select
-                                                className="w-full md:w-64 mt-1 px-2 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                                value={item.isCatalogItem ? 'catalog' : 'free'}
-                                                onChange={(e) => {
-                                                    const isCatalog = e.target.value === 'catalog';
-                                                    setItems((prev) => {
-                                                        const next = [...prev];
-                                                        next[index] = {
-                                                            ...next[index],
-                                                            isCatalogItem: isCatalog,
-                                                            rawMaterialId: isCatalog ? next[index].rawMaterialId : '',
-                                                            catalogSearch: isCatalog ? next[index].catalogSearch : '',
-                                                            customDescription: isCatalog ? '' : next[index].customDescription,
-                                                            customUnit: isCatalog ? '' : next[index].customUnit,
-                                                            isInventoriable: isCatalog ? true : false,
-                                                        };
-                                                        return next;
-                                                    });
-                                                }}
-                                            >
-                                                <option value="catalog">Ítem de catálogo</option>
-                                                <option value="free">Ítem libre (ocasional)</option>
-                                            </select>
-                                        </div>
-                                        <div className="xl:col-span-3">
-                                            <Label className="xl:hidden">{item.isCatalogItem ? 'Materia Prima *' : 'Descripción *'}</Label>
-                                            {item.isCatalogItem ? (
-                                                <>
-                                                    <div className="relative">
+                                            <div className="xl:col-span-12">
+                                                <Label>Tipo de línea</Label>
+                                                <select
+                                                    className="w-full md:w-64 mt-1 px-2 py-1.5 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                                    value={item.isCatalogItem ? 'catalog' : 'free'}
+                                                    onChange={(e) => {
+                                                        const isCatalog = e.target.value === 'catalog';
+                                                        setItems((prev) => {
+                                                            const next = [...prev];
+                                                            next[index] = {
+                                                                ...next[index],
+                                                                isCatalogItem: isCatalog,
+                                                                rawMaterialId: isCatalog ? next[index].rawMaterialId : '',
+                                                                catalogSearch: isCatalog ? next[index].catalogSearch : '',
+                                                                customDescription: isCatalog ? '' : next[index].customDescription,
+                                                                customUnit: isCatalog ? '' : next[index].customUnit,
+                                                                isInventoriable: isCatalog ? true : false,
+                                                            };
+                                                            return next;
+                                                        });
+                                                    }}
+                                                >
+                                                    <option value="catalog">Ítem de catálogo</option>
+                                                    <option value="free">Ítem libre (ocasional)</option>
+                                                </select>
+                                            </div>
+                                            <div className="xl:col-span-3">
+                                                <Label className="xl:hidden">{item.isCatalogItem ? 'Materia Prima *' : 'Descripción *'}</Label>
+                                                {item.isCatalogItem ? (
+                                                    <>
+                                                        <div className="relative">
+                                                            <Input
+                                                                className="mt-1 md:mt-0"
+                                                                placeholder="Buscar por nombre o SKU..."
+                                                                value={item.catalogSearch}
+                                                                onFocus={() => {
+                                                                    setActiveCatalogComboboxIdx(index);
+                                                                    setCatalogHighlightByIndex((prev) => ({ ...prev, [index]: 0 }));
+                                                                }}
+                                                                onBlur={() => {
+                                                                    setTimeout(() => {
+                                                                        setActiveCatalogComboboxIdx((prev) => (prev === index ? null : prev));
+                                                                    }, 120);
+                                                                }}
+                                                                onKeyDown={(e) => {
+                                                                    void handleCatalogInputKeyDown(index, e);
+                                                                }}
+                                                                onChange={(e) => {
+                                                                    updateItem(index, 'catalogSearch', e.target.value);
+                                                                    setActiveCatalogComboboxIdx(index);
+                                                                    setCatalogHighlightByIndex((prev) => ({ ...prev, [index]: 0 }));
+                                                                }}
+                                                            />
+                                                            {activeCatalogComboboxIdx === index ? (
+                                                                <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg max-h-60 overflow-auto">
+                                                                    {getFilteredMaterials(item.catalogSearch).length === 0 ? (
+                                                                        <div className="px-3 py-2 text-xs text-slate-500">Sin resultados para tu búsqueda.</div>
+                                                                    ) : (
+                                                                        getFilteredMaterials(item.catalogSearch).map((material, resultIndex) => {
+                                                                            const highlighted = (catalogHighlightByIndex[index] ?? 0) === resultIndex;
+                                                                            return (
+                                                                                <button
+                                                                                    key={material.id}
+                                                                                    type="button"
+                                                                                    className={`w-full text-left px-3 py-2 text-sm border-b border-slate-100 last:border-b-0 ${highlighted ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50'}`}
+                                                                                    onMouseDown={() => {
+                                                                                        void handleMaterialChange(index, material.id);
+                                                                                        setActiveCatalogComboboxIdx(null);
+                                                                                    }}
+                                                                                >
+                                                                                    <span className="font-medium">{material.sku}</span> - {material.name}
+                                                                                </button>
+                                                                            );
+                                                                        })
+                                                                    )}
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <Input
+                                                        className="mt-1 md:mt-0"
+                                                        placeholder="Ej: Servicio de transporte especial"
+                                                        value={item.customDescription}
+                                                        onChange={(e) => updateItem(index, 'customDescription', e.target.value)}
+                                                    />
+                                                )}
+                                                {item.isCatalogItem && item.rawMaterialId ? (
+                                                    <div className="mt-1 space-y-1">
+                                                        {loadingMaterialSuppliersByMaterialId[item.rawMaterialId] ? (
+                                                            <div className="text-[11px] text-slate-500">Cargando proveedores sugeridos...</div>
+                                                        ) : null}
+                                                        {(() => {
+                                                            const suggestedRows = materialSuppliersByMaterialId[item.rawMaterialId] ?? [];
+                                                            const materialPreferredSupplier = getMaterialById(item.rawMaterialId)?.supplierId;
+                                                            const suggestedSupplierIds = new Set(suggestedRows.map((row) => row.supplier.id));
+                                                            if (materialPreferredSupplier) suggestedSupplierIds.add(materialPreferredSupplier);
+                                                            const selectedSupplierMismatch = Boolean(
+                                                                formData.supplierId &&
+                                                                suggestedSupplierIds.size > 0 &&
+                                                                !suggestedSupplierIds.has(formData.supplierId)
+                                                            );
+
+                                                            return (
+                                                                <>
+                                                                    {suggestedRows.length > 0 ? (
+                                                                        <div className="text-[11px] text-slate-600">
+                                                                            Sugeridos: {suggestedRows.slice(0, 3).map((row) => row.supplier.name).join(', ')}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-[11px] text-slate-500">
+                                                                            Sin historial de proveedores para este material.
+                                                                        </div>
+                                                                    )}
+                                                                    {selectedSupplierMismatch ? (
+                                                                        <div className="text-[11px] text-amber-700">
+                                                                            El proveedor seleccionado no coincide con sugeridos/histórico de esta materia prima.
+                                                                        </div>
+                                                                    ) : null}
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                ) : null}
+                                            </div>
+
+                                            <div className="xl:col-span-2">
+                                                <Label className="xl:hidden">Cantidad *</Label>
+                                                <div className="flex flex-col gap-1">
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0.01"
+                                                        className="px-3 py-2 h-9 text-sm text-center"
+                                                        value={item.quantity || ''}
+                                                        onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
+                                                        required
+                                                    />
+                                                    {material && (
+                                                        <span className="text-[11px] text-slate-500">{material.unit}</span>
+                                                    )}
+                                                    {!item.isCatalogItem ? (
                                                         <Input
-                                                            className="mt-1 md:mt-0"
-                                                            placeholder="Buscar por nombre o SKU..."
-                                                            value={item.catalogSearch}
-                                                            onFocus={() => {
-                                                                setActiveCatalogComboboxIdx(index);
-                                                                setCatalogHighlightByIndex((prev) => ({ ...prev, [index]: 0 }));
-                                                            }}
-                                                            onBlur={() => {
-                                                                setTimeout(() => {
-                                                                    setActiveCatalogComboboxIdx((prev) => (prev === index ? null : prev));
-                                                                }, 120);
-                                                            }}
-                                                            onKeyDown={(e) => {
-                                                                void handleCatalogInputKeyDown(index, e);
-                                                            }}
+                                                            className="h-8 text-xs"
+                                                            placeholder="Unidad (ej: servicio, und, hora)"
+                                                            value={item.customUnit}
+                                                            onChange={(e) => updateItem(index, 'customUnit', e.target.value)}
+                                                        />
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            <div className="xl:col-span-2 relative">
+                                                <Label className="xl:hidden">Precio Unitario *</Label>
+                                                <div className="flex flex-col lg:flex-row lg:items-center gap-2">
+                                                    <CurrencyInput
+                                                        className="h-9 text-sm text-right flex-1"
+                                                        value={item.unitPrice || ''}
+                                                        onValueChange={(val) => updateItem(index, 'unitPrice', val || 0)}
+                                                        placeholder="$0"
+                                                        required
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className={`h-9 w-9 p-0 shrink-0 self-end lg:self-auto ${activeCalcIdx === index ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
+                                                        onClick={() => {
+                                                            if (activeCalcIdx === index) {
+                                                                setActiveCalcIdx(null);
+                                                            } else {
+                                                                setActiveCalcIdx(index);
+                                                                setCalcBulkPrice(0);
+                                                                setCalcBulkQty(0);
+                                                            }
+                                                        }}
+                                                        title="Calcular precio unitario"
+                                                    >
+                                                        <Calculator className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+
+                                                {activeCalcIdx === index && (
+                                                    <div className="absolute z-10 top-full right-0 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-xl p-3 space-y-3 animate-in fade-in zoom-in duration-200">
+                                                        <div className="flex justify-between items-center border-b pb-1 mb-2">
+                                                            <span className="text-xs font-bold text-slate-700">Calculadora de Precio</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setActiveCalcIdx(null)}
+                                                                className="text-slate-400 hover:text-slate-600"
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="space-y-2">
+                                                            <div>
+                                                                <label className="text-[10px] uppercase font-bold text-slate-500">Precio Total Cotizado</label>
+                                                                <CurrencyInput
+                                                                    className="h-7 text-xs text-right"
+                                                                    value={calcBulkPrice || ''}
+                                                                    onValueChange={(val) => setCalcBulkPrice(val || 0)}
+                                                                    placeholder="$0"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[10px] uppercase font-bold text-slate-500">Cantidad en el Empaque / Rollo</label>
+                                                                <Input
+                                                                    type="number"
+                                                                    className="h-7 text-xs text-right"
+                                                                    value={calcBulkQty || ''}
+                                                                    onChange={(e) => setCalcBulkQty(parseFloat(e.target.value) || 0)}
+                                                                    placeholder="Cant."
+                                                                />
+                                                            </div>
+
+                                                            {calcBulkPrice > 0 && calcBulkQty > 0 && (
+                                                                <div className="bg-slate-50 p-2 rounded border border-slate-100 text-center">
+                                                                    <div className="text-[10px] text-slate-500 uppercase">Precio Unitario Resultante</div>
+                                                                    <div className="text-sm font-bold text-blue-600">
+                                                                        {formatCurrency(calcBulkPrice / calcBulkQty)}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            <div className="flex gap-2 pt-1">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="default"
+                                                                    size="sm"
+                                                                    className="flex-1 h-7 text-xs"
+                                                                    disabled={!calcBulkPrice || !calcBulkQty}
+                                                                    onClick={() => {
+                                                                        const calculated = calcBulkPrice / calcBulkQty;
+                                                                        updateItem(index, 'unitPrice', calculated);
+                                                                        setActiveCalcIdx(null);
+                                                                    }}
+                                                                >
+                                                                    <Check className="h-3 w-3 mr-1" /> Aplicar
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="xl:col-span-2 flex items-center justify-start xl:justify-center">
+                                                <Label className="xl:hidden mr-2">IVA (19%)</Label>
+                                                <div className="flex flex-col gap-1 w-full md:w-auto md:min-w-[120px]">
+                                                    <label className="flex items-center gap-2 text-xs text-slate-600">
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`iva-${index}`}
+                                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+                                                            checked={item.hasIva}
                                                             onChange={(e) => {
-                                                                updateItem(index, 'catalogSearch', e.target.value);
-                                                                setActiveCatalogComboboxIdx(index);
-                                                                setCatalogHighlightByIndex((prev) => ({ ...prev, [index]: 0 }));
+                                                                updateItem(index, 'hasIva', e.target.checked);
+                                                                if (!e.target.checked) {
+                                                                    updateItem(index, 'ivaIncluded', false);
+                                                                }
                                                             }}
                                                         />
-                                                        {activeCatalogComboboxIdx === index ? (
-                                                            <div className="absolute z-20 mt-1 w-full rounded-md border border-slate-200 bg-white shadow-lg max-h-60 overflow-auto">
-                                                                {getFilteredMaterials(item.catalogSearch).length === 0 ? (
-                                                                    <div className="px-3 py-2 text-xs text-slate-500">Sin resultados para tu búsqueda.</div>
-                                                                ) : (
-                                                                    getFilteredMaterials(item.catalogSearch).map((material, resultIndex) => {
-                                                                        const highlighted = (catalogHighlightByIndex[index] ?? 0) === resultIndex;
-                                                                        return (
-                                                                            <button
-                                                                                key={material.id}
-                                                                                type="button"
-                                                                                className={`w-full text-left px-3 py-2 text-sm border-b border-slate-100 last:border-b-0 ${highlighted ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50'}`}
-                                                                                onMouseDown={() => {
-                                                                                    void handleMaterialChange(index, material.id);
-                                                                                    setActiveCatalogComboboxIdx(null);
-                                                                                }}
-                                                                            >
-                                                                                <span className="font-medium">{material.sku}</span> - {material.name}
-                                                                            </button>
-                                                                        );
-                                                                    })
-                                                                )}
-                                                            </div>
-                                                        ) : null}
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <Input
-                                                    className="mt-1 md:mt-0"
-                                                    placeholder="Ej: Servicio de transporte especial"
-                                                    value={item.customDescription}
-                                                    onChange={(e) => updateItem(index, 'customDescription', e.target.value)}
-                                                />
-                                            )}
-                                            {item.isCatalogItem && item.rawMaterialId ? (
-                                                <div className="mt-1 space-y-1">
-                                                    {loadingMaterialSuppliersByMaterialId[item.rawMaterialId] ? (
-                                                        <div className="text-[11px] text-slate-500">Cargando proveedores sugeridos...</div>
+                                                        Aplica IVA
+                                                    </label>
+                                                    {item.hasIva ? (
+                                                        <select
+                                                            className="h-9 min-w-[110px] px-2 py-1 border border-slate-300 rounded-md text-sm"
+                                                            value={item.ivaIncluded ? 'included' : 'add'}
+                                                            onChange={(e) => updateItem(index, 'ivaIncluded', e.target.value === 'included')}
+                                                        >
+                                                            <option value="add">+ IVA</option>
+                                                            <option value="included">Incluido</option>
+                                                        </select>
                                                     ) : null}
-                                                    {(() => {
-                                                        const suggestedRows = materialSuppliersByMaterialId[item.rawMaterialId] ?? [];
-                                                        const materialPreferredSupplier = getMaterialById(item.rawMaterialId)?.supplierId;
-                                                        const suggestedSupplierIds = new Set(suggestedRows.map((row) => row.supplier.id));
-                                                        if (materialPreferredSupplier) suggestedSupplierIds.add(materialPreferredSupplier);
-                                                        const selectedSupplierMismatch = Boolean(
-                                                            formData.supplierId &&
-                                                            suggestedSupplierIds.size > 0 &&
-                                                            !suggestedSupplierIds.has(formData.supplierId)
-                                                        );
+                                                </div>
+                                            </div>
 
-                                                        return (
-                                                            <>
-                                                                {suggestedRows.length > 0 ? (
-                                                                    <div className="text-[11px] text-slate-600">
-                                                                        Sugeridos: {suggestedRows.slice(0, 3).map((row) => row.supplier.name).join(', ')}
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="text-[11px] text-slate-500">
-                                                                        Sin historial de proveedores para este material.
-                                                                    </div>
-                                                                )}
-                                                                {selectedSupplierMismatch ? (
-                                                                    <div className="text-[11px] text-amber-700">
-                                                                        El proveedor seleccionado no coincide con sugeridos/histórico de esta materia prima.
-                                                                    </div>
-                                                                ) : null}
-                                                            </>
-                                                        );
-                                                    })()}
+                                            <div className="xl:col-span-2 flex xl:flex-row flex-col items-start xl:items-center justify-between xl:justify-end gap-2">
+                                                <div className="w-full xl:min-w-[180px]">
+                                                    <Label className="xl:hidden">Total Línea</Label>
+                                                    <div className="mt-1 xl:mt-0 px-2 py-1 bg-slate-50 border border-slate-100 rounded xl:border-none xl:bg-transparent text-right text-base font-semibold text-slate-700">
+                                                        {formatCurrency(lineTotal)}
+                                                    </div>
+                                                    {item.hasIva ? (
+                                                        <div className="text-xs text-slate-500 text-right">
+                                                            IVA: {formatCurrency(taxAmount)}
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            <div className="xl:col-span-1"></div>
+                                            {!item.isCatalogItem ? (
+                                                <div className="xl:col-span-12">
+                                                    <label className="text-sm flex items-center gap-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={item.isInventoriable}
+                                                            onChange={(e) => updateItem(index, 'isInventoriable', e.target.checked)}
+                                                        />
+                                                        Item libre inventariable (si se marca, se gestiona como compra interna sin materia prima)
+                                                    </label>
                                                 </div>
                                             ) : null}
                                         </div>
-
-                                        <div className="xl:col-span-2">
-                                            <Label className="xl:hidden">Cantidad *</Label>
-                                            <div className="flex flex-col gap-1">
-                                                <Input
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0.01"
-                                                    className="px-3 py-2 h-9 text-sm text-center"
-                                                    value={item.quantity || ''}
-                                                    onChange={(e) => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                                                    required
-                                                />
-                                                {material && (
-                                                    <span className="text-[11px] text-slate-500">{material.unit}</span>
-                                                )}
-                                                {!item.isCatalogItem ? (
-                                                    <Input
-                                                        className="h-8 text-xs"
-                                                        placeholder="Unidad (ej: servicio, und, hora)"
-                                                        value={item.customUnit}
-                                                        onChange={(e) => updateItem(index, 'customUnit', e.target.value)}
-                                                    />
-                                                ) : null}
-                                            </div>
-                                        </div>
-
-                                        <div className="xl:col-span-2 relative">
-                                            <Label className="xl:hidden">Precio Unitario *</Label>
-                                            <div className="flex flex-col lg:flex-row lg:items-center gap-2">
-                                                <CurrencyInput
-                                                    className="h-9 text-sm text-right flex-1"
-                                                    value={item.unitPrice || ''}
-                                                    onValueChange={(val) => updateItem(index, 'unitPrice', val || 0)}
-                                                    placeholder="$0"
-                                                    required
-                                                />
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className={`h-9 w-9 p-0 shrink-0 self-end lg:self-auto ${activeCalcIdx === index ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
-                                                    onClick={() => {
-                                                        if (activeCalcIdx === index) {
-                                                            setActiveCalcIdx(null);
-                                                        } else {
-                                                            setActiveCalcIdx(index);
-                                                            setCalcBulkPrice(0);
-                                                            setCalcBulkQty(0);
-                                                        }
-                                                    }}
-                                                    title="Calcular precio unitario"
-                                                >
-                                                    <Calculator className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-
-                                            {activeCalcIdx === index && (
-                                                <div className="absolute z-10 top-full right-0 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-xl p-3 space-y-3 animate-in fade-in zoom-in duration-200">
-                                                    <div className="flex justify-between items-center border-b pb-1 mb-2">
-                                                        <span className="text-xs font-bold text-slate-700">Calculadora de Precio</span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setActiveCalcIdx(null)}
-                                                            className="text-slate-400 hover:text-slate-600"
-                                                        >
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </div>
-
-                                                    <div className="space-y-2">
-                                                        <div>
-                                                            <label className="text-[10px] uppercase font-bold text-slate-500">Precio Total Cotizado</label>
-                                                            <CurrencyInput
-                                                                className="h-7 text-xs text-right"
-                                                                value={calcBulkPrice || ''}
-                                                                onValueChange={(val) => setCalcBulkPrice(val || 0)}
-                                                                placeholder="$0"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] uppercase font-bold text-slate-500">Cantidad en el Empaque / Rollo</label>
-                                                            <Input
-                                                                type="number"
-                                                                className="h-7 text-xs text-right"
-                                                                value={calcBulkQty || ''}
-                                                                onChange={(e) => setCalcBulkQty(parseFloat(e.target.value) || 0)}
-                                                                placeholder="Cant."
-                                                            />
-                                                        </div>
-
-                                                        {calcBulkPrice > 0 && calcBulkQty > 0 && (
-                                                            <div className="bg-slate-50 p-2 rounded border border-slate-100 text-center">
-                                                                <div className="text-[10px] text-slate-500 uppercase">Precio Unitario Resultante</div>
-                                                                <div className="text-sm font-bold text-blue-600">
-                                                                    {formatCurrency(calcBulkPrice / calcBulkQty)}
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        <div className="flex gap-2 pt-1">
-                                                            <Button
-                                                                type="button"
-                                                                variant="default"
-                                                                size="sm"
-                                                                className="flex-1 h-7 text-xs"
-                                                                disabled={!calcBulkPrice || !calcBulkQty}
-                                                                onClick={() => {
-                                                                    const calculated = calcBulkPrice / calcBulkQty;
-                                                                    updateItem(index, 'unitPrice', calculated);
-                                                                    setActiveCalcIdx(null);
-                                                                }}
-                                                            >
-                                                                <Check className="h-3 w-3 mr-1" /> Aplicar
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="xl:col-span-2 flex items-center justify-start xl:justify-center">
-                                            <Label className="xl:hidden mr-2">IVA (19%)</Label>
-                                            <div className="flex flex-col gap-1 w-full md:w-auto md:min-w-[120px]">
-                                                <label className="flex items-center gap-2 text-xs text-slate-600">
-                                                    <input
-                                                        type="checkbox"
-                                                        id={`iva-${index}`}
-                                                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-                                                        checked={item.hasIva}
-                                                        onChange={(e) => {
-                                                            updateItem(index, 'hasIva', e.target.checked);
-                                                            if (!e.target.checked) {
-                                                                updateItem(index, 'ivaIncluded', false);
-                                                            }
-                                                        }}
-                                                    />
-                                                    Aplica IVA
-                                                </label>
-                                                {item.hasIva ? (
-                                                    <select
-                                                        className="h-9 min-w-[110px] px-2 py-1 border border-slate-300 rounded-md text-sm"
-                                                        value={item.ivaIncluded ? 'included' : 'add'}
-                                                        onChange={(e) => updateItem(index, 'ivaIncluded', e.target.value === 'included')}
-                                                    >
-                                                        <option value="add">+ IVA</option>
-                                                        <option value="included">Incluido</option>
-                                                    </select>
-                                                ) : null}
-                                            </div>
-                                        </div>
-
-                                        <div className="xl:col-span-2 flex xl:flex-row flex-col items-start xl:items-center justify-between xl:justify-end gap-2">
-                                            <div className="w-full xl:min-w-[180px]">
-                                                <Label className="xl:hidden">Total Línea</Label>
-                                                <div className="mt-1 xl:mt-0 px-2 py-1 bg-slate-50 border border-slate-100 rounded xl:border-none xl:bg-transparent text-right text-base font-semibold text-slate-700">
-                                                    {formatCurrency(lineTotal)}
-                                                </div>
-                                                {item.hasIva ? (
-                                                    <div className="text-xs text-slate-500 text-right">
-                                                        IVA: {formatCurrency(taxAmount)}
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                        </div>
-
-                                        <div className="xl:col-span-1"></div>
-                                        {!item.isCatalogItem ? (
-                                            <div className="xl:col-span-12">
-                                                <label className="text-sm flex items-center gap-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={item.isInventoriable}
-                                                        onChange={(e) => updateItem(index, 'isInventoriable', e.target.checked)}
-                                                    />
-                                                    Item libre inventariable (si se marca, se gestiona como compra interna sin materia prima)
-                                                </label>
-                                            </div>
-                                        ) : null}
-                                    </div>
                                     ) : null}
                                 </div>
                             );

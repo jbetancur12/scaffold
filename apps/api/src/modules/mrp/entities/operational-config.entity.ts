@@ -41,26 +41,29 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
     purchasePaymentMethods: string[] = [];
 
     @Property({ nullable: true })
-    defaultPurchaseOrderControlledDocumentId?: string;
+    defaultPurchaseOrderControlledDocumentId?: string | null;
 
     @Property({ nullable: true })
-    defaultPurchaseOrderControlledDocumentCode?: string;
+    defaultPurchaseOrderControlledDocumentCode?: string | null;
 
     @Property({ nullable: true })
-    defaultIncomingInspectionControlledDocumentCode?: string;
+    defaultIncomingInspectionControlledDocumentCode?: string | null;
 
     @Property({ nullable: true })
-    defaultPackagingControlledDocumentCode?: string;
+    defaultPackagingControlledDocumentCode?: string | null;
 
     @Property({ nullable: true })
-    defaultLabelingControlledDocumentCode?: string;
+    defaultLabelingControlledDocumentCode?: string | null;
 
     @Property({ nullable: true })
-    defaultBatchReleaseControlledDocumentCode?: string;
+    defaultBatchReleaseControlledDocumentCode?: string | null;
 
     @Property({ nullable: true })
-    operationMode?: 'lote' | 'serial';
+    operationMode?: 'lote' | 'serial' | null;
+
+    @Property({ type: 'integer', nullable: true })
+    uvtValue?: number | null;
 
     @Property({ type: 'json', nullable: true })
-    purchaseWithholdingRules: Array<{ key: string; label: string; rate: number; active: boolean }> = [];
+    purchaseWithholdingRules: Array<{ key: string; label: string; rate: number; active: boolean; baseUvtLimit?: number }> = [];
 }

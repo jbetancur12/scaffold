@@ -58,6 +58,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.patch('/production-orders/:id/status', (req, res, next) => mrpController.updateProductionOrderStatus(req, res, next));
     router.post('/production-orders', (req, res, next) => mrpController.createProductionOrder(req, res, next));
     router.get('/production-orders/:id/requirements', (req, res, next) => mrpController.calculateMaterialRequirements(req, res, next));
+    router.post('/production-orders/:id/material-allocation', (req, res, next) => mrpController.upsertProductionMaterialAllocation(req, res, next));
     router.get('/production-orders/:id/batches', (req, res, next) => mrpController.listProductionBatches(req, res, next));
     router.post('/production-orders/:id/batches', (req, res, next) => mrpController.createProductionBatch(req, res, next));
     router.post('/production-batches/:batchId/units', (req, res, next) => mrpController.addProductionBatchUnits(req, res, next));

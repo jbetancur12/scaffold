@@ -34,9 +34,10 @@ export default function OperationalSettingsPage() {
         defaultPurchaseOrderControlledDocumentId: '',
         defaultPurchaseOrderControlledDocumentCode: '',
         purchaseWithholdingRules: [
-            { key: 'compra', label: 'Compra', rate: 2.5, active: true },
-            { key: 'servicio', label: 'Servicio', rate: 4, active: true },
+            { key: 'compra', label: 'Compra', rate: 2.5, active: true, baseUvtLimit: 0 },
+            { key: 'servicio', label: 'Servicio', rate: 4, active: true, baseUvtLimit: 0 },
         ],
+        uvtValue: 47065,
         createdAt: new Date(),
         updatedAt: new Date()
     });
@@ -137,7 +138,7 @@ export default function OperationalSettingsPage() {
             ...config,
             purchaseWithholdingRules: [
                 ...config.purchaseWithholdingRules,
-                { key: '', label: '', rate: 0, active: true },
+                { key: '', label: '', rate: 0, active: true, baseUvtLimit: 0 },
             ],
         });
     };
@@ -146,7 +147,7 @@ export default function OperationalSettingsPage() {
         const next = config.purchaseWithholdingRules.filter((_, i) => i !== index);
         setConfig({
             ...config,
-            purchaseWithholdingRules: next.length > 0 ? next : [{ key: 'compra', label: 'Compra', rate: 2.5, active: true }],
+            purchaseWithholdingRules: next.length > 0 ? next : [{ key: 'compra', label: 'Compra', rate: 2.5, active: true, baseUvtLimit: 0 }],
         });
     };
 
@@ -416,6 +417,21 @@ export default function OperationalSettingsPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-slate-100">
+                                <div className="space-y-2">
+                                    <Label htmlFor="uvtValue">Valor Global del UVT ($)</Label>
+                                    <div className="relative">
+                                        <CurrencyInput
+                                            id="uvtValue"
+                                            className="pl-8"
+                                            value={config.uvtValue || 0}
+                                            onValueChange={(val) => setConfig({ ...config, uvtValue: val || 0 })}
+                                        />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Valor del UVT para cálculo de umbrales en retención.</p>
+                                </div>
+                            </div>
+
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <Label>Formas de Pago (select)</Label>
@@ -447,13 +463,13 @@ export default function OperationalSettingsPage() {
                                 {config.purchaseWithholdingRules.map((rule, index) => (
                                     <div key={`wr-${index}`} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center rounded border p-2">
                                         <Input
-                                            className="md:col-span-3"
+                                            className="md:col-span-2"
                                             value={rule.key}
                                             onChange={(e) => updateWithholdingRule(index, { key: e.target.value.toLowerCase().trim() })}
-                                            placeholder="clave (ej: compra)"
+                                            placeholder="clave (compra)"
                                         />
                                         <Input
-                                            className="md:col-span-4"
+                                            className="md:col-span-3"
                                             value={rule.label}
                                             onChange={(e) => updateWithholdingRule(index, { label: e.target.value })}
                                             placeholder="Etiqueta"
@@ -466,7 +482,16 @@ export default function OperationalSettingsPage() {
                                             step={0.01}
                                             value={rule.rate}
                                             onChange={(e) => updateWithholdingRule(index, { rate: Number(e.target.value) || 0 })}
-                                            placeholder="%"
+                                            placeholder="% Ret"
+                                        />
+                                        <Input
+                                            className="md:col-span-2"
+                                            type="number"
+                                            min={0}
+                                            step={1}
+                                            value={rule.baseUvtLimit || ''}
+                                            onChange={(e) => updateWithholdingRule(index, { baseUvtLimit: Number(e.target.value) || 0 })}
+                                            placeholder="Límite UVT"
                                         />
                                         <label className="md:col-span-2 text-sm flex items-center gap-2">
                                             <input

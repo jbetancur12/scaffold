@@ -32,8 +32,9 @@ import { ControlledDocument } from '../entities/controlled-document.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
 import { RawMaterialLot } from '../entities/raw-material-lot.entity';
 import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
+import { ProductionMaterialAllocation } from '../entities/production-material-allocation.entity';
 import { DocumentControlService } from './document-control.service';
-import { ProductionOrderSchema, ProductionOrderItemCreateSchema } from '@scaffold/schemas';
+import { ProductionOrderSchema, ProductionOrderItemCreateSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { AppError } from '../../../shared/utils/response';
 
@@ -49,6 +50,7 @@ export class ProductionService {
     private readonly changeControlRepo: EntityRepository<ChangeControl>;
     private readonly operationalConfigRepo: EntityRepository<OperationalConfig>;
     private readonly rawMaterialLotRepo: EntityRepository<RawMaterialLot>;
+    private readonly materialAllocationRepo: EntityRepository<ProductionMaterialAllocation>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -62,6 +64,7 @@ export class ProductionService {
         this.changeControlRepo = em.getRepository(ChangeControl);
         this.operationalConfigRepo = em.getRepository(OperationalConfig);
         this.rawMaterialLotRepo = em.getRepository(RawMaterialLot);
+        this.materialAllocationRepo = em.getRepository(ProductionMaterialAllocation);
     }
 
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
@@ -467,7 +470,8 @@ export class ProductionService {
         required: number,
         available: number,
         potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[],
-        pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[]
+        pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[],
+        selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
     }[]> {
         const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] });
 
@@ -476,7 +480,8 @@ export class ProductionService {
             required: number,
             available: number,
             potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[],
-            pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[]
+            pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[],
+            selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
         }>();
 
         // 1. Calculate Required
@@ -545,6 +550,14 @@ export class ProductionService {
 
             // 3. Check Potential Suppliers (SupplierMaterial)
             const supplierMaterials = await this.em.find(SupplierMaterial, { rawMaterial: { $in: materialIds } }, { populate: ['supplier'], orderBy: { lastPurchasePrice: 'ASC', lastPurchaseDate: 'DESC' } });
+            const allocations = await this.materialAllocationRepo.find(
+                { productionOrder: orderId, rawMaterial: { $in: materialIds }, lot: { $ne: null } },
+                { populate: ['lot', 'lot.warehouse'] }
+            );
+            const allocationByMaterial = new Map<string, ProductionMaterialAllocation>();
+            for (const row of allocations) {
+                allocationByMaterial.set(row.rawMaterial.id, row);
+            }
 
             for (const sm of supplierMaterials) {
                 if (requirements.has(sm.rawMaterial.id)) {
@@ -574,9 +587,29 @@ export class ProductionService {
                     req.potentialSuppliers.sort((a, b) => a.lastPrice - b.lastPrice);
                     req.potentialSuppliers[0].isCheapest = true;
                 }
+                const allocation = allocationByMaterial.get(req.material.id);
+                if (allocation?.lot) {
+                    req.selectedAllocation = {
+                        lotId: allocation.lot.id,
+                        lotCode: allocation.lot.supplierLotCode,
+                        warehouseId: allocation.lot.warehouse.id,
+                        warehouseName: allocation.lot.warehouse.name,
+                        quantityRequested: allocation.quantityRequested ? Number(allocation.quantityRequested) : undefined,
+                    };
+                }
                 let pending = Number(req.required);
+                if (allocation?.lot) {
+                    const selectedLot = req.pepsLots.find((lot) => lot.lotId === allocation.lot?.id);
+                    if (selectedLot) {
+                        const desired = Number(allocation.quantityRequested || req.required);
+                        const suggested = Math.min(desired, Number(selectedLot.available), pending);
+                        selectedLot.suggestedUse = suggested;
+                        pending -= suggested;
+                    }
+                }
                 for (const lot of req.pepsLots) {
                     if (pending <= 0) break;
+                    if (allocation?.lot && lot.lotId === allocation.lot.id) continue;
                     const use = Math.min(pending, Number(lot.available));
                     lot.suggestedUse = use;
                     pending -= use;
@@ -585,6 +618,50 @@ export class ProductionService {
         }
 
         return Array.from(requirements.values());
+    }
+
+    async upsertMaterialAllocation(orderId: string, payload: z.infer<typeof UpsertProductionMaterialAllocationSchema>) {
+        const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] });
+        if ([ProductionOrderStatus.COMPLETED, ProductionOrderStatus.CANCELLED].includes(order.status)) {
+            throw new AppError('No puedes cambiar asignación de lotes en una OP cerrada/cancelada', 400);
+        }
+
+        const requirements = await this.calculateMaterialRequirements(orderId);
+        const req = requirements.find((row) => row.material.id === payload.rawMaterialId);
+        if (!req) {
+            throw new AppError('La materia prima no hace parte de los requerimientos de la OP', 400);
+        }
+
+        const row = await this.materialAllocationRepo.findOne({ productionOrder: orderId, rawMaterial: payload.rawMaterialId });
+        if (!payload.lotId) {
+            if (row) await this.em.removeAndFlush(row);
+            return { productionOrderId: orderId, rawMaterialId: payload.rawMaterialId, lotId: null };
+        }
+
+        const lot = await this.rawMaterialLotRepo.findOne({ id: payload.lotId }, { populate: ['rawMaterial', 'warehouse'] });
+        if (!lot) throw new AppError('Lote de materia prima no encontrado', 404);
+        if (lot.rawMaterial.id !== payload.rawMaterialId) {
+            throw new AppError('El lote seleccionado no corresponde a la materia prima', 400);
+        }
+        if (lot.warehouse.type === WarehouseType.QUARANTINE) {
+            throw new AppError('No puedes asignar un lote en cuarentena', 400);
+        }
+        if (Number(lot.quantityAvailable) <= 0) {
+            throw new AppError('El lote seleccionado no tiene disponibilidad', 400);
+        }
+        if (payload.quantityRequested && Number(payload.quantityRequested) > Number(req.required)) {
+            throw new AppError(`La cantidad solicitada no puede superar lo requerido (${Number(req.required).toFixed(4)})`, 400);
+        }
+
+        const entity = row || this.materialAllocationRepo.create({
+            productionOrder: order,
+            rawMaterial: this.em.getReference(RawMaterial, payload.rawMaterialId),
+        } as unknown as ProductionMaterialAllocation);
+        entity.lot = lot;
+        entity.quantityRequested = payload.quantityRequested;
+        entity.notes = payload.notes?.trim() || undefined;
+        await this.em.persistAndFlush(entity);
+        return entity;
     }
 
     async updateStatus(id: string, status: ProductionOrderStatus, warehouseId?: string): Promise<ProductionOrder> {
@@ -692,6 +769,7 @@ export class ProductionService {
                     await this.ensureLegacyLots(materialIds, tx);
                     const lotRepo = tx.getRepository(RawMaterialLot);
                     const kardexRepo = tx.getRepository(RawMaterialKardex);
+                    const allocationRepo = tx.getRepository(ProductionMaterialAllocation);
                     const lots = await lotRepo.find(
                         {
                             rawMaterial: { $in: materialIds },
@@ -712,6 +790,15 @@ export class ProductionService {
                         lotsByMaterial.set(materialId, rows);
                     }
 
+                    const allocations = await allocationRepo.find(
+                        { productionOrder: order.id, rawMaterial: { $in: materialIds }, lot: { $ne: null } },
+                        { populate: ['lot', 'lot.warehouse'] }
+                    );
+                    const allocationByMaterial = new Map<string, ProductionMaterialAllocation>();
+                    for (const row of allocations) {
+                        allocationByMaterial.set(row.rawMaterial.id, row);
+                    }
+
                     const consumedByMaterialWarehouse = new Map<string, number>();
                     for (const [materialId, requirement] of materialRequirements.entries()) {
                         let pending = Number(requirement.required);
@@ -724,21 +811,15 @@ export class ProductionService {
                             );
                         }
 
-                        for (const lot of rows) {
-                            if (pending <= 0) {
-                                break;
-                            }
+                        const consumeFromLot = (lot: RawMaterialLot, maxQty: number) => {
+                            if (maxQty <= 0) return 0;
                             const currentQty = Number(lot.quantityAvailable);
-                            if (currentQty <= 0) {
-                                continue;
-                            }
-                            const consume = Math.min(currentQty, pending);
+                            if (currentQty <= 0) return 0;
+                            const consume = Math.min(currentQty, maxQty);
                             lot.quantityAvailable = currentQty - consume;
                             pending -= consume;
-
                             const key = `${materialId}::${lot.warehouse.id}`;
                             consumedByMaterialWarehouse.set(key, Number(consumedByMaterialWarehouse.get(key) || 0) + consume);
-
                             const kardex = kardexRepo.create({
                                 rawMaterial: lot.rawMaterial,
                                 warehouse: lot.warehouse,
@@ -752,6 +833,31 @@ export class ProductionService {
                                 occurredAt: new Date(),
                             } as unknown as RawMaterialKardex);
                             tx.persist([lot, kardex]);
+                            return consume;
+                        };
+
+                        const allocation = allocationByMaterial.get(materialId);
+                        if (allocation?.lot) {
+                            const selectedLot = rows.find((row) => row.id === allocation.lot?.id);
+                            if (selectedLot) {
+                                const desired = Number(allocation.quantityRequested || requirement.required);
+                                const requested = Math.min(desired, Number(requirement.required));
+                                const taken = consumeFromLot(selectedLot, requested);
+                                if (taken < requested) {
+                                    throw new AppError(
+                                        `El lote asignado (${selectedLot.supplierLotCode}) no tiene suficiente para ${requirement.materialName}. Requerido asignado: ${requested.toFixed(4)}, disponible: ${Number(selectedLot.quantityAvailable + taken).toFixed(4)}`,
+                                        400
+                                    );
+                                }
+                            }
+                        }
+
+                        for (const lot of rows) {
+                            if (pending <= 0) {
+                                break;
+                            }
+                            if (allocation?.lot && lot.id === allocation.lot.id) continue;
+                            consumeFromLot(lot, pending);
                         }
                     }
 

@@ -353,6 +353,13 @@ export const UpdateProductionOrderStatusSchema = z.object({
     warehouseId: z.string().uuid().optional(),
 });
 
+export const UpsertProductionMaterialAllocationSchema = z.object({
+    rawMaterialId: z.string().uuid(),
+    lotId: z.string().uuid().optional(),
+    quantityRequested: z.number().positive().optional(),
+    notes: z.string().optional(),
+});
+
 export const InventoryQuerySchema = z.object({
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().optional(),
@@ -1054,19 +1061,21 @@ export const OperationalConfigSchema = z.object({
 
     numberOfOperators: z.number().min(1, 'Debe haber al menos 1 operario'),
     purchasePaymentMethods: z.array(z.string().min(1, 'Forma de pago inválida')).min(1, 'Debe haber al menos una forma de pago'),
-    defaultPurchaseOrderControlledDocumentId: z.string().uuid().optional(),
-    defaultPurchaseOrderControlledDocumentCode: z.string().min(1).optional(),
-    defaultIncomingInspectionControlledDocumentCode: z.string().min(1).optional(),
-    defaultPackagingControlledDocumentCode: z.string().min(1).optional(),
-    defaultLabelingControlledDocumentCode: z.string().min(1).optional(),
-    defaultBatchReleaseControlledDocumentCode: z.string().min(1).optional(),
-    operationMode: z.enum(['lote', 'serial']).optional(),
+    defaultPurchaseOrderControlledDocumentId: z.string().uuid().nullish(),
+    defaultPurchaseOrderControlledDocumentCode: z.string().min(1).nullish(),
+    defaultIncomingInspectionControlledDocumentCode: z.string().min(1).nullish(),
+    defaultPackagingControlledDocumentCode: z.string().min(1).nullish(),
+    defaultLabelingControlledDocumentCode: z.string().min(1).nullish(),
+    defaultBatchReleaseControlledDocumentCode: z.string().min(1).nullish(),
+    operationMode: z.enum(['lote', 'serial']).nullish(),
+    uvtValue: z.number().min(0, 'El valor del UVT debe ser mayor o igual a 0').nullish(),
     purchaseWithholdingRules: z.array(
         z.object({
             key: z.string().min(1),
             label: z.string().min(1),
             rate: z.number().min(0).max(100),
             active: z.boolean().optional().default(true),
+            baseUvtLimit: z.number().min(0, 'El límite base debe ser mayor o igual a 0').optional(),
         })
     ).min(1, 'Debe haber al menos una regla de retención'),
 });
@@ -1083,14 +1092,15 @@ export type UpdateProductVariantDto = z.infer<typeof UpdateProductVariantSchema>
 type DateInputValue<T> = T extends Date
     ? string | Date
     : T extends (infer U)[]
-      ? DateInputValue<U>[]
-      : T extends object
-        ? { [K in keyof T]: DateInputValue<T[K]> }
-        : T;
+    ? DateInputValue<U>[]
+    : T extends object
+    ? { [K in keyof T]: DateInputValue<T[K]> }
+    : T;
 
 // MRP/Quality API input contracts (schema-driven)
 export type CreateProductionBatchPayload = DateInputValue<z.input<typeof CreateProductionBatchSchema>>;
 export type UpsertProductionBatchPackagingFormPayload = DateInputValue<z.input<typeof UpsertProductionBatchPackagingFormSchema>>;
+export type UpsertProductionMaterialAllocationPayload = DateInputValue<z.input<typeof UpsertProductionMaterialAllocationSchema>>;
 export type CreateNonConformityPayload = DateInputValue<z.input<typeof CreateNonConformitySchema>>;
 export type UpdateNonConformityPayload = DateInputValue<z.input<typeof UpdateNonConformitySchema>>;
 export type CreateCapaPayload = DateInputValue<z.input<typeof CreateCapaSchema>>;

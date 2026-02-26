@@ -1722,14 +1722,16 @@ export interface OperationalConfig {
         label: string;
         rate: number;
         active: boolean;
+        baseUvtLimit?: number;
     }>;
-    defaultPurchaseOrderControlledDocumentId?: string;
-    defaultPurchaseOrderControlledDocumentCode?: string;
-    defaultIncomingInspectionControlledDocumentCode?: string;
-    defaultPackagingControlledDocumentCode?: string;
-    defaultLabelingControlledDocumentCode?: string;
-    defaultBatchReleaseControlledDocumentCode?: string;
-    operationMode?: ProductionTraceabilityMode;
+    uvtValue?: number | null;
+    defaultPurchaseOrderControlledDocumentId?: string | null;
+    defaultPurchaseOrderControlledDocumentCode?: string | null;
+    defaultIncomingInspectionControlledDocumentCode?: string | null;
+    defaultPackagingControlledDocumentCode?: string | null;
+    defaultLabelingControlledDocumentCode?: string | null;
+    defaultBatchReleaseControlledDocumentCode?: string | null;
+    operationMode?: ProductionTraceabilityMode | null;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

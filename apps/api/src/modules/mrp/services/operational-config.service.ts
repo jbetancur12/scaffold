@@ -117,6 +117,9 @@ export class OperationalConfigService {
         if (data.operationMode !== undefined) {
             config.operationMode = data.operationMode;
         }
+        if (data.uvtValue !== undefined) {
+            config.uvtValue = data.uvtValue;
+        }
         if (data.purchaseWithholdingRules !== undefined) {
             config.purchaseWithholdingRules = data.purchaseWithholdingRules.map((rule) => ({
                 ...rule,
