@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
+    BatchDhrExpedient,
     BatchRelease,
     BatchReleaseStatus,
     DocumentApprovalMethod,
@@ -49,6 +50,7 @@ import {
     useProductionBatchesQuery,
     useProductionOrderQuery,
     useProductionRequirementsQuery,
+    useReturnProductionMaterialMutation,
     useUpdateProductionBatchPackagingMutation,
     useUpdateProductionBatchQcMutation,
     useUpdateProductionBatchUnitPackagingMutation,
@@ -112,6 +114,11 @@ export default function ProductionOrderDetailPage() {
     const [lotCenterSigning, setLotCenterSigning] = useState(false);
     const [lotCenterRelease, setLotCenterRelease] = useState<BatchRelease | null>(null);
     const [lotCenterLotLabel, setLotCenterLotLabel] = useState<RegulatoryLabel | null>(null);
+    const [lotCenterDhr, setLotCenterDhr] = useState<BatchDhrExpedient | null>(null);
+    const [returnMaterialId, setReturnMaterialId] = useState<string>('');
+    const [returnLotId, setReturnLotId] = useState<string>('');
+    const [returnQuantity, setReturnQuantity] = useState<string>('0');
+    const [returnNotes, setReturnNotes] = useState<string>('');
 
     const { data: order, loading, error, execute: reloadOrder } = useProductionOrderQuery(id);
     const { data: requirementsData, loading: loadingReqs, error: requirementsError } = useProductionRequirementsQuery(id);
@@ -131,6 +138,7 @@ export default function ProductionOrderDetailPage() {
     const { execute: updateUnitPackaging } = useUpdateProductionBatchUnitPackagingMutation();
     const { execute: upsertPackagingForm, loading: savingPackagingForm } = useUpsertProductionBatchPackagingFormMutation();
     const { execute: upsertMaterialAllocation, loading: savingMaterialAllocation } = useUpsertProductionMaterialAllocationMutation();
+    const { execute: returnMaterial, loading: returningMaterial } = useReturnProductionMaterialMutation();
 
     useMrpQueryErrorRedirect(error, 'No se pudo cargar la orden de producción', '/mrp/production-orders');
     useMrpQueryErrorToast(requirementsError, 'No se pudieron calcular los requerimientos');
@@ -269,6 +277,47 @@ export default function ProductionOrderDetailPage() {
         }
     };
 
+    const returnableMaterials = useMemo(
+        () => requirements.filter((row) => (row.pepsLots?.length || 0) > 0),
+        [requirements]
+    );
+    const selectedReturnMaterial = useMemo(
+        () => returnableMaterials.find((row) => row.material.id === returnMaterialId),
+        [returnableMaterials, returnMaterialId]
+    );
+    const returnableLots = selectedReturnMaterial?.pepsLots || [];
+
+    const submitMaterialReturn = async () => {
+        if (!id) return;
+        const qty = Number(returnQuantity || 0);
+        if (!returnMaterialId || !returnLotId) {
+            toast({ title: 'Faltan datos', description: 'Selecciona materia prima y lote para registrar devolución.', variant: 'destructive' });
+            return;
+        }
+        if (qty <= 0) {
+            toast({ title: 'Cantidad inválida', description: 'La cantidad a devolver debe ser mayor a 0.', variant: 'destructive' });
+            return;
+        }
+        try {
+            await returnMaterial({
+                orderId: id,
+                payload: {
+                    rawMaterialId: returnMaterialId,
+                    lotId: returnLotId,
+                    quantity: qty,
+                    notes: returnNotes.trim() || undefined,
+                    actor: 'sistema-web',
+                },
+            });
+            toast({ title: 'Devolución registrada', description: 'Se creó movimiento kardex de entrada por devolución.' });
+            setReturnQuantity('0');
+            setReturnNotes('');
+            await reloadOrder({ force: true });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo registrar devolución de materia prima'), variant: 'destructive' });
+        }
+    };
+
     const openPackagingFormDialog = (batchId: string) => {
         const batch = batches.find((b) => b.id === batchId);
         const data = (batch?.packagingFormData || {}) as Record<string, unknown>;
@@ -393,20 +442,57 @@ export default function ProductionOrderDetailPage() {
         }
     };
 
+    const downloadDhrExport = async (batchId: string, formatType: 'json' | 'csv' = 'json') => {
+        try {
+            const file = await mrpApi.exportBatchDhr(batchId, formatType, 'sistema-web');
+            const blob = new Blob([file.content], {
+                type: formatType === 'json' ? 'application/json' : 'text/csv;charset=utf-8',
+            });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = file.fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo exportar el DHR del lote'), variant: 'destructive' });
+        }
+    };
+
+    const downloadDhrPdf = async (batchId: string) => {
+        try {
+            const blob = await mrpApi.getBatchDhrPdf(batchId, 'sistema-web');
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `DHR-${batchId.slice(0, 8).toUpperCase()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo descargar el DHR en PDF'), variant: 'destructive' });
+        }
+    };
+
     const openLotCenter = async (batchId: string) => {
         const batch = batches.find((b) => b.id === batchId);
         if (!batch) return;
         setLotCenterBatchId(batchId);
         setLotCenterLoading(true);
         try {
-            const [labels, releases] = await Promise.all([
+            const [labels, releases, dhr] = await Promise.all([
                 mrpApi.listRegulatoryLabels({ productionBatchId: batchId, scopeType: RegulatoryLabelScopeType.LOTE }),
                 mrpApi.listBatchReleases({ productionBatchId: batchId }),
+                mrpApi.getBatchDhr(batchId, 'sistema-web'),
             ]);
             const lotLabel = labels.find((row) => row.scopeType === RegulatoryLabelScopeType.LOTE) || null;
             const release = releases[0] || null;
             setLotCenterLotLabel(lotLabel);
             setLotCenterRelease(release);
+            setLotCenterDhr(dhr);
             setLotCenterLabel({
                 productName: lotLabel?.productName || batch.variant?.product?.name || '',
                 manufacturerName: lotLabel?.manufacturerName || '',
@@ -649,7 +735,49 @@ export default function ProductionOrderDetailPage() {
                         ? 'Guardar checklist QA'
                         : nextLotStep === 'sign'
                             ? 'Firmar liberación QA'
-                            : 'Lote completo';
+                        : 'Lote completo';
+
+    const formatShortDate = (value?: string | Date | null) => {
+        if (!value) return '—';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '—';
+        return format(date, 'dd/MM/yyyy');
+    };
+
+    const lotTimeline = [
+        { key: 'for', label: 'FOR Empaque', done: lotStepStatus.form },
+        { key: 'label', label: 'Etiquetado', done: lotStepStatus.label },
+        { key: 'qc', label: 'QC', done: lotStepStatus.qc },
+        { key: 'pack', label: 'Empaque', done: lotStepStatus.packed },
+        { key: 'qa', label: 'Liberación QA', done: lotStepStatus.qa },
+    ];
+
+    const lotDocumentSnapshots = [
+        {
+            key: 'packaging',
+            title: 'FOR Empaque',
+            code: activeLotBatch?.packagingFormDocumentCode,
+            version: activeLotBatch?.packagingFormDocumentVersion,
+            date: activeLotBatch?.packagingFormDocumentDate,
+            status: lotStepStatus.form ? 'Listo' : 'Pendiente',
+        },
+        {
+            key: 'labeling',
+            title: 'FOR Etiquetado',
+            code: lotCenterLotLabel?.documentControlCode,
+            version: lotCenterLotLabel?.documentControlVersion,
+            date: lotCenterLotLabel?.documentControlDate,
+            status: lotStepStatus.label ? 'Validado' : 'Pendiente',
+        },
+        {
+            key: 'release',
+            title: 'FOR Liberación QA',
+            code: lotCenterRelease?.documentControlCode,
+            version: lotCenterRelease?.documentControlVersion,
+            date: lotCenterRelease?.documentControlDate,
+            status: lotStepStatus.qa ? 'Firmado' : 'Pendiente',
+        },
+    ];
 
     const handleNextLotStep = async () => {
         if (!activeLotBatch) return;
@@ -1012,6 +1140,64 @@ export default function ProductionOrderDetailPage() {
                                 <p className="text-xs text-slate-400 ml-2">Requerimientos y disponibilidad en inventario.</p>
                             </div>
                             <div className="p-6">
+                                <div className="mb-5 bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-slate-800">Devolución de sobrantes a bodega (Kardex)</h3>
+                                        <p className="text-xs text-slate-500">Registra devoluciones reales de MP consumida para mantener trazabilidad INVIMA por OP/lote.</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                                        <Select
+                                            value={returnMaterialId}
+                                            onValueChange={(value) => {
+                                                setReturnMaterialId(value);
+                                                setReturnLotId('');
+                                            }}
+                                        >
+                                            <SelectTrigger className="md:col-span-2">
+                                                <SelectValue placeholder="Materia prima" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {returnableMaterials.map((row) => (
+                                                    <SelectItem key={row.material.id} value={row.material.id}>
+                                                        {row.material.name} ({row.material.sku})
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <Select value={returnLotId} onValueChange={setReturnLotId} disabled={!selectedReturnMaterial}>
+                                            <SelectTrigger className="md:col-span-2">
+                                                <SelectValue placeholder="Lote MP" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {returnableLots.map((lot) => (
+                                                    <SelectItem key={lot.lotId} value={lot.lotId}>
+                                                        {lot.lotCode} · {lot.warehouseName}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <input
+                                            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                            type="number"
+                                            min={0.0001}
+                                            step={0.0001}
+                                            value={returnQuantity}
+                                            onChange={(e) => setReturnQuantity(e.target.value)}
+                                            placeholder="Cantidad"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                                        <input
+                                            className="h-10 rounded-md border border-input bg-background px-3 text-sm md:col-span-4"
+                                            value={returnNotes}
+                                            onChange={(e) => setReturnNotes(e.target.value)}
+                                            placeholder="Observación devolución (opcional)"
+                                        />
+                                        <Button onClick={submitMaterialReturn} disabled={returningMaterial}>
+                                            {returningMaterial ? 'Registrando...' : 'Registrar devolución'}
+                                        </Button>
+                                    </div>
+                                </div>
                                 {loadingReqs ? (
                                     <div className="flex items-center justify-center py-12 text-slate-400">
                                         <div className="animate-spin mr-3 h-6 w-6 border-4 border-slate-200 border-t-violet-600 rounded-full" />
@@ -1031,7 +1217,12 @@ export default function ProductionOrderDetailPage() {
             </div>
             <div>
 
-                <Dialog open={Boolean(lotCenterBatchId)} onOpenChange={(open) => !open && setLotCenterBatchId(null)}>
+                <Dialog open={Boolean(lotCenterBatchId)} onOpenChange={(open) => {
+                    if (!open) {
+                        setLotCenterBatchId(null);
+                        setLotCenterDhr(null);
+                    }
+                }}>
                     <DialogContent className="max-w-4xl">
                         <DialogHeader className="pb-3 border-b border-slate-100">
                             <div className="flex items-center gap-3">
@@ -1054,19 +1245,177 @@ export default function ProductionOrderDetailPage() {
                             </div>
                         ) : (
                             <div className="space-y-5 max-h-[72vh] overflow-y-auto pr-1 py-2">
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div>
+                                            <h3 className="text-sm font-semibold text-slate-800">Trazabilidad E2E del lote</h3>
+                                            <p className="text-xs text-slate-500">Consulta el estado completo sin salir de esta vista.</p>
+                                        </div>
+                                        <div className="text-xs text-slate-500 font-mono">
+                                            OP: {order.code} · Lote: {activeLotBatch?.code || '—'}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button size="sm" variant="outline" className="rounded-xl border-slate-200" onClick={() => setLotCenterBatchId(null)}>
+                                            Volver al detalle OP
+                                        </Button>
+                                        <Button size="sm" variant="outline" className="rounded-xl border-slate-200" onClick={() => navigate('/mrp/inventory')}>
+                                            Ver inventario / Kardex
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="rounded-xl border-slate-200"
+                                            onClick={() => activeLotBatch && downloadPackagingFormPdf(activeLotBatch.id)}
+                                            disabled={!lotStepStatus.form}
+                                        >
+                                            PDF FOR Empaque
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="rounded-xl border-slate-200"
+                                            onClick={() => activeLotBatch && downloadLabelPdf(activeLotBatch.id)}
+                                            disabled={!lotStepStatus.label}
+                                        >
+                                            PDF Etiquetado
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="rounded-xl border-slate-200"
+                                            onClick={() => activeLotBatch && downloadBatchReleasePdf(activeLotBatch.id)}
+                                            disabled={!lotCenterRelease}
+                                        >
+                                            PDF Liberación QA
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="rounded-xl border-slate-200"
+                                            onClick={() => activeLotBatch && downloadDhrPdf(activeLotBatch.id)}
+                                            disabled={!lotCenterDhr}
+                                        >
+                                            PDF DHR
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="rounded-xl border-slate-200"
+                                            onClick={() => activeLotBatch && downloadDhrExport(activeLotBatch.id, 'json')}
+                                            disabled={!lotCenterDhr}
+                                        >
+                                            Exportar DHR
+                                        </Button>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                        {lotDocumentSnapshots.map((doc) => (
+                                            <div key={doc.key} className="bg-white border border-slate-200 rounded-xl p-3">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">{doc.title}</p>
+                                                    <Badge variant="outline" className={doc.status === 'Pendiente' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}>
+                                                        {doc.status}
+                                                    </Badge>
+                                                </div>
+                                                <p className="text-sm font-mono text-slate-900 mt-2">{doc.code || 'Sin documento'}</p>
+                                                <p className="text-xs text-slate-500 mt-1">
+                                                    Versión: {doc.version ? `v${doc.version}` : '—'} · Fecha: {formatShortDate(doc.date)}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+                                            <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Origen (Recepción / OC)</p>
+                                            {(lotCenterDhr?.materials || []).length === 0 ? (
+                                                <p className="text-xs text-slate-500">Sin materias primas registradas en DHR.</p>
+                                            ) : (
+                                                <div className="space-y-2 max-h-52 overflow-auto pr-1">
+                                                    {lotCenterDhr?.materials.map((material) => (
+                                                        <div key={material.rawMaterialId} className="border border-slate-100 rounded-lg p-2">
+                                                            <p className="text-xs font-semibold text-slate-800">
+                                                                {material.rawMaterialName} <span className="text-slate-400">({material.rawMaterialSku})</span>
+                                                            </p>
+                                                            {material.latestInspection ? (
+                                                                <p className="text-xs text-slate-600 mt-1">
+                                                                    Recepción: {formatShortDate(material.latestInspection.inspectedAt)} · Resultado: {material.latestInspection.inspectionResult || 'N/A'}
+                                                                    {material.latestInspection.purchaseOrderId ? (
+                                                                        <>
+                                                                            {' '}· OC:{' '}
+                                                                            <button
+                                                                                type="button"
+                                                                                className="underline text-violet-700 hover:text-violet-900"
+                                                                                onClick={() => navigate(`/mrp/purchase-orders/${material.latestInspection?.purchaseOrderId}`)}
+                                                                            >
+                                                                                {material.latestInspection.purchaseOrderCode || `OC-${material.latestInspection.purchaseOrderId.slice(0, 8).toUpperCase()}`}
+                                                                            </button>
+                                                                        </>
+                                                                    ) : null}
+                                                                </p>
+                                                            ) : (
+                                                                <p className="text-xs text-amber-700 mt-1">Sin recepción liberada detectada.</p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+                                            <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Despacho</p>
+                                            {(lotCenterDhr?.shipments || []).length === 0 ? (
+                                                <p className="text-xs text-slate-500">Lote aún no despachado.</p>
+                                            ) : (
+                                                <div className="space-y-2 max-h-52 overflow-auto pr-1">
+                                                    {lotCenterDhr?.shipments.map((shipment) => (
+                                                        <div key={shipment.id} className="border border-slate-100 rounded-lg p-2">
+                                                            <p className="text-xs font-semibold text-slate-800">
+                                                                {shipment.customer?.name || 'Cliente'} · {shipment.commercialDocument}
+                                                            </p>
+                                                            <p className="text-xs text-slate-600 mt-1">
+                                                                Fecha: {formatShortDate(shipment.shippedAt)} · Ítems: {shipment.items.length}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-2">
+                                        <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Kardex MP (consumo/devolución OP)</p>
+                                        {(lotCenterDhr?.materialMovements || []).length === 0 ? (
+                                            <p className="text-xs text-slate-500">Sin movimientos kardex vinculados a esta OP.</p>
+                                        ) : (
+                                            <div className="space-y-2 max-h-44 overflow-auto pr-1">
+                                                {lotCenterDhr?.materialMovements.map((movement) => (
+                                                    <div key={movement.id} className="border border-slate-100 rounded-lg p-2">
+                                                        <p className="text-xs font-semibold text-slate-800">
+                                                            {movement.rawMaterialName} <span className="text-slate-400">({movement.rawMaterialSku})</span>
+                                                        </p>
+                                                        <p className="text-xs text-slate-600 mt-1">
+                                                            {formatShortDate(movement.occurredAt)} · {movement.movementType} · Qty {Number(movement.quantity).toLocaleString('es-CO')}
+                                                            {' '}· Saldo lote {Number(movement.balanceAfter).toLocaleString('es-CO')}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 mt-1">
+                                                            Lote: {movement.supplierLotCode || 'N/A'} · Bodega: {movement.warehouseName || 'N/A'}
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
 
                                 {/* Progress stepper */}
                                 <div className="grid grid-cols-5 gap-2">
-                                    {[
-                                        { n: 1, label: 'FOR Empaque', done: lotStepStatus.form },
-                                        { n: 2, label: 'Etiqueta', done: lotStepStatus.label },
-                                        { n: 3, label: 'QC', done: lotStepStatus.qc },
-                                        { n: 4, label: 'Empaque', done: lotStepStatus.packed },
-                                        { n: 5, label: 'QA', done: lotStepStatus.qa },
-                                    ].map(({ n, label, done }) => (
-                                        <div key={n} className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition-all ${done ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                                    {lotTimeline.map(({ key, label, done }, index) => (
+                                        <div key={key} className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition-all ${done ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
                                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${done ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                                                {done ? '✓' : n}
+                                                {done ? '✓' : index + 1}
                                             </div>
                                             <span className={`text-xs font-semibold leading-tight ${done ? 'text-emerald-700' : 'text-slate-500'}`}>{label}</span>
                                             <span className={`text-[10px] font-medium ${done ? 'text-emerald-600' : 'text-slate-400'}`}>{done ? 'Listo' : 'Pendiente'}</span>

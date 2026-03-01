@@ -137,6 +137,7 @@ import type {
     ListSalesOrdersFilters,
     UpdateSalesOrderStatusPayload,
     UpsertProductionMaterialAllocationPayload,
+    ReturnProductionMaterialPayload,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -472,6 +473,17 @@ export const mrpApi = {
         const response = await api.post(`/mrp/production-orders/${orderId}/material-allocation`, payload);
         return response.data;
     },
+    returnProductionMaterial: async (orderId: string, payload: ReturnProductionMaterialPayload) => {
+        const response = await api.post(`/mrp/production-orders/${orderId}/material-returns`, payload);
+        return response.data as {
+            productionOrderId: string;
+            rawMaterialId: string;
+            lotId: string;
+            returnedQuantity: number;
+            availableToReturn: number;
+            newLotBalance: number;
+        };
+    },
     updateProductionOrderStatus: async (id: string, status: string, warehouseId?: string): Promise<ProductionOrder> => {
         const response = await api.patch(`/mrp/production-orders/${id}/status`, { status, warehouseId });
         return response.data;
@@ -736,6 +748,13 @@ export const mrpApi = {
     exportBatchDhr: async (productionBatchId: string, format: 'csv' | 'json' = 'json', actor?: string): Promise<BatchDhrExportFile> => {
         const response = await api.get<BatchDhrExportFile>(`/mrp/quality/dhr/${productionBatchId}/export`, { params: { format, actor } });
         return response.data;
+    },
+    getBatchDhrPdf: async (productionBatchId: string, actor?: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/quality/dhr/${productionBatchId}/pdf`, {
+            responseType: 'blob',
+            params: { actor },
+        });
+        return response.data as Blob;
     },
     updateRecallProgress: async (id: string, data: UpdateRecallProgressPayload): Promise<RecallCase> => {
         const response = await api.patch<RecallCase>(`/mrp/quality/recalls/${id}/progress`, data);
