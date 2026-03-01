@@ -9,6 +9,7 @@ import {
     ProductionBatchQcStatus,
     ProductionBatchStatus,
     ProductionOrderStatus,
+    SalesOrderStatus,
     BatchReleaseStatus,
     RegulatoryLabelScopeType,
     RegulatoryLabelStatus,
@@ -33,6 +34,7 @@ import { OperationalConfig } from '../entities/operational-config.entity';
 import { RawMaterialLot } from '../entities/raw-material-lot.entity';
 import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { ProductionMaterialAllocation } from '../entities/production-material-allocation.entity';
+import { SalesOrder } from '../entities/sales-order.entity';
 import { DocumentControlService } from './document-control.service';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
 import { z } from 'zod';
@@ -94,6 +96,10 @@ export class ProductionService {
 
         const order = this.productionOrderRepo.create(orderData as unknown as ProductionOrder);
 
+        if ((data as any).salesOrderId) {
+            order.salesOrder = this.em.getReference(SalesOrder, (data as any).salesOrderId);
+        }
+
         for (const itemData of itemsData) {
             const item = new ProductionOrderItem();
             item.variant = this.em.getReference(ProductVariant, itemData.variantId);
@@ -103,6 +109,61 @@ export class ProductionService {
 
         await this.em.persistAndFlush(order);
         return order;
+    }
+
+    async linkSalesOrder(productionOrderId: string, salesOrderId: string | null): Promise<ProductionOrder> {
+        return this.em.transactional(async (tx) => {
+            const order = await tx.getRepository(ProductionOrder).findOneOrFail({ id: productionOrderId }, { populate: ['salesOrder'] });
+            const oldSalesOrderId = order.salesOrder?.id;
+
+            if (salesOrderId) {
+                order.salesOrder = tx.getReference(SalesOrder, salesOrderId);
+            } else {
+                order.salesOrder = undefined;
+            }
+            await tx.persistAndFlush(order);
+
+            if (oldSalesOrderId && oldSalesOrderId !== salesOrderId) {
+                await this.syncSalesOrderStatus(oldSalesOrderId, tx);
+            }
+            if (salesOrderId) {
+                await this.syncSalesOrderStatus(salesOrderId, tx);
+            }
+
+            return order;
+        });
+    }
+
+    private async syncSalesOrderStatus(salesOrderId: string, tx: EntityManager) {
+        const soRepo = tx.getRepository(SalesOrder);
+        const poRepo = tx.getRepository(ProductionOrder);
+
+        const so = await soRepo.findOne({ id: salesOrderId });
+        if (!so) return;
+
+        const linkedPos = await poRepo.find({ salesOrder: salesOrderId });
+        if (linkedPos.length === 0) {
+            // No linked POs, do not automatically change status (could be mostly manual)
+            return;
+        }
+
+        const allCompleted = linkedPos.every(po => po.status === ProductionOrderStatus.COMPLETED);
+        const allCancelled = linkedPos.every(po => po.status === ProductionOrderStatus.CANCELLED);
+
+        let newStatus = so.status;
+        if (allCancelled) {
+            // Keep current status or allow manual intervention, but let's not auto-cancel SO based on PO
+        } else if (allCompleted) {
+            newStatus = SalesOrderStatus.READY_TO_SHIP;
+        } else {
+            // Any PO is draft, planned or in progress
+            newStatus = SalesOrderStatus.IN_PRODUCTION;
+        }
+
+        if (so.status !== newStatus) {
+            so.status = newStatus;
+            tx.persist(so);
+        }
     }
 
     async listOrders(page: number = 1, limit: number = 10): Promise<{ orders: ProductionOrder[], total: number }> {
@@ -671,7 +732,7 @@ export class ProductionService {
             const warehouseRepo = tx.getRepository(Warehouse);
             const order = await productionOrderRepo.findOneOrFail(
                 { id },
-                { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial', 'batches', 'batches.units'] }
+                { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial', 'batches', 'batches.units', 'salesOrder'] }
             );
 
             // Basic transition validation
@@ -926,6 +987,10 @@ export class ProductionService {
                     }
                     tx.persist(inventoryItem);
                 }
+            }
+
+            if (order.salesOrder) {
+                await this.syncSalesOrderStatus(order.salesOrder.id, tx);
             }
 
             await tx.flush();

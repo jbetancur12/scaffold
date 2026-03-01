@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { InventoryItem, ProductVariant, RawMaterial, Warehouse, Product } from '@scaffold/types';
 import {
     Table,
@@ -27,8 +27,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Package, Plus } from 'lucide-react';
-import { format } from 'date-fns';
+import { Loader2, Package, Plus, Layers, AlertCircle, TrendingUp, Search } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatQuantity } from '@/lib/utils';
@@ -55,7 +54,7 @@ export default function InventoryDashboardPage() {
     const [manualQuantity, setManualQuantity] = useState('');
     const [manualCost, setManualCost] = useState('');
     const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
-    const { data: inventoryData, loading, error: inventoryError, execute: refetchInventory } = useInventoryQuery(1, 100, warehouseId);
+    const { data: inventoryData, error: inventoryError, execute: refetchInventory, loading } = useInventoryQuery(1, 100, warehouseId);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
     const { materials: rawMaterials, error: rawMaterialsError } = useRawMaterialsQuery(1, 100, '');
     const { execute: addManualStock, loading: submittingManual } = useManualStockMutation();
@@ -65,6 +64,23 @@ export default function InventoryDashboardPage() {
 
     useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar información auxiliar');
     useMrpQueryErrorToast(warehousesError, 'No se pudo cargar información auxiliar');
+
+    // Memos para KPIs
+    const kpis = useMemo(() => {
+        let rawMaterialCount = 0;
+        let productCount = 0;
+
+        inventory.forEach(item => {
+            if (item.variant) productCount++;
+            else if (item.rawMaterial) rawMaterialCount++;
+        });
+
+        return {
+            total: inventory.length,
+            rawMaterials: rawMaterialCount,
+            products: productCount
+        };
+    }, [inventory]);
 
     const handleManualAdd = async () => {
         if (!selectedMaterialId || !manualQuantity || !manualCost) {
@@ -114,38 +130,42 @@ export default function InventoryDashboardPage() {
         return 'N/A';
     };
 
-    const getItemType = (item: PopulatedInventoryItem) => {
-        if (item.variant) return <Badge variant="default">Producto Final</Badge>;
-        if (item.rawMaterial) return <Badge variant="secondary">Materia Prima</Badge>;
-        return <Badge variant="outline">Desconocido</Badge>;
-    };
-
     return (
-        <div className="space-y-8 max-w-7xl mx-auto">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                        Inventario
-                    </h1>
-                    <p className="text-slate-500">
-                        Gestión de Stock: Materias Primas y Productos Terminados por Almacén.
-                    </p>
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
+            {/* Hero Header */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mt-2">
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl ring-1 ring-indigo-100 hidden sm:block">
+                        <Layers className="h-8 w-8" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mb-1">
+                            Inventario General
+                        </h1>
+                        <p className="text-sm text-slate-500">
+                            Gestión centralizada de stock, materias primas y productos finalizados.
+                        </p>
+                    </div>
                 </div>
-                <div className="flex gap-2">
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                     <Select value={selectedFilterWarehouseId} onValueChange={setSelectedFilterWarehouseId}>
-                        <SelectTrigger className="w-[200px]">
-                            <SelectValue placeholder="Filtrar por Almacén" />
+                        <SelectTrigger className="w-full sm:w-[240px] bg-slate-50 border-slate-200">
+                            <SelectValue placeholder="Todos los Almacenes" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Todos los Almacenes</SelectItem>
+                            <SelectItem value="all">
+                                <span className="font-semibold">Todos los Almacenes</span>
+                            </SelectItem>
                             {warehouses.map((w) => (
                                 <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
+
                     <Dialog open={isManualAddOpen} onOpenChange={setIsManualAddOpen}>
                         <DialogTrigger asChild>
-                            <Button>
+                            <Button className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all">
                                 <Plus className="mr-2 h-4 w-4" />
                                 Ajuste Manual
                             </Button>
@@ -226,57 +246,147 @@ export default function InventoryDashboardPage() {
                 </div>
             </div>
 
-            {loading ? (
-                <div className="flex justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-slate-50 text-slate-500 rounded-lg">
+                            <TrendingUp className="h-5 w-5" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Total Referencias</h3>
+                    </div>
+                    <div className="text-3xl font-bold text-slate-900 mt-1">{kpis.total}</div>
                 </div>
-            ) : inventoryErrorMessage ? (
-                <div className="p-4 text-red-500 bg-red-50 rounded-md">
-                    {inventoryErrorMessage}
+
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                            <Package className="h-5 w-5" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Materias Primas</h3>
+                    </div>
+                    <div className="text-3xl font-bold text-slate-900 mt-1">{kpis.rawMaterials}</div>
                 </div>
-            ) : (
-                <div className="rounded-3xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Ítem</TableHead>
-                                <TableHead>Tipo</TableHead>
-                                <TableHead>Almacén</TableHead>
-                                <TableHead className="text-right">Cantidad</TableHead>
-                                <TableHead>Última Actualización</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {inventory.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
-                                        No hay ítems en inventario.
-                                    </TableCell>
-                                </TableRow>
-                            ) : (
-                                inventory.map((item) => (
-                                    <TableRow key={item.id}>
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center gap-2">
-                                                <Package className="h-4 w-4 text-slate-400" />
-                                                {getItemName(item)}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>{getItemType(item)}</TableCell>
-                                        <TableCell>{item.warehouse?.name || '---'}</TableCell>
-                                        <TableCell className="text-right font-bold text-lg text-slate-700">
-                                            {formatQuantity(item.quantity)}
-                                        </TableCell>
-                                        <TableCell className="text-muted-foreground">
-                                            {item.updatedAt ? format(new Date(item.updatedAt), 'dd/MM/yyyy HH:mm') : '-'}
-                                        </TableCell>
+
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center">
+                    <div className="flex items-center gap-3 mb-2">
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                            <Layers className="h-5 w-5" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Prod. Terminados</h3>
+                    </div>
+                    <div className="text-3xl font-bold text-slate-900 mt-1">{kpis.products}</div>
+                </div>
+            </div>
+
+            {
+                loading ? (
+                    <div className="flex justify-center py-8" >
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                ) : inventoryErrorMessage ? (
+                    <div className="p-4 text-red-500 bg-red-50 rounded-md">
+                        {inventoryErrorMessage}
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+                            <h2 className="text-lg font-bold text-slate-800">Stock Actual</h2>
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-medium">
+                                {kpis.total} ítems
+                            </Badge>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader className="bg-slate-50/80">
+                                    <TableRow className="hover:bg-transparent">
+                                        <TableHead className="w-[30%] sm:w-[40%] text-xs font-semibold text-slate-500 uppercase tracking-wider py-4">Ítem</TableHead>
+                                        <TableHead className="w-[20%] text-xs font-semibold text-slate-500 uppercase tracking-wider py-4">Tipo</TableHead>
+                                        <TableHead className="w-[20%] text-xs font-semibold text-slate-500 uppercase tracking-wider py-4">Almacén</TableHead>
+                                        <TableHead className="w-[15%] text-right text-xs font-semibold text-slate-500 uppercase tracking-wider py-4">Cantidad</TableHead>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </div>
-            )}
+                                </TableHeader>
+                                <TableBody>
+                                    {inventory.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="h-[400px]">
+                                                <div className="flex flex-col items-center justify-center text-center h-full space-y-4">
+                                                    <div className="p-6 bg-slate-50 rounded-full ring-8 ring-slate-50/50">
+                                                        <Search className="h-10 w-10 text-slate-300" />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <p className="text-lg font-medium text-slate-900">
+                                                            No se encontraron ítems
+                                                        </p>
+                                                        <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                                                            {selectedFilterWarehouseId === 'all'
+                                                                ? 'Empieza recibiendo órdenes de compra o crea un ajuste manual de stock.'
+                                                                : 'No hay inventario registrado para el almacén seleccionado.'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        inventory.map((item) => (
+                                            <TableRow key={item.id} className="group hover:bg-slate-50/50 transition-colors">
+                                                <TableCell className="py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`p-2 rounded-lg shrink-0 ${item.variant ? 'bg-indigo-50 text-indigo-500' : 'bg-amber-50 text-amber-500'}`}>
+                                                            {item.variant ? <Layers className="h-4 w-4" /> : <Package className="h-4 w-4" />}
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-semibold text-slate-900 line-clamp-1">
+                                                                {getItemName(item).split(' - ')[0]}
+                                                            </div>
+                                                            {(item.variant?.sku || item.rawMaterial?.sku) && (
+                                                                <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                                                    <span className="font-mono bg-slate-100 px-1 rounded">{item.variant?.sku || item.rawMaterial?.sku}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="py-4">
+                                                    {item.variant ? (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10">
+                                                            Producto Final
+                                                        </span>
+                                                    ) : item.rawMaterial ? (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/10">
+                                                            Materia Prima
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-slate-50 text-slate-700 ring-1 ring-inset ring-slate-600/10">
+                                                            Desconocido
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="py-4 text-slate-700 font-medium">
+                                                    {item.warehouse?.name || <span className="text-slate-400 italic">No asignado</span>}
+                                                </TableCell>
+                                                <TableCell className="py-4 text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {item.quantity <= 10 && (
+                                                            <AlertCircle className="h-4 w-4 text-amber-500" />
+                                                        )}
+                                                        <span className="text-xl font-bold text-slate-900">
+                                                            {formatQuantity(item.quantity)}
+                                                        </span>
+                                                        <span className="text-xs font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                                                            U
+                                                        </span>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                )
+            }
         </div>
     );
 }

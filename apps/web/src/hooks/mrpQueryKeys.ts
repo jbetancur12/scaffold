@@ -21,6 +21,13 @@ export const mrpQueryKeys = {
     purchaseRequisitionsList: (page: number, limit: number, status?: string, productionOrderId?: string) =>
         `mrp.purchase-requisitions.${page}.${limit}.${status || ''}.${productionOrderId || ''}`,
     purchaseRequisition: (id: string) => `mrp.purchase-requisition.${id}`,
+    salesOrders: 'mrp.sales-orders',
+    salesOrdersList: (page: number, limit: number, status?: string, search?: string) => `mrp.sales-orders.${page}.${limit}.${status || ''}.${search || ''}`,
+    salesOrder: (id: string) => `mrp.sales-orders.${id}`,
+
+    customers: 'mrp.customers',
+    customersList: (search?: string) => `mrp.customers.list.${search || ''}`,
+    customerDetail: (id: string) => `mrp.customer.${id}`,
     productionOrders: 'mrp.production-orders',
     productionOrdersList: (page: number, limit: number) => `mrp.production-orders.${page}.${limit}`,
     productionOrder: (id: string) => `mrp.production-order.${id}`,

@@ -44,6 +44,7 @@ import {
     EquipmentMaintenanceType,
     EquipmentMaintenanceResult,
     OperationalAlertRole,
+    SalesOrderStatus,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -207,6 +208,7 @@ export const ProductionOrderSchema = z.object({
     startDate: z.string().or(z.date()).optional(),
     endDate: z.string().or(z.date()).optional(),
     notes: z.string().optional(),
+    salesOrderId: z.string().uuid().optional(),
 });
 
 export const ProductionOrderItemSchema = z.object({
@@ -285,6 +287,7 @@ export const CreateProductionOrderSchema = z.object({
     startDate: z.string().or(z.date()).optional(),
     endDate: z.string().or(z.date()).optional(),
     notes: z.string().optional(),
+    salesOrderId: z.string().uuid().optional(),
     items: z.array(ProductionOrderItemCreateSchema).min(1, 'Debe agregar al menos un item'),
 });
 
@@ -1067,6 +1070,9 @@ export const OperationalConfigSchema = z.object({
     defaultPackagingControlledDocumentCode: z.string().min(1).nullish(),
     defaultLabelingControlledDocumentCode: z.string().min(1).nullish(),
     defaultBatchReleaseControlledDocumentCode: z.string().min(1).nullish(),
+    defaultSalesOrderProductionDocCode: z.string().min(1).nullish(),
+    defaultSalesOrderBillingDocCode: z.string().min(1).nullish(),
+    purchaseOrderPrefix: z.string().nullish(),
     operationMode: z.enum(['lote', 'serial']).nullish(),
     uvtValue: z.number().min(0, 'El valor del UVT debe ser mayor o igual a 0').nullish(),
     purchaseWithholdingRules: z.array(
@@ -1078,6 +1084,30 @@ export const OperationalConfigSchema = z.object({
             baseUvtLimit: z.number().min(0, 'El límite base debe ser mayor o igual a 0').optional(),
         })
     ).min(1, 'Debe haber al menos una regla de retención'),
+});
+
+export const CreateSalesOrderSchema = z.object({
+    customerId: z.string().uuid(),
+    expectedDeliveryDate: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    notes: z.string().optional(),
+    items: z.array(z.object({
+        productId: z.string().uuid(),
+        variantId: z.string().uuid().optional(),
+        quantity: z.number().positive('La cantidad debe ser mayor a 0'),
+        unitPrice: z.number().min(0, 'El precio debe ser mayor o igual a 0'),
+        taxRate: z.number().min(0).optional()
+    })).min(1, 'El pedido debe tener al menos un ítem'),
+});
+
+export const ListSalesOrdersQuerySchema = z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    search: z.string().optional(),
+    status: z.nativeEnum(SalesOrderStatus).optional(),
+});
+
+export const UpdateSalesOrderStatusSchema = z.object({
+    status: z.nativeEnum(SalesOrderStatus),
 });
 
 export type CreateUserDto = z.infer<typeof CreateUserSchema>;
@@ -1145,8 +1175,10 @@ export type CreatePurchaseRequisitionPayload = DateInputValue<z.input<typeof Cre
 export type CreatePurchaseRequisitionFromProductionOrderPayload = DateInputValue<z.input<typeof CreatePurchaseRequisitionFromProductionOrderSchema>>;
 export type CreateEquipmentPayload = DateInputValue<z.input<typeof CreateEquipmentSchema>>;
 export type UpdateEquipmentPayload = DateInputValue<z.input<typeof UpdateEquipmentSchema>>;
-export type CreateEquipmentCalibrationPayload = DateInputValue<z.input<typeof CreateEquipmentCalibrationSchema>>;
 export type CreateEquipmentMaintenancePayload = DateInputValue<z.input<typeof CreateEquipmentMaintenanceSchema>>;
 export type RegisterBatchEquipmentUsagePayload = DateInputValue<z.input<typeof RegisterBatchEquipmentUsageSchema>>;
 export type ListOperationalAlertsPayload = DateInputValue<z.input<typeof ListOperationalAlertsQuerySchema>>;
 export type ExportWeeklyComplianceReportPayload = DateInputValue<z.input<typeof ExportWeeklyComplianceReportQuerySchema>>;
+export type CreateSalesOrderPayload = DateInputValue<z.input<typeof CreateSalesOrderSchema>>;
+export type ListSalesOrdersFilters = DateInputValue<z.input<typeof ListSalesOrdersQuerySchema>>;
+export type UpdateSalesOrderStatusPayload = DateInputValue<z.input<typeof UpdateSalesOrderStatusSchema>>;

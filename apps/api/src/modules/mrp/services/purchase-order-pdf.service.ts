@@ -5,19 +5,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 type PugModule = {
-    compile: (template: string, options?: { pretty?: boolean }) => (locals: Record<string, unknown>) => string;
+  compile: (template: string, options?: { pretty?: boolean }) => (locals: Record<string, unknown>) => string;
 };
 
 type PlaywrightModule = {
-    chromium: {
-        launch: (options?: Record<string, unknown>) => Promise<{
-            newPage: () => Promise<{
-                setContent: (html: string, options?: Record<string, unknown>) => Promise<void>;
-                pdf: (options?: Record<string, unknown>) => Promise<Buffer>;
-            }>;
-            close: () => Promise<void>;
-        }>;
-    };
+  chromium: {
+    launch: (options?: Record<string, unknown>) => Promise<{
+      newPage: () => Promise<{
+        setContent: (html: string, options?: Record<string, unknown>) => Promise<void>;
+        pdf: (options?: Record<string, unknown>) => Promise<Buffer>;
+      }>;
+      close: () => Promise<void>;
+    }>;
+  };
 };
 
 const purchaseOrderPdfTemplate = `
@@ -118,77 +118,77 @@ html(lang="es")
 `;
 
 export class PurchaseOrderPdfService {
-    private readonly purchaseOrderService: PurchaseOrderService;
+  private readonly purchaseOrderService: PurchaseOrderService;
 
-    constructor(em: EntityManager) {
-        this.purchaseOrderService = new PurchaseOrderService(em);
-    }
+  constructor(em: EntityManager) {
+    this.purchaseOrderService = new PurchaseOrderService(em);
+  }
 
-    private formatCurrency(value?: number | null) {
-        const numeric = Number(value || 0);
-        return new Intl.NumberFormat('es-CO', {
-            style: 'currency',
-            currency: 'COP',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2,
-        }).format(numeric);
-    }
+  private formatCurrency(value?: number | null) {
+    const numeric = Number(value || 0);
+    return new Intl.NumberFormat('es-CO', {
+      style: 'currency',
+      currency: 'COP',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(numeric);
+  }
 
-    private formatDate(value?: Date | string | null) {
-        if (!value) return 'N/A';
-        return new Date(value).toLocaleDateString('es-CO');
-    }
+  private formatDate(value?: Date | string | null) {
+    if (!value) return 'N/A';
+    return new Date(value).toLocaleDateString('es-CO');
+  }
 
-    private formatHeaderDate(value?: Date | string | null) {
-        if (!value) return 'N/A';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return 'N/A';
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
+  private formatHeaderDate(value?: Date | string | null) {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 
-    private resolveProcessLabelByDocCode(code?: string | null) {
-        const normalizedCode = (code || '').trim().toUpperCase();
-        const prefix = normalizedCode.split('-')[0];
-        const map: Record<string, string> = {
-            GP: 'Proceso de Gestión de Producción',
-            GC: 'Proceso de Gestión de Calidad',
-            GAF: 'Proceso de Gestión Administrativa y Financiera',
-            GTH: 'Proceso de Gestión de Talento Humano',
-            GS: 'Proceso de Gestión de Seguridad',
-            GM: 'Proceso de Gestión de Mantenimiento',
-        };
-        return map[prefix] || 'Proceso de Gestión de Producción';
-    }
+  private resolveProcessLabelByDocCode(code?: string | null) {
+    const normalizedCode = (code || '').trim().toUpperCase();
+    const prefix = normalizedCode.split('-')[0];
+    const map: Record<string, string> = {
+      GP: 'Proceso de Gestión de Producción',
+      GC: 'Proceso de Gestión de Calidad',
+      GAF: 'Proceso de Gestión Administrativa y Financiera',
+      GTH: 'Proceso de Gestión de Talento Humano',
+      GS: 'Proceso de Gestión de Seguridad',
+      GM: 'Proceso de Gestión de Mantenimiento',
+    };
+    return map[prefix] || 'Proceso de Gestión de Producción';
+  }
 
-    private escapeHtml(value: string) {
-        return value
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
+  private escapeHtml(value: string) {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
 
-    private buildHeaderTemplate(data: {
-        logoDataUrl?: string;
-        title: string;
-        processLabel: string;
-        docCode: string;
-        docVersion: number;
-        docDate: string;
-    }) {
-        const safeTitle = this.escapeHtml(data.title);
-        const safeProcessLabel = this.escapeHtml(data.processLabel);
-        const safeDocCode = this.escapeHtml(data.docCode);
-        const safeDocDate = this.escapeHtml(data.docDate);
-        const logoCell = data.logoDataUrl
-            ? `<img style="width:100%;max-height:56px;object-fit:contain;display:block;margin:0 auto;" src="${data.logoDataUrl}" alt="COLMOR" />`
-            : '<div style="text-align:center;font-weight:700;font-size:16px;">COLMOR</div>';
+  private buildHeaderTemplate(data: {
+    logoDataUrl?: string;
+    title: string;
+    processLabel: string;
+    docCode: string;
+    docVersion: number;
+    docDate: string;
+  }) {
+    const safeTitle = this.escapeHtml(data.title);
+    const safeProcessLabel = this.escapeHtml(data.processLabel);
+    const safeDocCode = this.escapeHtml(data.docCode);
+    const safeDocDate = this.escapeHtml(data.docDate);
+    const logoCell = data.logoDataUrl
+      ? `<img style="width:100%;max-height:56px;object-fit:contain;display:block;margin:0 auto;" src="${data.logoDataUrl}" alt="COLMOR" />`
+      : '<div style="text-align:center;font-weight:700;font-size:16px;">COLMOR</div>';
 
-        return `
+    return `
             <style>
               html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; }
               .header-wrap { padding: 8px 24px 0 24px; width: 100%; background: #fff; }
@@ -207,7 +207,7 @@ export class PurchaseOrderPdfService {
                   <td style="width:36%">${logoCell}</td>
                   <td style="width:40%">
                     <div class="doc-title">
-                      <div class="l1">SAS COLMOR</div>
+                      <div class="l1">COLORTOPEDICAS SAS</div>
                       <div class="l2">${safeProcessLabel}</div>
                       <div class="l3">${safeTitle}</div>
                     </div>
@@ -223,10 +223,10 @@ export class PurchaseOrderPdfService {
               </table>
             </div>
         `;
-    }
+  }
 
-    private buildFooterTemplate() {
-        return `
+  private buildFooterTemplate() {
+    return `
             <style>
               html, body { margin: 0; padding: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; }
               .footer-wrap { width: 100%; padding: 0 24px 8px 24px; background: #fff; }
@@ -242,124 +242,124 @@ export class PurchaseOrderPdfService {
               </div>
             </div>
         `;
+  }
+
+  private loadPug(): PugModule {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      return (eval('require') as NodeRequire)('pug') as PugModule;
+    } catch {
+      throw new AppError('Dependencia "pug" no instalada. Ejecuta: npm install --workspace=api pug', 500);
+    }
+  }
+
+  private loadPlaywright(): PlaywrightModule {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      return (eval('require') as NodeRequire)('playwright') as PlaywrightModule;
+    } catch {
+      throw new AppError('Dependencia "playwright" no instalada. Ejecuta: npm install --workspace=api playwright', 500);
+    }
+  }
+
+  private getLogoDataUrl(): string | undefined {
+    const candidates = [
+      path.resolve(__dirname, '../../../assets/colmor-logo.jpg'),
+      path.resolve(process.cwd(), 'logo.jpg'),
+      path.resolve(process.cwd(), 'logo-c.jpg'),
+      path.resolve(process.cwd(), '..', 'logo.jpg'),
+      path.resolve(process.cwd(), '..', 'logo-c.jpg'),
+      path.resolve(process.cwd(), 'src/assets/colmor-logo.jpg'),
+      path.resolve(process.cwd(), 'apps/api/src/assets/colmor-logo.jpg'),
+      path.resolve(process.cwd(), 'apps/web/src/assets/logo.jpg'),
+      path.resolve(process.cwd(), '..', 'apps/web/src/assets/logo.jpg'),
+    ];
+    for (const filePath of candidates) {
+      if (!fs.existsSync(filePath)) continue;
+      const mime = filePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
+      const base64 = fs.readFileSync(filePath).toString('base64');
+      return `data:${mime};base64,${base64}`;
+    }
+    return undefined;
+  }
+
+  async generatePurchaseOrderPdf(id: string) {
+    const order = await this.purchaseOrderService.getPurchaseOrder(id);
+    if (!order) {
+      throw new AppError('Orden de compra no encontrada', 404);
     }
 
-    private loadPug(): PugModule {
-        try {
-            // eslint-disable-next-line @typescript-eslint/no-implied-eval
-            return (eval('require') as NodeRequire)('pug') as PugModule;
-        } catch {
-            throw new AppError('Dependencia "pug" no instalada. Ejecuta: npm install --workspace=api pug', 500);
-        }
+    const pug = this.loadPug();
+    const playwright = this.loadPlaywright();
+    const compile = pug.compile(purchaseOrderPdfTemplate);
+    const logoDataUrl = this.getLogoDataUrl();
+    const docCode = order.documentControlCode || 'GP-FOR-04';
+    const processLabel = this.resolveProcessLabelByDocCode(docCode);
+    const docDate = this.formatHeaderDate(order.documentControlDate || order.createdAt);
+    const html = compile({
+      title: order.documentControlTitle || 'Orden de Compra',
+      processLabel,
+      docCode,
+      docVersion: order.documentControlVersion || 1,
+      docDate,
+      orderNumber: order.code || `OC-${order.id.slice(0, 8).toUpperCase()}`,
+      orderDate: this.formatDate(order.orderDate),
+      supplierName: order.supplier?.name || 'N/A',
+      expectedDeliveryDate: this.formatDate(order.expectedDeliveryDate),
+      purchaseType: order.purchaseType || 'N/A',
+      paymentMethod: order.paymentMethod || 'N/A',
+      notes: order.notes || '',
+      items: (order.items ?? []).map((item) => ({
+        description: item.rawMaterial?.name || item.customDescription || 'Ítem libre',
+        reference: item.rawMaterial?.sku || '-',
+        unit: item.rawMaterial?.unit || item.customUnit || '',
+        quantity: Number(item.quantity || 0).toLocaleString('es-CO'),
+        unitPrice: this.formatCurrency(Number(item.unitPrice || 0)),
+        lineTotal: this.formatCurrency(Number(item.subtotal || 0)),
+        taxAmount: this.formatCurrency(Number(item.taxAmount || 0)),
+      })),
+      subtotalBase: this.formatCurrency(Number(order.subtotalBase || 0)),
+      taxTotal: this.formatCurrency(Number(order.taxTotal || 0)),
+      discountAmount: this.formatCurrency(Number(order.discountAmount || 0)),
+      withholdingAmount: this.formatCurrency(Number(order.withholdingAmount || 0)),
+      otherChargesAmount: this.formatCurrency(Number(order.otherChargesAmount || 0)),
+      netTotalAmount: this.formatCurrency(Number(order.netTotalAmount || order.totalAmount || 0)),
+      logoDataUrl,
+    });
+
+    const browser = await playwright.chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle' });
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        displayHeaderFooter: true,
+        headerTemplate: this.buildHeaderTemplate({
+          logoDataUrl,
+          title: order.documentControlTitle || 'Orden de Compra',
+          processLabel,
+          docCode,
+          docVersion: order.documentControlVersion || 1,
+          docDate,
+        }),
+        footerTemplate: this.buildFooterTemplate(),
+        margin: {
+          top: '140px',
+          bottom: '70px',
+          left: '24px',
+          right: '24px',
+        },
+      });
+      return {
+        fileName: `${order.documentControlCode || order.code || 'OC'}-v${order.documentControlVersion || 1}.pdf`,
+        buffer: pdfBuffer,
+      };
+    } finally {
+      await browser.close();
     }
-
-    private loadPlaywright(): PlaywrightModule {
-        try {
-            // eslint-disable-next-line @typescript-eslint/no-implied-eval
-            return (eval('require') as NodeRequire)('playwright') as PlaywrightModule;
-        } catch {
-            throw new AppError('Dependencia "playwright" no instalada. Ejecuta: npm install --workspace=api playwright', 500);
-        }
-    }
-
-    private getLogoDataUrl(): string | undefined {
-        const candidates = [
-            path.resolve(__dirname, '../../../assets/colmor-logo.jpg'),
-            path.resolve(process.cwd(), 'logo.jpg'),
-            path.resolve(process.cwd(), 'logo-c.jpg'),
-            path.resolve(process.cwd(), '..', 'logo.jpg'),
-            path.resolve(process.cwd(), '..', 'logo-c.jpg'),
-            path.resolve(process.cwd(), 'src/assets/colmor-logo.jpg'),
-            path.resolve(process.cwd(), 'apps/api/src/assets/colmor-logo.jpg'),
-            path.resolve(process.cwd(), 'apps/web/src/assets/logo.jpg'),
-            path.resolve(process.cwd(), '..', 'apps/web/src/assets/logo.jpg'),
-        ];
-        for (const filePath of candidates) {
-            if (!fs.existsSync(filePath)) continue;
-            const mime = filePath.endsWith('.png') ? 'image/png' : 'image/jpeg';
-            const base64 = fs.readFileSync(filePath).toString('base64');
-            return `data:${mime};base64,${base64}`;
-        }
-        return undefined;
-    }
-
-    async generatePurchaseOrderPdf(id: string) {
-        const order = await this.purchaseOrderService.getPurchaseOrder(id);
-        if (!order) {
-            throw new AppError('Orden de compra no encontrada', 404);
-        }
-
-        const pug = this.loadPug();
-        const playwright = this.loadPlaywright();
-        const compile = pug.compile(purchaseOrderPdfTemplate);
-        const logoDataUrl = this.getLogoDataUrl();
-        const docCode = order.documentControlCode || 'GP-FOR-04';
-        const processLabel = this.resolveProcessLabelByDocCode(docCode);
-        const docDate = this.formatHeaderDate(order.documentControlDate || order.createdAt);
-        const html = compile({
-            title: order.documentControlTitle || 'Orden de Compra',
-            processLabel,
-            docCode,
-            docVersion: order.documentControlVersion || 1,
-            docDate,
-            orderNumber: `OC-${order.id.slice(0, 8).toUpperCase()}`,
-            orderDate: this.formatDate(order.orderDate),
-            supplierName: order.supplier?.name || 'N/A',
-            expectedDeliveryDate: this.formatDate(order.expectedDeliveryDate),
-            purchaseType: order.purchaseType || 'N/A',
-            paymentMethod: order.paymentMethod || 'N/A',
-            notes: order.notes || '',
-            items: (order.items ?? []).map((item) => ({
-                description: item.rawMaterial?.name || item.customDescription || 'Ítem libre',
-                reference: item.rawMaterial?.sku || '-',
-                unit: item.rawMaterial?.unit || item.customUnit || '',
-                quantity: Number(item.quantity || 0).toLocaleString('es-CO'),
-                unitPrice: this.formatCurrency(Number(item.unitPrice || 0)),
-                lineTotal: this.formatCurrency(Number(item.subtotal || 0)),
-                taxAmount: this.formatCurrency(Number(item.taxAmount || 0)),
-            })),
-            subtotalBase: this.formatCurrency(Number(order.subtotalBase || 0)),
-            taxTotal: this.formatCurrency(Number(order.taxTotal || 0)),
-            discountAmount: this.formatCurrency(Number(order.discountAmount || 0)),
-            withholdingAmount: this.formatCurrency(Number(order.withholdingAmount || 0)),
-            otherChargesAmount: this.formatCurrency(Number(order.otherChargesAmount || 0)),
-            netTotalAmount: this.formatCurrency(Number(order.netTotalAmount || order.totalAmount || 0)),
-            logoDataUrl,
-        });
-
-        const browser = await playwright.chromium.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        });
-        try {
-            const page = await browser.newPage();
-            await page.setContent(html, { waitUntil: 'networkidle' });
-            const pdfBuffer = await page.pdf({
-                format: 'A4',
-                printBackground: true,
-                displayHeaderFooter: true,
-                headerTemplate: this.buildHeaderTemplate({
-                    logoDataUrl,
-                    title: order.documentControlTitle || 'Orden de Compra',
-                    processLabel,
-                    docCode,
-                    docVersion: order.documentControlVersion || 1,
-                    docDate,
-                }),
-                footerTemplate: this.buildFooterTemplate(),
-                margin: {
-                    top: '140px',
-                    bottom: '70px',
-                    left: '24px',
-                    right: '24px',
-                },
-            });
-            return {
-                fileName: `${order.documentControlCode || 'OC'}-${order.id.slice(0, 8).toUpperCase()}-v${order.documentControlVersion || 1}.pdf`,
-                buffer: pdfBuffer,
-            };
-        } finally {
-            await browser.close();
-        }
-    }
+  }
 }

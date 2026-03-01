@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 
 const querySubscriptions = new Map<string, Set<() => void>>();
 const inFlightRequests = new Map<string, Promise<unknown>>();
@@ -129,6 +129,16 @@ export function useMrpQuery<T>(
     const shouldRetry = options?.shouldRetry ?? defaultShouldRetry;
     const persist = options?.persist ?? false;
 
+    const fetcherRef = useRef(fetcher);
+    useEffect(() => {
+        fetcherRef.current = fetcher;
+    }, [fetcher]);
+
+    const shouldRetryRef = useRef(shouldRetry);
+    useEffect(() => {
+        shouldRetryRef.current = shouldRetry;
+    }, [shouldRetry]);
+
     const execute = useCallback(async (params?: { force?: boolean }) => {
         const force = params?.force ?? false;
         if (queryKey && ttlMs > 0 && !force) {
@@ -147,9 +157,9 @@ export function useMrpQuery<T>(
             let attempt = 0;
             for (let i = 0; i <= retry; i += 1) {
                 try {
-                    return await fetcher();
+                    return await fetcherRef.current();
                 } catch (err) {
-                    if (attempt >= retry || !shouldRetry(err, attempt + 1)) {
+                    if (attempt >= retry || !shouldRetryRef.current(err, attempt + 1)) {
                         throw err;
                     }
                     const delay = retryDelayMs * Math.pow(backoffFactor, attempt);
@@ -195,7 +205,7 @@ export function useMrpQuery<T>(
             }
             setLoading(false);
         }
-    }, [backoffFactor, fetcher, persist, queryKey, retry, retryDelayMs, shouldRetry, ttlMs]);
+    }, [backoffFactor, persist, queryKey, retry, retryDelayMs, ttlMs]);
 
     useEffect(() => {
         if (!queryKey || !persist || ttlMs <= 0) return;

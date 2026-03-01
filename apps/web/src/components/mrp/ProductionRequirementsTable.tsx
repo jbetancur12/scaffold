@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
     Table,
     TableBody,
@@ -42,13 +43,34 @@ interface Requirement {
         receivedAt: string;
         suggestedUse: number;
     }[];
+    selectedAllocation?: {
+        lotId: string;
+        lotCode: string;
+        warehouseId: string;
+        warehouseName: string;
+        quantityRequested?: number;
+    };
 }
 
 interface ProductionRequirementsTableProps {
     requirements: Requirement[];
+    onAssignLot?: (input: { rawMaterialId: string; lotId?: string; quantityRequested?: number }) => Promise<void>;
+    savingAllocation?: boolean;
 }
 
-export function ProductionRequirementsTable({ requirements }: ProductionRequirementsTableProps) {
+export function ProductionRequirementsTable({ requirements, onAssignLot, savingAllocation }: ProductionRequirementsTableProps) {
+    const [draftByMaterial, setDraftByMaterial] = useState<Record<string, { lotId: string; quantityRequested: string }>>({});
+
+    useEffect(() => {
+        const next: Record<string, { lotId: string; quantityRequested: string }> = {};
+        for (const req of requirements) {
+            next[req.material.id] = {
+                lotId: req.selectedAllocation?.lotId || '',
+                quantityRequested: req.selectedAllocation?.quantityRequested ? String(req.selectedAllocation.quantityRequested) : '',
+            };
+        }
+        setDraftByMaterial(next);
+    }, [requirements]);
 
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
@@ -116,6 +138,7 @@ export function ProductionRequirementsTable({ requirements }: ProductionRequirem
                             <TableHead className="text-right">Disponible</TableHead>
                             <TableHead className="text-right">Faltante</TableHead>
                             <TableHead>Lotes PEPS sugeridos</TableHead>
+                            <TableHead>Asignación manual</TableHead>
                             <TableHead>Proveedores Conocidos</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -161,6 +184,69 @@ export function ProductionRequirementsTable({ requirements }: ProductionRequirem
                                             </div>
                                         ) : (
                                             <span className="text-xs text-muted-foreground italic">Sin lotes trazables</span>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="min-w-[280px]">
+                                        {onAssignLot ? (
+                                            <div className="space-y-2">
+                                                <select
+                                                    className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                                    value={draftByMaterial[req.material.id]?.lotId || ''}
+                                                    onChange={(e) => setDraftByMaterial((prev) => ({
+                                                        ...prev,
+                                                        [req.material.id]: {
+                                                            lotId: e.target.value,
+                                                            quantityRequested: prev[req.material.id]?.quantityRequested || '',
+                                                        },
+                                                    }))}
+                                                >
+                                                    <option value="">Automático PEPS</option>
+                                                    {(req.pepsLots || []).map((lot) => (
+                                                        <option key={lot.lotId} value={lot.lotId}>
+                                                            {lot.lotCode} | Disp {formatQuantity(lot.available)} {req.material.unit}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                                                        placeholder="Cantidad (opcional)"
+                                                        value={draftByMaterial[req.material.id]?.quantityRequested || ''}
+                                                        onChange={(e) => setDraftByMaterial((prev) => ({
+                                                            ...prev,
+                                                            [req.material.id]: {
+                                                                lotId: prev[req.material.id]?.lotId || '',
+                                                                quantityRequested: e.target.value,
+                                                            },
+                                                        }))}
+                                                    />
+                                                    <Button
+                                                        size="sm"
+                                                        disabled={Boolean(savingAllocation)}
+                                                        onClick={async () => {
+                                                            const draft = draftByMaterial[req.material.id] || { lotId: '', quantityRequested: '' };
+                                                            const parsedQty = draft.quantityRequested.trim() ? Number(draft.quantityRequested) : undefined;
+                                                            await onAssignLot({
+                                                                rawMaterialId: req.material.id,
+                                                                lotId: draft.lotId || undefined,
+                                                                quantityRequested: parsedQty && parsedQty > 0 ? parsedQty : undefined,
+                                                            });
+                                                        }}
+                                                    >
+                                                        Guardar
+                                                    </Button>
+                                                </div>
+                                                {req.selectedAllocation ? (
+                                                    <div className="text-xs text-blue-700">
+                                                        Asignado: {req.selectedAllocation.lotCode}
+                                                        {req.selectedAllocation.quantityRequested ? ` (${formatQuantity(req.selectedAllocation.quantityRequested)} ${req.material.unit})` : ''}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-xs text-muted-foreground">Sin asignación manual</div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground italic">No editable</span>
                                         )}
                                     </TableCell>
                                     <TableCell className="max-w-[400px]">

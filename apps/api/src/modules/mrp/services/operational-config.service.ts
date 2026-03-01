@@ -114,6 +114,12 @@ export class OperationalConfigService {
         if (data.defaultBatchReleaseControlledDocumentCode !== undefined) {
             config.defaultBatchReleaseControlledDocumentCode = data.defaultBatchReleaseControlledDocumentCode?.trim() || undefined;
         }
+        if (data.defaultSalesOrderProductionDocCode !== undefined) {
+            config.defaultSalesOrderProductionDocCode = data.defaultSalesOrderProductionDocCode?.trim() || undefined;
+        }
+        if (data.defaultSalesOrderBillingDocCode !== undefined) {
+            config.defaultSalesOrderBillingDocCode = data.defaultSalesOrderBillingDocCode?.trim() || undefined;
+        }
         if (data.operationMode !== undefined) {
             config.operationMode = data.operationMode;
         }

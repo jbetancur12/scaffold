@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ControlledDocument, DocumentCategory, IncomingInspectionResult, IncomingInspectionStatus, NonConformityStatus, OperationalConfig, QualitySeverity, UserRole } from '@scaffold/types';
 import { TabsContent } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -402,407 +402,448 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
   };
 
   return (
-                <TabsContent value="incoming" className="space-y-4">
-                    <Card>
-                        <CardHeader>
-                          <div className="flex items-center justify-between gap-2">
-                            <CardTitle>Inspecciones de Recepción</CardTitle>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setShowReceptionDocSettings((prev) => !prev)}
-                              disabled={!canManageIncoming}
-                              title={!canManageIncoming ? 'Solo administrador/superadmin' : undefined}
-                            >
-                              <Settings className="h-4 w-4 mr-2" />
-                              Formato global
-                            </Button>
+    <TabsContent value="incoming" className="space-y-5">
+
+      {/* Header */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-5 relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-violet-50/40 to-transparent pointer-events-none" />
+          <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-2.5 bg-violet-50 rounded-2xl ring-1 ring-violet-100 shadow-sm shrink-0">
+                <Settings className="h-6 w-6 text-violet-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Inspecciones de Recepción</h2>
+                <p className="text-slate-500 text-sm mt-0.5">Control de calidad en recepción de materia prima.</p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowReceptionDocSettings((prev) => !prev)}
+              disabled={!canManageIncoming}
+              title={!canManageIncoming ? 'Solo administrador/superadmin' : undefined}
+              className="rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 font-medium shrink-0"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Formato global
+            </Button>
+          </div>
+
+          {/* Settings panel */}
+          {showReceptionDocSettings && (
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-3">
+              <p className="text-sm text-slate-600">
+                Selecciona el código documental global para recepción. Se aplicará por defecto en esta sección y en nuevos PDFs.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+                <div className="md:col-span-2 space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600 uppercase tracking-wide">Formato global (Calidad / FOR)</label>
+                  <select
+                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    value={globalReceptionDocCode}
+                    onChange={(e) => setGlobalReceptionDocCode(e.target.value)}
+                  >
+                    <option value="">Automático (GC-FOR-28 vigente)</option>
+                    {documentCodeOptions.map((doc) => (
+                      <option key={doc.code} value={doc.code}>
+                        {doc.code} (última v{doc.version}, {doc.status}) - {doc.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Button
+                  type="button"
+                  onClick={saveGlobalReceptionDoc}
+                  disabled={!canManageIncoming || savingReceptionDocSetting}
+                  className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-medium"
+                >
+                  {savingReceptionDocSetting ? (
+                    <>
+                      <div className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                      Guardando...
+                    </>
+                  ) : 'Guardar'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* KPI Bar */}
+        <div className="grid grid-cols-4 divide-x divide-slate-100 border-t border-slate-100">
+          {[
+            { label: 'Total', value: auditSummary.total, color: 'text-slate-700', bg: '' },
+            { label: 'Pendientes', value: auditSummary.pending, color: 'text-amber-700', bg: 'bg-amber-50/60' },
+            { label: 'Bloqueadas', value: auditSummary.blocked, color: 'text-red-600', bg: 'bg-red-50/60' },
+            { label: 'Completas', value: auditSummary.complete, color: 'text-emerald-700', bg: 'bg-emerald-50/60' },
+          ].map(({ label, value, color, bg }) => (
+            <div key={label} className={`flex flex-col items-center py-3 px-4 ${bg}`}>
+              <span className={`text-2xl font-bold ${color}`}>{value}</span>
+              <span className="text-xs text-slate-500 font-medium mt-0.5">{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Filtro operativo</label>
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500"
+              value={auditFilter}
+              onChange={(e) => setAuditFilter(e.target.value as typeof auditFilter)}
+            >
+              <option value="all">Todas</option>
+              <option value="pending">Con pendientes</option>
+              <option value="blocked">Bloqueadas</option>
+              <option value="complete">Completas</option>
+            </select>
+          </div>
+          <div className="md:col-span-2 space-y-1.5">
+            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Buscar inspección</label>
+            <Input
+              value={auditSearch}
+              onChange={(e) => setAuditSearch(e.target.value)}
+              placeholder="Material, SKU, proveedor, código documental o ID"
+              className="h-10 rounded-xl border-slate-200 focus-visible:ring-violet-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Inspection list */}
+      {model.loadingIncomingInspections ? (
+        <div className="flex items-center justify-center py-16 text-slate-400">
+          <div className="animate-spin mr-3 h-6 w-6 border-4 border-slate-200 border-t-violet-600 rounded-full" />
+          <span className="text-sm animate-pulse">Cargando inspecciones...</span>
+        </div>
+      ) : filteredInspections.length === 0 ? (
+        <div className="text-center py-16 bg-white border border-slate-200 rounded-2xl text-slate-400">
+          <Settings className="h-10 w-10 mx-auto mb-3 opacity-20" />
+          <p className="text-sm font-medium">Sin inspecciones para el filtro actual.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredInspections.map(({ inspection, stages, blocked, complete }) => {
+            const statusStyle =
+              inspection.status === IncomingInspectionStatus.PENDIENTE
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : inspection.status === IncomingInspectionStatus.RECHAZADO
+                  ? 'bg-red-50 text-red-600 border-red-200'
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+
+            return (
+              <div key={inspection.id} className={`bg-white border rounded-2xl overflow-hidden shadow-sm transition-all ${blocked ? 'border-red-200' : complete ? 'border-emerald-200' : 'border-slate-200'}`}>
+
+                {/* Card header row */}
+                <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center flex-wrap gap-2 mb-1">
+                      <span className="font-bold text-slate-900 text-sm">
+                        {inspection.rawMaterial?.name || inspection.rawMaterialId}
+                        {inspection.rawMaterial?.sku ? <span className="ml-1.5 font-normal text-slate-400 text-xs font-mono">({inspection.rawMaterial.sku})</span> : null}
+                      </span>
+                      <Badge variant="outline" className={`font-semibold text-[11px] ring-1 ring-inset ${statusStyle}`}>
+                        {inspection.status}
+                      </Badge>
+                      {isConditionalPending(inspection) && (
+                        <span className="text-[11px] font-semibold bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5">Condicional pendiente</span>
+                      )}
+                    </div>
+
+                    <div className="text-xs text-slate-500 space-y-0.5">
+                      <div>
+                        Recibido: <span className="font-semibold text-slate-700">{inspection.quantityReceived}</span>
+                        &nbsp;·&nbsp;Aceptado: <span className="font-semibold text-emerald-700">{inspection.quantityAccepted}</span>
+                        &nbsp;·&nbsp;Rechazado: <span className="font-semibold text-red-600">{inspection.quantityRejected}</span>
+                      </div>
+                      <div>
+                        OC:{' '}
+                        {inspection.purchaseOrderId ? (
+                          <button type="button" className="underline text-violet-600 hover:text-violet-800 font-medium"
+                            onClick={() => navigate(`/mrp/purchase-orders/${inspection.purchaseOrderId}`)}
+                            title={inspection.purchaseOrderId}>
+                            OC-{inspection.purchaseOrderId.slice(0, 8).toUpperCase()}
+                          </button>
+                        ) : 'N/A'}
+                        &nbsp;·&nbsp;Proveedor:{' '}
+                        {inspection.purchaseOrder?.supplier?.id ? (
+                          <button type="button" className="underline text-violet-600 hover:text-violet-800 font-medium"
+                            onClick={() => navigate(`/mrp/suppliers/${inspection.purchaseOrder!.supplier!.id}`)}
+                            title={inspection.purchaseOrder!.supplier!.id}>
+                            {inspection.purchaseOrder?.supplier?.name || 'N/A'}
+                          </button>
+                        ) : (inspection.purchaseOrder?.supplier?.name || 'N/A')}
+                        &nbsp;·&nbsp;Cert: {inspection.certificateRef || <span className="italic text-slate-400">Sin certificado</span>}
+                      </div>
+                    </div>
+
+                    {/* Audit stage pills */}
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      {stages.map((stage) => (
+                        <span
+                          key={stage.key}
+                          className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-semibold ${auditStageClassName[stage.status]}`}
+                        >
+                          {stage.status === 'ok' ? '✓' : '◐'} {stage.label}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap gap-1.5 shrink-0">
+                    <Button size="sm" variant="outline"
+                      onClick={() => setExpandedIncomingInspectionId((prev) => (prev === inspection.id ? null : inspection.id))}
+                      className="rounded-lg border-slate-200 text-xs h-8">
+                      {expandedIncomingInspectionId === inspection.id ? 'Ocultar' : 'Detalle'}
+                    </Button>
+                    <Button size="sm" variant="outline"
+                      onClick={() => downloadFor28Pdf(inspection.id)}
+                      className="rounded-lg border-slate-200 text-xs h-8">
+                      FOR-28
+                    </Button>
+                    <Button size="sm" variant="outline"
+                      onClick={() => promptAndUploadEvidence(inspection.id, 'invoice')}
+                      disabled={!canManageIncoming}
+                      className="rounded-lg border-slate-200 text-xs h-8">
+                      + Factura
+                    </Button>
+                    <Button size="sm" variant="outline"
+                      onClick={() => promptAndUploadEvidence(inspection.id, 'certificate')}
+                      disabled={!canManageIncoming}
+                      className="rounded-lg border-slate-200 text-xs h-8">
+                      + Certif.
+                    </Button>
+                    {inspection.invoiceFileName && (
+                      <Button size="sm" variant="outline" onClick={() => downloadEvidence(inspection.id, 'invoice')} className="rounded-lg border-slate-200 text-xs h-8">
+                        ↓ Factura
+                      </Button>
+                    )}
+                    {inspection.certificateFileName && (
+                      <Button size="sm" variant="outline" onClick={() => downloadEvidence(inspection.id, 'certificate')} className="rounded-lg border-slate-200 text-xs h-8">
+                        ↓ Certif.
+                      </Button>
+                    )}
+                    {inspection.status === IncomingInspectionStatus.PENDIENTE ? (
+                      <Button size="sm"
+                        onClick={() => openResolver(inspection.id, Number(inspection.quantityReceived))}
+                        disabled={!canManageIncoming}
+                        className="bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-xs h-8 font-medium">
+                        {isConditionalPending(inspection) ? 'Cerrar condicional' : 'Resolver QA'}
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="outline"
+                        onClick={() => model.quickCorrectIncomingInspectionCost(inspection.id)}
+                        disabled={!canManageIncoming || Number(inspection.quantityAccepted) <= 0}
+                        title={Number(inspection.quantityAccepted) <= 0 ? 'No aplica: sin cantidad aceptada' : undefined}
+                        className="rounded-lg border-slate-200 text-xs h-8">
+                        Corregir costo
+                      </Button>
+                    )}
+                    {inspection.status === IncomingInspectionStatus.RECHAZADO && (
+                      <Button size="sm" variant="outline"
+                        disabled={!canManageIncoming || hasLinkedNc(inspection.id)}
+                        onClick={() => goCreateNcFromInspection(inspection)}
+                        className={`rounded-lg text-xs h-8 ${hasLinkedNc(inspection.id) ? 'border-emerald-200 text-emerald-700 bg-emerald-50' : 'border-red-200 text-red-600 hover:bg-red-50'}`}>
+                        {hasLinkedNc(inspection.id) ? '✓ NC creada' : 'Crear NC'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Expanded detail */}
+                {expandedIncomingInspectionId === inspection.id && (
+                  <div className="border-t border-slate-100 px-5 py-4 bg-slate-50/60">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-y-2 gap-x-4 text-xs">
+                      {[
+                        { label: 'Resultado', value: inspection.inspectionResult || 'N/A' },
+                        { label: 'Formato', value: `${inspection.documentControlCode || 'N/A'} v${inspection.documentControlVersion || 1}` },
+                        { label: 'Costo unitario', value: inspection.acceptedUnitCost ?? 'N/A' },
+                        { label: 'Lote proveedor', value: inspection.supplierLotCode || 'N/A', mono: true },
+                        { label: 'Factura N°', value: inspection.invoiceNumber || 'N/A', mono: true },
+                        { label: 'Archivo factura', value: inspection.invoiceFileName || 'Sin adjunto' },
+                        { label: 'Archivo certificado', value: inspection.certificateFileName || 'Sin adjunto' },
+                        { label: 'Notas', value: inspection.notes || 'Sin notas' },
+                        { label: 'Inspeccionado por', value: inspection.inspectedBy || 'N/A' },
+                        { label: 'Fecha inspección', value: inspection.inspectedAt ? new Date(inspection.inspectedAt).toLocaleString() : 'N/A' },
+                        { label: 'Liberado por', value: inspection.releasedBy || 'N/A' },
+                        { label: 'Fecha liberación', value: inspection.releasedAt ? new Date(inspection.releasedAt).toLocaleString() : 'N/A' },
+                      ].map(({ label, value, mono }) => (
+                        <div key={label}>
+                          <span className="text-slate-400 font-medium">{label}</span>
+                          <p className={`text-slate-700 font-semibold truncate mt-0.5 ${mono ? 'font-mono' : ''}`}>{String(value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {inspection.purchaseOrderItemId && (
+                      <div className="mt-3 text-xs text-slate-500 font-mono">
+                        Ítem OC:{' '}
+                        {inspection.purchaseOrderItem?.rawMaterial
+                          ? `${inspection.purchaseOrderItem.rawMaterial.name} (${inspection.purchaseOrderItem.rawMaterial.sku}) x ${inspection.purchaseOrderItem.quantity || 0}`
+                          : inspection.purchaseOrderItemId}
+                        {' '}<span title={inspection.purchaseOrderItemId} className="text-slate-400">[{shortId(inspection.purchaseOrderItemId)}]</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Inline Resolver Form */}
+                {resolverOpenId === inspection.id && (
+                  <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-5 space-y-4">
+
+                    {/* Decisión */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Decisión de inspección</p>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium text-slate-700">Resultado</Label>
+                          <select
+                            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500"
+                            value={resolverForm.inspectionResult}
+                            onChange={(e) => {
+                              const nextResult = e.target.value as IncomingInspectionResult;
+                              setResolverForm((p) => ({
+                                ...p,
+                                inspectionResult: nextResult,
+                                quantityAccepted: nextResult === IncomingInspectionResult.CONDICIONAL ? '0' : p.quantityAccepted,
+                              }));
+                            }}
+                          >
+                            {isConditionalPending(inspection) ? null : (
+                              <option value={IncomingInspectionResult.APROBADO}>Aprobado</option>
+                            )}
+                            <option value={IncomingInspectionResult.CONDICIONAL}>Condicional</option>
+                            <option value={IncomingInspectionResult.RECHAZADO}>Rechazado</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium text-slate-700">Cantidad aceptada</Label>
+                          <Input type="number" min={0} step="0.0001"
+                            value={resolverForm.quantityAccepted}
+                            disabled={resolverForm.inspectionResult === IncomingInspectionResult.CONDICIONAL}
+                            onChange={(e) => setResolverForm((p) => ({ ...p, quantityAccepted: e.target.value }))}
+                            className="h-10 rounded-xl border-slate-200 focus-visible:ring-violet-500"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium text-slate-700">Cantidad rechazada</Label>
+                          <Input readOnly
+                            value={(() => {
+                              if (resolverForm.inspectionResult === IncomingInspectionResult.CONDICIONAL) return '0';
+                              const accepted = Number(resolverForm.quantityAccepted);
+                              if (Number.isNaN(accepted)) return 'N/A';
+                              return String(Number((Number(inspection.quantityReceived) - accepted).toFixed(4)));
+                            })()}
+                            className="h-10 rounded-xl border-slate-200 bg-slate-100 text-slate-500"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium text-slate-700">Notas</Label>
+                          <Input value={resolverForm.notes}
+                            onChange={(e) => setResolverForm((p) => ({ ...p, notes: e.target.value }))}
+                            placeholder="Obligatorio en condicional/rechazado"
+                            className="h-10 rounded-xl border-slate-200 focus-visible:ring-violet-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Trazabilidad */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trazabilidad documental</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {[
+                          { key: 'supplierLotCode' as const, label: 'Lote proveedor', placeholder: 'Requerido si hay aceptado', mono: true },
+                          { key: 'certificateRef' as const, label: 'Certificado / COA', placeholder: 'Requerido para aprobado/condicional' },
+                          { key: 'invoiceNumber' as const, label: 'Factura N°', placeholder: 'Opcional', mono: true },
+                        ].map(({ key, label, placeholder, mono }) => (
+                          <div key={key} className="space-y-1.5">
+                            <Label className="text-xs font-medium text-slate-700">{label}</Label>
+                            <Input value={resolverForm[key]} onChange={(e) => setResolverForm((p) => ({ ...p, [key]: e.target.value }))}
+                              placeholder={placeholder}
+                              className={`h-10 rounded-xl border-slate-200 focus-visible:ring-violet-500 ${mono ? 'font-mono' : ''}`}
+                            />
                           </div>
-                          {showReceptionDocSettings ? (
-                            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 space-y-2">
-                              <div className="text-sm text-slate-600">
-                                Selecciona el código documental global para recepción. Se aplicará por defecto en esta sección y en nuevos PDFs.
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
-                                <div className="md:col-span-2 space-y-1">
-                                  <Label>Formato global de recepción (Calidad / FOR)</Label>
-                                  <select
-                                    className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                    value={globalReceptionDocCode}
-                                    onChange={(e) => setGlobalReceptionDocCode(e.target.value)}
-                                  >
-                                    <option value="">Automático (GC-FOR-28 vigente)</option>
-                                    {documentCodeOptions.map((doc) => (
-                                      <option key={doc.code} value={doc.code}>
-                                        {doc.code} (última v{doc.version}, {doc.status}) - {doc.title}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <Button
-                                  type="button"
-                                  onClick={saveGlobalReceptionDoc}
-                                  disabled={!canManageIncoming || savingReceptionDocSetting}
-                                >
-                                  {savingReceptionDocSetting ? 'Guardando...' : 'Guardar'}
-                                </Button>
-                              </div>
-                            </div>
-                          ) : null}
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-2">
-                              <div className="text-sm font-medium">Checklist auditable por etapa</div>
-                              <div className="text-xs text-slate-600">
-                                Total: {auditSummary.total} | Pendientes: {auditSummary.pending} | Bloqueadas: {auditSummary.blocked} | Completas: {auditSummary.complete}
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
-                                <div className="space-y-1">
-                                  <Label>Filtro operativo</Label>
-                                  <select
-                                    className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                    value={auditFilter}
-                                    onChange={(e) => setAuditFilter(e.target.value as typeof auditFilter)}
-                                  >
-                                    <option value="all">Todas</option>
-                                    <option value="pending">Con pendientes</option>
-                                    <option value="blocked">Bloqueadas</option>
-                                    <option value="complete">Completas</option>
-                                  </select>
-                                </div>
-                                <div className="md:col-span-2 space-y-1">
-                                  <Label>Buscar inspección</Label>
-                                  <Input
-                                    value={auditSearch}
-                                    onChange={(e) => setAuditSearch(e.target.value)}
-                                    placeholder="Material, SKU, proveedor, código documental o ID"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                            {model.loadingIncomingInspections ? <div>Cargando...</div> : filteredInspections.length === 0 ? <div className="text-sm text-slate-500">Sin inspecciones para el filtro actual.</div> : filteredInspections.map(({ inspection, stages }) => (
-                                <div key={inspection.id} className="border rounded-md p-3 flex items-start justify-between gap-3">
-                                    <div>
-                                        <div className="font-medium">
-                                            Materia prima: {inspection.rawMaterial?.name || inspection.rawMaterialId}
-                                            {inspection.rawMaterial?.sku ? ` (${inspection.rawMaterial.sku})` : ''}
-                                        </div>
-                                        <div className="text-xs text-slate-500 mt-1">ID: {inspection.rawMaterialId}</div>
-                                        <div className="text-xs text-slate-600 mt-1">
-                                            Recibido: {inspection.quantityReceived} | Aceptado: {inspection.quantityAccepted} | Rechazado: {inspection.quantityRejected}
-                                        </div>
-                                        {isConditionalPending(inspection) ? (
-                                          <div className="text-xs text-amber-700 mt-1">
-                                            Estado operativo: Condicional pendiente de cierre
-                                          </div>
-                                        ) : null}
-                                        <div className="text-xs text-slate-500 mt-1">
-                                            OC:{' '}
-                                            {inspection.purchaseOrderId ? (
-                                                <button
-                                                    type="button"
-                                                    className="underline text-blue-700 hover:text-blue-900"
-                                                    onClick={() => navigate(`/mrp/purchase-orders/${inspection.purchaseOrderId}`)}
-                                                    title={inspection.purchaseOrderId}
-                                                >
-                                                    {inspection.purchaseOrder?.id
-                                                        ? `OC-${inspection.purchaseOrder.id.slice(0, 8).toUpperCase()}`
-                                                        : `OC-${inspection.purchaseOrderId.slice(0, 8).toUpperCase()}`}
-                                                </button>
-                                            ) : 'N/A'}
-                                            {' '}| Proveedor:{' '}
-                                            {inspection.purchaseOrder?.supplier?.id ? (
-                                                <button
-                                                    type="button"
-                                                    className="underline text-blue-700 hover:text-blue-900"
-                                                    onClick={() => navigate(`/mrp/suppliers/${inspection.purchaseOrder!.supplier!.id}`)}
-                                                    title={inspection.purchaseOrder!.supplier!.id}
-                                                >
-                                                    {inspection.purchaseOrder?.supplier?.name || 'N/A'}
-                                                </button>
-                                            ) : (inspection.purchaseOrder?.supplier?.name || 'N/A')}
-                                            {' '}| Certificado: {inspection.certificateRef || 'Sin certificado cargado'}
-                                        </div>
-                                        <div className="mt-2 flex flex-wrap gap-1.5">
-                                          {stages.map((stage) => (
-                                            <span
-                                              key={stage.key}
-                                              className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] ${auditStageClassName[stage.status]}`}
-                                            >
-                                              {stage.status === 'ok' ? '●' : '◐'} {stage.label}
-                                            </span>
-                                          ))}
-                                        </div>
-                                        {expandedIncomingInspectionId === inspection.id ? (
-                                            <div className="text-xs text-slate-600 mt-2 border rounded-md p-2 bg-slate-50 space-y-1">
-                                                <div>Resultado inspección: {inspection.inspectionResult || 'N/A'}</div>
-                                                <div>Formato: {(inspection.documentControlCode || 'N/A')} v{inspection.documentControlVersion || 1}</div>
-                                                <div>Costo unitario aceptado: {inspection.acceptedUnitCost ?? 'N/A'}</div>
-                                                <div>Lote proveedor: {inspection.supplierLotCode || 'N/A'}</div>
-                                                <div>Factura N°: {inspection.invoiceNumber || 'N/A'}</div>
-                                                <div>Archivo factura: {inspection.invoiceFileName || 'Sin adjunto'}</div>
-                                                <div>Archivo certificado: {inspection.certificateFileName || 'Sin adjunto'}</div>
-                                                <div>Notas: {inspection.notes || 'Sin notas'}</div>
-                                                <div>Inspeccionado por: {inspection.inspectedBy || 'N/A'}</div>
-                                                <div>Fecha inspección: {inspection.inspectedAt ? new Date(inspection.inspectedAt).toLocaleString() : 'N/A'}</div>
-                                                <div>Liberado por: {inspection.releasedBy || 'N/A'}</div>
-                                                <div>Fecha liberación: {inspection.releasedAt ? new Date(inspection.releasedAt).toLocaleString() : 'N/A'}</div>
-                                                <div>
-                                                    Ítem OC:{' '}
-                                                    {inspection.purchaseOrderItem?.rawMaterial
-                                                        ? `${inspection.purchaseOrderItem.rawMaterial.name} (${inspection.purchaseOrderItem.rawMaterial.sku}) x ${inspection.purchaseOrderItem.quantity || 0}`
-                                                        : (inspection.purchaseOrderItemId || 'N/A')}
-                                                    {inspection.purchaseOrderItemId ? (
-                                                        <> {' '}<span title={inspection.purchaseOrderItemId} className="text-slate-500">[{shortId(inspection.purchaseOrderItemId)}]</span></>
-                                                    ) : null}
-                                                </div>
-                                            </div>
-                                        ) : null}
-                                        {resolverOpenId === inspection.id ? (
-                                          <div className="mt-3 rounded-md border bg-slate-50 p-3 space-y-3">
-                                            <div className="rounded-md border bg-white p-3">
-                                              <div className="text-xs font-semibold text-slate-700 mb-2">Decisión de inspección</div>
-                                              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                                                <div className="space-y-1">
-                                                  <Label>Resultado inspección</Label>
-                                                  <select
-                                                    className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                                    value={resolverForm.inspectionResult}
-                                                    onChange={(e) => {
-                                                      const nextResult = e.target.value as IncomingInspectionResult;
-                                                      setResolverForm((p) => ({
-                                                        ...p,
-                                                        inspectionResult: nextResult,
-                                                        quantityAccepted: nextResult === IncomingInspectionResult.CONDICIONAL ? '0' : p.quantityAccepted,
-                                                      }));
-                                                    }}
-                                                  >
-                                                    {isConditionalPending(inspection) ? null : (
-                                                      <option value={IncomingInspectionResult.APROBADO}>Aprobado</option>
-                                                    )}
-                                                    <option value={IncomingInspectionResult.CONDICIONAL}>Condicional</option>
-                                                    <option value={IncomingInspectionResult.RECHAZADO}>Rechazado</option>
-                                                  </select>
-                                                </div>
-                                                <div className="space-y-1">
-                                                  <Label>Cantidad aceptada</Label>
-                                                  <Input
-                                                    type="number"
-                                                    min={0}
-                                                    step="0.0001"
-                                                    value={resolverForm.quantityAccepted}
-                                                    disabled={resolverForm.inspectionResult === IncomingInspectionResult.CONDICIONAL}
-                                                    onChange={(e) => setResolverForm((p) => ({ ...p, quantityAccepted: e.target.value }))}
-                                                  />
-                                                </div>
-                                                <div className="space-y-1">
-                                                  <Label>Cantidad rechazada</Label>
-                                                  <Input
-                                                    readOnly
-                                                    value={(() => {
-                                                      if (resolverForm.inspectionResult === IncomingInspectionResult.CONDICIONAL) return '0';
-                                                      const accepted = Number(resolverForm.quantityAccepted);
-                                                      if (Number.isNaN(accepted)) return 'N/A';
-                                                      return String(Number((Number(inspection.quantityReceived) - accepted).toFixed(4)));
-                                                    })()}
-                                                  />
-                                                </div>
-                                                <div className="space-y-1">
-                                                  <Label>Notas de inspección</Label>
-                                                  <Input
-                                                    value={resolverForm.notes}
-                                                    onChange={(e) => setResolverForm((p) => ({ ...p, notes: e.target.value }))}
-                                                    placeholder="Obligatorio en condicional/rechazado"
-                                                  />
-                                                </div>
-                                              </div>
-                                            </div>
+                        ))}
+                      </div>
+                    </div>
 
-                                            <div className="rounded-md border bg-white p-3">
-                                              <div className="text-xs font-semibold text-slate-700 mb-2">Trazabilidad documental</div>
-                                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                                <div className="space-y-1">
-                                                  <Label>Lote proveedor</Label>
-                                                  <Input
-                                                    value={resolverForm.supplierLotCode}
-                                                    onChange={(e) => setResolverForm((p) => ({ ...p, supplierLotCode: e.target.value }))}
-                                                    placeholder="Requerido si hay aceptado"
-                                                  />
-                                                </div>
-                                                <div className="space-y-1">
-                                                  <Label>Certificado/COA</Label>
-                                                  <Input
-                                                    value={resolverForm.certificateRef}
-                                                    onChange={(e) => setResolverForm((p) => ({ ...p, certificateRef: e.target.value }))}
-                                                    placeholder="Requerido para aprobado/condicional"
-                                                  />
-                                                </div>
-                                                <div className="space-y-1">
-                                                  <Label>Factura N°</Label>
-                                                  <Input
-                                                    value={resolverForm.invoiceNumber}
-                                                    onChange={(e) => setResolverForm((p) => ({ ...p, invoiceNumber: e.target.value }))}
-                                                    placeholder="Opcional"
-                                                  />
-                                                </div>
-                                              </div>
-                                            </div>
+                    {/* Firmas */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Firmas y aprobación</p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {[
+                          { key: 'inspectedBy' as const, label: 'Inspector QA', placeholder: 'Obligatorio' },
+                          { key: 'approvedBy' as const, label: 'Aprobador QA', placeholder: 'Obligatorio' },
+                          { key: 'managerApprovedBy' as const, label: 'Jefe de Calidad', placeholder: 'Obligatorio en condicional/rechazado' },
+                        ].map(({ key, label, placeholder }) => (
+                          <div key={key} className="space-y-1.5">
+                            <Label className="text-xs font-medium text-slate-700">{label}</Label>
+                            <Input value={resolverForm[key]} onChange={(e) => setResolverForm((p) => ({ ...p, [key]: e.target.value }))}
+                              placeholder={placeholder}
+                              className="h-10 rounded-xl border-slate-200 focus-visible:ring-violet-500"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                                            <div className="rounded-md border bg-white p-3">
-                                              <div className="text-xs font-semibold text-slate-700 mb-2">Firmas y aprobación</div>
-                                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                                <div className="space-y-1">
-                                                  <Label>Inspector QA</Label>
-                                                  <Input
-                                                    value={resolverForm.inspectedBy}
-                                                    onChange={(e) => setResolverForm((p) => ({ ...p, inspectedBy: e.target.value }))}
-                                                    placeholder="Obligatorio"
-                                                  />
-                                                </div>
-                                                <div className="space-y-1">
-                                                  <Label>Aprobador QA</Label>
-                                                  <Input
-                                                    value={resolverForm.approvedBy}
-                                                    onChange={(e) => setResolverForm((p) => ({ ...p, approvedBy: e.target.value }))}
-                                                    placeholder="Obligatorio"
-                                                  />
-                                                </div>
-                                                <div className="space-y-1">
-                                                  <Label>Jefe de calidad</Label>
-                                                  <Input
-                                                    value={resolverForm.managerApprovedBy}
-                                                    onChange={(e) => setResolverForm((p) => ({ ...p, managerApprovedBy: e.target.value }))}
-                                                    placeholder="Obligatorio en condicional/rechazado"
-                                                  />
-                                                </div>
-                                              </div>
-                                            </div>
+                    {/* Costo unitario opcional */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4">
+                      <label className="flex items-center gap-3 cursor-pointer">
+                        <div
+                          className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${showCostAdjustment ? 'bg-violet-600 border-violet-600' : 'border-slate-300 bg-white'}`}
+                          onClick={() => setShowCostAdjustment((v) => !v)}
+                        >
+                          {showCostAdjustment && <span className="text-white text-[10px] font-bold leading-none">✓</span>}
+                        </div>
+                        <input type="checkbox" className="sr-only" checked={showCostAdjustment} onChange={(e) => setShowCostAdjustment(e.target.checked)} />
+                        <span className="text-sm text-slate-700">Ajustar costo unitario aceptado <span className="text-slate-400">(opcional)</span></span>
+                      </label>
+                      {showCostAdjustment && (
+                        <div className="mt-3 max-w-xs">
+                          <Label className="text-xs font-medium text-slate-700">Costo unitario aceptado</Label>
+                          <Input type="number" min={0} step="0.0001"
+                            value={resolverForm.acceptedUnitCost}
+                            onChange={(e) => setResolverForm((p) => ({ ...p, acceptedUnitCost: e.target.value }))}
+                            placeholder="Opcional"
+                            className="h-10 rounded-xl border-slate-200 focus-visible:ring-violet-500 mt-1.5"
+                          />
+                        </div>
+                      )}
+                    </div>
 
-                                            <div className="rounded-md border bg-white p-3">
-                                              <label className="flex items-center gap-2 text-sm">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={showCostAdjustment}
-                                                  onChange={(e) => setShowCostAdjustment(e.target.checked)}
-                                                />
-                                                Ajustar costo unitario aceptado (opcional)
-                                              </label>
-                                              {showCostAdjustment ? (
-                                                <div className="mt-2 max-w-xs">
-                                                  <Label>Costo unitario aceptado</Label>
-                                                  <Input
-                                                    type="number"
-                                                    min={0}
-                                                    step="0.0001"
-                                                    value={resolverForm.acceptedUnitCost}
-                                                    onChange={(e) => setResolverForm((p) => ({ ...p, acceptedUnitCost: e.target.value }))}
-                                                    placeholder="Opcional"
-                                                  />
-                                                </div>
-                                              ) : null}
-                                            </div>
-
-                                            <div className="flex justify-end gap-2">
-                                              <Button type="button" variant="outline" onClick={() => setResolverOpenId(null)}>
-                                                Cancelar
-                                              </Button>
-                                              <Button
-                                                type="button"
-                                                disabled={model.resolvingIncomingInspection}
-                                                onClick={() => submitResolveInspection(inspection.id, Number(inspection.quantityReceived))}
-                                              >
-                                                {model.resolvingIncomingInspection ? 'Resolviendo...' : 'Confirmar resolución'}
-                                              </Button>
-                                            </div>
-                                          </div>
-                                        ) : null}
-                                        <Badge variant="outline" className="mt-2">{inspection.status}</Badge>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => setExpandedIncomingInspectionId((prev) => (prev === inspection.id ? null : inspection.id))}
-                                        >
-                                            {expandedIncomingInspectionId === inspection.id ? 'Ocultar detalle' : 'Ver detalle'}
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => downloadFor28Pdf(inspection.id)}
-                                        >
-                                            Descargar FOR-28
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => promptAndUploadEvidence(inspection.id, 'invoice')}
-                                            disabled={!canManageIncoming}
-                                        >
-                                            Adjuntar factura
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => promptAndUploadEvidence(inspection.id, 'certificate')}
-                                            disabled={!canManageIncoming}
-                                        >
-                                            Adjuntar certificado
-                                        </Button>
-                                        {inspection.invoiceFileName ? (
-                                          <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => downloadEvidence(inspection.id, 'invoice')}
-                                          >
-                                              Descargar factura
-                                          </Button>
-                                        ) : null}
-                                        {inspection.certificateFileName ? (
-                                          <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => downloadEvidence(inspection.id, 'certificate')}
-                                          >
-                                              Descargar certificado
-                                          </Button>
-                                        ) : null}
-                                        {inspection.status === IncomingInspectionStatus.PENDIENTE ? (
-                                            <Button
-                                                size="sm"
-                                                onClick={() => openResolver(inspection.id, Number(inspection.quantityReceived))}
-                                                disabled={!canManageIncoming}
-                                            >
-                                                {isConditionalPending(inspection) ? 'Cerrar condicional' : 'Resolver QA'}
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => model.quickCorrectIncomingInspectionCost(inspection.id)}
-                                                disabled={!canManageIncoming || Number(inspection.quantityAccepted) <= 0}
-                                                title={Number(inspection.quantityAccepted) <= 0 ? 'No aplica: inspección sin cantidad aceptada' : undefined}
-                                            >
-                                                Corregir costo
-                                            </Button>
-                                        )}
-                                        {inspection.status === IncomingInspectionStatus.RECHAZADO ? (
-                                          <Button
-                                              size="sm"
-                                              variant="outline"
-                                              disabled={!canManageIncoming || hasLinkedNc(inspection.id)}
-                                              onClick={() => goCreateNcFromInspection(inspection)}
-                                          >
-                                              {hasLinkedNc(inspection.id) ? 'NC ya creada' : 'Crear NC'}
-                                          </Button>
-                                        ) : null}
-                                    </div>
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
+                    {/* Footer actions */}
+                    <div className="flex justify-end gap-2">
+                      <Button type="button" variant="outline" onClick={() => setResolverOpenId(null)} className="rounded-xl border-slate-200">
+                        Cancelar
+                      </Button>
+                      <Button type="button"
+                        disabled={model.resolvingIncomingInspection}
+                        onClick={() => submitResolveInspection(inspection.id, Number(inspection.quantityReceived))}
+                        className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-medium px-6"
+                      >
+                        {model.resolvingIncomingInspection ? (
+                          <>
+                            <div className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                            Resolviendo...
+                          </>
+                        ) : 'Confirmar resolución'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </TabsContent>
   );
 }

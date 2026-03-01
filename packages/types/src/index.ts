@@ -42,6 +42,14 @@ export enum PurchaseOrderStatus {
     CANCELLED = 'CANCELLED',
 }
 
+export enum SalesOrderStatus {
+    PENDING = 'pending',
+    IN_PRODUCTION = 'in_production',
+    READY_TO_SHIP = 'ready_to_ship',
+    SHIPPED = 'shipped',
+    CANCELLED = 'cancelled',
+}
+
 export enum PurchaseRequisitionStatus {
     PENDIENTE = 'pendiente',
     APROBADA = 'aprobada',
@@ -396,6 +404,7 @@ export interface PurchaseOrderItem {
 
 export interface PurchaseOrder {
     id: string;
+    code: string;
     supplier: Pick<Supplier, 'id' | 'name'>;
     controlledDocumentId?: string;
     orderDate: string | Date;
@@ -423,6 +432,48 @@ export interface PurchaseOrder {
 
 export interface PurchaseOrderListResponse {
     data: PurchaseOrder[];
+    total: number;
+    page: number;
+    limit: number;
+}
+
+export interface SalesOrderItem {
+    id: string;
+    salesOrderId?: string;
+    productId: string;
+    product?: Pick<Product, 'id' | 'name' | 'sku'>;
+    variantId?: string;
+    variant?: Pick<ProductVariant, 'id' | 'name' | 'sku'>;
+    quantity: number;
+    unitPrice: number;
+    taxRate: number;
+    taxAmount: number;
+    subtotal: number;
+}
+
+export interface SalesOrder {
+    id: string;
+    code: string;
+    customerId: string;
+    customer?: Pick<Customer, 'id' | 'name' | 'documentNumber'>;
+    orderDate: string | Date;
+    expectedDeliveryDate?: string | Date;
+    status: SalesOrderStatus;
+    notes?: string;
+    totalAmount: number;
+    subtotalBase: number;
+    taxTotal: number;
+    discountAmount: number;
+    netTotalAmount: number;
+    items?: SalesOrderItem[];
+    productionOrders?: ProductionOrder[];
+    shipments?: Shipment[];
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface SalesOrderListResponse {
+    data: SalesOrder[];
     total: number;
     page: number;
     limit: number;
@@ -1731,7 +1782,28 @@ export interface OperationalConfig {
     defaultPackagingControlledDocumentCode?: string | null;
     defaultLabelingControlledDocumentCode?: string | null;
     defaultBatchReleaseControlledDocumentCode?: string | null;
+    defaultSalesOrderProductionDocCode?: string | null;
+    defaultSalesOrderBillingDocCode?: string | null;
     operationMode?: ProductionTraceabilityMode | null;
+    purchaseOrderPrefix?: string;
+    purchaseOrderSequence?: number;
+    salesOrderPrefix?: string;
+    salesOrderSequence?: number;
     createdAt: string | Date;
     updatedAt: string | Date;
+}
+
+export interface CreateSalesOrderItemPayload {
+    productId: string;
+    variantId?: string;
+    quantity: number;
+    unitPrice: number;
+    taxRate?: number;
+}
+
+export interface CreateSalesOrderPayload {
+    customerId: string;
+    expectedDeliveryDate?: string | Date;
+    notes?: string;
+    items: CreateSalesOrderItemPayload[];
 }

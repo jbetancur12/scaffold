@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { MikroORM, RequestContext } from '@mikro-orm/core';
+import { MikroORM, RequestContext, wrap } from '@mikro-orm/core';
 import { ProductService } from './services/product.service';
 import { SupplierService } from './services/supplier.service';
 import { MrpService } from './services/mrp.service';
@@ -11,6 +11,8 @@ import { PackagingFormPdfService } from './services/packaging-form-pdf.service';
 import { PurchaseRequisitionService } from './services/purchase-requisition.service';
 import { QualityService } from './services/quality.service';
 import { DocumentControlService } from './services/document-control.service';
+import { SalesOrderService } from './services/sales-order.service';
+import { SalesOrderPdfService } from './services/sales-order-pdf.service';
 import { QualityIncomingPdfService } from './services/quality-incoming-pdf.service';
 import { QualityLabelingPdfService } from './services/quality-labeling-pdf.service';
 import { QualityBatchReleasePdfService } from './services/quality-batch-release-pdf.service';
@@ -117,6 +119,9 @@ import {
     UpdateProductionBatchUnitPackagingSchema,
     UpsertProductionBatchPackagingFormSchema,
     UpsertProductionMaterialAllocationSchema,
+    CreateSalesOrderSchema,
+    ListSalesOrdersQuerySchema,
+    UpdateSalesOrderStatusSchema,
 } from '@scaffold/schemas';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -148,6 +153,7 @@ export class MrpController {
     private get purchaseRequisitionService() { return new PurchaseRequisitionService(this.em); }
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
+    private get salesOrderService() { return new SalesOrderService(this.em); }
 
     // --- Products ---
     async createProduct(req: Request, res: Response, next: NextFunction) {
@@ -485,6 +491,16 @@ export class MrpController {
         }
     }
 
+    async linkProductionToSalesOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { salesOrderId } = req.body as { salesOrderId: string | null };
+            const order = await this.productionService.linkSalesOrder(id, salesOrderId ?? null);
+            return ApiResponse.success(res, order, 'Vínculo actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
 
 
     async updateProductionOrderStatus(req: Request, res: Response, next: NextFunction) {
@@ -981,6 +997,37 @@ export class MrpController {
             const { search } = ListCustomersQuerySchema.parse(req.query);
             const rows = await this.qualityService.listCustomers({ search });
             return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getCustomer(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const row = await this.qualityService.getCustomer(id);
+            return ApiResponse.success(res, row);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateCustomer(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = CustomerSchema.partial().parse(req.body);
+            const row = await this.qualityService.updateCustomer(id, payload);
+            return ApiResponse.success(res, row, 'Cliente actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteCustomer(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            await this.qualityService.deleteCustomer(id);
+            return ApiResponse.success(res, null, 'Cliente eliminado');
         } catch (error) {
             next(error);
         }
@@ -1658,6 +1705,75 @@ export class MrpController {
             const { purchaseOrderId } = MarkPurchaseRequisitionConvertedSchema.parse(req.body);
             const row = await this.purchaseRequisitionService.markConverted(id, purchaseOrderId);
             return ApiResponse.success(res, row, 'Requisición marcada como convertida');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // --- Sales Orders ---
+    async createSalesOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateSalesOrderSchema.parse(req.body);
+            const order = await this.salesOrderService.createSalesOrder(payload);
+            return ApiResponse.success(res, order, 'Pedido de cliente creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listSalesOrders(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { page, limit, search, status } = ListSalesOrdersQuerySchema.parse(req.query);
+            const result = await this.salesOrderService.getSalesOrders(page || 1, limit || 20, search, status);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getSalesOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const order = await this.salesOrderService.getSalesOrderById(id);
+            if (!order) {
+                throw new AppError('Pedido no encontrado', 404);
+            }
+            return ApiResponse.success(res, wrap(order).toJSON());
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateSalesOrderStatus(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { status } = UpdateSalesOrderStatusSchema.parse(req.body);
+            const order = await this.salesOrderService.updateSalesOrderStatus(id, status);
+            return ApiResponse.success(res, order, 'Estado del pedido actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadSalesOrderPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const mode = (req.query.mode === 'production' ? 'production' : 'billing') as 'production' | 'billing';
+            const docOptions = {
+                docCode: req.query.docCode as string | undefined,
+                docTitle: req.query.docTitle as string | undefined,
+                docVersion: req.query.docVersion ? Number(req.query.docVersion) : undefined,
+                docDate: req.query.docDate as string | undefined,
+            };
+            const em = RequestContext.getEntityManager()!;
+            const pdfService = new SalesOrderPdfService(em);
+            const { fileName, buffer } = await pdfService.generateSalesOrderPdf(id, mode, docOptions);
+            res.set({
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `attachment; filename="${fileName}"`,
+                'Content-Length': buffer.length,
+            });
+            return res.send(buffer);
         } catch (error) {
             next(error);
         }

@@ -73,8 +73,10 @@ import {
     PurchaseOrder,
     PurchaseOrderListResponse,
     PurchaseRequisition,
-    PurchaseRequisitionListResponse,
     PurchaseRequisitionStatus,
+    PurchaseRequisitionListResponse,
+    SalesOrder,
+    SalesOrderListResponse,
     UpsertProductionBatchPackagingFormPayload,
 } from '@scaffold/types';
 import type {
@@ -99,7 +101,6 @@ import type {
     CreateChangeControlApprovalPayload,
     CreateEquipmentPayload,
     UpdateEquipmentPayload,
-    CreateEquipmentCalibrationPayload,
     CreateEquipmentMaintenancePayload,
     RegisterBatchEquipmentUsagePayload,
     ListOperationalAlertsPayload,
@@ -132,6 +133,10 @@ import type {
     UpdateInvimaRegistrationPayload,
     CreatePurchaseRequisitionPayload,
     CreatePurchaseRequisitionFromProductionOrderPayload,
+    CreateSalesOrderPayload,
+    ListSalesOrdersFilters,
+    UpdateSalesOrderStatusPayload,
+    UpsertProductionMaterialAllocationPayload,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -158,6 +163,13 @@ export interface MaterialRequirement {
         receivedAt: string;
         suggestedUse: number;
     }[];
+    selectedAllocation?: {
+        lotId: string;
+        lotCode: string;
+        warehouseId: string;
+        warehouseName: string;
+        quantityRequested?: number;
+    };
 }
 
 export interface RawMaterialSupplier {
@@ -293,6 +305,42 @@ export const mrpApi = {
         return response.data;
     },
 
+    // Sales Orders
+    createSalesOrder: async (data: CreateSalesOrderPayload): Promise<SalesOrder> => {
+        const response = await api.post<SalesOrder>('/mrp/sales-orders', data);
+        return response.data;
+    },
+    listSalesOrders: async (
+        page = 1,
+        limit = 20,
+        filters?: ListSalesOrdersFilters
+    ): Promise<SalesOrderListResponse> => {
+        const response = await api.get<SalesOrderListResponse>('/mrp/sales-orders', {
+            params: { page, limit, ...filters },
+        });
+        return response.data;
+    },
+    getSalesOrder: async (id: string): Promise<SalesOrder> => {
+        const response = await api.get<SalesOrder>(`/mrp/sales-orders/${id}`);
+        return response.data;
+    },
+    updateSalesOrderStatus: async (id: string, data: UpdateSalesOrderStatusPayload): Promise<SalesOrder> => {
+        const response = await api.patch<SalesOrder>(`/mrp/sales-orders/${id}/status`, data);
+        return response.data;
+    },
+    getSalesOrderPdf: async (
+        id: string,
+        mode: 'production' | 'billing' = 'billing',
+        docOptions?: { docCode?: string; docTitle?: string; docVersion?: number; docDate?: string }
+    ): Promise<Blob> => {
+        const params: Record<string, string | number | undefined> = { mode, ...docOptions };
+        const response = await api.get(`/mrp/sales-orders/${id}/pdf`, { responseType: 'blob', params });
+        return response.data as Blob;
+    },
+    linkProductionToSalesOrder: async (productionOrderId: string, salesOrderId: string | null): Promise<void> => {
+        await api.patch(`/mrp/production-orders/${productionOrderId}/link-sales-order`, { salesOrderId });
+    },
+
     // Warehouses
     getWarehouses: async () => {
         const response = await api.get<Warehouse[]>('/mrp/warehouses');
@@ -394,6 +442,10 @@ export const mrpApi = {
     },
     getMaterialRequirements: async (orderId: string): Promise<MaterialRequirement[]> => {
         const response = await api.get<MaterialRequirement[]>(`/mrp/production-orders/${orderId}/requirements`);
+        return response.data;
+    },
+    upsertProductionMaterialAllocation: async (orderId: string, payload: UpsertProductionMaterialAllocationPayload) => {
+        const response = await api.post(`/mrp/production-orders/${orderId}/material-allocation`, payload);
         return response.data;
     },
     updateProductionOrderStatus: async (id: string, status: string, warehouseId?: string): Promise<ProductionOrder> => {
@@ -540,7 +592,7 @@ export const mrpApi = {
     },
     createEquipmentCalibration: async (
         equipmentId: string,
-        data: CreateEquipmentCalibrationPayload & { result?: EquipmentCalibrationResult }
+        data: Record<string, any> & { result?: EquipmentCalibrationResult }
     ): Promise<EquipmentCalibration> => {
         const response = await api.post<EquipmentCalibration>(`/mrp/quality/equipment/${equipmentId}/calibrations`, data);
         return response.data;
@@ -612,6 +664,17 @@ export const mrpApi = {
     listCustomers: async (search?: string): Promise<Customer[]> => {
         const response = await api.get<Customer[]>('/mrp/quality/customers', { params: { search } });
         return response.data;
+    },
+    getCustomer: async (id: string): Promise<Customer> => {
+        const response = await api.get<Customer>(`/mrp/quality/customers/${id}`);
+        return response.data;
+    },
+    updateCustomer: async (id: string, data: Partial<CreateCustomerPayload>): Promise<Customer> => {
+        const response = await api.patch<Customer>(`/mrp/quality/customers/${id}`, data);
+        return response.data;
+    },
+    deleteCustomer: async (id: string): Promise<void> => {
+        await api.delete(`/mrp/quality/customers/${id}`);
     },
     createShipment: async (data: CreateShipmentPayload): Promise<Shipment> => {
         const response = await api.post<Shipment>('/mrp/quality/shipments', data);

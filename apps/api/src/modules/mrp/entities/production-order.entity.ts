@@ -1,8 +1,9 @@
-import { Entity, Property, Enum, OneToMany, Collection } from '@mikro-orm/core';
+import { Entity, Property, Enum, OneToMany, Collection, ManyToOne } from '@mikro-orm/core';
 import { BaseEntity } from '../../../shared/entities/base.entity';
 import { ProductionOrderStatus } from '@scaffold/types';
 import { ProductionOrderItem } from './production-order-item.entity';
 import { ProductionBatch } from './production-batch.entity';
+import { SalesOrder } from './sales-order.entity';
 
 @Entity()
 export class ProductionOrder extends BaseEntity {
@@ -26,4 +27,7 @@ export class ProductionOrder extends BaseEntity {
 
     @OneToMany(() => ProductionBatch, batch => batch.productionOrder)
     batches = new Collection<ProductionBatch>(this);
+
+    @ManyToOne(() => SalesOrder, { nullable: true })
+    salesOrder?: SalesOrder;
 }

@@ -15,102 +15,129 @@ import { OperationalConfig } from '../entities/operational-config.entity';
 
 export class PurchaseOrderService {
     private purchaseOrderRepo: EntityRepository<PurchaseOrder>;
-    private purchaseOrderItemRepo: EntityRepository<PurchaseOrderItem>;
-    private supplierRepo: EntityRepository<Supplier>;
-    private rawMaterialRepo: EntityRepository<RawMaterial>;
     private incomingInspectionRepo: EntityRepository<IncomingInspection>;
 
     constructor(
         private em: EntityManager
     ) {
         this.purchaseOrderRepo = em.getRepository(PurchaseOrder);
-        this.purchaseOrderItemRepo = em.getRepository(PurchaseOrderItem);
-        this.supplierRepo = em.getRepository(Supplier);
-        this.rawMaterialRepo = em.getRepository(RawMaterial);
         this.incomingInspectionRepo = em.getRepository(IncomingInspection);
     }
 
     async createPurchaseOrder(data: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
-        // Fetch supplier
-        const supplier = await this.supplierRepo.findOneOrFail({ id: data.supplierId });
         const controlDocument = await this.resolvePurchaseOrderControlDocument(data.controlledDocumentId);
 
-        // Create purchase order
-        const purchaseOrder = this.purchaseOrderRepo.create({
-            supplier,
-            controlledDocumentId: controlDocument?.id,
-            expectedDeliveryDate: data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : undefined,
-            notes: data.notes,
-            status: PurchaseOrderStatus.PENDING,
-            purchaseType: data.purchaseType,
-            paymentMethod: data.paymentMethod,
-            currency: data.currency || 'COP',
-            documentControlCode: controlDocument?.code || 'GP-FOR-04',
-            documentControlTitle: controlDocument?.title || 'Orden de Compra de Materias Primas e Insumos',
-            documentControlVersion: controlDocument?.version || 1,
-            documentControlDate: controlDocument?.effectiveDate || controlDocument?.approvedAt || new Date(),
-        } as PurchaseOrder);
+        return this.em.transactional(async (tx) => {
+            // Fetch supplier
+            const supplier = await tx.getRepository(Supplier).findOneOrFail({ id: data.supplierId });
 
-        let totalAmount = 0;
-        let taxTotal = 0;
-        let subtotalBase = 0;
+            // Create purchase order
+            const purchaseOrder = tx.getRepository(PurchaseOrder).create({
+                supplier,
+                controlledDocumentId: controlDocument?.id,
+                expectedDeliveryDate: data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : undefined,
+                notes: data.notes,
+                status: PurchaseOrderStatus.PENDING,
+                purchaseType: data.purchaseType,
+                paymentMethod: data.paymentMethod,
+                currency: data.currency || 'COP',
+                documentControlCode: controlDocument?.code || 'GP-FOR-04',
+                documentControlTitle: controlDocument?.title || 'Orden de Compra de Materias Primas e Insumos',
+                documentControlVersion: controlDocument?.version || 1,
+                documentControlDate: controlDocument?.effectiveDate || controlDocument?.approvedAt || new Date(),
+            } as PurchaseOrder);
 
-        // Create purchase order items
-        for (const itemData of data.items) {
-            const isCatalogItem = itemData.isCatalogItem !== false;
-            const rawMaterial = isCatalogItem ? await this.rawMaterialRepo.findOneOrFail({ id: itemData.rawMaterialId }) : undefined;
+            // Fetch operational config and lock it to safely increment sequence
+            let [config] = await tx.find(OperationalConfig, {}, { orderBy: { createdAt: 'DESC' }, limit: 1, lockMode: 4 }); // PESSIMISTIC_WRITE
 
-            const subtotal = itemData.quantity * itemData.unitPrice;
-            const taxAmount = itemData.taxAmount || 0;
-            const itemTotal = subtotal + taxAmount;
+            if (!config) {
+                config = tx.getRepository(OperationalConfig).create({
+                    operatorSalary: 0,
+                    operatorLoadFactor: 1.5,
+                    operatorRealMonthlyMinutes: 9600,
+                    rent: 0,
+                    utilities: 0,
+                    adminSalaries: 0,
+                    otherExpenses: 0,
+                    numberOfOperators: 1,
+                    modCostPerMinute: 0,
+                    cifCostPerMinute: 0,
+                    costPerMinute: 0,
+                    purchasePaymentMethods: ['Contado', 'Crédito 30 días'],
+                    purchaseWithholdingRules: [],
+                    purchaseOrderPrefix: 'OC',
+                    purchaseOrderSequence: 0
+                } as unknown as OperationalConfig);
+                await tx.persistAndFlush(config);
+            }
 
-            subtotalBase += subtotal;
-            taxTotal += taxAmount;
-            totalAmount += itemTotal;
+            const prefix = config.purchaseOrderPrefix || 'OC';
+            const nextNumber = (config.purchaseOrderSequence || 0) + 1;
 
-            const item = this.purchaseOrderItemRepo.create({
-                purchaseOrder,
-                isCatalogItem,
-                rawMaterial,
-                customDescription: !isCatalogItem ? itemData.customDescription?.trim() : undefined,
-                customUnit: !isCatalogItem ? itemData.customUnit?.trim() : undefined,
-                isInventoriable: itemData.isInventoriable ?? isCatalogItem,
-                quantity: itemData.quantity,
-                unitPrice: itemData.unitPrice,
-                taxAmount,
-                subtotal: itemTotal,
-            } as PurchaseOrderItem);
+            config.purchaseOrderSequence = nextNumber;
+            purchaseOrder.code = `${prefix}-${String(nextNumber).padStart(4, '0')}`;
 
-            purchaseOrder.items.add(item);
-        }
+            let totalAmount = 0;
+            let taxTotal = 0;
+            let subtotalBase = 0;
 
-        const discountAmount = Number(data.discountAmount || 0);
-        const otherChargesAmount = Number(data.otherChargesAmount || 0);
-        const withholdingRate = Number(data.withholdingRate || 0);
-        const taxableBase = Math.max(0, subtotalBase - discountAmount);
-        const withholdingAmount = Number(
-            data.withholdingAmount !== undefined
-                ? data.withholdingAmount
-                : taxableBase * (withholdingRate / 100)
-        );
-        const grossTotal = Math.max(0, totalAmount - discountAmount + otherChargesAmount);
-        const netTotalAmount = Number(
-            data.netTotalAmount !== undefined
-                ? data.netTotalAmount
-                : Math.max(0, grossTotal - withholdingAmount)
-        );
+            // Create purchase order items
+            for (const itemData of data.items) {
+                const isCatalogItem = itemData.isCatalogItem !== false;
+                const rawMaterial = isCatalogItem ? await tx.getRepository(RawMaterial).findOneOrFail({ id: itemData.rawMaterialId }) : undefined;
 
-        purchaseOrder.subtotalBase = subtotalBase;
-        purchaseOrder.taxTotal = taxTotal;
-        purchaseOrder.totalAmount = grossTotal;
-        purchaseOrder.discountAmount = discountAmount;
-        purchaseOrder.otherChargesAmount = otherChargesAmount;
-        purchaseOrder.withholdingRate = withholdingRate;
-        purchaseOrder.withholdingAmount = withholdingAmount;
-        purchaseOrder.netTotalAmount = netTotalAmount;
+                const subtotal = itemData.quantity * itemData.unitPrice;
+                const taxAmount = itemData.taxAmount || 0;
+                const itemTotal = subtotal + taxAmount;
 
-        await this.em.persistAndFlush(purchaseOrder);
-        return purchaseOrder;
+                subtotalBase += subtotal;
+                taxTotal += taxAmount;
+                totalAmount += itemTotal;
+
+                const item = tx.getRepository(PurchaseOrderItem).create({
+                    purchaseOrder,
+                    isCatalogItem,
+                    rawMaterial,
+                    customDescription: !isCatalogItem ? itemData.customDescription?.trim() : undefined,
+                    customUnit: !isCatalogItem ? itemData.customUnit?.trim() : undefined,
+                    isInventoriable: itemData.isInventoriable ?? isCatalogItem,
+                    quantity: itemData.quantity,
+                    unitPrice: itemData.unitPrice,
+                    taxAmount,
+                    subtotal: itemTotal,
+                } as PurchaseOrderItem);
+
+                purchaseOrder.items.add(item);
+            }
+
+            const discountAmount = Number(data.discountAmount || 0);
+            const otherChargesAmount = Number(data.otherChargesAmount || 0);
+            const withholdingRate = Number(data.withholdingRate || 0);
+            const taxableBase = Math.max(0, subtotalBase - discountAmount);
+            const withholdingAmount = Number(
+                data.withholdingAmount !== undefined
+                    ? data.withholdingAmount
+                    : taxableBase * (withholdingRate / 100)
+            );
+            const grossTotal = Math.max(0, totalAmount - discountAmount + otherChargesAmount);
+            const netTotalAmount = Number(
+                data.netTotalAmount !== undefined
+                    ? data.netTotalAmount
+                    : Math.max(0, grossTotal - withholdingAmount)
+            );
+
+            purchaseOrder.subtotalBase = subtotalBase;
+            purchaseOrder.taxTotal = taxTotal;
+            purchaseOrder.totalAmount = grossTotal;
+            purchaseOrder.discountAmount = discountAmount;
+            purchaseOrder.otherChargesAmount = otherChargesAmount;
+            purchaseOrder.withholdingRate = withholdingRate;
+            purchaseOrder.withholdingAmount = withholdingAmount;
+            purchaseOrder.netTotalAmount = netTotalAmount;
+
+            await tx.persistAndFlush(purchaseOrder);
+            return purchaseOrder;
+        });
     }
 
     private async resolvePurchaseOrderControlDocument(controlledDocumentId?: string) {

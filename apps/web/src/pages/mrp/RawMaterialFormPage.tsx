@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save, RefreshCw, Calculator } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw, Calculator, Package, DollarSign, Fingerprint, Building2, Anchor } from 'lucide-react';
 import { generateRawMaterialSku } from '@/utils/skuGenerator';
 import {
     Select,
@@ -44,6 +44,7 @@ export default function RawMaterialFormPage() {
     const [calcQty, setCalcQty] = useState<string>('');
     const [calcMode, setCalcMode] = useState<'BASE' | 'TOTAL'>('TOTAL');
     const [calcTaxRate, setCalcTaxRate] = useState(19);
+    const [showCalculator, setShowCalculator] = useState(false);
 
     // Manual Cost IVA helper state
     const [manualIncludesIva, setManualIncludesIva] = useState(false);
@@ -82,7 +83,6 @@ export default function RawMaterialFormPage() {
                 });
             }
         } else {
-            // Check for initial data from navigation state (Duplicate)
             const state = location.state as RawMaterialFormLocationState | null;
             if (state?.initialData) {
                 setFormData({
@@ -94,7 +94,7 @@ export default function RawMaterialFormPage() {
                     supplierId: state.initialData.supplierId || '',
                 });
                 if (state.initialData.sku) {
-                    setSkuManuallyEdited(true); // Treat as manually edited if we passed a SKU (though list page clears it usually)
+                    setSkuManuallyEdited(true);
                 }
             }
         }
@@ -109,9 +109,11 @@ export default function RawMaterialFormPage() {
             const total = calcMode === 'BASE'
                 ? calcPrice * (1 + (calcTaxRate / 100))
                 : calcPrice;
-            setFormData(prev => ({ ...prev, cost: Number((total / qty).toFixed(2)) }));
+            if (!manualIncludesIva) {
+                setFormData(prev => ({ ...prev, cost: Number((total / qty).toFixed(2)) }));
+            }
         }
-    }, [calcPrice, calcQty, calcMode, calcTaxRate]);
+    }, [calcPrice, calcQty, calcMode, calcTaxRate, manualIncludesIva]);
 
     // Recalculate cost when manual IVA helper changes
     useEffect(() => {
@@ -136,21 +138,21 @@ export default function RawMaterialFormPage() {
             if (isEditing && id) {
                 await saveRawMaterial({ id, payload });
                 toast({
-                    title: 'Éxito',
-                    description: 'Material actualizado exitosamente',
+                    title: 'Material actualizado',
+                    description: 'Los cambios se han guardado exitosamente.',
                 });
             } else {
                 await saveRawMaterial({ payload });
                 toast({
-                    title: 'Éxito',
-                    description: 'Material creado exitosamente',
+                    title: 'Material creado',
+                    description: 'El nuevo material se ha registrado exitosamente.',
                 });
             }
             navigate('/mrp/raw-materials');
         } catch (error: unknown) {
             toast({
-                title: 'Error',
-                description: getErrorMessage(error, 'Error al guardar'),
+                title: 'Verifica los datos',
+                description: getErrorMessage(error, 'Ocurrió un error al guardar o hay campos inválidos.'),
                 variant: 'destructive',
             });
         } finally {
@@ -158,313 +160,384 @@ export default function RawMaterialFormPage() {
         }
     };
 
-    if (isEditing && loadingMaterial && !materialData) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <div className="text-lg text-slate-500">Cargando material...</div>
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-8 max-w-4xl mx-auto">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/raw-materials')}>
-                    <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                        {isEditing ? 'Editar Material' : 'Nuevo Material'}
-                    </h1>
-                    <p className="text-slate-500">
-                        {isEditing ? 'Modifica los detalles del material.' : 'Registra nueva materia prima o insumo.'}
-                    </p>
+        <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
+            {/* Header Section */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => navigate('/mrp/raw-materials')}
+                        className="rounded-full shadow-sm hover:bg-slate-100"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                    </Button>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                                {isEditing ? 'Editar Material / Insumo' : 'Nuevo Material / Insumo'}
+                            </h1>
+                            {loadingMaterial && isEditing && (
+                                <span className="flex h-3 w-3 relative ml-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-sm text-slate-500 mt-1">
+                            {isEditing ? 'Actualiza la información, costos y configuración de este insumo.' : 'Registra un nuevo material para tus fabricaciones y compras.'}
+                        </p>
+                    </div>
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-                    <div className="grid gap-6 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="name">Nombre del Material</Label>
-                            <Input
-                                id="name"
-                                value={formData.name}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
-                                required
-                                placeholder="Ej. Tela Algodón"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="sku">SKU / Código</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    id="sku"
-                                    value={formData.sku}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                        setFormData({ ...formData, sku: e.target.value });
-                                        setSkuManuallyEdited(true);
-                                    }}
-                                    required
-                                    placeholder="Ej. MAT-TEL-001"
-                                />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    title="Generar SKU automáticamente"
-                                    onClick={() => {
-                                        if (formData.name) {
-                                            const autoSku = generateRawMaterialSku(formData.name);
-                                            setFormData({ ...formData, sku: autoSku });
-                                            setSkuManuallyEdited(false);
-                                        }
-                                    }}
-                                >
-                                    <RefreshCw className="h-4 w-4" />
-                                </Button>
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column: General Details */}
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                                <div className="p-2 bg-amber-100 text-amber-700 rounded-lg">
+                                    <Package className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-semibold text-slate-800">Detalles Generales</h2>
+                                    <p className="text-sm text-slate-500">Identificación e información básica</p>
+                                </div>
                             </div>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="unit">Unidad de Medida</Label>
-                            <Select
-                                value={formData.unit}
-                                onValueChange={(value: string) => setFormData({ ...formData, unit: value as UnitType })}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Object.values(UnitType).map((unit) => (
-                                        <SelectItem key={unit} value={unit}>
-                                            {unit.toUpperCase()}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="supplierId">Proveedor preferido (opcional)</Label>
-                            <Select
-                                value={formData.supplierId || '__none__'}
-                                onValueChange={(value: string) => setFormData({ ...formData, supplierId: value === '__none__' ? '' : value })}
-                            >
-                                <SelectTrigger id="supplierId">
-                                    <SelectValue placeholder="Selecciona un proveedor" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="__none__">Sin proveedor preferido</SelectItem>
-                                    {suppliers.map((supplier) => (
-                                        <SelectItem key={supplier.id} value={supplier.id}>
-                                            {supplier.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                            <div className="p-6 md:p-8 grid gap-8 md:grid-cols-2">
+                                {/* Name Input */}
+                                <div className="space-y-2 md:col-span-2">
+                                    <Label htmlFor="name" className="text-slate-700 font-medium flex items-center gap-2">
+                                        Nombre del Material <span className="text-red-500">*</span>
+                                    </Label>
+                                    <Input
+                                        id="name"
+                                        value={formData.name}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, name: e.target.value })}
+                                        required
+                                        placeholder="Ej. Bobina de cartón corrugado"
+                                        className="h-11 shadow-sm focus-visible:ring-indigo-500 text-base"
+                                        autoFocus
+                                    />
+                                </div>
 
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="cost">Costo Estándar (Por Unidad)</Label>
-                                <CurrencyInput
-                                    id="cost"
-                                    value={formData.cost}
-                                    onValueChange={(val) => {
-                                        if (!manualIncludesIva) {
-                                            setFormData({ ...formData, cost: val || 0 });
-                                        }
-                                    }}
-                                    readOnly={manualIncludesIva}
-                                    className={manualIncludesIva ? "bg-slate-50 cursor-not-allowed" : ""}
-                                    required
-                                />
-                                <div className="flex flex-col gap-2 mt-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            id="manual-iva"
-                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-                                            checked={manualIncludesIva}
-                                            onChange={(e) => {
-                                                setManualIncludesIva(e.target.checked);
-                                                if (e.target.checked) {
-                                                    setManualBasePrice(formData.cost);
+                                {/* SKU Input */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="sku" className="text-slate-700 font-medium flex items-center gap-2">
+                                        <Fingerprint className="h-4 w-4 text-slate-400" />
+                                        Código SKU <span className="text-red-500">*</span>
+                                    </Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            id="sku"
+                                            value={formData.sku}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                                setFormData({ ...formData, sku: e.target.value });
+                                                setSkuManuallyEdited(true);
+                                            }}
+                                            required
+                                            placeholder="Ej. MAT-001"
+                                            className="h-11 shadow-sm focus-visible:ring-indigo-500 font-mono"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="h-11 px-3 border-dashed hover:border-indigo-300 hover:bg-indigo-50"
+                                            title="Generar SKU automáticamente"
+                                            onClick={() => {
+                                                if (formData.name) {
+                                                    const autoSku = generateRawMaterialSku(formData.name);
+                                                    setFormData({ ...formData, sku: autoSku });
+                                                    setSkuManuallyEdited(false);
                                                 }
                                             }}
-                                        />
-                                        <Label htmlFor="manual-iva" className="text-xs font-semibold text-slate-700 cursor-pointer">Sumar IVA (%) al precio</Label>
-                                    </div>
-
-                                    {manualIncludesIva && (
-                                        <div className="flex items-center gap-3 pt-2 border-t border-slate-200/60">
-                                            <div className="flex-1 space-y-1">
-                                                <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Precio Neto</Label>
-                                                <CurrencyInput
-                                                    id="manual-base"
-                                                    className="h-8 text-xs bg-white"
-                                                    value={manualBasePrice}
-                                                    onValueChange={(val) => setManualBasePrice(val || 0)}
-                                                    autoFocus
-                                                />
-                                            </div>
-                                            <div className="w-20 space-y-1">
-                                                <Label className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">% IVA</Label>
-                                                <div className="flex items-center gap-1">
-                                                    <Input
-                                                        type="number"
-                                                        className="h-8 text-xs px-1 bg-white"
-                                                        value={manualIvaPercentage}
-                                                        onChange={(e) => setManualIvaPercentage(Number(e.target.value))}
-                                                    />
-                                                    <span className="text-xs text-slate-400">%</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <p className="text-xs text-slate-500 mt-1">
-                                    Costo promedio inicial. Se actualizará con las compras.
-                                </p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="minStockLevel">Stock Mínimo</Label>
-                                <Input
-                                    id="minStockLevel"
-                                    type="number"
-                                    min="0"
-                                    value={formData.minStockLevel}
-                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, minStockLevel: Number(e.target.value) })}
-                                    placeholder="0"
-                                />
-                                <p className="text-xs text-slate-500">
-                                    Nivel de alerta para reabastecimiento.
-                                </p>
-                            </div>
-
-                            {/* Calculator Helper */}
-                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4 shadow-sm">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                                    <Calculator className="h-4 w-4 text-indigo-600" />
-                                    Calculadora de Costo Unitario
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="calc-price" className="text-xs text-slate-500">Precio de Referencia</Label>
-                                        <CurrencyInput
-                                            id="calc-price"
-                                            placeholder="ej. 40.000"
-                                            className="h-9 text-sm"
-                                            onValueChange={(val) => setCalcPrice(val || 0)}
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="calc-qty" className="text-xs text-slate-500">Cantidad Total ({formData.unit})</Label>
-                                        <Input
-                                            id="calc-qty"
-                                            type="number"
-                                            placeholder="ej. 30"
-                                            className="h-9 text-sm"
-                                            value={calcQty}
-                                            onChange={(e) => setCalcQty(e.target.value)}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label className="text-xs text-slate-500">¿El precio ingresado es?</Label>
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setCalcMode('BASE')}
-                                            className={`flex-1 py-2 px-3 text-xs rounded-lg border transition-all ${calcMode === 'BASE'
-                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-medium'
-                                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                                }`}
                                         >
-                                            Antes de IVA (Neto)
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setCalcMode('TOTAL')}
-                                            className={`flex-1 py-2 px-3 text-xs rounded-lg border transition-all ${calcMode === 'TOTAL'
-                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-medium'
-                                                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                                                }`}
-                                        >
-                                            Con IVA Incluido (Bruto)
-                                        </button>
+                                            <RefreshCw className="h-4 w-4 text-slate-500" />
+                                        </Button>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100">
-                                    <Label htmlFor="calc-iva-rate" className="text-xs text-slate-600">% IVA</Label>
-                                    <div className="flex items-center gap-1">
-                                        <Input
-                                            id="calc-iva-rate"
-                                            type="number"
-                                            className="h-7 w-16 text-xs px-2"
-                                            value={calcTaxRate}
-                                            onChange={(e) => setCalcTaxRate(Number(e.target.value))}
-                                        />
-                                        <span className="text-xs text-slate-400">%</span>
-                                    </div>
+                                {/* Unit Selection */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="unit" className="text-slate-700 font-medium flex items-center gap-2">
+                                        <Anchor className="h-4 w-4 text-slate-400" />
+                                        Unidad de Medida <span className="text-red-500">*</span>
+                                    </Label>
+                                    <Select
+                                        value={formData.unit}
+                                        onValueChange={(value: string) => setFormData({ ...formData, unit: value as UnitType })}
+                                    >
+                                        <SelectTrigger className="h-11 shadow-sm focus:ring-indigo-500 font-medium">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.values(UnitType).map((unit) => (
+                                                <SelectItem key={unit} value={unit}>
+                                                    {unit.toUpperCase()}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
-                                {calcPrice > 0 && (
-                                    <div className="pt-3 border-t border-slate-200 space-y-2">
-                                        <div className="flex justify-between text-xs text-slate-500">
-                                            <span>Subtotal (Base):</span>
-                                            <span className="font-medium text-slate-700">
-                                                {formatCurrency(calcMode === 'TOTAL' ? calcPrice / (1 + (calcTaxRate / 100)) : calcPrice)}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-xs text-slate-500">
-                                            <span>IVA ({calcTaxRate}%):</span>
-                                            <span className="font-medium text-slate-700">
-                                                {formatCurrency(calcMode === 'TOTAL'
-                                                    ? calcPrice - (calcPrice / (1 + (calcTaxRate / 100)))
-                                                    : calcPrice * (calcTaxRate / 100)
-                                                )}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-xs font-semibold text-slate-900 pt-1 border-t border-dashed border-slate-200">
-                                            <span>Total (IVA Incluido):</span>
-                                            <span>
-                                                {formatCurrency(calcMode === 'TOTAL' ? calcPrice : calcPrice * (1 + (calcTaxRate / 100)))}
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <p className="text-[10px] text-slate-400 leading-tight">
-                                    Nota: El sistema guardará el **Total** dividido por la **Cantidad** como costo estándar, para incluir los impuestos en el costo del material.
-                                </p>
+                                {/* Supplier Selection */}
+                                <div className="space-y-2 md:col-span-2">
+                                    <Label htmlFor="supplierId" className="text-slate-700 font-medium flex items-center gap-2">
+                                        <Building2 className="h-4 w-4 text-slate-400" />
+                                        Proveedor Preferido
+                                    </Label>
+                                    <Select
+                                        value={formData.supplierId || '__none__'}
+                                        onValueChange={(value: string) => setFormData({ ...formData, supplierId: value === '__none__' ? '' : value })}
+                                    >
+                                        <SelectTrigger id="supplierId" className="h-11 shadow-sm focus:ring-indigo-500">
+                                            <SelectValue placeholder="Selecciona el proveedor habitual" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__" className="text-slate-500 italic">Ningún proveedor preferido</SelectItem>
+                                            {suppliers.map((supplier) => (
+                                                <SelectItem key={supplier.id} value={supplier.id} className="font-medium">
+                                                    {supplier.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-slate-500">
+                                        Se usará como valor por defecto al generar órdenes de compra para este material.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    {/* Right Column: Pricing and Inventory Setting */}
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                                <div className="p-2 bg-green-100 text-green-700 rounded-lg">
+                                    <DollarSign className="h-4 w-4" />
+                                </div>
+                                <h2 className="text-base font-semibold text-slate-800">Costo y Compra</h2>
+                            </div>
+
+                            <div className="p-5 space-y-6">
+                                {/* Base Cost */}
+                                <div className="space-y-3">
+                                    <Label htmlFor="cost" className="text-slate-700 font-medium text-sm">
+                                        Costo Estándar ({formData.unit.toUpperCase()})
+                                    </Label>
+                                    <CurrencyInput
+                                        id="cost"
+                                        value={formData.cost}
+                                        onValueChange={(val) => {
+                                            if (!manualIncludesIva) {
+                                                setFormData({ ...formData, cost: val || 0 });
+                                            }
+                                        }}
+                                        readOnly={manualIncludesIva}
+                                        className={`h-12 text-lg font-semibold ${manualIncludesIva ? "bg-slate-50 text-slate-500 cursor-not-allowed border-dashed" : "shadow-inner focus-visible:ring-indigo-500"}`}
+                                        required
+                                    />
+
+                                    {/* IVA Helper Toggle */}
+                                    <div className="flex items-start gap-3 mt-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                                        <input
+                                            type="checkbox"
+                                            id="manual-iva"
+                                            className="mt-1 h-4 w-4 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-600"
+                                            checked={manualIncludesIva}
+                                            onChange={(e) => {
+                                                setManualIncludesIva(e.target.checked);
+                                                if (e.target.checked) setManualBasePrice(formData.cost);
+                                            }}
+                                        />
+                                        <div className="flex flex-col gap-1 w-full">
+                                            <Label htmlFor="manual-iva" className="text-sm font-medium text-indigo-900 cursor-pointer">
+                                                Añadir IVA al precio base
+                                            </Label>
+
+                                            {manualIncludesIva && (
+                                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-indigo-100">
+                                                    <div className="flex-1">
+                                                        <Label className="text-[10px] text-indigo-500 uppercase font-bold tracking-wider mb-1 block">Precio Neto</Label>
+                                                        <CurrencyInput
+                                                            id="manual-base"
+                                                            className="h-9 text-sm bg-white shadow-sm border-indigo-200"
+                                                            value={manualBasePrice}
+                                                            onValueChange={(val) => setManualBasePrice(val || 0)}
+                                                            autoFocus
+                                                        />
+                                                    </div>
+                                                    <div className="w-20">
+                                                        <Label className="text-[10px] text-indigo-500 uppercase font-bold tracking-wider mb-1 block">% IVA</Label>
+                                                        <div className="flex items-center gap-1">
+                                                            <Input
+                                                                type="number"
+                                                                className="h-9 text-sm px-2 bg-white shadow-sm border-indigo-200"
+                                                                value={manualIvaPercentage}
+                                                                onChange={(e) => setManualIvaPercentage(Number(e.target.value))}
+                                                            />
+                                                            <span className="text-xs text-indigo-400 font-medium">%</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 leading-tight">
+                                        Este es el costo promedio inicial. El sistema lo actualizará automáticamente al recibir nuevas compras.
+                                    </p>
+                                </div>
+
+                                {/* Calculator Toggle */}
+                                <div className="pt-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCalculator(!showCalculator)}
+                                        className="text-sm font-medium text-indigo-600 hover:text-indigo-700 flex items-center gap-1.5 transition-colors"
+                                    >
+                                        <Calculator className="h-4 w-4" />
+                                        {showCalculator ? "Ocultar calculador de bultos" : "Calcular costo por bulto/factura"}
+                                    </button>
+
+                                    {showCalculator && (
+                                        <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-4 shadow-inner">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <Label htmlFor="calc-price" className="text-[11px] font-semibold text-slate-500 uppercase">Monto Total</Label>
+                                                    <CurrencyInput
+                                                        id="calc-price"
+                                                        placeholder="40.000"
+                                                        className="h-8 text-sm"
+                                                        onValueChange={(val) => setCalcPrice(val || 0)}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label htmlFor="calc-qty" className="text-[11px] font-semibold text-slate-500 uppercase">{formData.unit} Totales</Label>
+                                                    <Input
+                                                        id="calc-qty"
+                                                        type="number"
+                                                        placeholder="30"
+                                                        className="h-8 text-sm"
+                                                        value={calcQty}
+                                                        onChange={(e) => setCalcQty(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <Label className="text-[11px] font-semibold text-slate-500 uppercase">¿El Monto es?</Label>
+                                                    <Select value={calcMode} onValueChange={(val: 'BASE' | 'TOTAL') => setCalcMode(val)}>
+                                                        <SelectTrigger className="h-8 text-xs font-medium">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="BASE">Neto (sin IVA)</SelectItem>
+                                                            <SelectItem value="TOTAL">Bruto (con IVA)</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label htmlFor="calc-iva-rate" className="text-[11px] font-semibold text-slate-500 uppercase">% IVA Aplicable</Label>
+                                                    <div className="relative">
+                                                        <Input
+                                                            id="calc-iva-rate"
+                                                            type="number"
+                                                            className="h-8 text-sm pl-2 pr-6"
+                                                            value={calcTaxRate}
+                                                            onChange={(e) => setCalcTaxRate(Number(e.target.value))}
+                                                        />
+                                                        <span className="absolute right-2 top-2 text-xs text-slate-400">%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {calcPrice > 0 && Number(calcQty) > 0 && (
+                                                <div className="pt-3 border-t border-slate-200 mt-2 text-center bg-white p-2 rounded-lg border">
+                                                    <span className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 block">Costo Resultante / {formData.unit}</span>
+                                                    <span className="font-bold text-lg text-emerald-600 block">
+                                                        {formatCurrency(
+                                                            calcMode === 'BASE'
+                                                                ? (calcPrice * (1 + (calcTaxRate / 100))) / Number(calcQty)
+                                                                : calcPrice / Number(calcQty)
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Minimum Stock Settings */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100 bg-slate-50/50">
+                                <h2 className="text-base font-semibold text-slate-800">Alertas de Inventario</h2>
+                            </div>
+                            <div className="p-5">
+                                <div className="space-y-3">
+                                    <Label htmlFor="minStockLevel" className="text-slate-700 font-medium text-sm">
+                                        Stock Mínimo
+                                    </Label>
+                                    <div className="relative">
+                                        <Input
+                                            id="minStockLevel"
+                                            type="number"
+                                            min="0"
+                                            className="h-11 shadow-sm font-medium pl-4 pr-12 focus-visible:ring-indigo-500"
+                                            value={formData.minStockLevel}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, minStockLevel: Number(e.target.value) })}
+                                            placeholder="0"
+                                        />
+                                        <span className="absolute right-4 top-3 text-sm text-slate-400 font-medium select-none">
+                                            {formData.unit.toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500">
+                                        Se mostrará una alerta de reabastecimiento cuando las existencias totales en todos los almacenes caigan por debajo de esta cantidad.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
 
-                <div className="flex justify-end gap-4">
+                {/* Sticky Action Footer */}
+                <div className="flex items-center justify-end gap-3 pt-6 pb-2 border-t border-slate-200 sticky bottom-4 bg-white/80 backdrop-blur-sm p-4 rounded-2xl shadow-sm border">
                     <Button
                         type="button"
                         variant="ghost"
                         onClick={() => navigate('/mrp/raw-materials')}
+                        className="h-11 px-6 text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                     >
-                        Cancelar
+                        Descartar
                     </Button>
-                    <Button type="submit" disabled={loading} className="min-w-[150px]">
-                        {loading ? 'Guardando...' : (
+                    <Button
+                        type="submit"
+                        disabled={loading || !formData.name || !formData.sku}
+                        className="h-11 px-8 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20 transition-all font-medium"
+                    >
+                        {loading ? (
+                            <>
+                                <span className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full"></span>
+                                Guardando...
+                            </>
+                        ) : (
                             <>
                                 <Save className="mr-2 h-4 w-4" />
-                                {isEditing ? 'Actualizar Material' : 'Crear Material'}
+                                {isEditing ? 'Guardar Cambios' : 'Crear Material'}
                             </>
                         )}
                     </Button>
                 </div>
-            </form >
-        </div >
+            </form>
+        </div>
     );
 }

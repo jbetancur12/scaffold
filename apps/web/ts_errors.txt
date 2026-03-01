@@ -1,1 +1,7 @@
-src/pages/mrp/OperationalSettingsPage.tsx(9,28): error TS6133: 'DollarSign' is declared but its value is never read.
+src/pages/mrp/ProductBOMPage.tsx(136,54): error TS2339: Property 'bom' does not exist on type 'ProductVariant'.
+src/pages/mrp/ProductBOMPage.tsx(136,69): error TS2339: Property 'bom' does not exist on type 'ProductVariant'.
+src/pages/mrp/ProductDetailPage.tsx(370,51): error TS6133: 'plannedMargin' is declared but its value is never read.
+src/pages/mrp/ProductListPage.tsx(10,48): error TS6133: 'Eye' is declared but its value is never read.
+src/pages/mrp/PurchaseOrderDetailPage.tsx(6,58): error TS6133: 'AlertCircle' is declared but its value is never read.
+src/pages/mrp/WarehouseListPage.tsx(238,72): error TS2339: Property 'description' does not exist on type 'Warehouse'.
+src/pages/mrp/WarehouseListPage.tsx(240,80): error TS2339: Property 'description' does not exist on type 'Warehouse'.

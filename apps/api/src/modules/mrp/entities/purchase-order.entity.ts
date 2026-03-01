@@ -9,6 +9,9 @@ export class PurchaseOrder {
     @PrimaryKey()
     id: string = uuid();
 
+    @Property({ unique: true })
+    code!: string;
+
     @ManyToOne(() => Supplier)
     supplier!: Supplier;
 

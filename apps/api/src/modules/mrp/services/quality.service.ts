@@ -393,6 +393,27 @@ export class QualityService {
         return this.postmarketService.listCustomers(filters);
     }
 
+    async getCustomer(id: string) {
+        return this.postmarketService.getCustomer(id);
+    }
+
+    async updateCustomer(id: string, payload: Partial<{
+        name: string;
+        documentType: string;
+        documentNumber: string;
+        contactName: string;
+        email: string;
+        phone: string;
+        address: string;
+        notes: string;
+    }>, actor?: string) {
+        return this.postmarketService.updateCustomer(id, payload, actor);
+    }
+
+    async deleteCustomer(id: string, actor?: string) {
+        return this.postmarketService.deleteCustomer(id, actor);
+    }
+
     async createShipment(payload: {
         customerId: string;
         commercialDocument: string;

@@ -16,10 +16,10 @@ import {
 } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2, Factory, FileText, Package, Layers, AlertTriangle, TrendingDown, Boxes, Save } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ProductionRequirementsTable } from '@/components/mrp/ProductionRequirementsTable';
 import {
@@ -54,6 +54,7 @@ import {
     useUpdateProductionBatchUnitPackagingMutation,
     useUpdateProductionBatchUnitQcMutation,
     useUpdateProductionOrderStatusMutation,
+    useUpsertProductionMaterialAllocationMutation,
     useUpsertProductionBatchPackagingFormMutation,
 } from '@/hooks/mrp/useProductionOrders';
 
@@ -129,6 +130,7 @@ export default function ProductionOrderDetailPage() {
     const { execute: updateUnitQc } = useUpdateProductionBatchUnitQcMutation();
     const { execute: updateUnitPackaging } = useUpdateProductionBatchUnitPackagingMutation();
     const { execute: upsertPackagingForm, loading: savingPackagingForm } = useUpsertProductionBatchPackagingFormMutation();
+    const { execute: upsertMaterialAllocation, loading: savingMaterialAllocation } = useUpsertProductionMaterialAllocationMutation();
 
     useMrpQueryErrorRedirect(error, 'No se pudo cargar la orden de producción', '/mrp/production-orders');
     useMrpQueryErrorToast(requirementsError, 'No se pudieron calcular los requerimientos');
@@ -253,6 +255,17 @@ export default function ProductionOrderDetailPage() {
             await reloadBatches({ force: true });
         } catch (err) {
             toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo actualizar empaque de unidad'), variant: 'destructive' });
+        }
+    };
+
+    const handleAssignMaterialLot = async (input: { rawMaterialId: string; lotId?: string; quantityRequested?: number }) => {
+        if (!id) return;
+        try {
+            await upsertMaterialAllocation({ orderId: id, payload: input });
+            toast({ title: 'Asignación guardada', description: 'Se actualizó el lote asignado para este material.' });
+            await reloadOrder({ force: true });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo guardar asignación de lote'), variant: 'destructive' });
         }
     };
 
@@ -582,11 +595,18 @@ export default function ProductionOrderDetailPage() {
     };
 
     if (loading) {
-        return <div className="flex justify-center p-8">Cargando...</div>;
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-violet-50/20 to-slate-50 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3 text-slate-400">
+                    <div className="animate-spin h-8 w-8 border-4 border-slate-200 border-t-violet-600 rounded-full" />
+                    <p className="font-medium animate-pulse text-sm">Cargando orden...</p>
+                </div>
+            </div>
+        );
     }
 
     if (!order) {
-        return <div className="p-8">Orden no encontrada</div>;
+        return <div className="p-8 text-slate-500 italic">Orden no encontrada</div>;
     }
 
     const lotExecutionEnabled = order.status === ProductionOrderStatus.IN_PROGRESS;
@@ -628,8 +648,8 @@ export default function ProductionOrderDetailPage() {
                     : nextLotStep === 'checklist'
                         ? 'Guardar checklist QA'
                         : nextLotStep === 'sign'
-                        ? 'Firmar liberación QA'
-                        : 'Lote completo';
+                            ? 'Firmar liberación QA'
+                            : 'Lote completo';
 
     const handleNextLotStep = async () => {
         if (!activeLotBatch) return;
@@ -661,584 +681,857 @@ export default function ProductionOrderDetailPage() {
         }
     };
 
+    const statusCfgDetail = {
+        [ProductionOrderStatus.DRAFT]: { label: 'Borrador', classes: 'bg-slate-50 text-slate-600 border-slate-200' },
+        [ProductionOrderStatus.PLANNED]: { label: 'Planificada', classes: 'bg-blue-50 text-blue-700 border-blue-200' },
+        [ProductionOrderStatus.IN_PROGRESS]: { label: 'En Progreso', classes: 'bg-amber-50 text-amber-700 border-amber-200' },
+        [ProductionOrderStatus.COMPLETED]: { label: 'Completada', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        [ProductionOrderStatus.CANCELLED]: { label: 'Cancelada', classes: 'bg-red-50 text-red-600 border-red-200' },
+    };
+    const currentStatusCfg = statusCfgDetail[order.status] ?? statusCfgDetail[ProductionOrderStatus.DRAFT];
+
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/production-orders')}>
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-                            {order.code}
-                            <Badge variant="outline" className="ml-2">
-                                {order.status}
-                            </Badge>
-                        </h1>
-                        <p className="text-slate-500">Detalle de Orden de Producción</p>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-violet-50/20 to-slate-50">
+            <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+                {/* Hero Header */}
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                    <div className="p-6 relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-violet-50/40 to-transparent pointer-events-none" />
+                        <div className="relative">
+                            <Button
+                                variant="ghost"
+                                onClick={() => navigate('/mrp/production-orders')}
+                                className="mb-4 -ml-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all"
+                            >
+                                <ArrowLeft className="mr-2 h-4 w-4" />
+                                Volver a Órdenes
+                            </Button>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-violet-50 rounded-2xl ring-1 ring-violet-100 shadow-sm shrink-0">
+                                        <Factory className="h-7 w-7 text-violet-600" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            <h1 className="text-2xl font-bold tracking-tight text-slate-900 font-mono">{order.code}</h1>
+                                            <Badge variant="outline" className={`font-semibold ring-1 ring-inset ${currentStatusCfg.classes}`}>
+                                                {currentStatusCfg.label}
+                                            </Badge>
+                                        </div>
+                                        <p className="text-slate-500 mt-1 text-sm">Detalle y gestión de la orden de producción.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {order.status === ProductionOrderStatus.DRAFT && (
+                                        <Button onClick={() => handleStatusChange(ProductionOrderStatus.PLANNED)} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium h-10 px-5">
+                                            <Truck className="mr-2 h-4 w-4" />
+                                            Planificar
+                                        </Button>
+                                    )}
+                                    {order.status === ProductionOrderStatus.PLANNED && (
+                                        <Button onClick={() => handleStatusChange(ProductionOrderStatus.IN_PROGRESS)} className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-medium h-10 px-5">
+                                            <Play className="mr-2 h-4 w-4" />
+                                            Iniciar Producción
+                                        </Button>
+                                    )}
+                                    {order.status === ProductionOrderStatus.IN_PROGRESS && (
+                                        <Button onClick={() => handleStatusChange(ProductionOrderStatus.COMPLETED)} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium h-10 px-5">
+                                            <CheckCircle className="mr-2 h-4 w-4" />
+                                            Finalizar
+                                        </Button>
+                                    )}
+                                    <Button variant="outline" size="icon" className="rounded-xl border-slate-200 h-10 w-10">
+                                        <Printer className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    {order.status === ProductionOrderStatus.DRAFT && (
-                        <Button onClick={() => handleStatusChange(ProductionOrderStatus.PLANNED)} className="bg-blue-600 hover:bg-blue-700">
-                            <Truck className="mr-2 h-4 w-4" />
-                            Planificar
-                        </Button>
-                    )}
-                    {order.status === ProductionOrderStatus.PLANNED && (
-                        <Button onClick={() => handleStatusChange(ProductionOrderStatus.IN_PROGRESS)} className="bg-amber-600 hover:bg-amber-700">
-                            <Play className="mr-2 h-4 w-4" />
-                            Iniciar Producción
-                        </Button>
-                    )}
-                    {order.status === ProductionOrderStatus.IN_PROGRESS && (
-                        <Button onClick={() => handleStatusChange(ProductionOrderStatus.COMPLETED)} className="bg-green-600 hover:bg-green-700">
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Finalizar
-                        </Button>
-                    )}
-                    <Button variant="outline" size="icon">
-                        <Printer className="h-4 w-4" />
-                    </Button>
-                </div>
-            </div>
 
-            <Tabs defaultValue="details" className="w-full">
-                <TabsList>
-                    <TabsTrigger value="details">Detalles</TabsTrigger>
-                    <TabsTrigger value="procurement">Aprovisionamiento</TabsTrigger>
-                </TabsList>
+                <Tabs defaultValue="details" className="w-full">
+                    <TabsList className="bg-white border border-slate-200 rounded-2xl p-1 h-auto shadow-sm">
+                        <TabsTrigger value="details" className="rounded-xl data-[state=active]:bg-violet-600 data-[state=active]:text-white data-[state=active]:shadow-sm font-medium px-5 py-2">Detalles</TabsTrigger>
+                        <TabsTrigger value="procurement" className="rounded-xl data-[state=active]:bg-violet-600 data-[state=active]:text-white data-[state=active]:shadow-sm font-medium px-5 py-2">Aprovisionamiento</TabsTrigger>
+                    </TabsList>
 
-                <TabsContent value="details" className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Información General</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <span className="text-slate-500">Fecha Inicio:</span>
-                                    <span>{order.startDate ? format(new Date(order.startDate), 'dd/MM/yyyy') : '-'}</span>
-
-                                    <span className="text-slate-500">Fecha Fin:</span>
-                                    <span>{order.endDate ? format(new Date(order.endDate), 'dd/MM/yyyy') : '-'}</span>
-
-                                    <span className="text-slate-500">Notas:</span>
-                                    <span className="col-span-2 mt-1 p-2 bg-slate-50 rounded border text-slate-700 text-xs">
-                                        {order.notes || "Sin notas"}
+                    <TabsContent value="details" className="space-y-5 mt-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-violet-500" />
+                                    <h2 className="font-semibold text-slate-800">Información General</h2>
+                                </div>
+                                <div className="p-6 grid grid-cols-2 gap-y-3 text-sm">
+                                    <span className="text-slate-500 font-medium">Fecha Inicio</span>
+                                    <span className="text-slate-800">{order.startDate ? format(new Date(order.startDate), 'dd/MM/yyyy') : <span className="italic text-slate-400">—</span>}</span>
+                                    <span className="text-slate-500 font-medium">Fecha Fin</span>
+                                    <span className="text-slate-800">{order.endDate ? format(new Date(order.endDate), 'dd/MM/yyyy') : <span className="italic text-slate-400">—</span>}</span>
+                                    <span className="text-slate-500 font-medium col-span-2 mt-2 border-t border-slate-100 pt-3">Notas</span>
+                                    <span className="col-span-2 p-3 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 text-xs leading-relaxed">
+                                        {order.notes || <span className="italic text-slate-400">Sin notas</span>}
                                     </span>
                                 </div>
-                            </CardContent>
-                        </Card>
+                            </div>
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Items a Producir</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
+                            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                                    <Package className="h-4 w-4 text-violet-500" />
+                                    <h2 className="font-semibold text-slate-800">Ítems a Producir</h2>
+                                </div>
+                                <div className="p-6 space-y-3">
                                     {order.items?.map((item) => {
                                         const populatedItem = item as ProductionOrderItem & { variant?: ProductVariant & { product?: Product } };
                                         return (
-                                            <div key={item.id} className="flex justify-between items-center border-b pb-2 last:border-0 last:pb-0">
+                                            <div key={item.id} className="flex justify-between items-center bg-slate-50 rounded-xl px-4 py-3">
                                                 <div>
-                                                    <div className="font-medium">{populatedItem.variant?.product?.name} - {populatedItem.variant?.name}</div>
-                                                    <div className="text-xs text-slate-500">{populatedItem.variant?.sku}</div>
+                                                    <div className="font-semibold text-slate-800 text-sm">{populatedItem.variant?.product?.name} <span className="text-slate-400 mx-1">·</span> {populatedItem.variant?.name}</div>
+                                                    <div className="text-xs text-slate-400 mt-0.5 font-mono">{populatedItem.variant?.sku}</div>
                                                 </div>
-                                                <div className="font-bold text-lg">
-                                                    {item.quantity} unds
-                                                </div>
+                                                <span className="font-bold text-slate-900 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm shrink-0">
+                                                    {item.quantity} un.
+                                                </span>
                                             </div>
                                         );
                                     })}
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Trazabilidad por Lotes</CardTitle>
-                            <CardDescription>
-                                Crea lotes, controla QC y empaque. La orden solo se puede finalizar cuando todos los lotes estén liberados.
-                            </CardDescription>
-                            {!isSerialMode ? (
-                                <p className="text-xs text-slate-600">Modo activo: lote (sin manejo de unidades seriales).</p>
-                            ) : null}
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {!lotExecutionEnabled ? (
-                                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                                    QC y empaque se habilitan cuando la orden esté en "in_progress".
-                                </p>
-                            ) : null}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-                                <Select value={newBatchVariantId} onValueChange={handleVariantChange}>
-                                    <SelectTrigger className="md:col-span-2">
-                                        <SelectValue placeholder="Variante para el lote" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {(order.items ?? []).map((item) => {
-                                            const populatedItem = item as ProductionOrderItem & { variant?: ProductVariant & { product?: Product } };
-                                            return (
-                                                <SelectItem key={item.variantId} value={item.variantId}>
-                                                    {populatedItem.variant?.product?.name} - {populatedItem.variant?.name}
-                                                </SelectItem>
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </Select>
-                                <input
-                                    className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                                    type="number"
-                                    min={1}
-                                    value={newBatchQty}
-                                    onChange={(e) => setNewBatchQty(Number(e.target.value) || 1)}
-                                    placeholder="Cantidad"
-                                />
-                                <Button onClick={handleCreateBatch} disabled={!newBatchVariantId || creatingBatch || exceedsPlannedQtyForSelectedVariant}>
-                                    {creatingBatch ? 'Creando...' : 'Crear Lote'}
-                                </Button>
                             </div>
-                            {newBatchVariantId ? (
-                                <p className={`text-xs ${exceedsPlannedQtyForSelectedVariant ? 'text-red-700' : 'text-slate-600'}`}>
-                                    Pendiente por lotear para esta variante: {remainingToPlanForSelectedVariant}
-                                    {exceedsPlannedQtyForSelectedVariant ? ` | La cantidad ingresada (${newBatchQty}) supera el pendiente.` : ''}
-                                </p>
-                            ) : null}
-                            <input
-                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full md:w-1/2"
-                                value={newBatchCode}
-                                onChange={(e) => setNewBatchCode(e.target.value)}
-                                placeholder="Código lote opcional"
-                            />
+                        </div>
 
-                            <div className="space-y-3">
-                                {batches.length === 0 ? (
-                                    <div className="text-sm text-slate-500">Sin lotes registrados.</div>
-                                ) : (
-                                    batches.map((batch) => (
-                                        <div key={batch.id} className="border rounded-md p-3 space-y-3">
-                                            {(() => {
-                                                const hasPackagingForm = Boolean(batch.packagingFormCompleted);
-
+                        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-slate-100">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Layers className="h-4 w-4 text-violet-500" />
+                                    <h2 className="font-semibold text-slate-800">Trazabilidad por Lotes</h2>
+                                </div>
+                                <p className="text-xs text-slate-500">Crea lotes, controla QC y empaque. La orden solo se puede finalizar cuando todos los lotes estén liberados. {!isSerialMode ? 'Modo activo: lote.' : ''}</p>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                {!lotExecutionEnabled ? (
+                                    <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                                        QC y empaque se habilitan cuando la orden esté en "En Progreso".
+                                    </div>
+                                ) : null}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                                    <Select value={newBatchVariantId} onValueChange={handleVariantChange}>
+                                        <SelectTrigger className="md:col-span-2">
+                                            <SelectValue placeholder="Variante para el lote" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {(order.items ?? []).map((item) => {
+                                                const populatedItem = item as ProductionOrderItem & { variant?: ProductVariant & { product?: Product } };
                                                 return (
-                                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                                <div>
-                                                    <div className="font-semibold">{batch.code}</div>
-                                                    <div className="text-xs text-slate-500">
-                                                        {batch.variant?.product?.name} - {batch.variant?.name} | Plan: {batch.plannedQty} | Producido: {batch.producedQty}
-                                                    </div>
-                                                    <div className="text-xs text-slate-500 mt-1">
-                                                        ID:{' '}
-                                                        <span title={batch.id} className="font-mono">
-                                                            {shortId(batch.id)}
-                                                        </span>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            className="h-6 px-2 ml-1 text-[11px]"
-                                                            onClick={() => copyBatchId(batch.id)}
-                                                            title="Copiar UUID completo"
-                                                        >
-                                                            Copiar ID
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <Badge variant="outline" className={getQcBadgeClass(batch.qcStatus)}>
-                                                        QC: {getQcStatusLabel(batch.qcStatus)}
-                                                    </Badge>
-                                                    <Badge variant="outline" className={getPackagingBadgeClass(batch.packagingStatus)}>
-                                                        Empaque: {getPackagingStatusLabel(batch.packagingStatus)}
-                                                    </Badge>
-                                                    <Badge variant="outline" className={hasPackagingForm ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-700'}>
-                                                        FOR Empaque: {hasPackagingForm ? 'Listo' : 'Pendiente'}
-                                                    </Badge>
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() => openLotCenter(batch.id)}
-                                                    >
-                                                        Gestionar lote
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => downloadPackagingFormPdf(batch.id)}
-                                                        disabled={!hasPackagingForm}
-                                                        title={!hasPackagingForm ? 'Primero diligencia el FOR de empaque' : ''}
-                                                    >
-                                                        PDF FOR
-                                                    </Button>
-                                                    {isSerialMode ? (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => handleAddUnits(batch.id)}
-                                                            disabled={batch.packagingStatus === 'packed' || !lotExecutionEnabled}
-                                                            title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
-                                                        >
-                                                            + Unidades
-                                                        </Button>
-                                                    ) : null}
-                                                </div>
-                                            </div>
+                                                    <SelectItem key={item.variantId} value={item.variantId}>
+                                                        {populatedItem.variant?.product?.name} - {populatedItem.variant?.name}
+                                                    </SelectItem>
                                                 );
-                                            })()}
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                    <input
+                                        className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                                        type="number"
+                                        min={1}
+                                        value={newBatchQty}
+                                        onChange={(e) => setNewBatchQty(Number(e.target.value) || 1)}
+                                        placeholder="Cantidad"
+                                    />
+                                    <Button onClick={handleCreateBatch} disabled={!newBatchVariantId || creatingBatch || exceedsPlannedQtyForSelectedVariant}>
+                                        {creatingBatch ? 'Creando...' : 'Crear Lote'}
+                                    </Button>
+                                </div>
+                                {newBatchVariantId ? (
+                                    <p className={`text-xs ${exceedsPlannedQtyForSelectedVariant ? 'text-red-700' : 'text-slate-600'}`}>
+                                        Pendiente por lotear para esta variante: {remainingToPlanForSelectedVariant}
+                                        {exceedsPlannedQtyForSelectedVariant ? ` | La cantidad ingresada (${newBatchQty}) supera el pendiente.` : ''}
+                                    </p>
+                                ) : null}
+                                <input
+                                    className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full md:w-1/2"
+                                    value={newBatchCode}
+                                    onChange={(e) => setNewBatchCode(e.target.value)}
+                                    placeholder="Código lote opcional"
+                                />
 
-                                            {(() => {
-                                                const units = batch.units ?? [];
-                                                const hasUnits = units.length > 0;
-                                                const allUnitsQcPassed = hasUnits ? units.every((u) => u.rejected || u.qcPassed) : true;
-                                                const hasPackagingForm = Boolean(batch.packagingFormCompleted);
-                                                const canPackBatch = batch.qcStatus === 'passed'
-                                                    && batch.packagingStatus !== 'packed'
-                                                    && hasPackagingForm
-                                                    && allUnitsQcPassed;
-                                                const packDisabledReason = batch.qcStatus !== 'passed'
-                                                    ? 'Debes aprobar QC del lote antes de empacar.'
-                                                    : !hasPackagingForm
-                                                        ? 'Debes diligenciar el FOR de empaque antes de empacar.'
-                                                    : !allUnitsQcPassed
-                                                        ? 'Todas las unidades deben pasar QC antes de empacar el lote.'
-                                                        : null;
-                                                return !canPackBatch && packDisabledReason ? (
-                                                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                                                        {packDisabledReason}
-                                                    </p>
-                                                ) : null;
-                                            })()}
-
-                                            {isSerialMode && (batch.units ?? []).length > 0 ? (
-                                                <div className="overflow-auto">
-                                                    <table className="w-full text-xs">
-                                                        <thead>
-                                                            <tr className="border-b">
-                                                                <th className="text-left p-1">Serial</th>
-                                                                <th className="text-left p-1">QC</th>
-                                                                <th className="text-left p-1">Empaque</th>
-                                                                <th className="text-right p-1">Acciones</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            {(batch.units ?? []).map((unit) => (
-                                                                <tr key={unit.id} className="border-b">
-                                                                    <td className="p-1">{unit.serialCode}</td>
-                                                                    <td className="p-1">{unit.qcPassed ? 'OK' : 'Pendiente'}</td>
-                                                                    <td className="p-1">{unit.packaged ? 'Empacada' : 'Pendiente'}</td>
-                                                                    <td className="p-1 text-right space-x-1">
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            onClick={() => handleUnitQc(unit.id, true)}
-                                                                            disabled={unit.qcPassed || !lotExecutionEnabled}
-                                                                            title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
-                                                                        >
-                                                                            QC
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            onClick={() => handleUnitPackaging(unit.id, true)}
-                                                                            disabled={!unit.qcPassed || unit.packaged || !lotExecutionEnabled}
-                                                                            title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
-                                                                        >
-                                                                            Empacar
-                                                                        </Button>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            ) : null}
+                                <div className="space-y-3">
+                                    {batches.length === 0 ? (
+                                        <div className="text-center py-8 text-slate-400">
+                                            <Boxes className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                                            <p className="text-sm">Sin lotes registrados. Crea el primero arriba.</p>
                                         </div>
-                                    ))
+                                    ) : (
+                                        batches.map((batch) => (
+                                            <div key={batch.id} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3 hover:border-violet-200 transition-colors">
+                                                {(() => {
+                                                    const hasPackagingForm = Boolean(batch.packagingFormCompleted);
+
+                                                    return (
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <div>
+                                                                <div className="font-semibold">{batch.code}</div>
+                                                                <div className="text-xs text-slate-500">
+                                                                    {batch.variant?.product?.name} - {batch.variant?.name} | Plan: {batch.plannedQty} | Producido: {batch.producedQty}
+                                                                </div>
+                                                                <div className="text-xs text-slate-500 mt-1">
+                                                                    ID:{' '}
+                                                                    <span title={batch.id} className="font-mono">
+                                                                        {shortId(batch.id)}
+                                                                    </span>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        className="h-6 px-2 ml-1 text-[11px]"
+                                                                        onClick={() => copyBatchId(batch.id)}
+                                                                        title="Copiar UUID completo"
+                                                                    >
+                                                                        Copiar ID
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <Badge variant="outline" className={getQcBadgeClass(batch.qcStatus)}>
+                                                                    QC: {getQcStatusLabel(batch.qcStatus)}
+                                                                </Badge>
+                                                                <Badge variant="outline" className={getPackagingBadgeClass(batch.packagingStatus)}>
+                                                                    Empaque: {getPackagingStatusLabel(batch.packagingStatus)}
+                                                                </Badge>
+                                                                <Badge variant="outline" className={hasPackagingForm ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-700'}>
+                                                                    FOR Empaque: {hasPackagingForm ? 'Listo' : 'Pendiente'}
+                                                                </Badge>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => openLotCenter(batch.id)}
+                                                                >
+                                                                    Gestionar lote
+                                                                </Button>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() => downloadPackagingFormPdf(batch.id)}
+                                                                    disabled={!hasPackagingForm}
+                                                                    title={!hasPackagingForm ? 'Primero diligencia el FOR de empaque' : ''}
+                                                                >
+                                                                    PDF FOR
+                                                                </Button>
+                                                                {isSerialMode ? (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => handleAddUnits(batch.id)}
+                                                                        disabled={batch.packagingStatus === 'packed' || !lotExecutionEnabled}
+                                                                        title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
+                                                                    >
+                                                                        + Unidades
+                                                                    </Button>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+
+                                                {(() => {
+                                                    const units = batch.units ?? [];
+                                                    const hasUnits = units.length > 0;
+                                                    const allUnitsQcPassed = hasUnits ? units.every((u) => u.rejected || u.qcPassed) : true;
+                                                    const hasPackagingForm = Boolean(batch.packagingFormCompleted);
+                                                    const canPackBatch = batch.qcStatus === 'passed'
+                                                        && batch.packagingStatus !== 'packed'
+                                                        && hasPackagingForm
+                                                        && allUnitsQcPassed;
+                                                    const packDisabledReason = batch.qcStatus !== 'passed'
+                                                        ? 'Debes aprobar QC del lote antes de empacar.'
+                                                        : !hasPackagingForm
+                                                            ? 'Debes diligenciar el FOR de empaque antes de empacar.'
+                                                            : !allUnitsQcPassed
+                                                                ? 'Todas las unidades deben pasar QC antes de empacar el lote.'
+                                                                : null;
+                                                    return !canPackBatch && packDisabledReason ? (
+                                                        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                                                            {packDisabledReason}
+                                                        </p>
+                                                    ) : null;
+                                                })()}
+
+                                                {isSerialMode && (batch.units ?? []).length > 0 ? (
+                                                    <div className="overflow-auto">
+                                                        <table className="w-full text-xs">
+                                                            <thead>
+                                                                <tr className="border-b">
+                                                                    <th className="text-left p-1">Serial</th>
+                                                                    <th className="text-left p-1">QC</th>
+                                                                    <th className="text-left p-1">Empaque</th>
+                                                                    <th className="text-right p-1">Acciones</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {(batch.units ?? []).map((unit) => (
+                                                                    <tr key={unit.id} className="border-b">
+                                                                        <td className="p-1">{unit.serialCode}</td>
+                                                                        <td className="p-1">{unit.qcPassed ? 'OK' : 'Pendiente'}</td>
+                                                                        <td className="p-1">{unit.packaged ? 'Empacada' : 'Pendiente'}</td>
+                                                                        <td className="p-1 text-right space-x-1">
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="ghost"
+                                                                                onClick={() => handleUnitQc(unit.id, true)}
+                                                                                disabled={unit.qcPassed || !lotExecutionEnabled}
+                                                                                title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
+                                                                            >
+                                                                                QC
+                                                                            </Button>
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="ghost"
+                                                                                onClick={() => handleUnitPackaging(unit.id, true)}
+                                                                                disabled={!unit.qcPassed || unit.packaged || !lotExecutionEnabled}
+                                                                                title={!lotExecutionEnabled ? lotExecutionDisabledReason : ''}
+                                                                            >
+                                                                                Empacar
+                                                                            </Button>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="procurement" className="mt-5">
+                        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                                <TrendingDown className="h-4 w-4 text-violet-500" />
+                                <h2 className="font-semibold text-slate-800">Análisis de Materiales</h2>
+                                <p className="text-xs text-slate-400 ml-2">Requerimientos y disponibilidad en inventario.</p>
+                            </div>
+                            <div className="p-6">
+                                {loadingReqs ? (
+                                    <div className="flex items-center justify-center py-12 text-slate-400">
+                                        <div className="animate-spin mr-3 h-6 w-6 border-4 border-slate-200 border-t-violet-600 rounded-full" />
+                                        <span className="text-sm animate-pulse">Calculando requerimientos...</span>
+                                    </div>
+                                ) : (
+                                    <ProductionRequirementsTable
+                                        requirements={requirements}
+                                        onAssignLot={handleAssignMaterialLot}
+                                        savingAllocation={savingMaterialAllocation}
+                                    />
                                 )}
                             </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                        </div>
+                    </TabsContent>
+                </Tabs>
+            </div>
+            <div>
 
-                <TabsContent value="procurement">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Análisis de Materiales</CardTitle>
-                            <CardDescription>
-                                Requerimientos de materia prima para esta orden y disponibilidad en inventario.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {loadingReqs ? (
-                                <div className="text-center py-8">Calculando requerimientos...</div>
-                            ) : (
-                                <ProductionRequirementsTable requirements={requirements} />
-                            )}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
+                <Dialog open={Boolean(lotCenterBatchId)} onOpenChange={(open) => !open && setLotCenterBatchId(null)}>
+                    <DialogContent className="max-w-4xl">
+                        <DialogHeader className="pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-violet-50 rounded-xl">
+                                    <Layers className="h-5 w-5 text-violet-600" />
+                                </div>
+                                <div>
+                                    <DialogTitle className="text-lg font-bold text-slate-900 font-mono">
+                                        Centro de Lote{activeLotBatch ? ` — ${activeLotBatch.code}` : ''}
+                                    </DialogTitle>
+                                    <p className="text-xs text-slate-500 mt-0.5">Flujo de liberación: FOR → Etiqueta → QC → Empaque → QA</p>
+                                </div>
+                            </div>
+                        </DialogHeader>
 
-            <Dialog open={Boolean(lotCenterBatchId)} onOpenChange={(open) => !open && setLotCenterBatchId(null)}>
-                <DialogContent className="max-w-4xl">
-                    <DialogHeader>
-                        <DialogTitle>Centro de Lote {activeLotBatch ? `- ${activeLotBatch.code}` : ''}</DialogTitle>
-                    </DialogHeader>
-                    {lotCenterLoading ? (
-                        <div className="py-6 text-sm text-slate-500">Cargando datos del lote...</div>
-                    ) : (
-                        <div className="space-y-4 max-h-[72vh] overflow-y-auto pr-1">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                                <div className={`rounded border px-2 py-1 ${lotStepStatus.form ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>1. FOR Empaque: {lotStepStatus.form ? 'Listo' : 'Pendiente'}</div>
-                                <div className={`rounded border px-2 py-1 ${lotStepStatus.label ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>2. Etiqueta: {lotStepStatus.label ? 'Validada' : 'Pendiente'}</div>
-                                <div className={`rounded border px-2 py-1 ${lotStepStatus.qc ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>3. QC: {lotStepStatus.qc ? 'Aprobado' : 'Pendiente'}</div>
-                                <div className={`rounded border px-2 py-1 ${lotStepStatus.packed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>4. Empaque: {lotStepStatus.packed ? 'Empacado' : 'Pendiente'}</div>
-                                <div className={`rounded border px-2 py-1 ${lotStepStatus.qa ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>5. QA: {lotStepStatus.qa ? 'Liberado' : 'Pendiente'}</div>
+                        {lotCenterLoading ? (
+                            <div className="flex items-center justify-center py-12 text-slate-400">
+                                <div className="animate-spin mr-3 h-6 w-6 border-4 border-slate-200 border-t-violet-600 rounded-full" />
+                                <span className="text-sm animate-pulse">Cargando datos del lote...</span>
+                            </div>
+                        ) : (
+                            <div className="space-y-5 max-h-[72vh] overflow-y-auto pr-1 py-2">
+
+                                {/* Progress stepper */}
+                                <div className="grid grid-cols-5 gap-2">
+                                    {[
+                                        { n: 1, label: 'FOR Empaque', done: lotStepStatus.form },
+                                        { n: 2, label: 'Etiqueta', done: lotStepStatus.label },
+                                        { n: 3, label: 'QC', done: lotStepStatus.qc },
+                                        { n: 4, label: 'Empaque', done: lotStepStatus.packed },
+                                        { n: 5, label: 'QA', done: lotStepStatus.qa },
+                                    ].map(({ n, label, done }) => (
+                                        <div key={n} className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition-all ${done ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${done ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                                {done ? '✓' : n}
+                                            </div>
+                                            <span className={`text-xs font-semibold leading-tight ${done ? 'text-emerald-700' : 'text-slate-500'}`}>{label}</span>
+                                            <span className={`text-[10px] font-medium ${done ? 'text-emerald-600' : 'text-slate-400'}`}>{done ? 'Listo' : 'Pendiente'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Paso 1: FOR */}
+                                <div className={`bg-white border rounded-2xl overflow-hidden ${lotStepStatus.form ? 'border-emerald-100' : 'border-slate-200'}`}>
+                                    <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${lotStepStatus.form ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                            {lotStepStatus.form ? '✓' : '1'}
+                                        </div>
+                                        <h3 className="font-semibold text-slate-800 text-sm">FOR de Empaque</h3>
+                                        {lotStepStatus.form && <span className="ml-auto text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">Completo</span>}
+                                    </div>
+                                    <div className="px-5 py-4 flex flex-wrap items-center gap-2">
+                                        <Button
+                                            variant={lotStepStatus.form ? 'outline' : 'default'}
+                                            onClick={() => activeLotBatch && openPackagingFormDialog(activeLotBatch.id)}
+                                            className={lotStepStatus.form ? 'rounded-xl border-slate-200' : 'bg-violet-600 hover:bg-violet-700 text-white rounded-xl'}
+                                        >
+                                            <Package className="mr-2 h-4 w-4" />
+                                            {lotStepStatus.form ? 'Editar FOR' : 'Diligenciar FOR'}
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => activeLotBatch && downloadPackagingFormPdf(activeLotBatch.id)}
+                                            disabled={!lotStepStatus.form}
+                                            className="rounded-xl border-slate-200"
+                                        >
+                                            <Printer className="mr-2 h-4 w-4" />
+                                            PDF FOR
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Paso 2: Etiqueta */}
+                                <div className={`bg-white border rounded-2xl overflow-hidden ${lotStepStatus.label ? 'border-emerald-100' : 'border-slate-200'}`}>
+                                    <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${lotStepStatus.label ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                            {lotStepStatus.label ? '✓' : '2'}
+                                        </div>
+                                        <h3 className="font-semibold text-slate-800 text-sm">Etiqueta Regulatoria de Lote</h3>
+                                        {lotStepStatus.label && <span className="ml-auto text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">Validada</span>}
+                                    </div>
+                                    <div className="px-5 py-4 space-y-3">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {[
+                                                { placeholder: 'Nombre producto', key: 'productName' as const },
+                                                { placeholder: 'Fabricante', key: 'manufacturerName' as const },
+                                                { placeholder: 'Registro INVIMA', key: 'invimaRegistration' as const },
+                                                { placeholder: 'Código lote', key: 'lotCode' as const, mono: true },
+                                            ].map(({ placeholder, key, mono }) => (
+                                                <input
+                                                    key={key}
+                                                    className={`h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500 ${mono ? 'font-mono' : ''}`}
+                                                    placeholder={placeholder}
+                                                    value={lotCenterLabel[key]}
+                                                    onChange={(e) => setLotCenterLabel((p) => ({ ...p, [key]: e.target.value }))}
+                                                />
+                                            ))}
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-500">Fecha fabricación</label>
+                                                <input type="date" className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500" value={lotCenterLabel.manufactureDate} onChange={(e) => setLotCenterLabel((p) => ({ ...p, manufactureDate: e.target.value }))} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-500">Fecha vencimiento</label>
+                                                <input type="date" className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500" value={lotCenterLabel.expirationDate} onChange={(e) => setLotCenterLabel((p) => ({ ...p, expirationDate: e.target.value }))} />
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => activeLotBatch && downloadLabelPdf(activeLotBatch.id)}
+                                                disabled={!lotStepStatus.label}
+                                                className="rounded-xl border-slate-200"
+                                            >
+                                                <Printer className="mr-2 h-4 w-4" />
+                                                PDF Etiquetado
+                                            </Button>
+                                            <Button
+                                                onClick={saveLotLabel}
+                                                disabled={lotCenterSavingLabel || !lotStepStatus.form}
+                                                className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-medium"
+                                            >
+                                                {lotCenterSavingLabel ? (
+                                                    <>
+                                                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                                                        Guardando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Save className="mr-2 h-4 w-4" />
+                                                        Guardar y validar etiqueta
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Pasos 3, 4 y 5: QC, Empaque, Checklist QA */}
+                                <div className={`bg-white border rounded-2xl overflow-hidden ${lotStepStatus.qa ? 'border-emerald-100' : 'border-slate-200'}`}>
+                                    <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${lotStepStatus.qa ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                            {lotStepStatus.qa ? '✓' : '3–5'}
+                                        </div>
+                                        <h3 className="font-semibold text-slate-800 text-sm">QC · Empaque · Liberación QA</h3>
+                                    </div>
+                                    <div className="px-5 py-4 space-y-4">
+                                        {/* Checklist */}
+                                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {[
+                                                { key: 'qc_auto', label: 'QC aprobado (automático)', checked: lotStepStatus.qc, disabled: true },
+                                                { key: 'labelingValidated', label: 'Etiquetado validado', checked: lotCenterChecklist.labelingValidated, onChange: (v: boolean) => setLotCenterChecklist((p) => ({ ...p, labelingValidated: v })) },
+                                                { key: 'documentsCurrent', label: 'Documentación vigente', checked: lotCenterChecklist.documentsCurrent, onChange: (v: boolean) => setLotCenterChecklist((p) => ({ ...p, documentsCurrent: v })) },
+                                                { key: 'evidencesComplete', label: 'Evidencias completas', checked: lotCenterChecklist.evidencesComplete, onChange: (v: boolean) => setLotCenterChecklist((p) => ({ ...p, evidencesComplete: v })) },
+                                            ].map(({ key, label, checked, disabled, onChange }) => (
+                                                <label key={key} className={`flex items-center gap-3 select-none ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                    <div
+                                                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${checked ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300 bg-white'}`}
+                                                        onClick={() => !disabled && onChange && onChange(!checked)}
+                                                    >
+                                                        {checked && <CheckCircle className="h-3 w-3 text-white" />}
+                                                    </div>
+                                                    <input type="checkbox" className="sr-only" checked={checked} disabled={disabled} onChange={(e) => !disabled && onChange && onChange(e.target.checked)} />
+                                                    <span className="text-sm text-slate-700">{label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+
+                                        {/* Notas */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Notas checklist</label>
+                                                <textarea
+                                                    className="min-h-[72px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm w-full resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                    placeholder="Notas adicionales..."
+                                                    value={lotCenterChecklist.checklistNotes}
+                                                    onChange={(e) => setLotCenterChecklist((p) => ({ ...p, checklistNotes: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Motivo de rechazo <span className="normal-case text-slate-400">(opcional)</span></label>
+                                                <textarea
+                                                    className="min-h-[72px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm w-full resize-none focus:outline-none focus:ring-2 focus:ring-red-400"
+                                                    placeholder="Motivo de rechazo..."
+                                                    value={lotCenterChecklist.rejectedReason}
+                                                    onChange={(e) => setLotCenterChecklist((p) => ({ ...p, rejectedReason: e.target.value }))}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Action buttons */}
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => activeLotBatch && handleBatchQc(activeLotBatch.id, true)}
+                                                disabled={!lotStepStatus.form || !lotStepStatus.label || lotStepStatus.qc}
+                                                className={`rounded-xl ${lotStepStatus.qc ? 'border-emerald-200 text-emerald-700 bg-emerald-50' : 'border-slate-200'}`}
+                                            >
+                                                <CheckCircle className="mr-2 h-4 w-4" />
+                                                {lotStepStatus.qc ? 'QC Aprobado' : 'Aprobar QC'}
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => activeLotBatch && handleBatchPackaging(activeLotBatch.id, true)}
+                                                disabled={!lotStepStatus.form || !lotStepStatus.label || !lotStepStatus.qc || lotStepStatus.packed}
+                                                className={`rounded-xl ${lotStepStatus.packed ? 'border-emerald-200 text-emerald-700 bg-emerald-50' : 'border-slate-200'}`}
+                                            >
+                                                <Boxes className="mr-2 h-4 w-4" />
+                                                {lotStepStatus.packed ? 'Empacado' : 'Ejecutar empaque'}
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={saveLotChecklist}
+                                                disabled={lotCenterSavingChecklist || !lotStepStatus.packed}
+                                                className="rounded-xl border-slate-200"
+                                            >
+                                                {lotCenterSavingChecklist ? 'Guardando...' : 'Guardar checklist QA'}
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => activeLotBatch && downloadBatchReleasePdf(activeLotBatch.id)}
+                                                disabled={!lotCenterRelease}
+                                                className="rounded-xl border-slate-200 ml-auto"
+                                            >
+                                                <Printer className="mr-2 h-4 w-4" />
+                                                PDF Liberación QA
+                                            </Button>
+                                        </div>
+
+                                        {/* Firma digital */}
+                                        <div className="flex items-end gap-3 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                                            <div className="flex-1 space-y-1.5">
+                                                <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Firma digital</label>
+                                                <input
+                                                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500 font-mono"
+                                                    value={lotCenterSignature}
+                                                    onChange={(e) => setLotCenterSignature(e.target.value)}
+                                                    placeholder="Firma digital (responsable QA)"
+                                                />
+                                            </div>
+                                            <Button
+                                                onClick={signLotRelease}
+                                                disabled={lotCenterSigning || !lotStepStatus.packed || !checklistReadyForSign}
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium h-10 px-5 shrink-0"
+                                            >
+                                                {lotCenterSigning ? (
+                                                    <>
+                                                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                                                        Firmando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                                        Firmar liberación QA
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <DialogFooter className="pt-4 border-t border-slate-100 flex gap-2">
+                            <Button
+                                onClick={handleNextLotStep}
+                                disabled={lotCenterLoading || nextLotStep === 'done'}
+                                className={`rounded-xl font-medium ${nextLotStep === 'done' ? 'bg-emerald-600 text-white' : 'bg-violet-600 hover:bg-violet-700 text-white'}`}
+                            >
+                                {nextLotStep === 'done' ? (
+                                    <>
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Lote Completo
+                                    </>
+                                ) : nextLotStepLabel}
+                            </Button>
+                            <Button variant="outline" onClick={() => setLotCenterBatchId(null)} className="rounded-xl border-slate-200">
+                                Cerrar
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+
+                <Dialog open={Boolean(packagingFormBatchId)} onOpenChange={(open) => !open && closePackagingFormDialog()}>
+                    <DialogContent className="max-w-3xl">
+                        <DialogHeader className="pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-violet-50 rounded-xl">
+                                    <Package className="h-5 w-5 text-violet-600" />
+                                </div>
+                                <div>
+                                    <DialogTitle className="text-lg font-bold text-slate-900">FOR de Empaque por Lote</DialogTitle>
+                                    <p className="text-xs text-slate-500 mt-0.5">Diligencia el formato de empaque para este lote de producción.</p>
+                                </div>
+                            </div>
+                        </DialogHeader>
+                        <div className="max-h-[65vh] overflow-y-auto pr-1 space-y-5 py-2">
+                            {/* Personal */}
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Personal</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium text-slate-700">Operario</Label>
+                                        <input
+                                            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            value={packagingForm.operatorName}
+                                            onChange={(e) => setPackagingForm((prev) => ({ ...prev, operatorName: e.target.value }))}
+                                            placeholder="Nombre del operario"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium text-slate-700">Verificador</Label>
+                                        <input
+                                            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            value={packagingForm.verifierName}
+                                            onChange={(e) => setPackagingForm((prev) => ({ ...prev, verifierName: e.target.value }))}
+                                            placeholder="Nombre del verificador"
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Paso 1: FOR de Empaque</CardTitle>
-                                </CardHeader>
-                                <CardContent className="flex items-center gap-2">
-                                    <Button variant="outline" onClick={() => activeLotBatch && openPackagingFormDialog(activeLotBatch.id)}>
-                                        {lotStepStatus.form ? 'Editar FOR' : 'Diligenciar FOR'}
-                                    </Button>
-                                    <Button variant="outline" onClick={() => activeLotBatch && downloadPackagingFormPdf(activeLotBatch.id)} disabled={!lotStepStatus.form}>Descargar PDF FOR</Button>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Paso 2: Etiqueta regulatoria de lote</CardTitle>
-                                </CardHeader>
-                                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    <input className="h-10 rounded-md border border-input bg-background px-3 text-sm" placeholder="Nombre producto" value={lotCenterLabel.productName} onChange={(e) => setLotCenterLabel((p) => ({ ...p, productName: e.target.value }))} />
-                                    <input className="h-10 rounded-md border border-input bg-background px-3 text-sm" placeholder="Fabricante" value={lotCenterLabel.manufacturerName} onChange={(e) => setLotCenterLabel((p) => ({ ...p, manufacturerName: e.target.value }))} />
-                                    <input className="h-10 rounded-md border border-input bg-background px-3 text-sm" placeholder="Registro INVIMA" value={lotCenterLabel.invimaRegistration} onChange={(e) => setLotCenterLabel((p) => ({ ...p, invimaRegistration: e.target.value }))} />
-                                    <input className="h-10 rounded-md border border-input bg-background px-3 text-sm" placeholder="Código lote" value={lotCenterLabel.lotCode} onChange={(e) => setLotCenterLabel((p) => ({ ...p, lotCode: e.target.value }))} />
-                                    <input type="date" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={lotCenterLabel.manufactureDate} onChange={(e) => setLotCenterLabel((p) => ({ ...p, manufactureDate: e.target.value }))} />
-                                    <input type="date" className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={lotCenterLabel.expirationDate} onChange={(e) => setLotCenterLabel((p) => ({ ...p, expirationDate: e.target.value }))} />
-                                    <div className="md:col-span-2 flex justify-end gap-2">
-                                        <Button variant="outline" onClick={() => activeLotBatch && downloadLabelPdf(activeLotBatch.id)} disabled={!lotStepStatus.label}>
-                                            PDF Etiquetado
-                                        </Button>
-                                        <Button onClick={saveLotLabel} disabled={lotCenterSavingLabel || !lotStepStatus.form}>
-                                            {lotCenterSavingLabel ? 'Guardando etiqueta...' : 'Guardar y validar etiqueta'}
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Paso 4 y 5: Checklist y liberación QA</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                                        <label className="flex items-center gap-2"><input type="checkbox" checked={lotStepStatus.qc} disabled />QC aprobado (automático)</label>
-                                        <label className="flex items-center gap-2"><input type="checkbox" checked={lotCenterChecklist.labelingValidated} onChange={(e) => setLotCenterChecklist((p) => ({ ...p, labelingValidated: e.target.checked }))} />Etiquetado validado</label>
-                                        <label className="flex items-center gap-2"><input type="checkbox" checked={lotCenterChecklist.documentsCurrent} onChange={(e) => setLotCenterChecklist((p) => ({ ...p, documentsCurrent: e.target.checked }))} />Documentación vigente</label>
-                                        <label className="flex items-center gap-2"><input type="checkbox" checked={lotCenterChecklist.evidencesComplete} onChange={(e) => setLotCenterChecklist((p) => ({ ...p, evidencesComplete: e.target.checked }))} />Evidencias completas</label>
-                                    </div>
-                                    <textarea className="min-h-[64px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full" placeholder="Notas checklist" value={lotCenterChecklist.checklistNotes} onChange={(e) => setLotCenterChecklist((p) => ({ ...p, checklistNotes: e.target.value }))} />
-                                    <textarea className="min-h-[64px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full" placeholder="Motivo rechazo (opcional)" value={lotCenterChecklist.rejectedReason} onChange={(e) => setLotCenterChecklist((p) => ({ ...p, rejectedReason: e.target.value }))} />
-                                    <div className="flex flex-wrap gap-2 justify-end">
-                                        <Button variant="outline" onClick={() => activeLotBatch && handleBatchQc(activeLotBatch.id, true)} disabled={!lotStepStatus.form || !lotStepStatus.label || lotStepStatus.qc}>
-                                            Aprobar QC
-                                        </Button>
-                                        <Button variant="outline" onClick={() => activeLotBatch && handleBatchPackaging(activeLotBatch.id, true)} disabled={!lotStepStatus.form || !lotStepStatus.label || !lotStepStatus.qc || lotStepStatus.packed}>
-                                            Ejecutar empaque
-                                        </Button>
-                                        <Button variant="outline" onClick={saveLotChecklist} disabled={lotCenterSavingChecklist || !lotStepStatus.packed}>
-                                            {lotCenterSavingChecklist ? 'Guardando checklist...' : 'Guardar checklist QA'}
-                                        </Button>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2">
+                            {/* Cantidades */}
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Cantidades</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium text-slate-700">A empacar</Label>
                                         <input
-                                            className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-                                            value={lotCenterSignature}
-                                            onChange={(e) => setLotCenterSignature(e.target.value)}
-                                            placeholder="Firma digital"
+                                            type="number" min={1}
+                                            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            value={packagingForm.quantityToPack}
+                                            onChange={(e) => setPackagingForm((prev) => ({ ...prev, quantityToPack: e.target.value }))}
                                         />
-                                        <Button onClick={signLotRelease} disabled={lotCenterSigning || !lotStepStatus.packed || !checklistReadyForSign}>
-                                            {lotCenterSigning ? 'Firmando...' : 'Firmar liberación QA'}
-                                        </Button>
                                     </div>
-                                    <div className="flex justify-end">
-                                        <Button variant="outline" onClick={() => activeLotBatch && downloadBatchReleasePdf(activeLotBatch.id)} disabled={!lotCenterRelease}>
-                                            PDF Liberación QA
-                                        </Button>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium text-slate-700">Empacada</Label>
+                                        <input
+                                            type="number" min={0}
+                                            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            value={packagingForm.quantityPacked}
+                                            onChange={(e) => setPackagingForm((prev) => ({ ...prev, quantityPacked: e.target.value }))}
+                                        />
                                     </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button onClick={handleNextLotStep} disabled={lotCenterLoading || nextLotStep === 'done'}>
-                            {nextLotStepLabel}
-                        </Button>
-                        <Button variant="outline" onClick={() => setLotCenterBatchId(null)}>Cerrar</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium text-slate-700">Etiqueta de lote</Label>
+                                        <input
+                                            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full font-mono focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            value={packagingForm.lotLabel}
+                                            onChange={(e) => setPackagingForm((prev) => ({ ...prev, lotLabel: e.target.value }))}
+                                            placeholder="Ej: LOTE-20260224"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
 
-            <Dialog open={Boolean(packagingFormBatchId)} onOpenChange={(open) => !open && closePackagingFormDialog()}>
-                <DialogContent className="max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle>FOR de Empaque por Lote</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 py-1 max-h-[65vh] overflow-y-auto">
-                        <div className="space-y-1">
-                            <Label>Operario</Label>
-                            <input
-                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                value={packagingForm.operatorName}
-                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, operatorName: e.target.value }))}
-                                placeholder="Nombre del operario"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Verificador</Label>
-                            <input
-                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                value={packagingForm.verifierName}
-                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, verifierName: e.target.value }))}
-                                placeholder="Nombre del verificador"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Cantidad a empacar</Label>
-                            <input
-                                type="number"
-                                min={1}
-                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                value={packagingForm.quantityToPack}
-                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, quantityToPack: e.target.value }))}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Cantidad empacada</Label>
-                            <input
-                                type="number"
-                                min={0}
-                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                value={packagingForm.quantityPacked}
-                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, quantityPacked: e.target.value }))}
-                            />
-                        </div>
-                        <div className="space-y-1 md:col-span-2">
-                            <Label>Etiqueta de lote</Label>
-                            <input
-                                className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full"
-                                value={packagingForm.lotLabel}
-                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, lotLabel: e.target.value }))}
-                                placeholder="Ej: LOTE-20260224"
-                            />
-                        </div>
-                        <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            <label className="flex items-center gap-2"><input type="checkbox" checked={packagingForm.hasTechnicalSheet} onChange={(e) => setPackagingForm((prev) => ({ ...prev, hasTechnicalSheet: e.target.checked }))} />Ficha técnica disponible</label>
-                            <label className="flex items-center gap-2"><input type="checkbox" checked={packagingForm.hasLabels} onChange={(e) => setPackagingForm((prev) => ({ ...prev, hasLabels: e.target.checked }))} />Etiquetas disponibles</label>
-                            <label className="flex items-center gap-2"><input type="checkbox" checked={packagingForm.hasPackagingMaterial} onChange={(e) => setPackagingForm((prev) => ({ ...prev, hasPackagingMaterial: e.target.checked }))} />Material de empaque disponible</label>
-                            <label className="flex items-center gap-2"><input type="checkbox" checked={packagingForm.hasTools} onChange={(e) => setPackagingForm((prev) => ({ ...prev, hasTools: e.target.checked }))} />Herramientas listas</label>
-                            <label className="flex items-center gap-2 md:col-span-2"><input type="checkbox" checked={packagingForm.inventoryRecorded} onChange={(e) => setPackagingForm((prev) => ({ ...prev, inventoryRecorded: e.target.checked }))} />Registro en inventario realizado</label>
-                        </div>
-                        <div className="space-y-1 md:col-span-2">
-                            <Label>Observaciones</Label>
-                            <textarea
-                                className="min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full"
-                                value={packagingForm.observations}
-                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, observations: e.target.value }))}
-                            />
-                        </div>
-                        <div className="space-y-1 md:col-span-2">
-                            <Label>No conformidad (si aplica)</Label>
-                            <textarea
-                                className="min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full"
-                                value={packagingForm.nonConformity}
-                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, nonConformity: e.target.value }))}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Acción correctiva</Label>
-                            <textarea
-                                className="min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full"
-                                value={packagingForm.correctiveAction}
-                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, correctiveAction: e.target.value }))}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <Label>Acción preventiva</Label>
-                            <textarea
-                                className="min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm w-full"
-                                value={packagingForm.preventiveAction}
-                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, preventiveAction: e.target.value }))}
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={closePackagingFormDialog}>
-                            Cancelar
-                        </Button>
-                        <Button onClick={submitPackagingForm} disabled={savingPackagingForm}>
-                            {savingPackagingForm ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Guardando...
-                                </>
-                            ) : (
-                                'Guardar FOR'
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                            {/* Checklist */}
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Verificación previa</p>
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {[
+                                        { key: 'hasTechnicalSheet', label: 'Ficha técnica disponible' },
+                                        { key: 'hasLabels', label: 'Etiquetas disponibles' },
+                                        { key: 'hasPackagingMaterial', label: 'Material de empaque disponible' },
+                                        { key: 'hasTools', label: 'Herramientas listas' },
+                                        { key: 'inventoryRecorded', label: 'Registro en inventario realizado', full: true },
+                                    ].map(({ key, label, full }) => {
+                                        const checked = packagingForm[key as keyof typeof packagingForm] as boolean;
+                                        return (
+                                            <label key={key} className={`flex items-center gap-3 cursor-pointer select-none ${full ? 'md:col-span-2' : ''}`}>
+                                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${checked ? 'bg-violet-600 border-violet-600' : 'border-slate-300 bg-white'}`}
+                                                    onClick={() => setPackagingForm((prev) => ({ ...prev, [key]: !checked }))}
+                                                >
+                                                    {checked && <CheckCircle className="h-3 w-3 text-white" />}
+                                                </div>
+                                                <input type="checkbox" className="sr-only" checked={checked} onChange={(e) => setPackagingForm((prev) => ({ ...prev, [key]: e.target.checked }))} />
+                                                <span className="text-sm text-slate-700">{label}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
-            <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Finalizar Orden de Producción</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <p className="text-sm text-slate-500">
-                            ¿Estás seguro de finalizar esta orden? Los productos terminados se agregarán al inventario.
-                        </p>
-                        <div className="grid gap-2">
-                            <Label htmlFor="warehouse">Almacén de Destino</Label>
-                            <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Seleccionar almacén (Opcional)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {warehouses.map((w) => (
-                                        <SelectItem key={w.id} value={w.id}>
-                                            {w.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <p className="text-xs text-slate-400">
-                                Si no selecciona uno, se usará el Almacén Principal.
+                            {/* Observaciones y no conformidades */}
+                            <div>
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Observaciones y no conformidades</p>
+                                <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-sm font-medium text-slate-700">Observaciones</Label>
+                                        <textarea
+                                            className="min-h-[72px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm w-full resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                            value={packagingForm.observations}
+                                            onChange={(e) => setPackagingForm((prev) => ({ ...prev, observations: e.target.value }))}
+                                            placeholder="Observaciones generales..."
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-sm font-medium text-slate-700">No conformidad</Label>
+                                            <textarea
+                                                className="min-h-[72px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm w-full resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                value={packagingForm.nonConformity}
+                                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, nonConformity: e.target.value }))}
+                                                placeholder="Descripción (si aplica)"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-sm font-medium text-slate-700">Acción correctiva</Label>
+                                            <textarea
+                                                className="min-h-[72px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm w-full resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                value={packagingForm.correctiveAction}
+                                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, correctiveAction: e.target.value }))}
+                                                placeholder="Acción tomada..."
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-sm font-medium text-slate-700">Acción preventiva</Label>
+                                            <textarea
+                                                className="min-h-[72px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm w-full resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                                value={packagingForm.preventiveAction}
+                                                onChange={(e) => setPackagingForm((prev) => ({ ...prev, preventiveAction: e.target.value }))}
+                                                placeholder="Acción preventiva..."
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter className="pt-4 border-t border-slate-100 flex gap-2">
+                            <Button variant="outline" onClick={closePackagingFormDialog} className="rounded-xl border-slate-200 text-slate-600">
+                                Cancelar
+                            </Button>
+                            <Button
+                                onClick={submitPackagingForm}
+                                disabled={savingPackagingForm}
+                                className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-medium px-6"
+                            >
+                                {savingPackagingForm ? (
+                                    <>
+                                        <div className="animate-spin mr-2 h-4 w-4 border-2 border-white/30 border-t-white rounded-full" />
+                                        Guardando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save className="mr-2 h-4 w-4" />
+                                        Guardar FOR
+                                    </>
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Finalizar Orden de Producción</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <p className="text-sm text-slate-500">
+                                ¿Estás seguro de finalizar esta orden? Los productos terminados se agregarán al inventario.
                             </p>
+                            <div className="grid gap-2">
+                                <Label htmlFor="warehouse">Almacén de Destino</Label>
+                                <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar almacén (Opcional)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {warehouses.map((w) => (
+                                            <SelectItem key={w.id} value={w.id}>
+                                                {w.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-slate-400">
+                                    Si no selecciona uno, se usará el Almacén Principal.
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsCompleteDialogOpen(false)}>
-                            Cancelar
-                        </Button>
-                        <Button onClick={handleComplete} disabled={submitting}>
-                            {submitting ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Finalizando...
-                                </>
-                            ) : (
-                                'Confirmar y Finalizar'
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsCompleteDialogOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleComplete} disabled={submitting}>
+                                {submitting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Finalizando...
+                                    </>
+                                ) : (
+                                    'Confirmar y Finalizar'
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div >
         </div>
+
     );
 }

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { ProductionBatch, ProductionBatchUnit, ProductionOrder, UpsertProductionBatchPackagingFormPayload } from '@scaffold/types';
 import { MaterialRequirement, mrpApi } from '@/services/mrpApi';
-import { CreateProductionOrderDto } from '@scaffold/schemas';
+import { CreateProductionOrderDto, UpsertProductionMaterialAllocationPayload } from '@scaffold/schemas';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 import { invalidateMrpQueriesByPrefix, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
@@ -153,6 +153,18 @@ export const useUpsertProductionBatchPackagingFormMutation = () => {
         {
             onSuccess: async (_batch, input) => {
                 invalidateMrpQuery(mrpQueryKeys.productionBatches(input.orderId));
+                invalidateMrpQuery(mrpQueryKeys.productionOrder(input.orderId));
+            },
+        }
+    );
+};
+
+export const useUpsertProductionMaterialAllocationMutation = () => {
+    return useMrpMutation<{ orderId: string; payload: UpsertProductionMaterialAllocationPayload }, unknown>(
+        async ({ orderId, payload }) => mrpApi.upsertProductionMaterialAllocation(orderId, payload),
+        {
+            onSuccess: async (_row, input) => {
+                invalidateMrpQuery(mrpQueryKeys.productionRequirements(input.orderId));
                 invalidateMrpQuery(mrpQueryKeys.productionOrder(input.orderId));
             },
         }

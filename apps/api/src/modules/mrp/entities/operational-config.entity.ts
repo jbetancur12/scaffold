@@ -56,10 +56,28 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
     defaultLabelingControlledDocumentCode?: string | null;
 
     @Property({ nullable: true })
-    defaultBatchReleaseControlledDocumentCode?: string | null;
+    defaultBatchReleaseControlledDocumentCode?: string;
 
     @Property({ nullable: true })
-    operationMode?: 'lote' | 'serial' | null;
+    purchaseOrderPrefix?: string;
+
+    @Property({ type: 'integer', default: 0 })
+    purchaseOrderSequence: number = 0;
+
+    @Property({ nullable: true })
+    salesOrderPrefix?: string;
+
+    @Property({ type: 'integer', default: 0 })
+    salesOrderSequence: number = 0;
+
+    @Property({ nullable: true })
+    defaultSalesOrderProductionDocCode?: string | null;
+
+    @Property({ nullable: true })
+    defaultSalesOrderBillingDocCode?: string | null;
+
+    @Property({ nullable: true })
+    operationMode?: 'lote' | 'serial';
 
     @Property({ type: 'integer', nullable: true })
     uvtValue?: number | null;

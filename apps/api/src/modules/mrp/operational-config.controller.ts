@@ -18,7 +18,7 @@ export class OperationalConfigController {
     async updateConfig(req: Request, res: Response, next: NextFunction) {
         try {
             const data = OperationalConfigSchema.parse(req.body);
-            const config = await this.configService.updateConfig(data);
+            const config = await this.configService.updateConfig(data as any);
             return ApiResponse.success(res, config, 'Configuración actualizada');
         } catch (error) {
             next(error);

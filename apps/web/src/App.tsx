@@ -12,6 +12,8 @@ import ProductBOMPage from '@/pages/mrp/ProductBOMPage';
 import SupplierListPage from '@/pages/mrp/SupplierListPage';
 import SupplierFormPage from '@/pages/mrp/SupplierFormPage';
 import SupplierDetailPage from '@/pages/mrp/SupplierDetailPage';
+import CustomerListPage from '@/pages/mrp/CustomerListPage';
+import CustomerFormPage from '@/pages/mrp/CustomerFormPage';
 import RawMaterialListPage from '@/pages/mrp/RawMaterialListPage';
 import RawMaterialFormPage from '@/pages/mrp/RawMaterialFormPage';
 import RawMaterialDetailPage from '@/pages/mrp/RawMaterialDetailPage';
@@ -23,6 +25,9 @@ import PurchaseOrderFormPage from '@/pages/mrp/PurchaseOrderFormPage';
 import PurchaseOrderDetailPage from '@/pages/mrp/PurchaseOrderDetailPage';
 import PurchaseRequisitionListPage from '@/pages/mrp/PurchaseRequisitionListPage';
 import PurchaseRequisitionFormPage from '@/pages/mrp/PurchaseRequisitionFormPage';
+import SalesOrderListPage from '@/pages/mrp/SalesOrderListPage';
+import SalesOrderFormPage from '@/pages/mrp/SalesOrderFormPage';
+import SalesOrderDetailPage from '@/pages/mrp/SalesOrderDetailPage';
 import ProductionOrderDetailPage from '@/pages/mrp/ProductionOrderDetailPage';
 import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
 import WarehouseListPage from '@/pages/mrp/WarehouseListPage';
@@ -135,6 +140,10 @@ export default function App() {
                         <Route path="/mrp/suppliers/:id" element={<SupplierDetailPage />} />
                         <Route path="/mrp/suppliers/:id/edit" element={<SupplierFormPage />} />
 
+                        <Route path="/mrp/customers" element={<CustomerListPage />} />
+                        <Route path="/mrp/customers/new" element={<CustomerFormPage />} />
+                        <Route path="/mrp/customers/:id/edit" element={<CustomerFormPage />} />
+
                         <Route path="/mrp/raw-materials" element={<RawMaterialListPage />} />
                         <Route path="/mrp/raw-materials/new" element={<RawMaterialFormPage />} />
                         <Route path="/mrp/raw-materials/:id" element={<RawMaterialDetailPage />} />
@@ -150,6 +159,10 @@ export default function App() {
                         <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
                         <Route path="/mrp/purchase-requisitions" element={<PurchaseRequisitionListPage />} />
                         <Route path="/mrp/purchase-requisitions/new" element={<PurchaseRequisitionFormPage />} />
+
+                        <Route path="/mrp/sales-orders" element={<SalesOrderListPage />} />
+                        <Route path="/mrp/sales-orders/new" element={<SalesOrderFormPage />} />
+                        <Route path="/mrp/sales-orders/:id" element={<SalesOrderDetailPage />} />
 
                         <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
                         <Route path="/quality" element={<Navigate to="/quality/nc" replace />} />

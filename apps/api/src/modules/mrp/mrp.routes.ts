@@ -56,6 +56,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/production-orders', (req, res, next) => mrpController.listProductionOrders(req, res, next));
     router.get('/production-orders/:id', (req, res, next) => mrpController.getProductionOrder(req, res, next));
     router.patch('/production-orders/:id/status', (req, res, next) => mrpController.updateProductionOrderStatus(req, res, next));
+    router.patch('/production-orders/:id/link-sales-order', (req, res, next) => mrpController.linkProductionToSalesOrder(req, res, next));
     router.post('/production-orders', (req, res, next) => mrpController.createProductionOrder(req, res, next));
     router.get('/production-orders/:id/requirements', (req, res, next) => mrpController.calculateMaterialRequirements(req, res, next));
     router.post('/production-orders/:id/material-allocation', (req, res, next) => mrpController.upsertProductionMaterialAllocation(req, res, next));
@@ -105,6 +106,9 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/recalls', (req, res, next) => mrpController.listRecallCases(req, res, next));
     router.post('/quality/customers', (req, res, next) => mrpController.createCustomer(req, res, next));
     router.get('/quality/customers', (req, res, next) => mrpController.listCustomers(req, res, next));
+    router.get('/quality/customers/:id', (req, res, next) => mrpController.getCustomer(req, res, next));
+    router.patch('/quality/customers/:id', (req, res, next) => mrpController.updateCustomer(req, res, next));
+    router.delete('/quality/customers/:id', (req, res, next) => mrpController.deleteCustomer(req, res, next));
     router.post('/quality/shipments', (req, res, next) => mrpController.createShipment(req, res, next));
     router.get('/quality/shipments', (req, res, next) => mrpController.listShipments(req, res, next));
     router.post('/quality/dmr-templates', (req, res, next) => mrpController.createDmrTemplate(req, res, next));
@@ -164,6 +168,13 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.patch('/purchase-requisitions/:id/status', (req, res, next) => mrpController.updatePurchaseRequisitionStatus(req, res, next));
     router.post('/purchase-requisitions/:id/mark-converted', (req, res, next) => mrpController.markPurchaseRequisitionConverted(req, res, next));
     router.post('/production-orders/:id/purchase-requisition', (req, res, next) => mrpController.createPurchaseRequisitionFromProductionOrder(req, res, next));
+
+    // Sales Orders
+    router.post('/sales-orders', (req, res, next) => mrpController.createSalesOrder(req, res, next));
+    router.get('/sales-orders', (req, res, next) => mrpController.listSalesOrders(req, res, next));
+    router.get('/sales-orders/:id', (req, res, next) => mrpController.getSalesOrder(req, res, next));
+    router.patch('/sales-orders/:id/status', (req, res, next) => mrpController.updateSalesOrderStatus(req, res, next));
+    router.get('/sales-orders/:id/pdf', (req, res, next) => mrpController.downloadSalesOrderPdf(req, res, next));
 
     // Inventory
     router.get('/inventory', (req, res, next) => mrpController.getInventory(req, res, next));

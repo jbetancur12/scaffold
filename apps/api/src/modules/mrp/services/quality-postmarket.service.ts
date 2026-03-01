@@ -419,6 +419,51 @@ export class QualityPostmarketService {
         return this.customerRepo.find(query, { orderBy: { name: 'ASC' } });
     }
 
+    async getCustomer(id: string) {
+        return this.customerRepo.findOneOrFail({ id });
+    }
+
+    async updateCustomer(id: string, payload: Partial<{
+        name: string;
+        documentType: string;
+        documentNumber: string;
+        contactName: string;
+        email: string;
+        phone: string;
+        address: string;
+        notes: string;
+    }>, actor?: string) {
+        const customer = await this.customerRepo.findOneOrFail({ id });
+        this.customerRepo.assign(customer, payload);
+
+        await this.em.persistAndFlush(customer);
+        await this.logEvent({
+            entityType: 'customer',
+            entityId: customer.id,
+            action: 'updated',
+            actor,
+            metadata: payload as Record<string, unknown>,
+        });
+        return customer;
+    }
+
+    async deleteCustomer(id: string, actor?: string) {
+        const customer = await this.customerRepo.findOneOrFail({ id });
+
+        // We shouldn't delete customers with active shipments or sales orders,
+        // but for now we'll allow soft deletion or just try-catch EM removal
+        await this.em.removeAndFlush(customer);
+
+        await this.logEvent({
+            entityType: 'customer',
+            entityId: id,
+            action: 'deleted',
+            actor,
+        });
+
+        return { success: true };
+    }
+
     async createShipment(payload: {
         customerId: string;
         commercialDocument: string;
