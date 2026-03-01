@@ -36,7 +36,7 @@ import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { ProductionMaterialAllocation } from '../entities/production-material-allocation.entity';
 import { SalesOrder } from '../entities/sales-order.entity';
 import { DocumentControlService } from './document-control.service';
-import { ProductionOrderSchema, ProductionOrderItemCreateSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
+import { ProductionOrderSchema, ProductionOrderItemCreateSchema, ReturnProductionMaterialSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { AppError } from '../../../shared/utils/response';
 
@@ -725,6 +725,108 @@ export class ProductionService {
         return entity;
     }
 
+    async returnMaterialToWarehouse(orderId: string, payload: z.infer<typeof ReturnProductionMaterialSchema>) {
+        return this.em.transactional(async (tx) => {
+            const orderRepo = tx.getRepository(ProductionOrder);
+            const lotRepo = tx.getRepository(RawMaterialLot);
+            const kardexRepo = tx.getRepository(RawMaterialKardex);
+            const inventoryRepo = tx.getRepository(InventoryItem);
+
+            const order = await orderRepo.findOneOrFail({ id: orderId });
+            if (order.status === ProductionOrderStatus.CANCELLED) {
+                throw new AppError('No puedes registrar devoluciones sobre una OP cancelada', 400);
+            }
+
+            const lot = await lotRepo.findOne(
+                { id: payload.lotId },
+                { populate: ['rawMaterial', 'warehouse'] }
+            );
+            if (!lot) throw new AppError('Lote de materia prima no encontrado', 404);
+            if (lot.rawMaterial.id !== payload.rawMaterialId) {
+                throw new AppError('El lote no corresponde a la materia prima indicada', 400);
+            }
+
+            const [consumedRows, returnedRows] = await Promise.all([
+                kardexRepo.find({
+                    lot: lot.id,
+                    rawMaterial: payload.rawMaterialId,
+                    referenceType: 'production_order',
+                    referenceId: order.id,
+                    movementType: 'SALIDA_PRODUCCION',
+                }),
+                kardexRepo.find({
+                    lot: lot.id,
+                    rawMaterial: payload.rawMaterialId,
+                    referenceType: 'production_order',
+                    referenceId: order.id,
+                    movementType: 'ENTRADA_DEVOLUCION_PRODUCCION',
+                }),
+            ]);
+
+            const consumedQty = consumedRows.reduce((acc, row) => acc + Math.abs(Number(row.quantity || 0)), 0);
+            const returnedQty = returnedRows.reduce((acc, row) => acc + Number(row.quantity || 0), 0);
+            const availableToReturn = consumedQty - returnedQty;
+            if (availableToReturn <= 0) {
+                throw new AppError('No hay consumo pendiente por devolver para este lote en la OP', 400);
+            }
+            if (payload.quantity > availableToReturn) {
+                throw new AppError(
+                    `La devolución supera el máximo permitido para este lote en esta OP (${availableToReturn.toFixed(4)})`,
+                    400
+                );
+            }
+
+            const newLotBalance = Number(lot.quantityAvailable || 0) + Number(payload.quantity);
+            lot.quantityAvailable = newLotBalance;
+
+            let inventoryRow = await inventoryRepo.findOne({
+                rawMaterial: lot.rawMaterial.id,
+                warehouse: lot.warehouse.id,
+            });
+            if (!inventoryRow) {
+                inventoryRow = inventoryRepo.create({
+                    rawMaterial: lot.rawMaterial,
+                    warehouse: lot.warehouse,
+                    quantity: 0,
+                } as unknown as InventoryItem);
+            }
+            inventoryRow.quantity = Number(inventoryRow.quantity || 0) + Number(payload.quantity);
+
+            const kardex = kardexRepo.create({
+                rawMaterial: lot.rawMaterial,
+                warehouse: lot.warehouse,
+                lot,
+                movementType: 'ENTRADA_DEVOLUCION_PRODUCCION',
+                quantity: payload.quantity,
+                balanceAfter: newLotBalance,
+                referenceType: 'production_order',
+                referenceId: order.id,
+                notes: payload.notes?.trim() || `Devolución sobrante OP ${order.code}`,
+                occurredAt: new Date(),
+            } as unknown as RawMaterialKardex);
+
+            tx.persist([lot, inventoryRow, kardex]);
+            await tx.flush();
+            await this.logAudit('raw_material_lot', lot.id, 'raw_material_returned_to_warehouse', {
+                productionOrderId: order.id,
+                productionOrderCode: order.code,
+                rawMaterialId: payload.rawMaterialId,
+                lotId: lot.id,
+                quantity: Number(payload.quantity),
+                actor: payload.actor,
+            });
+
+            return {
+                productionOrderId: order.id,
+                rawMaterialId: payload.rawMaterialId,
+                lotId: lot.id,
+                returnedQuantity: Number(payload.quantity),
+                availableToReturn: Number((availableToReturn - Number(payload.quantity)).toFixed(4)),
+                newLotBalance: Number(newLotBalance.toFixed(4)),
+            };
+        });
+    }
+
     async updateStatus(id: string, status: ProductionOrderStatus, warehouseId?: string): Promise<ProductionOrder> {
         return this.em.transactional(async (tx) => {
             const productionOrderRepo = tx.getRepository(ProductionOrder);
@@ -1078,6 +1180,7 @@ export class ProductionService {
         const now = new Date();
         const configured = await docRepo.findOne({
             code: configuredCode,
+            process: DocumentProcess.EMPAQUE,
             documentCategory: DocumentCategory.FOR,
             status: DocumentStatus.APROBADO,
             $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],

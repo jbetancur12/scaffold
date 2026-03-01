@@ -337,6 +337,14 @@ export const UpsertProductionBatchPackagingFormSchema = z.object({
     actor: z.string().optional(),
 });
 
+export const ReturnProductionMaterialSchema = z.object({
+    rawMaterialId: z.string().uuid(),
+    lotId: z.string().uuid(),
+    quantity: z.number().positive(),
+    notes: z.string().optional(),
+    actor: z.string().optional(),
+});
+
 export const PaginationQuerySchema = z.object({
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().optional(),
@@ -1141,6 +1149,7 @@ type DateInputValue<T> = T extends Date
 export type CreateProductionBatchPayload = DateInputValue<z.input<typeof CreateProductionBatchSchema>>;
 export type UpsertProductionBatchPackagingFormPayload = DateInputValue<z.input<typeof UpsertProductionBatchPackagingFormSchema>>;
 export type UpsertProductionMaterialAllocationPayload = DateInputValue<z.input<typeof UpsertProductionMaterialAllocationSchema>>;
+export type ReturnProductionMaterialPayload = DateInputValue<z.input<typeof ReturnProductionMaterialSchema>>;
 export type CreateNonConformityPayload = DateInputValue<z.input<typeof CreateNonConformitySchema>>;
 export type UpdateNonConformityPayload = DateInputValue<z.input<typeof UpdateNonConformitySchema>>;
 export type CreateCapaPayload = DateInputValue<z.input<typeof CreateCapaSchema>>;

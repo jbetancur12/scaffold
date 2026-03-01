@@ -999,6 +999,11 @@ export interface RegulatoryLabel {
     codingValue?: string;
     validationErrors?: string[];
     createdBy?: string;
+    documentControlId?: string;
+    documentControlCode?: string;
+    documentControlTitle?: string;
+    documentControlVersion?: number;
+    documentControlDate?: string | Date;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -1084,6 +1089,7 @@ export interface IncomingInspection {
     invoiceNumber?: string;
     invoiceFileName?: string;
     invoiceFileMime?: string;
+    documentControlId?: string;
     documentControlCode?: string;
     documentControlTitle?: string;
     documentControlVersion?: number;
@@ -1117,6 +1123,11 @@ export interface BatchRelease {
     approvalSignature?: string;
     signedAt?: string | Date;
     reviewedBy?: string;
+    documentControlId?: string;
+    documentControlCode?: string;
+    documentControlTitle?: string;
+    documentControlVersion?: number;
+    documentControlDate?: string | Date;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -1237,7 +1248,27 @@ export interface BatchDhrExpedient {
             inspectedBy?: string;
             inspectedAt?: string | Date;
             certificateRef?: string;
+            purchaseOrderId?: string;
+            purchaseOrderCode?: string;
+            supplierName?: string;
+            supplierLotCode?: string;
+            invoiceNumber?: string;
         };
+    }>;
+    materialMovements: Array<{
+        id: string;
+        rawMaterialId: string;
+        rawMaterialName: string;
+        rawMaterialSku: string;
+        movementType: string;
+        quantity: number;
+        balanceAfter: number;
+        supplierLotCode?: string;
+        warehouseName?: string;
+        referenceType?: string;
+        referenceId?: string;
+        occurredAt: string | Date;
+        notes?: string;
     }>;
     productionAndQuality: {
         qcPassedUnits: number;

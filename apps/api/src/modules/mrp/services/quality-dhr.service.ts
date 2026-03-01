@@ -20,6 +20,7 @@ import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 import { ProcessDeviation } from '../entities/process-deviation.entity';
 import { OosCase } from '../entities/oos-case.entity';
 import { ChangeControl } from '../entities/change-control.entity';
+import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 
 type QualityAuditLogger = (payload: {
     entityType: string;
@@ -46,6 +47,7 @@ export class QualityDhrService {
     private readonly oosRepo: EntityRepository<OosCase>;
     private readonly changeControlRepo: EntityRepository<ChangeControl>;
     private readonly incomingInspectionRepo: EntityRepository<IncomingInspection>;
+    private readonly rawMaterialKardexRepo: EntityRepository<RawMaterialKardex>;
 
     constructor(em: EntityManager, private readonly logEvent: QualityAuditLogger) {
         this.em = em;
@@ -63,6 +65,7 @@ export class QualityDhrService {
         this.oosRepo = em.getRepository(OosCase);
         this.changeControlRepo = em.getRepository(ChangeControl);
         this.incomingInspectionRepo = em.getRepository(IncomingInspection);
+        this.rawMaterialKardexRepo = em.getRepository(RawMaterialKardex);
     }
 
     async createDmrTemplate(payload: {
@@ -176,7 +179,21 @@ export class QualityDhrService {
                     rawMaterial: { $in: bomItems.map((item) => item.rawMaterial.id) },
                     status: IncomingInspectionStatus.LIBERADO,
                 },
-                { orderBy: { inspectedAt: 'DESC', createdAt: 'DESC' } }
+                { populate: ['purchaseOrder', 'purchaseOrder.supplier'], orderBy: { inspectedAt: 'DESC', createdAt: 'DESC' } }
+            )
+            : [];
+        const materialIds = bomItems.map((item) => item.rawMaterial.id);
+        const rawMaterialMovements = materialIds.length > 0
+            ? await this.rawMaterialKardexRepo.find(
+                {
+                    rawMaterial: { $in: materialIds },
+                    referenceType: 'production_order',
+                    referenceId: batch.productionOrder.id,
+                },
+                {
+                    populate: ['rawMaterial', 'lot', 'warehouse'],
+                    orderBy: [{ occurredAt: 'ASC' }, { createdAt: 'ASC' }],
+                }
             )
             : [];
 
@@ -214,9 +231,29 @@ export class QualityDhrService {
                     inspectedBy: inspection.inspectedBy,
                     inspectedAt: inspection.inspectedAt,
                     certificateRef: inspection.certificateRef,
+                    purchaseOrderId: inspection.purchaseOrder?.id,
+                    purchaseOrderCode: inspection.purchaseOrder?.code,
+                    supplierName: inspection.purchaseOrder?.supplier?.name,
+                    supplierLotCode: inspection.supplierLotCode,
+                    invoiceNumber: inspection.invoiceNumber,
                 } : undefined,
             };
         });
+        const materialMovements = rawMaterialMovements.map((movement) => ({
+            id: movement.id,
+            rawMaterialId: movement.rawMaterial.id,
+            rawMaterialName: movement.rawMaterial.name,
+            rawMaterialSku: movement.rawMaterial.sku,
+            movementType: movement.movementType,
+            quantity: Number(movement.quantity),
+            balanceAfter: Number(movement.balanceAfter),
+            supplierLotCode: movement.lot?.supplierLotCode,
+            warehouseName: movement.warehouse?.name,
+            referenceType: movement.referenceType,
+            referenceId: movement.referenceId,
+            occurredAt: movement.occurredAt,
+            notes: movement.notes,
+        }));
 
         const units = batch.units.getItems();
         const shipments = shipmentsRows.map((shipment) => ({
@@ -326,6 +363,7 @@ export class QualityDhrService {
                 requiredEvidence: template.requiredEvidence,
             } : undefined,
             materials,
+            materialMovements,
             productionAndQuality: {
                 qcPassedUnits: units.filter((unit) => unit.qcPassed && !unit.rejected).length,
                 qcFailedUnits: units.filter((unit) => !unit.qcPassed && !unit.rejected).length,
@@ -356,6 +394,7 @@ export class QualityDhrService {
                 batchCode: batch.code,
                 hasDmrTemplate: Boolean(template),
                 materials: materials.length,
+                materialMovements: materialMovements.length,
                 labels: labels.length,
                 shipments: shipments.length,
             },
@@ -405,6 +444,7 @@ export class QualityDhrService {
         lines.push(toCsvRow(['quality', 'rejectedUnits', data.productionAndQuality.rejectedUnits]));
         lines.push(toCsvRow(['quality', 'lastUpdatedAt', new Date(data.productionAndQuality.lastUpdatedAt).toISOString()]));
         lines.push(toCsvRow(['counts', 'materials', data.materials.length]));
+        lines.push(toCsvRow(['counts', 'materialMovements', data.materialMovements.length]));
         lines.push(toCsvRow(['counts', 'labels', data.regulatoryLabels.length]));
         lines.push(toCsvRow(['counts', 'shipments', data.shipments.length]));
         lines.push(toCsvRow(['counts', 'nonConformities', data.incidents.nonConformities.length]));
@@ -414,6 +454,16 @@ export class QualityDhrService {
         lines.push(toCsvRow(['counts', 'processDeviations', data.incidents.processDeviations.length]));
         lines.push(toCsvRow(['counts', 'oosCases', data.incidents.oosCases.length]));
         lines.push(toCsvRow(['counts', 'changeControls', data.incidents.changeControls.length]));
+        for (const movement of data.materialMovements) {
+            lines.push(toCsvRow(['material_movement', 'rawMaterial', movement.rawMaterialName]));
+            lines.push(toCsvRow(['material_movement', 'movementType', movement.movementType]));
+            lines.push(toCsvRow(['material_movement', 'quantity', movement.quantity]));
+            lines.push(toCsvRow(['material_movement', 'balanceAfter', movement.balanceAfter]));
+            lines.push(toCsvRow(['material_movement', 'lot', movement.supplierLotCode]));
+            lines.push(toCsvRow(['material_movement', 'warehouse', movement.warehouseName]));
+            lines.push(toCsvRow(['material_movement', 'occurredAt', new Date(movement.occurredAt).toISOString()]));
+            lines.push(toCsvRow(['material_movement', 'reference', `${movement.referenceType || ''}/${movement.referenceId || ''}`]));
+        }
 
         return {
             generatedAt,

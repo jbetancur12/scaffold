@@ -56,6 +56,7 @@ import { ProcessDeviation } from '../entities/process-deviation.entity';
 import { OosCase } from '../entities/oos-case.entity';
 import { ChangeControl } from '../entities/change-control.entity';
 import { QualityDhrService } from './quality-dhr.service';
+import { QualityDhrPdfService } from './quality-dhr-pdf.service';
 import { QualityPostmarketService } from './quality-postmarket.service';
 import { QualityLabelingService } from './quality-labeling.service';
 import { QualityIncomingService } from './quality-incoming.service';
@@ -79,6 +80,7 @@ export class QualityService {
     private readonly oosRepo: EntityRepository<OosCase>;
     private readonly changeControlRepo: EntityRepository<ChangeControl>;
     private readonly dhrService: QualityDhrService;
+    private readonly dhrPdfService: QualityDhrPdfService;
     private readonly postmarketService: QualityPostmarketService;
     private readonly labelingService: QualityLabelingService;
     private readonly incomingService: QualityIncomingService;
@@ -102,6 +104,7 @@ export class QualityService {
         this.oosRepo = em.getRepository(OosCase);
         this.changeControlRepo = em.getRepository(ChangeControl);
         this.dhrService = new QualityDhrService(em, this.logEvent.bind(this));
+        this.dhrPdfService = new QualityDhrPdfService();
         this.labelingService = new QualityLabelingService(em, this.logEvent.bind(this));
         this.incomingService = new QualityIncomingService(em, this.logEvent.bind(this));
         this.deviationOosService = new QualityDeviationOosService(em, this.logEvent.bind(this));
@@ -589,6 +592,11 @@ export class QualityService {
 
     async exportBatchDhr(productionBatchId: string, format: 'csv' | 'json', actor?: string) {
         return this.dhrService.exportBatchDhr(productionBatchId, format, actor);
+    }
+
+    async exportBatchDhrPdf(productionBatchId: string, actor?: string) {
+        const dhr = await this.dhrService.getBatchDhr(productionBatchId, actor);
+        return this.dhrPdfService.generateBatchDhrPdf(dhr);
     }
 
     async createRiskControl(payload: {

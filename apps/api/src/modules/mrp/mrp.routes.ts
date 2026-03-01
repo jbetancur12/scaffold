@@ -60,6 +60,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/production-orders', (req, res, next) => mrpController.createProductionOrder(req, res, next));
     router.get('/production-orders/:id/requirements', (req, res, next) => mrpController.calculateMaterialRequirements(req, res, next));
     router.post('/production-orders/:id/material-allocation', (req, res, next) => mrpController.upsertProductionMaterialAllocation(req, res, next));
+    router.post('/production-orders/:id/material-returns', (req, res, next) => mrpController.returnProductionMaterial(req, res, next));
     router.get('/production-orders/:id/batches', (req, res, next) => mrpController.listProductionBatches(req, res, next));
     router.post('/production-orders/:id/batches', (req, res, next) => mrpController.createProductionBatch(req, res, next));
     router.post('/production-batches/:batchId/units', (req, res, next) => mrpController.addProductionBatchUnits(req, res, next));
@@ -115,6 +116,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/dmr-templates', (req, res, next) => mrpController.listDmrTemplates(req, res, next));
     router.get('/quality/dhr/:productionBatchId', (req, res, next) => mrpController.getBatchDhr(req, res, next));
     router.get('/quality/dhr/:productionBatchId/export', (req, res, next) => mrpController.exportBatchDhr(req, res, next));
+    router.get('/quality/dhr/:productionBatchId/pdf', (req, res, next) => mrpController.downloadBatchDhrPdf(req, res, next));
     router.get('/quality/recalls/:id/affected-customers', (req, res, next) => mrpController.listRecallAffectedCustomers(req, res, next));
     router.patch('/quality/recalls/:id/progress', (req, res, next) => mrpController.updateRecallProgress(req, res, next));
     router.post('/quality/recalls/:id/notifications', (req, res, next) => mrpController.createRecallNotification(req, res, next));

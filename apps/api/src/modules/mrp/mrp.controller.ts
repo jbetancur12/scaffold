@@ -119,6 +119,7 @@ import {
     UpdateProductionBatchUnitQcSchema,
     UpdateProductionBatchUnitPackagingSchema,
     UpsertProductionBatchPackagingFormSchema,
+    ReturnProductionMaterialSchema,
     UpsertProductionMaterialAllocationSchema,
     CreateSalesOrderSchema,
     ListSalesOrdersQuerySchema,
@@ -531,6 +532,17 @@ export class MrpController {
             const payload = UpsertProductionMaterialAllocationSchema.parse(req.body);
             const row = await this.productionService.upsertMaterialAllocation(id, payload);
             return ApiResponse.success(res, row, 'Asignación de lote para producción actualizada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async returnProductionMaterial(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = ReturnProductionMaterialSchema.parse(req.body);
+            const row = await this.productionService.returnMaterialToWarehouse(id, payload);
+            return ApiResponse.success(res, row, 'Devolución de materia prima registrada');
         } catch (error) {
             next(error);
         }
@@ -1091,6 +1103,19 @@ export class MrpController {
             const { format, actor } = ExportBatchDhrQuerySchema.parse(req.query);
             const row = await this.qualityService.exportBatchDhr(productionBatchId, format, actor);
             return ApiResponse.success(res, row, 'Exportable DHR generado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadBatchDhrPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productionBatchId } = req.params;
+            const { actor } = ActorPayloadSchema.parse(req.query);
+            const file = await this.qualityService.exportBatchDhrPdf(productionBatchId, actor);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.buffer);
         } catch (error) {
             next(error);
         }
