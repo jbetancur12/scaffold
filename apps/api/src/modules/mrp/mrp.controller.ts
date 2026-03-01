@@ -124,6 +124,7 @@ import {
     CreateSalesOrderSchema,
     ListSalesOrdersQuerySchema,
     UpdateSalesOrderStatusSchema,
+    ProductCsvImportSchema,
 } from '@scaffold/schemas';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -173,6 +174,48 @@ export class MrpController {
             const { page, limit } = PaginationQuerySchema.parse(req.query);
             const result = await this.productService.listProducts(page || 1, limit || 10);
             return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async exportProductsCsv(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const file = await this.productService.exportProductsCsv();
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductsImportTemplateCsv(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const file = await this.productService.getProductImportTemplateCsv();
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async previewProductsImport(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = ProductCsvImportSchema.parse(req.body);
+            const preview = await this.productService.previewProductImportCsv(payload.csvText);
+            return ApiResponse.success(res, preview, 'Previsualización de importación generada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async importProductsCsv(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = ProductCsvImportSchema.parse(req.body);
+            const result = await this.productService.importProductCsv(payload.csvText, payload.actor);
+            return ApiResponse.success(res, result, 'Catálogo importado');
         } catch (error) {
             next(error);
         }

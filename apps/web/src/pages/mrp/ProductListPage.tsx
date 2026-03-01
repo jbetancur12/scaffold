@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -7,7 +8,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Package, Plus, Layers, Trash2, Edit2, BoxSelect, AlertCircle } from 'lucide-react';
+import { Package, Plus, Layers, Trash2, Edit2, BoxSelect, AlertCircle, Download, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -15,14 +16,41 @@ import { getErrorMessage } from '@/lib/api-error';
 import { useDeleteProductMutation, useProductsQuery } from '@/hooks/mrp/useProducts';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { Badge } from '@/components/ui/badge';
+import { mrpApi } from '@/services/mrpApi';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function ProductListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const { data: productsResponse, loading, error } = useProductsQuery();
+    const { data: productsResponse, loading, error, execute: reloadProducts } = useProductsQuery();
     const products = productsResponse?.products ?? [];
     const { execute: deleteProduct } = useDeleteProductMutation();
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const [importCsvText, setImportCsvText] = useState('');
+    const [importFileName, setImportFileName] = useState('');
+    const [importPreview, setImportPreview] = useState<{
+        summary: {
+            totalRows: number;
+            productsInFile: number;
+            variantsInFile: number;
+            productsToCreate: number;
+            productsToUpdate: number;
+            variantsToCreate: number;
+            variantsToUpdate: number;
+            errorCount: number;
+        };
+        errors: Array<{ rowNumber: number; message: string }>;
+    } | null>(null);
+    const [importPreviewOpen, setImportPreviewOpen] = useState(false);
+    const [previewingImport, setPreviewingImport] = useState(false);
+    const [applyingImport, setApplyingImport] = useState(false);
 
     useMrpQueryErrorToast(error, 'No se pudieron cargar los productos');
 
@@ -40,6 +68,77 @@ export default function ProductListPage() {
                 description: getErrorMessage(error, 'No se pudo eliminar el producto'),
                 variant: 'destructive',
             });
+        }
+    };
+
+    const downloadBlob = (blob: Blob, fileName: string) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportCsv = async () => {
+        try {
+            const blob = await mrpApi.exportProductsCsv();
+            downloadBlob(blob, `productos-variantes-${new Date().toISOString().slice(0, 10)}.csv`);
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo exportar el catálogo'), variant: 'destructive' });
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            const blob = await mrpApi.downloadProductsImportTemplateCsv();
+            downloadBlob(blob, 'plantilla_productos_variantes.csv');
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo descargar la plantilla'), variant: 'destructive' });
+        }
+    };
+
+    const handleSelectImportFile = async (file: File | undefined) => {
+        if (!file) return;
+        setPreviewingImport(true);
+        try {
+            const csvText = await file.text();
+            const preview = await mrpApi.previewProductsImport({
+                csvText,
+                actor: 'sistema-web',
+            });
+            setImportCsvText(csvText);
+            setImportFileName(file.name);
+            setImportPreview(preview);
+            setImportPreviewOpen(true);
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo previsualizar el archivo CSV'), variant: 'destructive' });
+        } finally {
+            setPreviewingImport(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleApplyImport = async () => {
+        if (!importPreview || !importCsvText) return;
+        setApplyingImport(true);
+        try {
+            const result = await mrpApi.importProductsCsv({
+                csvText: importCsvText,
+                actor: 'sistema-web',
+            });
+            toast({
+                title: 'Importación completada',
+                description: `Productos C/U: ${result.productsToCreate}/${result.productsToUpdate} · Variantes C/U: ${result.variantsToCreate}/${result.variantsToUpdate}`,
+            });
+            setImportPreviewOpen(false);
+            await reloadProducts({ force: true });
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo importar el catálogo'), variant: 'destructive' });
+        } finally {
+            setApplyingImport(false);
         }
     };
 
@@ -63,7 +162,8 @@ export default function ProductListPage() {
     }).length;
 
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+        <>
+            <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
             {/* Hero Header Section */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
                 <div className="flex items-start gap-4">
@@ -86,6 +186,38 @@ export default function ProductListPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <Button
+                        onClick={handleDownloadTemplate}
+                        variant="outline"
+                        className="h-11 px-5 border-slate-200 w-full sm:w-auto"
+                    >
+                        <Download className="mr-2 h-4 w-4" />
+                        Plantilla CSV
+                    </Button>
+                    <Button
+                        onClick={handleExportCsv}
+                        variant="outline"
+                        className="h-11 px-5 border-slate-200 w-full sm:w-auto"
+                    >
+                        <Download className="mr-2 h-4 w-4" />
+                        Exportar CSV
+                    </Button>
+                    <Button
+                        onClick={() => fileInputRef.current?.click()}
+                        variant="outline"
+                        className="h-11 px-5 border-slate-200 w-full sm:w-auto"
+                        disabled={previewingImport}
+                    >
+                        <Upload className="mr-2 h-4 w-4" />
+                        {previewingImport ? 'Validando...' : 'Importar CSV'}
+                    </Button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="hidden"
+                        onChange={(e) => handleSelectImportFile(e.target.files?.[0])}
+                    />
                     <Button
                         onClick={() => navigate('/mrp/products/new')}
                         className="h-11 px-6 shadow-md shadow-fuchsia-600/20 bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-medium w-full sm:w-auto transition-colors"
@@ -295,5 +427,52 @@ export default function ProductListPage() {
                 </div>
             </div>
         </div>
+        <Dialog open={importPreviewOpen} onOpenChange={setImportPreviewOpen}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Previsualización de importación</DialogTitle>
+                </DialogHeader>
+                {!importPreview ? null : (
+                    <div className="space-y-4 text-sm">
+                        <p className="text-slate-600">Archivo: <span className="font-semibold">{importFileName || 'N/A'}</span></p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <div className="rounded-lg border p-2">Filas: <b>{importPreview.summary.totalRows}</b></div>
+                            <div className="rounded-lg border p-2">Prod crear: <b>{importPreview.summary.productsToCreate}</b></div>
+                            <div className="rounded-lg border p-2">Prod actualizar: <b>{importPreview.summary.productsToUpdate}</b></div>
+                            <div className="rounded-lg border p-2">Errores: <b>{importPreview.summary.errorCount}</b></div>
+                            <div className="rounded-lg border p-2">Variantes archivo: <b>{importPreview.summary.variantsInFile}</b></div>
+                            <div className="rounded-lg border p-2">Var crear: <b>{importPreview.summary.variantsToCreate}</b></div>
+                            <div className="rounded-lg border p-2">Var actualizar: <b>{importPreview.summary.variantsToUpdate}</b></div>
+                            <div className="rounded-lg border p-2">Productos archivo: <b>{importPreview.summary.productsInFile}</b></div>
+                        </div>
+
+                        {importPreview.errors.length > 0 ? (
+                            <div className="rounded-lg border border-red-200 bg-red-50 p-3 max-h-64 overflow-auto">
+                                <p className="font-semibold text-red-700 mb-2">Errores detectados (corrige antes de importar):</p>
+                                <ul className="list-disc pl-5 space-y-1 text-red-700">
+                                    {importPreview.errors.map((row, idx) => (
+                                        <li key={`${row.rowNumber}-${idx}`}>Fila {row.rowNumber}: {row.message}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : (
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-700">
+                                Archivo válido. Puedes continuar con la importación.
+                            </div>
+                        )}
+                    </div>
+                )}
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setImportPreviewOpen(false)}>Cerrar</Button>
+                    <Button
+                        onClick={handleApplyImport}
+                        disabled={!importPreview || importPreview.summary.errorCount > 0 || applyingImport}
+                    >
+                        {applyingImport ? 'Importando...' : 'Confirmar importación'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }

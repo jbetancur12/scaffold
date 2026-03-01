@@ -138,6 +138,7 @@ import type {
     UpdateSalesOrderStatusPayload,
     UpsertProductionMaterialAllocationPayload,
     ReturnProductionMaterialPayload,
+    ProductCsvImportPayload,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -230,6 +231,44 @@ export const mrpApi = {
     },
     deleteProduct: async (id: string): Promise<void> => {
         await api.delete(`/mrp/products/${id}`);
+    },
+    exportProductsCsv: async (): Promise<Blob> => {
+        const response = await api.get('/mrp/products/export/csv', { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    downloadProductsImportTemplateCsv: async (): Promise<Blob> => {
+        const response = await api.get('/mrp/products/import/template/csv', { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    previewProductsImport: async (payload: ProductCsvImportPayload): Promise<{
+        summary: {
+            totalRows: number;
+            productsInFile: number;
+            variantsInFile: number;
+            productsToCreate: number;
+            productsToUpdate: number;
+            variantsToCreate: number;
+            variantsToUpdate: number;
+            errorCount: number;
+        };
+        errors: Array<{ rowNumber: number; message: string }>;
+    }> => {
+        const response = await api.post('/mrp/products/import/preview', payload);
+        return response.data;
+    },
+    importProductsCsv: async (payload: ProductCsvImportPayload): Promise<{
+        actor?: string;
+        totalRows: number;
+        productsInFile: number;
+        variantsInFile: number;
+        productsToCreate: number;
+        productsToUpdate: number;
+        variantsToCreate: number;
+        variantsToUpdate: number;
+        errorCount: number;
+    }> => {
+        const response = await api.post('/mrp/products/import', payload);
+        return response.data;
     },
 
     // Variants

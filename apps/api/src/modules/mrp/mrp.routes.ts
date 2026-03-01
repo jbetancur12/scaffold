@@ -18,6 +18,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     // Products
     router.post('/products', (req, res, next) => mrpController.createProduct(req, res, next));
     router.get('/products', (req, res, next) => mrpController.listProducts(req, res, next));
+    router.get('/products/export/csv', (req, res, next) => mrpController.exportProductsCsv(req, res, next));
+    router.get('/products/import/template/csv', (req, res, next) => mrpController.getProductsImportTemplateCsv(req, res, next));
+    router.post('/products/import/preview', (req, res, next) => mrpController.previewProductsImport(req, res, next));
+    router.post('/products/import', (req, res, next) => mrpController.importProductsCsv(req, res, next));
     router.get('/products/:id', (req, res, next) => mrpController.getProduct(req, res, next));
     router.put('/products/:id', (req, res, next) => mrpController.updateProduct(req, res, next));
     router.delete('/products/:id', (req, res, next) => mrpController.deleteProduct(req, res, next));
