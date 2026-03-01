@@ -37,6 +37,7 @@ import {
     AddSupplierMaterialSchema,
     UpdateProductionOrderStatusSchema,
     InventoryQuerySchema,
+    InventoryKardexQuerySchema,
     ListPurchaseOrdersQuerySchema,
     CreatePurchaseRequisitionSchema,
     CreatePurchaseRequisitionFromProductionOrderSchema,
@@ -1473,6 +1474,24 @@ export class MrpController {
         try {
             const { page, limit, warehouseId } = InventoryQuerySchema.parse(req.query);
             const result = await this.inventoryService.getInventoryItems(page || 1, limit || 100, warehouseId);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getInventoryKardex(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = InventoryKardexQuerySchema.parse(req.query);
+            const result = await this.inventoryService.getRawMaterialKardex({
+                page: filters.page || 1,
+                limit: filters.limit || 100,
+                rawMaterialId: filters.rawMaterialId,
+                supplierLotCode: filters.supplierLotCode,
+                referenceId: filters.referenceId,
+                dateFrom: filters.dateFrom,
+                dateTo: filters.dateTo,
+            });
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);

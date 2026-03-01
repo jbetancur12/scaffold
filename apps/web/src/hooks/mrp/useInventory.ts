@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { InventoryItem } from '@scaffold/types';
-import { mrpApi } from '@/services/mrpApi';
+import { mrpApi, RawMaterialKardexRow } from '@/services/mrpApi';
 import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
 export const useInventoryQuery = (page = 1, limit = 100, warehouseId?: string) => {
@@ -19,4 +19,21 @@ export const useManualStockMutation = () => {
     >(
         async (payload) => mrpApi.addManualStock(payload)
     );
+};
+
+export const useInventoryKardexQuery = (filters?: {
+    page?: number;
+    limit?: number;
+    rawMaterialId?: string;
+    supplierLotCode?: string;
+    referenceId?: string;
+    dateFrom?: string;
+    dateTo?: string;
+}) => {
+    const fetchKardex = useCallback(async (): Promise<{ items: RawMaterialKardexRow[]; total: number }> => {
+        return mrpApi.getInventoryKardex(filters);
+    }, [filters?.dateFrom, filters?.dateTo, filters?.limit, filters?.page, filters?.rawMaterialId, filters?.referenceId, filters?.supplierLotCode]);
+
+    const queryKey = `mrp.inventory-kardex.${JSON.stringify(filters || {})}`;
+    return useMrpQuery(fetchKardex, true, queryKey);
 };

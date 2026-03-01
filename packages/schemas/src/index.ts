@@ -369,6 +369,16 @@ export const InventoryQuerySchema = z.object({
     warehouseId: z.string().uuid().optional(),
 });
 
+export const InventoryKardexQuerySchema = z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    rawMaterialId: z.string().uuid().optional(),
+    supplierLotCode: z.string().trim().min(1).optional(),
+    referenceId: z.string().trim().min(1).optional(),
+    dateFrom: z.coerce.date().optional(),
+    dateTo: z.coerce.date().optional(),
+});
+
 export const ListPurchaseOrdersQuerySchema = z.object({
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().optional(),

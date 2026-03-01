@@ -178,6 +178,30 @@ export interface RawMaterialSupplier {
     lastPurchaseDate: string;
 }
 
+export interface RawMaterialKardexRow {
+    id: string;
+    movementType: string;
+    quantity: number;
+    balanceAfter: number;
+    referenceType?: string;
+    referenceId?: string;
+    occurredAt: string;
+    rawMaterial?: {
+        id: string;
+        name: string;
+        sku: string;
+        unit: string;
+    };
+    lot?: {
+        id: string;
+        supplierLotCode: string;
+    };
+    warehouse?: {
+        id: string;
+        name: string;
+    };
+}
+
 export type IncomingInspectionEvidenceType = 'invoice' | 'certificate';
 
 export interface ListResponse<T> {
@@ -883,6 +907,18 @@ export const mrpApi = {
     // Inventory
     getInventory: async (page = 1, limit = 10, warehouseId?: string) => {
         const response = await api.get<{ items: InventoryItem[], total: number }>(`/mrp/inventory`, { params: { page, limit, warehouseId } });
+        return response.data;
+    },
+    getInventoryKardex: async (params?: {
+        page?: number;
+        limit?: number;
+        rawMaterialId?: string;
+        supplierLotCode?: string;
+        referenceId?: string;
+        dateFrom?: string;
+        dateTo?: string;
+    }) => {
+        const response = await api.get<{ items: RawMaterialKardexRow[], total: number }>(`/mrp/inventory/kardex`, { params });
         return response.data;
     },
     addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }): Promise<InventoryItem> => {

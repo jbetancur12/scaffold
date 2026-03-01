@@ -178,6 +178,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
 
     // Inventory
     router.get('/inventory', (req, res, next) => mrpController.getInventory(req, res, next));
+    router.get('/inventory/kardex', (req, res, next) => mrpController.getInventoryKardex(req, res, next));
     router.post('/inventory/manual-add', (req, res, next) => mrpController.addManualStock(req, res, next));
 
     // Warehouses

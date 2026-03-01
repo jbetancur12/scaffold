@@ -33,9 +33,11 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatQuantity } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
 import { useInventoryQuery, useManualStockMutation } from '@/hooks/mrp/useInventory';
+import { useInventoryKardexQuery } from '@/hooks/mrp/useInventory';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
+import { RawMaterialKardexRow } from '@/services/mrpApi';
 
 interface PopulatedInventoryItem extends InventoryItem {
     variant?: ProductVariant & { product?: Product };
@@ -53,14 +55,31 @@ export default function InventoryDashboardPage() {
     const [selectedMaterialId, setSelectedMaterialId] = useState('');
     const [manualQuantity, setManualQuantity] = useState('');
     const [manualCost, setManualCost] = useState('');
+    const [kardexMaterialId, setKardexMaterialId] = useState<string>('all');
+    const [kardexLotCode, setKardexLotCode] = useState('');
+    const [kardexReference, setKardexReference] = useState('');
+    const [kardexDateFrom, setKardexDateFrom] = useState('');
+    const [kardexDateTo, setKardexDateTo] = useState('');
+    const [activeView, setActiveView] = useState<'stock' | 'kardex'>('stock');
     const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
     const { data: inventoryData, error: inventoryError, execute: refetchInventory, loading } = useInventoryQuery(1, 100, warehouseId);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
     const { materials: rawMaterials, error: rawMaterialsError } = useRawMaterialsQuery(1, 100, '');
     const { execute: addManualStock, loading: submittingManual } = useManualStockMutation();
+    const { data: kardexData, loading: loadingKardex, error: kardexError } = useInventoryKardexQuery({
+        page: 1,
+        limit: 100,
+        rawMaterialId: kardexMaterialId === 'all' ? undefined : kardexMaterialId,
+        supplierLotCode: kardexLotCode.trim() || undefined,
+        referenceId: kardexReference.trim() || undefined,
+        dateFrom: kardexDateFrom || undefined,
+        dateTo: kardexDateTo || undefined,
+    });
     const inventory = (inventoryData?.items as PopulatedInventoryItem[]) ?? [];
+    const kardexRows = (kardexData?.items as RawMaterialKardexRow[]) ?? [];
     const warehouses: Warehouse[] = warehousesData ?? [];
     const inventoryErrorMessage = inventoryError ? getErrorMessage(inventoryError, 'Error al cargar el inventario') : '';
+    const kardexErrorMessage = kardexError ? getErrorMessage(kardexError, 'Error al cargar kardex') : '';
 
     useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar información auxiliar');
     useMrpQueryErrorToast(warehousesError, 'No se pudo cargar información auxiliar');
@@ -279,7 +298,24 @@ export default function InventoryDashboardPage() {
                 </div>
             </div>
 
-            {
+            <div className="bg-white rounded-xl border border-slate-200 p-2 inline-flex gap-2">
+                <Button
+                    variant={activeView === 'stock' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setActiveView('stock')}
+                >
+                    Stock
+                </Button>
+                <Button
+                    variant={activeView === 'kardex' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setActiveView('kardex')}
+                >
+                    Kardex MP
+                </Button>
+            </div>
+
+            {activeView === 'stock' ? (
                 loading ? (
                     <div className="flex justify-center py-8" >
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -386,7 +422,109 @@ export default function InventoryDashboardPage() {
                         </div>
                     </div>
                 )
-            }
+            ) : null}
+
+            {activeView === 'kardex' ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+                    <h2 className="text-lg font-bold text-slate-800">Kardex Materia Prima</h2>
+                    <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-medium">
+                        {kardexRows.length} movimientos
+                    </Badge>
+                </div>
+                <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-5 gap-3 border-b border-slate-100">
+                    <div className="md:col-span-2">
+                        <Label>Materia prima</Label>
+                        <Select value={kardexMaterialId} onValueChange={setKardexMaterialId}>
+                            <SelectTrigger className="bg-slate-50 border-slate-200">
+                                <SelectValue placeholder="Todas" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas</SelectItem>
+                                {rawMaterials.map((material) => (
+                                    <SelectItem key={material.id} value={material.id}>
+                                        {material.name} ({material.sku})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label>Lote</Label>
+                        <Input value={kardexLotCode} onChange={(e) => setKardexLotCode(e.target.value)} placeholder="Ej: LOT-001" />
+                    </div>
+                    <div>
+                        <Label>Referencia</Label>
+                        <Input value={kardexReference} onChange={(e) => setKardexReference(e.target.value)} placeholder="OP/INSPECCIÓN" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <Label>Desde</Label>
+                            <Input type="date" value={kardexDateFrom} onChange={(e) => setKardexDateFrom(e.target.value)} />
+                        </div>
+                        <div>
+                            <Label>Hasta</Label>
+                            <Input type="date" value={kardexDateTo} onChange={(e) => setKardexDateTo(e.target.value)} />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    {loadingKardex ? (
+                        <div className="flex justify-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                    ) : kardexErrorMessage ? (
+                        <div className="p-4 text-red-500 bg-red-50 rounded-md m-4">
+                            {kardexErrorMessage}
+                        </div>
+                    ) : (
+                        <Table>
+                            <TableHeader className="bg-slate-50/80">
+                                <TableRow className="hover:bg-transparent">
+                                    <TableHead>Fecha</TableHead>
+                                    <TableHead>Material</TableHead>
+                                    <TableHead>Lote</TableHead>
+                                    <TableHead>Movimiento</TableHead>
+                                    <TableHead>Referencia</TableHead>
+                                    <TableHead className="text-right">Cantidad</TableHead>
+                                    <TableHead className="text-right">Saldo lote</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {kardexRows.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="text-center text-slate-500 py-8">
+                                            Sin movimientos para los filtros actuales.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : kardexRows.map((row) => (
+                                    <TableRow key={row.id}>
+                                        <TableCell>{new Date(row.occurredAt).toLocaleString()}</TableCell>
+                                        <TableCell>
+                                            <div className="font-medium">{row.rawMaterial?.name || 'N/A'}</div>
+                                            <div className="text-xs text-slate-500">{row.rawMaterial?.sku || '-'}</div>
+                                        </TableCell>
+                                        <TableCell>{row.lot?.supplierLotCode || '-'}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{row.movementType}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="text-xs text-slate-700">{row.referenceType || '-'}</div>
+                                            <div className="font-mono text-xs text-slate-500">{row.referenceId || '-'}</div>
+                                        </TableCell>
+                                        <TableCell className={`text-right font-semibold ${Number(row.quantity) < 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                                            {formatQuantity(Number(row.quantity))}
+                                        </TableCell>
+                                        <TableCell className="text-right">{formatQuantity(Number(row.balanceAfter))}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+                </div>
+            </div>
+            ) : null}
         </div>
     );
 }

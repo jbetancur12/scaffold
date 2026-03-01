@@ -168,4 +168,41 @@ export class InventoryService {
         );
         return { items, total };
     }
+
+    async getRawMaterialKardex(filters: {
+        page: number;
+        limit: number;
+        rawMaterialId?: string;
+        supplierLotCode?: string;
+        referenceId?: string;
+        dateFrom?: Date;
+        dateTo?: Date;
+    }) {
+        const query: FilterQuery<RawMaterialKardex> = {};
+        if (filters.rawMaterialId) {
+            query.rawMaterial = filters.rawMaterialId;
+        }
+        if (filters.supplierLotCode) {
+            query.lot = { supplierLotCode: { $ilike: `%${filters.supplierLotCode}%` } };
+        }
+        if (filters.referenceId) {
+            query.referenceId = { $ilike: `%${filters.referenceId}%` };
+        }
+        if (filters.dateFrom || filters.dateTo) {
+            query.occurredAt = {};
+            if (filters.dateFrom) query.occurredAt.$gte = filters.dateFrom;
+            if (filters.dateTo) query.occurredAt.$lte = filters.dateTo;
+        }
+
+        const [items, total] = await this.rawMaterialKardexRepo.findAndCount(
+            query,
+            {
+                limit: filters.limit,
+                offset: (filters.page - 1) * filters.limit,
+                populate: ['rawMaterial', 'warehouse', 'lot'],
+                orderBy: { occurredAt: 'DESC' },
+            }
+        );
+        return { items, total };
+    }
 }
