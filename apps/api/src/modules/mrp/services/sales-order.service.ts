@@ -5,7 +5,11 @@ import { Customer } from '../entities/customer.entity';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
-import { CreateSalesOrderPayload, SalesOrderStatus } from '@scaffold/types';
+import { CreateSalesOrderPayload, ProductionOrderStatus, SalesOrderStatus, WarehouseType } from '@scaffold/types';
+import { ProductionOrder } from '../entities/production-order.entity';
+import { ProductionOrderItem } from '../entities/production-order-item.entity';
+import { InventoryItem } from '../entities/inventory-item.entity';
+import { AppError } from '../../../shared/utils/response';
 
 export class SalesOrderService {
     private salesOrderRepo: EntityRepository<SalesOrder>;
@@ -145,10 +149,116 @@ export class SalesOrderService {
 
     async updateSalesOrderStatus(id: string, status: SalesOrderStatus): Promise<SalesOrder> {
         return this.em.transactional(async (tx) => {
-            const order = await tx.getRepository(SalesOrder).findOneOrFail({ id });
-            order.status = status;
+            const order = await tx.getRepository(SalesOrder).findOneOrFail(
+                { id },
+                { populate: ['items', 'items.variant', 'items.product', 'productionOrders', 'productionOrders.items', 'productionOrders.items.variant'] }
+            );
+
+            if (status === SalesOrderStatus.CANCELLED && order.status === SalesOrderStatus.SHIPPED) {
+                throw new AppError('No se puede cancelar un pedido ya despachado', 400);
+            }
+
+            if (status === SalesOrderStatus.IN_PRODUCTION) {
+                const automation = await this.ensureProductionCoverage(order, tx);
+                order.status = automation.nextStatus;
+            } else {
+                order.status = status;
+            }
+
             await tx.persistAndFlush(order);
             return order;
         });
+    }
+
+    private async ensureProductionCoverage(order: SalesOrder, tx: EntityManager): Promise<{ nextStatus: SalesOrderStatus; createdProductionOrderId?: string }> {
+        if (!order.items?.length) {
+            throw new AppError('El pedido no tiene ítems para planificar producción', 400);
+        }
+
+        for (const item of order.items) {
+            if (!item.variant) {
+                throw new AppError(`El ítem ${item.product?.name || item.id} no tiene variante definida. Selecciona variante para producción.`, 400);
+            }
+        }
+
+        const variantIds = order.items.getItems().map((item) => item.variant!.id);
+
+        const inventoryRows = await tx.getRepository(InventoryItem).find({
+            variant: { $in: variantIds },
+            warehouse: { type: WarehouseType.FINISHED_GOODS },
+        }, { populate: ['variant'] });
+
+        const availableByVariant = new Map<string, number>();
+        for (const row of inventoryRows) {
+            const key = row.variant?.id;
+            if (!key) continue;
+            availableByVariant.set(key, Number(availableByVariant.get(key) || 0) + Number(row.quantity || 0));
+        }
+
+        const linkedPos = order.productionOrders.getItems();
+        const pipelineByVariant = new Map<string, number>();
+        for (const po of linkedPos) {
+            if ([ProductionOrderStatus.COMPLETED, ProductionOrderStatus.CANCELLED].includes(po.status)) continue;
+            for (const poItem of po.items.getItems()) {
+                const key = poItem.variant?.id;
+                if (!key) continue;
+                pipelineByVariant.set(key, Number(pipelineByVariant.get(key) || 0) + Number(poItem.quantity || 0));
+            }
+        }
+
+        const shortages: Array<{ variant: ProductVariant; quantity: number }> = [];
+        for (const item of order.items.getItems()) {
+            const variant = item.variant!;
+            const requested = Number(item.quantity || 0);
+            const available = Number(availableByVariant.get(variant.id) || 0);
+            const inPipeline = Number(pipelineByVariant.get(variant.id) || 0);
+            const missing = Math.max(0, requested - available - inPipeline);
+            if (missing > 0) {
+                shortages.push({ variant, quantity: missing });
+            }
+        }
+
+        if (shortages.length === 0) {
+            return { nextStatus: SalesOrderStatus.READY_TO_SHIP };
+        }
+
+        const poRepo = tx.getRepository(ProductionOrder);
+        const poItemRepo = tx.getRepository(ProductionOrderItem);
+
+        const now = new Date();
+        const code = await this.generateProductionOrderCode(tx);
+        const productionOrder = poRepo.create({
+            code,
+            status: ProductionOrderStatus.PLANNED,
+            startDate: now,
+            endDate: order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate) : undefined,
+            notes: `Generada automáticamente desde pedido ${order.code}`,
+            salesOrder: order,
+        } as unknown as ProductionOrder);
+
+        for (const shortage of shortages) {
+            const item = poItemRepo.create({
+                productionOrder,
+                variant: shortage.variant,
+                quantity: shortage.quantity,
+            } as unknown as ProductionOrderItem);
+            productionOrder.items.add(item);
+        }
+
+        await tx.persistAndFlush(productionOrder);
+        return { nextStatus: SalesOrderStatus.IN_PRODUCTION, createdProductionOrderId: productionOrder.id };
+    }
+
+    private async generateProductionOrderCode(tx: EntityManager): Promise<string> {
+        const repo = tx.getRepository(ProductionOrder);
+        let tries = 0;
+        while (tries < 10) {
+            const token = Date.now().toString(36).toUpperCase();
+            const candidate = `PO-${token}${tries > 0 ? String(tries) : ''}`;
+            const exists = await repo.findOne({ code: candidate });
+            if (!exists) return candidate;
+            tries += 1;
+        }
+        throw new AppError('No se pudo generar código único para orden de producción', 500);
     }
 }
