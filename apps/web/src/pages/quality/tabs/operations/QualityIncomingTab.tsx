@@ -111,6 +111,10 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
   }, [operationalConfig]);
 
   const submitResolveInspection = async (inspectionId: string, quantityReceived: number) => {
+    const inspection = model.incomingInspections.find((row) => row.id === inspectionId);
+    const hasCertificateFile = Boolean(inspection?.certificateFileName);
+    const hasInvoiceFile = Boolean(inspection?.invoiceFileName);
+
     if (!resolverForm.inspectedBy.trim() || resolverForm.inspectedBy.trim().length < 2) {
       toast({ title: 'Error', description: 'Debes registrar el inspector QA', variant: 'destructive' });
       return;
@@ -134,6 +138,14 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
     }
     if (quantityAccepted > quantityReceived) {
       toast({ title: 'Error', description: 'La cantidad aceptada no puede exceder la recibida', variant: 'destructive' });
+      return;
+    }
+    if (quantityAccepted > 0 && !resolverForm.certificateRef.trim() && !hasCertificateFile) {
+      toast({ title: 'Error', description: 'Para cantidad aceptada debes registrar certificado/COA o cargar el archivo', variant: 'destructive' });
+      return;
+    }
+    if (quantityAccepted > 0 && !resolverForm.invoiceNumber.trim() && !hasInvoiceFile) {
+      toast({ title: 'Error', description: 'Para cantidad aceptada debes registrar factura/remisión o cargar el archivo', variant: 'destructive' });
       return;
     }
     const quantityRejected = resolverForm.inspectionResult === IncomingInspectionResult.CONDICIONAL
@@ -761,7 +773,7 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                         {[
                           { key: 'supplierLotCode' as const, label: 'Lote proveedor', placeholder: 'Requerido si hay aceptado', mono: true },
                           { key: 'certificateRef' as const, label: 'Certificado / COA', placeholder: 'Requerido para aprobado/condicional' },
-                          { key: 'invoiceNumber' as const, label: 'Factura N°', placeholder: 'Opcional', mono: true },
+                          { key: 'invoiceNumber' as const, label: 'Factura / remisión N°', placeholder: 'Requerido si hay cantidad aceptada', mono: true },
                         ].map(({ key, label, placeholder, mono }) => (
                           <div key={key} className="space-y-1.5">
                             <Label className="text-xs font-medium text-slate-700">{label}</Label>

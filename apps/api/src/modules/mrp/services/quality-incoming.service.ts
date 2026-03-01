@@ -17,6 +17,7 @@ import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { MrpService } from './mrp.service';
 import { ObjectStorageService } from '../../../shared/services/object-storage.service';
 import { extname } from 'node:path';
+import { OperationalConfig } from '../entities/operational-config.entity';
 
 type QualityAuditLogger = (payload: {
     entityType: string;
@@ -35,6 +36,7 @@ export class QualityIncomingService {
     private readonly warehouseRepo: EntityRepository<Warehouse>;
     private readonly rawMaterialLotRepo: EntityRepository<RawMaterialLot>;
     private readonly rawMaterialKardexRepo: EntityRepository<RawMaterialKardex>;
+    private readonly operationalConfigRepo: EntityRepository<OperationalConfig>;
     private readonly logEvent: QualityAuditLogger;
     private readonly storageService: ObjectStorageService;
 
@@ -47,7 +49,55 @@ export class QualityIncomingService {
         this.warehouseRepo = em.getRepository(Warehouse);
         this.rawMaterialLotRepo = em.getRepository(RawMaterialLot);
         this.rawMaterialKardexRepo = em.getRepository(RawMaterialKardex);
+        this.operationalConfigRepo = em.getRepository(OperationalConfig);
         this.storageService = new ObjectStorageService();
+    }
+
+    private async resolveIncomingInspectionControlledDocument(controlledDocumentId?: string) {
+        if (controlledDocumentId) {
+            const selectedDocument = await this.controlledDocumentRepo.findOne({
+                id: controlledDocumentId,
+                process: DocumentProcess.CONTROL_CALIDAD,
+                documentCategory: DocumentCategory.FOR,
+                status: DocumentStatus.APROBADO,
+            });
+            if (!selectedDocument) {
+                throw new AppError('El formato seleccionado no está aprobado o no corresponde a Control de Calidad/FOR', 400);
+            }
+            return selectedDocument;
+        }
+
+        const [config] = await this.operationalConfigRepo.findAll({ limit: 1, orderBy: { createdAt: 'DESC' } });
+        const configuredCode = config?.defaultIncomingInspectionControlledDocumentCode?.trim();
+        const now = new Date();
+        if (configuredCode) {
+            const configuredDocument = await this.controlledDocumentRepo.findOne({
+                code: configuredCode,
+                process: DocumentProcess.CONTROL_CALIDAD,
+                documentCategory: DocumentCategory.FOR,
+                status: DocumentStatus.APROBADO,
+                $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+                $and: [{ $or: [{ effectiveDate: null }, { effectiveDate: { $lte: now } }] }],
+            }, { orderBy: { version: 'DESC' } });
+            if (configuredDocument) {
+                return configuredDocument;
+            }
+            throw new AppError(`El formato global de recepción (${configuredCode}) no está aprobado/vigente`, 400);
+        }
+
+        // Fallback controlado para instancias antiguas sin configuración global
+        const latestQualityFor = await this.controlledDocumentRepo.findOne({
+            process: DocumentProcess.CONTROL_CALIDAD,
+            documentCategory: DocumentCategory.FOR,
+            status: DocumentStatus.APROBADO,
+            $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+            $and: [{ $or: [{ effectiveDate: null }, { effectiveDate: { $lte: now } }] }],
+        }, { orderBy: { version: 'DESC', updatedAt: 'DESC' } });
+
+        if (!latestQualityFor) {
+            throw new AppError('Debes configurar un formato global de recepción (Calidad/FOR) o seleccionar uno manualmente', 400);
+        }
+        return latestQualityFor;
     }
 
     private decodeBase64Data(base64Data: string): Buffer {
@@ -125,6 +175,20 @@ export class QualityIncomingService {
             throw new AppError('Debes registrar el lote del proveedor cuando existe cantidad aceptada', 400);
         }
         if (
+            Number(payload.quantityAccepted) > 0 &&
+            !payload.certificateRef?.trim() &&
+            !row.certificateFilePath
+        ) {
+            throw new AppError('Para cantidad aceptada debes registrar certificado/COA (referencia o cargar archivo)', 400);
+        }
+        if (
+            Number(payload.quantityAccepted) > 0 &&
+            !payload.invoiceNumber?.trim() &&
+            !row.invoiceFilePath
+        ) {
+            throw new AppError('Para cantidad aceptada debes registrar factura/remisión (número o cargar archivo)', 400);
+        }
+        if (
             (payload.inspectionResult === IncomingInspectionResult.CONDICIONAL ||
                 payload.inspectionResult === IncomingInspectionResult.RECHAZADO) &&
             (!payload.notes || payload.notes.trim().length < 10)
@@ -151,25 +215,16 @@ export class QualityIncomingService {
         }
 
         row.inspectionResult = payload.inspectionResult;
-        if (payload.controlledDocumentId) {
-            const selectedDocument = await this.controlledDocumentRepo.findOne({
-                id: payload.controlledDocumentId,
-                process: DocumentProcess.CONTROL_CALIDAD,
-                documentCategory: DocumentCategory.FOR,
-                status: DocumentStatus.APROBADO,
-            });
-            if (!selectedDocument) {
-                throw new AppError('El formato seleccionado no está aprobado o no corresponde a Control de Calidad/FOR', 400);
-            }
-            row.documentControlCode = selectedDocument.code;
-            row.documentControlTitle = selectedDocument.title;
-            row.documentControlVersion = selectedDocument.version;
-            row.documentControlDate = selectedDocument.effectiveDate || selectedDocument.approvedAt || new Date();
-        }
-        row.supplierLotCode = payload.supplierLotCode;
-        row.certificateRef = payload.certificateRef;
-        row.invoiceNumber = payload.invoiceNumber;
-        row.notes = payload.notes;
+        const selectedDocument = await this.resolveIncomingInspectionControlledDocument(payload.controlledDocumentId);
+        row.documentControlId = selectedDocument.id;
+        row.documentControlCode = selectedDocument.code;
+        row.documentControlTitle = selectedDocument.title;
+        row.documentControlVersion = selectedDocument.version;
+        row.documentControlDate = selectedDocument.effectiveDate || selectedDocument.approvedAt || selectedDocument.updatedAt || new Date();
+        row.supplierLotCode = payload.supplierLotCode?.trim() || undefined;
+        row.certificateRef = payload.certificateRef?.trim() || undefined;
+        row.invoiceNumber = payload.invoiceNumber?.trim() || undefined;
+        row.notes = payload.notes?.trim() || undefined;
         row.quantityAccepted = payload.quantityAccepted;
         row.quantityRejected = payload.quantityRejected;
         row.acceptedUnitCost = payload.acceptedUnitCost;

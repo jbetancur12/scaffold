@@ -1,6 +1,7 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import {
     DocumentCategory,
+    DocumentProcess,
     DocumentStatus,
     DispatchValidationResult,
     InvimaRegistrationStatus,
@@ -218,6 +219,7 @@ export class QualityLabelingService {
         const now = new Date();
         const doc = await this.controlledDocRepo.findOne({
             code,
+            process: DocumentProcess.EMPAQUE,
             documentCategory: DocumentCategory.FOR,
             status: DocumentStatus.APROBADO,
             $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],

@@ -78,6 +78,9 @@ export class IncomingInspection extends BaseEntity implements IIncomingInspectio
     invoiceFilePath?: string;
 
     @Property({ nullable: true })
+    documentControlId?: string;
+
+    @Property({ nullable: true })
     documentControlCode?: string;
 
     @Property({ nullable: true })

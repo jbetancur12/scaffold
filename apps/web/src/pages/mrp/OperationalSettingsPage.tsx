@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
-import { ControlledDocument, DocumentCategory, DocumentProcess, DocumentStatus, OperationalConfig } from '@scaffold/types';
+import { ControlledDocument, DocumentCategory, DocumentStatus, OperationalConfig } from '@scaffold/types';
 import { Save, Calculator, Users, Building, ShoppingBag, FileText } from 'lucide-react';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
@@ -50,7 +50,6 @@ export default function OperationalSettingsPage() {
 
     const { data: currentConfig, error } = useOperationalConfigQuery();
     const { data: controlledDocuments, error: controlledDocumentsError } = useControlledDocumentsQuery({
-        process: DocumentProcess.PRODUCCION,
         documentCategory: DocumentCategory.FOR,
         status: DocumentStatus.APROBADO,
     });
@@ -153,6 +152,10 @@ export default function OperationalSettingsPage() {
             setLoadingDocs(true);
             const payload: Partial<OperationalConfig> = {
                 defaultPurchaseOrderControlledDocumentCode: config.defaultPurchaseOrderControlledDocumentCode || undefined,
+                defaultIncomingInspectionControlledDocumentCode: config.defaultIncomingInspectionControlledDocumentCode || undefined,
+                defaultPackagingControlledDocumentCode: config.defaultPackagingControlledDocumentCode || undefined,
+                defaultLabelingControlledDocumentCode: config.defaultLabelingControlledDocumentCode || undefined,
+                defaultBatchReleaseControlledDocumentCode: config.defaultBatchReleaseControlledDocumentCode || undefined,
             };
             const updated = await saveOperationalConfig(payload);
             setConfig(updated);
@@ -668,6 +671,114 @@ export default function OperationalSettingsPage() {
                                                 No hay formatos aprobados disponibles. El menú mostrará un encabezado genérico hasta que se apruebe uno.
                                             </p>
                                         ) : null}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="defaultIncomingInspectionControlledDocumentCode" className="text-base font-semibold">
+                                            Recepción / Inspección de MP
+                                        </Label>
+                                        <p className="text-sm text-muted-foreground pb-2">
+                                            Formato global para recepción e inspección de materia prima (FOR).
+                                        </p>
+                                        <select
+                                            id="defaultIncomingInspectionControlledDocumentCode"
+                                            className="w-full h-10 px-3 py-2 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                            value={config.defaultIncomingInspectionControlledDocumentCode || ''}
+                                            onChange={(e) =>
+                                                setConfig({
+                                                    ...config,
+                                                    defaultIncomingInspectionControlledDocumentCode: e.target.value || undefined,
+                                                })
+                                            }
+                                        >
+                                            <option value="">Sin formato global</option>
+                                            {documentCodeOptions.map((doc) => (
+                                                <option key={`incoming-${doc.code}`} value={doc.code}>
+                                                    {doc.code} (v{doc.version}) - {doc.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="defaultPackagingControlledDocumentCode" className="text-base font-semibold">
+                                            Empaque por lote
+                                        </Label>
+                                        <p className="text-sm text-muted-foreground pb-2">
+                                            Formato global para FOR de empaque.
+                                        </p>
+                                        <select
+                                            id="defaultPackagingControlledDocumentCode"
+                                            className="w-full h-10 px-3 py-2 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                            value={config.defaultPackagingControlledDocumentCode || ''}
+                                            onChange={(e) =>
+                                                setConfig({
+                                                    ...config,
+                                                    defaultPackagingControlledDocumentCode: e.target.value || undefined,
+                                                })
+                                            }
+                                        >
+                                            <option value="">Sin formato global</option>
+                                            {documentCodeOptions.map((doc) => (
+                                                <option key={`pack-${doc.code}`} value={doc.code}>
+                                                    {doc.code} (v{doc.version}) - {doc.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="defaultLabelingControlledDocumentCode" className="text-base font-semibold">
+                                            Etiquetado
+                                        </Label>
+                                        <p className="text-sm text-muted-foreground pb-2">
+                                            Formato global para FOR de etiquetado.
+                                        </p>
+                                        <select
+                                            id="defaultLabelingControlledDocumentCode"
+                                            className="w-full h-10 px-3 py-2 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                            value={config.defaultLabelingControlledDocumentCode || ''}
+                                            onChange={(e) =>
+                                                setConfig({
+                                                    ...config,
+                                                    defaultLabelingControlledDocumentCode: e.target.value || undefined,
+                                                })
+                                            }
+                                        >
+                                            <option value="">Sin formato global</option>
+                                            {documentCodeOptions.map((doc) => (
+                                                <option key={`label-${doc.code}`} value={doc.code}>
+                                                    {doc.code} (v{doc.version}) - {doc.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="defaultBatchReleaseControlledDocumentCode" className="text-base font-semibold">
+                                            Liberación QA
+                                        </Label>
+                                        <p className="text-sm text-muted-foreground pb-2">
+                                            Formato global para checklist/liberación QA.
+                                        </p>
+                                        <select
+                                            id="defaultBatchReleaseControlledDocumentCode"
+                                            className="w-full h-10 px-3 py-2 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                            value={config.defaultBatchReleaseControlledDocumentCode || ''}
+                                            onChange={(e) =>
+                                                setConfig({
+                                                    ...config,
+                                                    defaultBatchReleaseControlledDocumentCode: e.target.value || undefined,
+                                                })
+                                            }
+                                        >
+                                            <option value="">Sin formato global</option>
+                                            {documentCodeOptions.map((doc) => (
+                                                <option key={`release-${doc.code}`} value={doc.code}>
+                                                    {doc.code} (v{doc.version}) - {doc.title}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
                             </CardContent>

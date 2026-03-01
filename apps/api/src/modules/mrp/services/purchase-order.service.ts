@@ -34,17 +34,17 @@ export class PurchaseOrderService {
             // Create purchase order
             const purchaseOrder = tx.getRepository(PurchaseOrder).create({
                 supplier,
-                controlledDocumentId: controlDocument?.id,
+                controlledDocumentId: controlDocument.id,
                 expectedDeliveryDate: data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : undefined,
                 notes: data.notes,
                 status: PurchaseOrderStatus.PENDING,
                 purchaseType: data.purchaseType,
                 paymentMethod: data.paymentMethod,
                 currency: data.currency || 'COP',
-                documentControlCode: controlDocument?.code || 'GP-FOR-04',
-                documentControlTitle: controlDocument?.title || 'Orden de Compra de Materias Primas e Insumos',
-                documentControlVersion: controlDocument?.version || 1,
-                documentControlDate: controlDocument?.effectiveDate || controlDocument?.approvedAt || new Date(),
+                documentControlCode: controlDocument.code,
+                documentControlTitle: controlDocument.title,
+                documentControlVersion: controlDocument.version,
+                documentControlDate: controlDocument.effectiveDate || controlDocument.approvedAt || controlDocument.updatedAt || new Date(),
             } as PurchaseOrder);
 
             // Fetch operational config and lock it to safely increment sequence
@@ -157,7 +157,11 @@ export class PurchaseOrderService {
             const configured = await this.findPurchaseOrderControlledDocumentById(config.defaultPurchaseOrderControlledDocumentId);
             if (configured) return configured;
         }
-        return this.findActivePurchaseOrderControlDocument();
+        const fallback = await this.findActivePurchaseOrderControlDocument();
+        if (!fallback) {
+            throw new AppError('No existe formato FOR aprobado y vigente para Orden de Compra. Configura uno en Configuración Operativa > Documentos Globales', 400);
+        }
+        return fallback;
     }
 
     private async findPurchaseOrderControlledDocumentById(id: string) {

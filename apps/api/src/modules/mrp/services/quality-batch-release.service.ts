@@ -2,6 +2,7 @@ import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import {
     BatchReleaseStatus,
     DocumentCategory,
+    DocumentProcess,
     DocumentStatus,
     DispatchValidationResult,
     DocumentApprovalMethod,
@@ -167,6 +168,7 @@ export class QualityBatchReleaseService {
         const now = new Date();
         const doc = await this.controlledDocRepo.findOne({
             code,
+            process: DocumentProcess.CONTROL_CALIDAD,
             documentCategory: DocumentCategory.FOR,
             status: DocumentStatus.APROBADO,
             $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
