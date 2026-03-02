@@ -10,20 +10,20 @@ import { getErrorMessage } from '@/lib/api-error';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useSalesOrdersQuery, useUpdateSalesOrderStatusMutation } from '@/hooks/mrp/useSalesOrders';
 
-const statusLabels = {
-    PENDING: 'Pendiente',
-    IN_PRODUCTION: 'En Producción',
-    READY_TO_SHIP: 'Listo para Envío',
-    SHIPPED: 'Despachado',
-    CANCELLED: 'Cancelado',
+const statusLabels: Record<string, string> = {
+    [SalesOrderStatus.PENDING]: 'Pendiente',
+    [SalesOrderStatus.IN_PRODUCTION]: 'En Producción',
+    [SalesOrderStatus.READY_TO_SHIP]: 'Listo para Envío',
+    [SalesOrderStatus.SHIPPED]: 'Despachado',
+    [SalesOrderStatus.CANCELLED]: 'Cancelado',
 };
 
-const statusColors = {
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    IN_PRODUCTION: 'bg-indigo-100 text-indigo-800',
-    READY_TO_SHIP: 'bg-emerald-100 text-emerald-800',
-    SHIPPED: 'bg-blue-100 text-blue-800',
-    CANCELLED: 'bg-slate-100 text-slate-800',
+const statusColors: Record<string, string> = {
+    [SalesOrderStatus.PENDING]: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    [SalesOrderStatus.IN_PRODUCTION]: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    [SalesOrderStatus.READY_TO_SHIP]: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    [SalesOrderStatus.SHIPPED]: 'bg-blue-100 text-blue-800 border-blue-200',
+    [SalesOrderStatus.CANCELLED]: 'bg-slate-100 text-slate-800 border-slate-200',
 };
 
 export default function SalesOrderListPage() {
@@ -119,11 +119,11 @@ export default function SalesOrderListPage() {
                 <div className="flex overflow-x-auto pb-2 -mb-2 lg:pb-0 lg:mb-0 gap-2 w-full lg:w-auto scrollbar-hide">
                     {[
                         { value: 'ALL', label: 'Todos' },
-                        { value: 'PENDING', label: 'Pendientes' },
-                        { value: 'IN_PRODUCTION', label: 'En Producción' },
-                        { value: 'READY_TO_SHIP', label: 'Listo Envío' },
-                        { value: 'SHIPPED', label: 'Despachados' },
-                        { value: 'CANCELLED', label: 'Cancelados' },
+                        { value: SalesOrderStatus.PENDING, label: 'Pendientes' },
+                        { value: SalesOrderStatus.IN_PRODUCTION, label: 'En Producción' },
+                        { value: SalesOrderStatus.READY_TO_SHIP, label: 'Listo Envío' },
+                        { value: SalesOrderStatus.SHIPPED, label: 'Despachados' },
+                        { value: SalesOrderStatus.CANCELLED, label: 'Cancelados' },
                     ].map((status) => (
                         <button
                             key={status.value}
@@ -173,8 +173,8 @@ export default function SalesOrderListPage() {
                                         <h3 className="text-base font-bold text-slate-900 leading-tight">{order.customer?.name}</h3>
                                         <div className="text-sm text-slate-500 font-mono mt-1">{order.code}</div>
                                     </div>
-                                    <span className={`whitespace-nowrap px-2.5 py-1 text-xs font-semibold rounded-full border ${(statusColors as any)[order.status]}`}>
-                                        {(statusLabels as any)[order.status]}
+                                    <span className={`whitespace-nowrap px-2.5 py-1 text-xs font-semibold rounded-full border ${statusColors[order.status] || 'bg-slate-100 text-slate-800 border-slate-200'}`}>
+                                        {statusLabels[order.status] || order.status}
                                     </span>
                                 </div>
 
@@ -256,8 +256,8 @@ export default function SalesOrderListPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${(statusColors as any)[order.status]}`}>
-                                                {(statusLabels as any)[order.status]}
+                                            <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${statusColors[order.status] || 'bg-slate-100 text-slate-800 border-slate-200'}`}>
+                                                {statusLabels[order.status] || order.status}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">

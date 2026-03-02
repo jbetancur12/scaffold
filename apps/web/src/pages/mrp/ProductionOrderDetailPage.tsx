@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2, Factory, FileText, Package, Layers, AlertTriangle, TrendingDown, Boxes, Save } from 'lucide-react';
+import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2, Factory, FileText, Package, Layers, AlertTriangle, TrendingDown, Boxes, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ProductionRequirementsTable } from '@/components/mrp/ProductionRequirementsTable';
 import {
@@ -70,6 +70,7 @@ export default function ProductionOrderDetailPage() {
     // Warehouse selection for completion
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+    const [showItemsToProduce, setShowItemsToProduce] = useState(true);
     const [newBatchVariantId, setNewBatchVariantId] = useState<string>('');
     const [newBatchQty, setNewBatchQty] = useState<number>(1);
     const [newBatchCode, setNewBatchCode] = useState<string>('');
@@ -1146,26 +1147,52 @@ export default function ProductionOrderDetailPage() {
                             </div>
 
                             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-                                    <Package className="h-4 w-4 text-violet-500" />
-                                    <h2 className="font-semibold text-slate-800">Ítems a Producir</h2>
+                                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <Package className="h-4 w-4 text-violet-500" />
+                                        <h2 className="font-semibold text-slate-800">Ítems a Producir</h2>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 rounded-lg text-slate-600 hover:text-slate-900"
+                                        onClick={() => setShowItemsToProduce((prev) => !prev)}
+                                    >
+                                        {showItemsToProduce ? (
+                                            <>
+                                                <ChevronUp className="h-4 w-4 mr-1" />
+                                                Contraer
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ChevronDown className="h-4 w-4 mr-1" />
+                                                Expandir
+                                            </>
+                                        )}
+                                    </Button>
                                 </div>
-                                <div className="p-6 space-y-3">
-                                    {order.items?.map((item) => {
-                                        const populatedItem = item as ProductionOrderItem & { variant?: ProductVariant & { product?: Product } };
-                                        return (
-                                            <div key={item.id} className="flex justify-between items-center bg-slate-50 rounded-xl px-4 py-3">
-                                                <div>
-                                                    <div className="font-semibold text-slate-800 text-sm">{populatedItem.variant?.product?.name} <span className="text-slate-400 mx-1">·</span> {populatedItem.variant?.name}</div>
-                                                    <div className="text-xs text-slate-400 mt-0.5 font-mono">{populatedItem.variant?.sku}</div>
+                                {showItemsToProduce ? (
+                                    <div className="p-6 space-y-3">
+                                        {order.items?.map((item) => {
+                                            const populatedItem = item as ProductionOrderItem & { variant?: ProductVariant & { product?: Product } };
+                                            return (
+                                                <div key={item.id} className="flex justify-between items-center bg-slate-50 rounded-xl px-4 py-3">
+                                                    <div>
+                                                        <div className="font-semibold text-slate-800 text-sm">{populatedItem.variant?.product?.name} <span className="text-slate-400 mx-1">·</span> {populatedItem.variant?.name}</div>
+                                                        <div className="text-xs text-slate-400 mt-0.5 font-mono">{populatedItem.variant?.sku}</div>
+                                                    </div>
+                                                    <span className="font-bold text-slate-900 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm shrink-0">
+                                                        {item.quantity} un.
+                                                    </span>
                                                 </div>
-                                                <span className="font-bold text-slate-900 bg-white border border-slate-200 rounded-lg px-3 py-1 text-sm shrink-0">
-                                                    {item.quantity} un.
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="px-6 py-3 text-xs text-slate-500">
+                                        {order.items?.length || 0} ítem(s) configurados.
+                                    </div>
+                                )}
                             </div>
                         </div>
 
