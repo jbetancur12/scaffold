@@ -131,6 +131,28 @@ html(lang='es')
 `;
 
 export class QualityDhrPdfService {
+    private translateBatchStatus(status?: string | null) {
+        const normalized = String(status || '').toLowerCase();
+        const map: Record<string, string> = {
+            in_progress: 'En progreso',
+            qc_pending: 'QC pendiente',
+            qc_passed: 'QC aprobado',
+            packing: 'Empaque en proceso',
+            ready: 'Listo',
+            pending: 'Pendiente',
+            packed: 'Empacado',
+            passed: 'Aprobado',
+            failed: 'Rechazado',
+            pendiente: 'Pendiente',
+            liberado: 'Liberado',
+            rechazado: 'Rechazado',
+            validada: 'Validada',
+            bloqueada: 'Bloqueada',
+            borrador: 'Borrador',
+        };
+        return map[normalized] || status || '-';
+    }
+
     private loadPug(): PugModule {
         try {
             // eslint-disable-next-line @typescript-eslint/no-implied-eval
@@ -171,7 +193,7 @@ export class QualityDhrPdfService {
                 code: data.batchRelease?.documentControlCode || '-',
                 version: data.batchRelease?.documentControlVersion ? `v${data.batchRelease.documentControlVersion}` : '-',
                 date: this.formatDate(data.batchRelease?.documentControlDate),
-                status: data.productionBatch.packagingStatus,
+                status: this.translateBatchStatus(data.productionBatch.packagingStatus),
                 note: data.batchRelease?.checklistNotes || '-',
             },
             {
@@ -179,7 +201,7 @@ export class QualityDhrPdfService {
                 code: data.regulatoryLabels[0]?.documentControlCode || '-',
                 version: data.regulatoryLabels[0]?.documentControlVersion ? `v${data.regulatoryLabels[0].documentControlVersion}` : '-',
                 date: this.formatDate(data.regulatoryLabels[0]?.documentControlDate),
-                status: data.regulatoryLabels[0]?.status || '-',
+                status: this.translateBatchStatus(data.regulatoryLabels[0]?.status || '-'),
                 note: data.regulatoryLabels[0]?.internalCode || data.regulatoryLabels[0]?.codingValue || '-',
             },
             {
@@ -187,7 +209,7 @@ export class QualityDhrPdfService {
                 code: data.batchRelease?.documentControlCode || '-',
                 version: data.batchRelease?.documentControlVersion ? `v${data.batchRelease.documentControlVersion}` : '-',
                 date: this.formatDate(data.batchRelease?.documentControlDate),
-                status: data.batchRelease?.status || '-',
+                status: this.translateBatchStatus(data.batchRelease?.status || '-'),
                 note: data.batchRelease?.signedBy || '-',
             },
         ];
@@ -199,9 +221,9 @@ export class QualityDhrPdfService {
             variantName: data.productionBatch.variant?.name || '-',
             generatedAt: this.formatDate(data.generatedAt),
             generatedBy: data.generatedBy || 'sistema',
-            batchStatus: data.productionBatch.status,
-            qcStatus: data.productionBatch.qcStatus,
-            packagingStatus: data.productionBatch.packagingStatus,
+            batchStatus: this.translateBatchStatus(data.productionBatch.status),
+            qcStatus: this.translateBatchStatus(data.productionBatch.qcStatus),
+            packagingStatus: this.translateBatchStatus(data.productionBatch.packagingStatus),
             plannedQty: this.formatNumber(data.productionBatch.plannedQty),
             producedQty: this.formatNumber(data.productionBatch.producedQty),
             materials: data.materials.map((m) => ({

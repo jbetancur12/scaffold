@@ -71,6 +71,7 @@ export default function ProductionOrderDetailPage() {
     const [newBatchVariantId, setNewBatchVariantId] = useState<string>('');
     const [newBatchQty, setNewBatchQty] = useState<number>(1);
     const [newBatchCode, setNewBatchCode] = useState<string>('');
+    const [autoGeneratingBatches, setAutoGeneratingBatches] = useState(false);
     const [packagingFormBatchId, setPackagingFormBatchId] = useState<string | null>(null);
     const [packagingForm, setPackagingForm] = useState({
         operatorName: '',
@@ -205,6 +206,67 @@ export default function ProductionOrderDetailPage() {
                 description: getErrorMessage(err, 'No se pudo crear el lote'),
                 variant: 'destructive',
             });
+        }
+    };
+
+    const handleAutoGenerateMissingBatches = async () => {
+        if (!id || !order) return;
+        const orderItems = order.items ?? [];
+        if (orderItems.length === 0) {
+            toast({ title: 'Sin ítems', description: 'La OP no tiene variantes para lotear.', variant: 'destructive' });
+            return;
+        }
+
+        const plannedByVariant = new Map<string, number>();
+        for (const batch of batches) {
+            const variantId = batch.variant?.id;
+            if (!variantId) continue;
+            plannedByVariant.set(variantId, Number(plannedByVariant.get(variantId) || 0) + Number(batch.plannedQty || 0));
+        }
+
+        const missingRows = orderItems
+            .map((item) => {
+                const ordered = Number(item.quantity || 0);
+                const planned = Number(plannedByVariant.get(item.variantId) || 0);
+                const missing = Math.max(0, ordered - planned);
+                return { item, missing };
+            })
+            .filter((row) => row.missing > 0);
+
+        if (missingRows.length === 0) {
+            toast({ title: 'Todo loteado', description: 'No hay cantidades pendientes por lotear.' });
+            return;
+        }
+
+        const shouldContinue = confirm(
+            `Se crearán ${missingRows.length} lote(s), uno por variante pendiente. ¿Deseas continuar?`
+        );
+        if (!shouldContinue) return;
+
+        setAutoGeneratingBatches(true);
+        try {
+            let created = 0;
+            for (const row of missingRows) {
+                await mrpApi.createProductionBatch(id, {
+                    variantId: row.item.variantId,
+                    plannedQty: row.missing,
+                });
+                created += 1;
+            }
+            toast({
+                title: 'Lotes generados',
+                description: `Se crearon ${created} lote(s) automáticamente con cantidades pendientes.`,
+            });
+            await reloadBatches({ force: true });
+            await reloadOrder({ force: true });
+        } catch (err) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(err, 'No se pudieron generar todos los lotes faltantes'),
+                variant: 'destructive',
+            });
+        } finally {
+            setAutoGeneratingBatches(false);
         }
     };
 
@@ -655,6 +717,16 @@ export default function ProductionOrderDetailPage() {
         orderedForSelectedVariant > 0 &&
         newBatchQty > remainingToPlanForSelectedVariant
     );
+    const totalPendingToPlan = useMemo(
+        () => (order?.items ?? []).reduce((acc, item) => {
+            const planned = (batches ?? [])
+                .filter((batch) => batch.variant?.id === item.variantId)
+                .reduce((sum, batch) => sum + Number(batch.plannedQty || 0), 0);
+            const pending = Math.max(0, Number(item.quantity || 0) - planned);
+            return acc + pending;
+        }, 0),
+        [order?.items, batches]
+    );
 
     const handleVariantChange = (variantId: string) => {
         setNewBatchVariantId(variantId);
@@ -968,6 +1040,18 @@ export default function ProductionOrderDetailPage() {
                                     <Button onClick={handleCreateBatch} disabled={!newBatchVariantId || creatingBatch || exceedsPlannedQtyForSelectedVariant}>
                                         {creatingBatch ? 'Creando...' : 'Crear Lote'}
                                     </Button>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={handleAutoGenerateMissingBatches}
+                                        disabled={autoGeneratingBatches || creatingBatch || totalPendingToPlan <= 0}
+                                    >
+                                        {autoGeneratingBatches ? 'Generando...' : 'Generar lotes faltantes'}
+                                    </Button>
+                                    <span className="text-xs text-slate-600">
+                                        Pendiente total por lotear: {totalPendingToPlan}
+                                    </span>
                                 </div>
                                 {newBatchVariantId ? (
                                     <p className={`text-xs ${exceedsPlannedQtyForSelectedVariant ? 'text-red-700' : 'text-slate-600'}`}>
