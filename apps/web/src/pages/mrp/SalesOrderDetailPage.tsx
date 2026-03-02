@@ -97,7 +97,6 @@ export default function SalesOrderDetailPage() {
     const [draftProductionCode, setDraftProductionCode] = useState('');
     const [draftBillingCode, setDraftBillingCode] = useState('');
     const [savingDoc, setSavingDoc] = useState(false);
-    const [creatingPo, setCreatingPo] = useState(false);
 
     // Operational config (source of truth for default doc codes)
     const { data: operationalConfig } = useOperationalConfigQuery();
@@ -237,40 +236,32 @@ export default function SalesOrderDetailPage() {
         }
     };
 
-    const handleCreateProductionOrder = async () => {
-        if (!order || !order.items || order.items.length === 0) return;
+    const handlePlanFulfillment = async () => {
+        if (!order) return;
         try {
-            setCreatingPo(true);
-            const items = order.items.map(i => ({
-                variantId: i.variant?.id as string,
-                quantity: i.quantity
-            })).filter(i => i.variantId);
-
-            if (items.length === 0) {
-                toast({ title: 'Error', description: 'El pedido no tiene artículos válidos con variantes', variant: 'destructive' });
+            const updated = await updateStatus({ id: order.id, payload: { status: SalesOrderStatus.IN_PRODUCTION } });
+            await reloadOrder({ force: true });
+            if (updated.status === SalesOrderStatus.READY_TO_SHIP) {
+                toast({
+                    title: 'Cobertura completa',
+                    description: 'El pedido quedó listo para envío con stock disponible.',
+                });
                 return;
             }
-
-            await mrpApi.createProductionOrder({
-                salesOrderId: order.id,
-                startDate: new Date().toISOString(),
-                endDate: order.expectedDeliveryDate ? new Date(order.expectedDeliveryDate).toISOString() : undefined,
-                items
+            toast({
+                title: 'Producción planificada',
+                description: 'Se creó o reutilizó cobertura de producción para faltantes.',
             });
-            await reloadOrder({ force: true });
-            toast({ title: 'Éxito', description: 'Orden de producción creada y vinculada' });
         } catch (err) {
-            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo crear la OP'), variant: 'destructive' });
-        } finally {
-            setCreatingPo(false);
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo planificar el cumplimiento del pedido'), variant: 'destructive' });
         }
     };
 
     const renderActionButtons = () => {
-        if (isUpdatingStatus || creatingPo) {
+        if (isUpdatingStatus) {
             return (
                 <Button disabled variant="outline">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />{creatingPo ? 'Creando...' : 'Actualizando...'}
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />Actualizando...
                 </Button>
             );
         }
@@ -280,10 +271,10 @@ export default function SalesOrderDetailPage() {
             case SalesOrderStatus.IN_PRODUCTION:
                 return (
                     <div className="flex flex-wrap gap-2">
-                        {order.status === SalesOrderStatus.PENDING && (!order.productionOrders || order.productionOrders.length === 0) && (
+                        {order.status === SalesOrderStatus.PENDING && (
                             <Button variant="default" className="bg-purple-600 hover:bg-purple-700"
-                                onClick={handleCreateProductionOrder}>
-                                <Package className="mr-2 h-4 w-4" />Iniciar Producción
+                                onClick={handlePlanFulfillment}>
+                                <Package className="mr-2 h-4 w-4" />Planificar cumplimiento
                             </Button>
                         )}
                         <Button variant="destructive"
