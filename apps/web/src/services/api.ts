@@ -58,8 +58,10 @@ api.interceptors.response.use(
     },
     async (error) => {
         const originalRequest = error.config;
+        const status = error.response?.status;
+        const shouldAttemptRefresh = (status === 401 || status === 403) && !originalRequest?._retry;
 
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        if (shouldAttemptRefresh) {
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
@@ -92,7 +94,9 @@ api.interceptors.response.use(
             } catch (refreshError) {
                 processQueue(refreshError, null);
                 localStorage.removeItem('token');
-                // Optional: window.location.href = '/login';
+                if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
