@@ -106,6 +106,74 @@ export class ProductionService {
         return `${dateToken}-${variantMarker}-${String(next).padStart(2, '0')}`;
     }
 
+    private calculateRequiredMaterialFromFabrication(
+        bomQuantityPerUnit: number,
+        productionUnits: number,
+        fabricationParams?: {
+            calculationType?: 'area' | 'linear';
+            quantityPerUnit?: number;
+            rollWidth: number;
+            pieceWidth: number;
+            pieceLength: number;
+            orientation: 'normal' | 'rotated';
+        }
+    ): number {
+        const units = Number(productionUnits);
+        const perUnitQty = Number(bomQuantityPerUnit);
+        if (!Number.isFinite(units) || units <= 0 || !Number.isFinite(perUnitQty) || perUnitQty <= 0) {
+            return 0;
+        }
+
+        // Default behavior for legacy/manual BOM rows.
+        const linearRequired = perUnitQty * units;
+        if (!fabricationParams) {
+            return linearRequired;
+        }
+
+        // Backward compatibility:
+        // apply block-based consumption only when BOM row includes explicit pieces-per-unit.
+        // Older rows may have geometry without this field and were historically linear.
+        const hasExplicitPiecesPerUnit = fabricationParams.quantityPerUnit !== undefined;
+        if (!hasExplicitPiecesPerUnit) {
+            return linearRequired;
+        }
+        const quantityPerUnit = Math.max(1, Math.floor(Number(fabricationParams.quantityPerUnit)));
+        const totalPieces = units * quantityPerUnit;
+        const calculationType = fabricationParams.calculationType ?? 'area';
+
+        if (calculationType === 'linear') {
+            const materialLengthCm = Number(fabricationParams.rollWidth);
+            const cutLengthCm = Number(fabricationParams.pieceLength);
+            if (!Number.isFinite(materialLengthCm) || !Number.isFinite(cutLengthCm) || materialLengthCm <= 0 || cutLengthCm <= 0) {
+                return linearRequired;
+            }
+            const piecesPerBar = Math.floor(materialLengthCm / cutLengthCm);
+            if (piecesPerBar <= 0) {
+                return linearRequired;
+            }
+            const barsNeeded = Math.ceil(totalPieces / piecesPerBar);
+            return Number(((barsNeeded * materialLengthCm) / 100).toFixed(4));
+        }
+
+        const rollWidthCm = Number(fabricationParams.rollWidth);
+        const basePieceWidth = Number(fabricationParams.pieceWidth);
+        const basePieceLength = Number(fabricationParams.pieceLength);
+        if (!Number.isFinite(rollWidthCm) || !Number.isFinite(basePieceWidth) || !Number.isFinite(basePieceLength)
+            || rollWidthCm <= 0 || basePieceWidth <= 0 || basePieceLength <= 0) {
+            return linearRequired;
+        }
+
+        const pieceWidthCm = fabricationParams.orientation === 'rotated' ? basePieceLength : basePieceWidth;
+        const pieceLengthCm = fabricationParams.orientation === 'rotated' ? basePieceWidth : basePieceLength;
+        const piecesPerRow = Math.floor(rollWidthCm / pieceWidthCm);
+        if (piecesPerRow <= 0) {
+            return linearRequired;
+        }
+
+        const rowsNeeded = Math.ceil(totalPieces / piecesPerRow);
+        return Number(((rowsNeeded * pieceLengthCm) / 100).toFixed(4));
+    }
+
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
         // Ensure dates are properly instantiated as Date objects and handle potential string inputs
         const orderData = { ...data };
@@ -714,7 +782,18 @@ export class ProductionService {
 
             for (const bomItem of variant.bomItems) {
                 const rawMaterialId = bomItem.rawMaterial.id;
-                const requiredQty = bomItem.quantity * productionQty;
+                const requiredQty = this.calculateRequiredMaterialFromFabrication(
+                    Number(bomItem.quantity),
+                    Number(productionQty),
+                    bomItem.fabricationParams as {
+                        calculationType?: 'area' | 'linear';
+                        quantityPerUnit?: number;
+                        rollWidth: number;
+                        pieceWidth: number;
+                        pieceLength: number;
+                        orientation: 'normal' | 'rotated';
+                    } | undefined
+                );
 
                 if (requirements.has(rawMaterialId)) {
                     requirements.get(rawMaterialId)!.required += requiredQty;
@@ -1073,7 +1152,18 @@ export class ProductionService {
                             continue;
                         }
                         const rawMaterialId = bomItem.rawMaterial.id;
-                        const requiredQty = Number(bomItem.quantity) * producedQty;
+                        const requiredQty = this.calculateRequiredMaterialFromFabrication(
+                            Number(bomItem.quantity),
+                            Number(producedQty),
+                            bomItem.fabricationParams as {
+                                calculationType?: 'area' | 'linear';
+                                quantityPerUnit?: number;
+                                rollWidth: number;
+                                pieceWidth: number;
+                                pieceLength: number;
+                                orientation: 'normal' | 'rotated';
+                            } | undefined
+                        );
                         if (requiredQty <= 0) {
                             continue;
                         }
