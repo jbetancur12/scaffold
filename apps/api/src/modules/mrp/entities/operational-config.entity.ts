@@ -53,6 +53,9 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
     defaultPackagingControlledDocumentCode?: string | null;
 
     @Property({ nullable: true })
+    defaultFinishedInspectionControlledDocumentCode?: string | null;
+
+    @Property({ nullable: true })
     defaultLabelingControlledDocumentCode?: string | null;
 
     @Property({ nullable: true })

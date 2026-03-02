@@ -63,6 +63,7 @@ export class OperationalConfigService {
         config.defaultPurchaseOrderControlledDocumentCode = undefined;
         config.defaultIncomingInspectionControlledDocumentCode = undefined;
         config.defaultPackagingControlledDocumentCode = undefined;
+        config.defaultFinishedInspectionControlledDocumentCode = undefined;
         config.defaultLabelingControlledDocumentCode = undefined;
         config.defaultBatchReleaseControlledDocumentCode = undefined;
         config.operationMode = 'lote';
@@ -107,6 +108,9 @@ export class OperationalConfigService {
         }
         if (data.defaultPackagingControlledDocumentCode !== undefined) {
             config.defaultPackagingControlledDocumentCode = data.defaultPackagingControlledDocumentCode?.trim() || undefined;
+        }
+        if (data.defaultFinishedInspectionControlledDocumentCode !== undefined) {
+            config.defaultFinishedInspectionControlledDocumentCode = data.defaultFinishedInspectionControlledDocumentCode?.trim() || undefined;
         }
         if (data.defaultLabelingControlledDocumentCode !== undefined) {
             config.defaultLabelingControlledDocumentCode = data.defaultLabelingControlledDocumentCode?.trim() || undefined;

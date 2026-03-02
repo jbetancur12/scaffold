@@ -8,6 +8,7 @@ import { ProductionService } from './services/production.service';
 import { PurchaseOrderService } from './services/purchase-order.service';
 import { PurchaseOrderPdfService } from './services/purchase-order-pdf.service';
 import { PackagingFormPdfService } from './services/packaging-form-pdf.service';
+import { FinishedInspectionFormPdfService } from './services/finished-inspection-form-pdf.service';
 import { PurchaseRequisitionService } from './services/purchase-requisition.service';
 import { QualityService } from './services/quality.service';
 import { DocumentControlService } from './services/document-control.service';
@@ -120,6 +121,7 @@ import {
     UpdateProductionBatchUnitQcSchema,
     UpdateProductionBatchUnitPackagingSchema,
     UpsertProductionBatchPackagingFormSchema,
+    UpsertProductionBatchFinishedInspectionFormSchema,
     ReturnProductionMaterialSchema,
     UpsertProductionMaterialAllocationSchema,
     CreateSalesOrderSchema,
@@ -154,6 +156,7 @@ export class MrpController {
     private get purchaseOrderService() { return new PurchaseOrderService(this.em); }
     private get purchaseOrderPdfService() { return new PurchaseOrderPdfService(this.em); }
     private get packagingFormPdfService() { return new PackagingFormPdfService(this.em); }
+    private get finishedInspectionFormPdfService() { return new FinishedInspectionFormPdfService(this.em); }
     private get qualityIncomingPdfService() { return new QualityIncomingPdfService(this.em); }
     private get qualityLabelingPdfService() { return new QualityLabelingPdfService(this.em); }
     private get qualityBatchReleasePdfService() { return new QualityBatchReleasePdfService(this.em); }
@@ -730,6 +733,39 @@ export class MrpController {
             const { batchId } = req.params;
             const form = await this.productionService.getBatchPackagingForm(batchId);
             return ApiResponse.success(res, form);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async upsertProductionBatchFinishedInspectionForm(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { batchId } = req.params;
+            const payload = UpsertProductionBatchFinishedInspectionFormSchema.parse(req.body);
+            const batch = await this.productionService.upsertBatchFinishedInspectionForm(batchId, payload);
+            return ApiResponse.success(res, batch, 'FOR de inspección final guardado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionBatchFinishedInspectionForm(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { batchId } = req.params;
+            const form = await this.productionService.getBatchFinishedInspectionForm(batchId);
+            return ApiResponse.success(res, form);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadProductionBatchFinishedInspectionFormPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { batchId } = req.params;
+            const pdf = await this.finishedInspectionFormPdfService.generateFinishedInspectionFormPdf(batchId);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
+            return res.send(pdf.buffer);
         } catch (error) {
             next(error);
         }

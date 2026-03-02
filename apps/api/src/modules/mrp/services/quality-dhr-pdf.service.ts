@@ -52,8 +52,8 @@ html(lang='es')
         .box
           .k Estado lote
           .v= batchStatus
-          .k(style='margin-top:6px') QC / Empaque
-          .v= qcStatus + ' / ' + packagingStatus
+          .k(style='margin-top:6px') QC / Insp. PT / Empaque
+          .v= qcStatus + ' / ' + finishedInspectionStatus + ' / ' + packagingStatus
           .k(style='margin-top:6px') Cantidades
           .v= 'Plan: ' + plannedQty + ' · Producido: ' + producedQty
 
@@ -189,6 +189,14 @@ export class QualityDhrPdfService {
 
         const qualitySteps = [
             {
+                step: 'Inspección PT',
+                code: '-',
+                version: '-',
+                date: '-',
+                status: this.translateBatchStatus(data.productionBatch.finishedInspectionStatus || '-'),
+                note: 'Estado de inspección de producto terminado',
+            },
+            {
                 step: 'FOR Empaque',
                 code: data.batchRelease?.documentControlCode || '-',
                 version: data.batchRelease?.documentControlVersion ? `v${data.batchRelease.documentControlVersion}` : '-',
@@ -223,6 +231,7 @@ export class QualityDhrPdfService {
             generatedBy: data.generatedBy || 'sistema',
             batchStatus: this.translateBatchStatus(data.productionBatch.status),
             qcStatus: this.translateBatchStatus(data.productionBatch.qcStatus),
+            finishedInspectionStatus: this.translateBatchStatus(data.productionBatch.finishedInspectionStatus || '-'),
             packagingStatus: this.translateBatchStatus(data.productionBatch.packagingStatus),
             plannedQty: this.formatNumber(data.productionBatch.plannedQty),
             producedQty: this.formatNumber(data.productionBatch.producedQty),

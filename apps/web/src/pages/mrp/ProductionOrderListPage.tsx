@@ -65,6 +65,7 @@ export default function ProductionOrderListPage() {
         status: DocumentStatus.APROBADO,
     });
     const [selectedPackagingDocCode, setSelectedPackagingDocCode] = useState<string>('');
+    const [selectedFinishedInspectionDocCode, setSelectedFinishedInspectionDocCode] = useState<string>('');
     const [selectedLabelingDocCode, setSelectedLabelingDocCode] = useState<string>('');
     const [selectedBatchReleaseDocCode, setSelectedBatchReleaseDocCode] = useState<string>('');
     const orders = ordersResponse?.orders ?? [];
@@ -73,6 +74,7 @@ export default function ProductionOrderListPage() {
 
     const packagingOptions = packagingDocs ?? [];
     const currentPackagingConfigured = selectedPackagingDocCode || operationalConfig?.defaultPackagingControlledDocumentCode || '';
+    const currentFinishedInspectionConfigured = selectedFinishedInspectionDocCode || operationalConfig?.defaultFinishedInspectionControlledDocumentCode || '';
     const currentLabelingConfigured = selectedLabelingDocCode || operationalConfig?.defaultLabelingControlledDocumentCode || '';
     const currentBatchReleaseConfigured = selectedBatchReleaseDocCode || operationalConfig?.defaultBatchReleaseControlledDocumentCode || '';
     const currentOperationMode: 'lote' | 'serial' = 'lote';
@@ -93,6 +95,7 @@ export default function ProductionOrderListPage() {
                 defaultPurchaseOrderControlledDocumentCode: operationalConfig.defaultPurchaseOrderControlledDocumentCode || undefined,
                 defaultIncomingInspectionControlledDocumentCode: operationalConfig.defaultIncomingInspectionControlledDocumentCode || undefined,
                 defaultPackagingControlledDocumentCode: currentPackagingConfigured || undefined,
+                defaultFinishedInspectionControlledDocumentCode: currentFinishedInspectionConfigured || undefined,
                 defaultLabelingControlledDocumentCode: currentLabelingConfigured || undefined,
                 defaultBatchReleaseControlledDocumentCode: currentBatchReleaseConfigured || undefined,
                 operationMode: 'lote',
@@ -156,7 +159,7 @@ export default function ProductionOrderListPage() {
                         </div>
                         <div className="p-6 space-y-5">
                             <p className="text-sm text-slate-500">
-                                Configura los documentos FOR globales para el flujo de lote: empaque, etiquetado y liberación QA.
+                                Configura los documentos FOR globales para el flujo de lote: inspección PT, empaque, etiquetado y liberación QA.
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div className="space-y-2">
@@ -179,6 +182,21 @@ export default function ProductionOrderListPage() {
                                         <option value="">Selecciona formato de empaque...</option>
                                         {packagingOptions.map((doc) => (
                                             <option key={doc.id} value={doc.code}>
+                                                {doc.code} v{doc.version} — {doc.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-700">Formato de Inspección PT</label>
+                                    <select
+                                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                        value={currentFinishedInspectionConfigured}
+                                        onChange={(e) => setSelectedFinishedInspectionDocCode(e.target.value)}
+                                    >
+                                        <option value="">Selecciona formato de inspección final...</option>
+                                        {packagingOptions.map((doc) => (
+                                            <option key={`${doc.id}-fins`} value={doc.code}>
                                                 {doc.code} v{doc.version} — {doc.title}
                                             </option>
                                         ))}
@@ -215,10 +233,10 @@ export default function ProductionOrderListPage() {
                                     </select>
                                 </div>
                             </div>
-                            {(!currentPackagingConfigured || !currentLabelingConfigured || !currentBatchReleaseConfigured) && (
+                            {(!currentPackagingConfigured || !currentFinishedInspectionConfigured || !currentLabelingConfigured || !currentBatchReleaseConfigured) && (
                                 <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                                     <AlertCircle className="h-4 w-4 shrink-0" />
-                                    Debes configurar los tres formatos para completar el flujo unificado del lote.
+                                    Debes configurar los cuatro formatos para completar el flujo unificado del lote.
                                 </div>
                             )}
                             <div className="flex justify-end">

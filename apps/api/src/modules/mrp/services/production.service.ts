@@ -5,6 +5,7 @@ import {
     DocumentCategory,
     DocumentProcess,
     DocumentStatus,
+    ProductionBatchFinishedInspectionStatus,
     ProductionBatchPackagingStatus,
     ProductionBatchQcStatus,
     ProductionBatchStatus,
@@ -276,6 +277,7 @@ export class ProductionService {
             producedQty: 0,
             notes: payload.notes,
             qcStatus: ProductionBatchQcStatus.PENDING,
+            finishedInspectionStatus: ProductionBatchFinishedInspectionStatus.PENDING,
             packagingStatus: ProductionBatchPackagingStatus.PENDING,
             status: ProductionBatchStatus.IN_PROGRESS,
         } as unknown as ProductionBatch);
@@ -332,6 +334,11 @@ export class ProductionService {
         const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units', 'productionOrder'] });
         this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'aprobar QC de lote');
         batch.qcStatus = passed ? ProductionBatchQcStatus.PASSED : ProductionBatchQcStatus.FAILED;
+        if (!passed) {
+            batch.finishedInspectionStatus = ProductionBatchFinishedInspectionStatus.PENDING;
+            batch.finishedInspectionFormCompleted = false;
+            batch.packagingStatus = ProductionBatchPackagingStatus.PENDING;
+        }
         batch.status = passed ? ProductionBatchStatus.QC_PASSED : ProductionBatchStatus.QC_PENDING;
         await this.em.persistAndFlush(batch);
         if (!passed) {
@@ -347,6 +354,12 @@ export class ProductionService {
         this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'empacar lote');
         if (packed && !batch.packagingFormCompleted) {
             throw new AppError('Debes diligenciar el FOR de empaque antes de empacar', 400);
+        }
+        if (packed && !batch.finishedInspectionFormCompleted) {
+            throw new AppError('Debes diligenciar el FOR de inspección de producto terminado antes de empacar', 400);
+        }
+        if (packed && batch.finishedInspectionStatus !== ProductionBatchFinishedInspectionStatus.PASSED) {
+            throw new AppError('Debes aprobar la inspección final de producto terminado antes de empacar', 400);
         }
         if (batch.qcStatus !== ProductionBatchQcStatus.PASSED) {
             throw new AppError('Debes aprobar QC antes de empacar', 400);
@@ -382,6 +395,119 @@ export class ProductionService {
         }
         await this.logAudit('production_batch', batch.id, 'packaging_updated', { packed });
         return batch;
+    }
+
+    async upsertBatchFinishedInspectionForm(batchId: string, payload: {
+        inspectorName: string;
+        verifierName: string;
+        quantityInspected: number;
+        quantityApproved: number;
+        quantityRejected: number;
+        sizeCheck: boolean;
+        stitchingCheck: boolean;
+        visualCheck: boolean;
+        labelingCheck: boolean;
+        productMatchesOrder: boolean;
+        observations?: string;
+        nonConformity?: string;
+        correctiveAction?: string;
+        preventiveAction?: string;
+        controlledDocumentId?: string;
+        actor?: string;
+    }) {
+        const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['productionOrder'] });
+        this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'diligenciar FOR de inspección final');
+        if (batch.packagingStatus === ProductionBatchPackagingStatus.PACKED) {
+            throw new AppError('No puedes cambiar inspección final en un lote ya empacado', 400);
+        }
+        if (batch.qcStatus !== ProductionBatchQcStatus.PASSED) {
+            throw new AppError('Debes aprobar QC del lote antes de inspección final', 400);
+        }
+        if (payload.quantityInspected <= 0) {
+            throw new AppError('Cantidad inspeccionada debe ser mayor a 0', 400);
+        }
+        if (payload.quantityApproved < 0 || payload.quantityRejected < 0) {
+            throw new AppError('Cantidades aprobada/rechazada no pueden ser negativas', 400);
+        }
+        if (payload.quantityApproved + payload.quantityRejected > payload.quantityInspected) {
+            throw new AppError('Aprobada + rechazada no puede superar inspeccionada', 400);
+        }
+        if (payload.quantityInspected > batch.plannedQty) {
+            throw new AppError(`Cantidad inspeccionada no puede superar el plan del lote (${batch.plannedQty})`, 400);
+        }
+
+        const controlledDoc = await this.resolveFinishedInspectionControlledDocument(payload.controlledDocumentId);
+        const allChecksPassed =
+            payload.sizeCheck &&
+            payload.stitchingCheck &&
+            payload.visualCheck &&
+            payload.labelingCheck &&
+            payload.productMatchesOrder;
+        const passed =
+            allChecksPassed &&
+            payload.quantityRejected === 0 &&
+            payload.quantityApproved > 0;
+
+        batch.finishedInspectionFormData = {
+            inspectorName: payload.inspectorName.trim(),
+            verifierName: payload.verifierName.trim(),
+            quantityInspected: payload.quantityInspected,
+            quantityApproved: payload.quantityApproved,
+            quantityRejected: payload.quantityRejected,
+            sizeCheck: payload.sizeCheck,
+            stitchingCheck: payload.stitchingCheck,
+            visualCheck: payload.visualCheck,
+            labelingCheck: payload.labelingCheck,
+            productMatchesOrder: payload.productMatchesOrder,
+            observations: payload.observations?.trim() || undefined,
+            nonConformity: payload.nonConformity?.trim() || undefined,
+            correctiveAction: payload.correctiveAction?.trim() || undefined,
+            preventiveAction: payload.preventiveAction?.trim() || undefined,
+        };
+        batch.finishedInspectionFormCompleted = true;
+        batch.finishedInspectionFormFilledBy = payload.actor?.trim() || payload.inspectorName.trim();
+        batch.finishedInspectionFormFilledAt = new Date();
+        batch.finishedInspectionFormDocumentId = controlledDoc.id;
+        batch.finishedInspectionFormDocumentCode = controlledDoc.code;
+        batch.finishedInspectionFormDocumentTitle = controlledDoc.title;
+        batch.finishedInspectionFormDocumentVersion = controlledDoc.version;
+        batch.finishedInspectionFormDocumentDate = controlledDoc.effectiveDate || controlledDoc.approvedAt || controlledDoc.updatedAt;
+        batch.finishedInspectionStatus = passed
+            ? ProductionBatchFinishedInspectionStatus.PASSED
+            : ProductionBatchFinishedInspectionStatus.FAILED;
+        batch.status = passed ? ProductionBatchStatus.QC_PASSED : ProductionBatchStatus.QC_PENDING;
+        await this.em.persistAndFlush(batch);
+        await this.reopenBatchReleaseIfNeeded(batch.id, 'Cambio de inspección final de producto');
+        await this.logAudit('production_batch', batch.id, 'finished_inspection_form_updated', {
+            passed,
+            controlledDocumentCode: batch.finishedInspectionFormDocumentCode,
+            controlledDocumentVersion: batch.finishedInspectionFormDocumentVersion,
+            actor: payload.actor || payload.inspectorName,
+        });
+        return batch;
+    }
+
+    async getBatchFinishedInspectionForm(batchId: string) {
+        const batch = await this.batchRepo.findOneOrFail(
+            { id: batchId },
+            { populate: ['variant', 'variant.product', 'productionOrder'] }
+        );
+        return {
+            batchId: batch.id,
+            batchCode: batch.code,
+            productionOrderCode: batch.productionOrder.code,
+            productName: batch.variant?.product?.name || 'N/A',
+            variantName: batch.variant?.name || 'N/A',
+            formCompleted: Boolean(batch.finishedInspectionFormCompleted),
+            formFilledBy: batch.finishedInspectionFormFilledBy,
+            formFilledAt: batch.finishedInspectionFormFilledAt,
+            documentControlCode: batch.finishedInspectionFormDocumentCode,
+            documentControlTitle: batch.finishedInspectionFormDocumentTitle,
+            documentControlVersion: batch.finishedInspectionFormDocumentVersion,
+            documentControlDate: batch.finishedInspectionFormDocumentDate,
+            inspectionStatus: batch.finishedInspectionStatus,
+            data: batch.finishedInspectionFormData || null,
+        };
     }
 
     private async assertRegulatoryLabelingReady(batch: ProductionBatch) {
@@ -1224,6 +1350,40 @@ export class ProductionService {
         }, { orderBy: { version: 'DESC' } });
         if (!configured) {
             throw new AppError(`El formato global de empaque configurado (${configuredCode}) no está aprobado/vigente`, 400);
+        }
+        return configured;
+    }
+
+    private async resolveFinishedInspectionControlledDocument(controlledDocumentId?: string) {
+        const docRepo = this.em.getRepository(ControlledDocument);
+        if (controlledDocumentId) {
+            const selected = await docRepo.findOne({ id: controlledDocumentId });
+            if (!selected) {
+                throw new AppError('Documento controlado no encontrado para FOR de inspección final', 404);
+            }
+            if (selected.process !== DocumentProcess.CONTROL_CALIDAD || selected.status !== DocumentStatus.APROBADO) {
+                throw new AppError('El documento seleccionado debe estar aprobado y pertenecer a Control de Calidad', 400);
+            }
+            return selected;
+        }
+
+        const configs = await this.operationalConfigRepo.findAll({ limit: 1, orderBy: { createdAt: 'DESC' } });
+        const config = configs[0];
+        const configuredCode = config?.defaultFinishedInspectionControlledDocumentCode?.trim();
+        if (!configuredCode) {
+            throw new AppError('Debes configurar el formato global de inspección final en Órdenes de Producción (engranaje)', 400);
+        }
+        const now = new Date();
+        const configured = await docRepo.findOne({
+            code: configuredCode,
+            process: DocumentProcess.CONTROL_CALIDAD,
+            documentCategory: DocumentCategory.FOR,
+            status: DocumentStatus.APROBADO,
+            $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
+            $and: [{ $or: [{ effectiveDate: null }, { effectiveDate: { $lte: now } }] }],
+        }, { orderBy: { version: 'DESC' } });
+        if (!configured) {
+            throw new AppError(`El formato global de inspección final (${configuredCode}) no está aprobado/vigente`, 400);
         }
         return configured;
     }

@@ -6,6 +6,7 @@ import {
     DocumentStatus,
     DispatchValidationResult,
     DocumentApprovalMethod,
+    ProductionBatchFinishedInspectionStatus,
     ProductionBatchPackagingStatus,
     ProductionBatchQcStatus,
 } from '@scaffold/types';
@@ -121,9 +122,10 @@ export class QualityBatchReleaseService {
         }
         if (
             batch.qcStatus !== ProductionBatchQcStatus.PASSED ||
+            batch.finishedInspectionStatus !== ProductionBatchFinishedInspectionStatus.PASSED ||
             batch.packagingStatus !== ProductionBatchPackagingStatus.PACKED
         ) {
-            throw new AppError('El lote debe estar con QC y empaque aprobados', 400);
+            throw new AppError('El lote debe estar con QC, inspección final y empaque aprobados', 400);
         }
 
         const dispatchValidation = await this.validateDispatchReadiness(batch.id, payload.actor);

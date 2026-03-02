@@ -77,6 +77,9 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/production-batches/:batchId/packaging-form', (req, res, next) => mrpController.upsertProductionBatchPackagingForm(req, res, next));
     router.get('/production-batches/:batchId/packaging-form', (req, res, next) => mrpController.getProductionBatchPackagingForm(req, res, next));
     router.get('/production-batches/:batchId/packaging-form/pdf', (req, res, next) => mrpController.downloadProductionBatchPackagingFormPdf(req, res, next));
+    router.post('/production-batches/:batchId/finished-inspection-form', (req, res, next) => mrpController.upsertProductionBatchFinishedInspectionForm(req, res, next));
+    router.get('/production-batches/:batchId/finished-inspection-form', (req, res, next) => mrpController.getProductionBatchFinishedInspectionForm(req, res, next));
+    router.get('/production-batches/:batchId/finished-inspection-form/pdf', (req, res, next) => mrpController.downloadProductionBatchFinishedInspectionFormPdf(req, res, next));
     router.patch('/production-batch-units/:unitId/qc', (req, res, next) => mrpController.updateProductionBatchUnitQc(req, res, next));
     router.patch('/production-batch-units/:unitId/packaging', (req, res, next) => mrpController.updateProductionBatchUnitPackaging(req, res, next));
 

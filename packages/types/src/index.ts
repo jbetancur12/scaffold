@@ -68,6 +68,12 @@ export enum ProductionBatchPackagingStatus {
     PACKED = 'packed',
 }
 
+export enum ProductionBatchFinishedInspectionStatus {
+    PENDING = 'pending',
+    PASSED = 'passed',
+    FAILED = 'failed',
+}
+
 export enum ProductionBatchStatus {
     IN_PROGRESS = 'in_progress',
     QC_PENDING = 'qc_pending',
@@ -621,6 +627,7 @@ export interface ProductionBatch {
     plannedQty: number;
     producedQty: number;
     qcStatus: ProductionBatchQcStatus;
+    finishedInspectionStatus?: ProductionBatchFinishedInspectionStatus;
     packagingStatus: ProductionBatchPackagingStatus;
     status: ProductionBatchStatus;
     notes?: string;
@@ -633,6 +640,15 @@ export interface ProductionBatch {
     packagingFormDocumentTitle?: string;
     packagingFormDocumentVersion?: number;
     packagingFormDocumentDate?: string | Date;
+    finishedInspectionFormData?: Record<string, unknown>;
+    finishedInspectionFormCompleted?: boolean;
+    finishedInspectionFormFilledBy?: string;
+    finishedInspectionFormFilledAt?: string | Date;
+    finishedInspectionFormDocumentId?: string;
+    finishedInspectionFormDocumentCode?: string;
+    finishedInspectionFormDocumentTitle?: string;
+    finishedInspectionFormDocumentVersion?: number;
+    finishedInspectionFormDocumentDate?: string | Date;
     variant?: ProductVariant & { product?: Product };
     units?: ProductionBatchUnit[];
     createdAt: string | Date;
@@ -1209,6 +1225,7 @@ export interface BatchDhrExpedient {
         plannedQty: number;
         producedQty: number;
         qcStatus: ProductionBatchQcStatus;
+        finishedInspectionStatus?: ProductionBatchFinishedInspectionStatus;
         packagingStatus: ProductionBatchPackagingStatus;
         status: ProductionBatchStatus;
         productionOrder?: {
@@ -1746,6 +1763,25 @@ export interface UpsertProductionBatchPackagingFormPayload {
     actor?: string;
 }
 
+export interface UpsertProductionBatchFinishedInspectionFormPayload {
+    inspectorName: string;
+    verifierName: string;
+    quantityInspected: number;
+    quantityApproved: number;
+    quantityRejected: number;
+    sizeCheck: boolean;
+    stitchingCheck: boolean;
+    visualCheck: boolean;
+    labelingCheck: boolean;
+    productMatchesOrder: boolean;
+    observations?: string;
+    nonConformity?: string;
+    correctiveAction?: string;
+    preventiveAction?: string;
+    controlledDocumentId?: string;
+    actor?: string;
+}
+
 export interface SignBatchReleasePayload {
     actor: string;
     approvalMethod: DocumentApprovalMethod;
@@ -1811,6 +1847,7 @@ export interface OperationalConfig {
     defaultPurchaseOrderControlledDocumentCode?: string | null;
     defaultIncomingInspectionControlledDocumentCode?: string | null;
     defaultPackagingControlledDocumentCode?: string | null;
+    defaultFinishedInspectionControlledDocumentCode?: string | null;
     defaultLabelingControlledDocumentCode?: string | null;
     defaultBatchReleaseControlledDocumentCode?: string | null;
     defaultSalesOrderProductionDocCode?: string | null;

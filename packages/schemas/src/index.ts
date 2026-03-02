@@ -325,6 +325,33 @@ export const UpdateProductionBatchPackagingSchema = z.object({
     packed: z.boolean(),
 });
 
+export const UpsertProductionBatchFinishedInspectionFormSchema = z.object({
+    inspectorName: z.string().min(2),
+    verifierName: z.string().min(2),
+    quantityInspected: z.number().positive(),
+    quantityApproved: z.number().nonnegative(),
+    quantityRejected: z.number().nonnegative(),
+    sizeCheck: z.boolean(),
+    stitchingCheck: z.boolean(),
+    visualCheck: z.boolean(),
+    labelingCheck: z.boolean(),
+    productMatchesOrder: z.boolean(),
+    observations: z.string().optional(),
+    nonConformity: z.string().optional(),
+    correctiveAction: z.string().optional(),
+    preventiveAction: z.string().optional(),
+    controlledDocumentId: z.string().uuid().optional(),
+    actor: z.string().optional(),
+}).superRefine((data, ctx) => {
+    if (data.quantityApproved + data.quantityRejected > data.quantityInspected) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['quantityApproved'],
+            message: 'Aprobada + rechazada no puede superar cantidad inspeccionada',
+        });
+    }
+});
+
 export const UpdateProductionBatchUnitQcSchema = z.object({
     passed: z.boolean(),
 });
@@ -1105,6 +1132,7 @@ export const OperationalConfigSchema = z.object({
     defaultPurchaseOrderControlledDocumentCode: z.string().min(1).nullish(),
     defaultIncomingInspectionControlledDocumentCode: z.string().min(1).nullish(),
     defaultPackagingControlledDocumentCode: z.string().min(1).nullish(),
+    defaultFinishedInspectionControlledDocumentCode: z.string().min(1).nullish(),
     defaultLabelingControlledDocumentCode: z.string().min(1).nullish(),
     defaultBatchReleaseControlledDocumentCode: z.string().min(1).nullish(),
     defaultSalesOrderProductionDocCode: z.string().min(1).nullish(),
@@ -1202,6 +1230,7 @@ export type CreateDmrTemplatePayload = DateInputValue<z.input<typeof CreateDmrTe
 export type ProductCsvImportPayload = DateInputValue<z.input<typeof ProductCsvImportSchema>>;
 export type SupplierCsvImportPayload = DateInputValue<z.input<typeof SupplierCsvImportSchema>>;
 export type CustomerCsvImportPayload = DateInputValue<z.input<typeof CustomerCsvImportSchema>>;
+export type UpsertProductionBatchFinishedInspectionFormPayload = DateInputValue<z.input<typeof UpsertProductionBatchFinishedInspectionFormSchema>>;
 export type UpsertRegulatoryLabelPayload = DateInputValue<z.input<typeof UpsertRegulatoryLabelSchema>>;
 export type ValidateDispatchReadinessPayload = DateInputValue<z.input<typeof ValidateDispatchReadinessSchema>>;
 export type CreateQualityRiskControlPayload = DateInputValue<z.input<typeof CreateQualityRiskControlSchema>>;

@@ -78,6 +78,7 @@ import {
     SalesOrder,
     SalesOrderListResponse,
     UpsertProductionBatchPackagingFormPayload,
+    UpsertProductionBatchFinishedInspectionFormPayload,
 } from '@scaffold/types';
 import type {
     CreatePurchaseOrderDto,
@@ -597,6 +598,10 @@ export const mrpApi = {
         const response = await api.post<ProductionBatch>(`/mrp/production-batches/${batchId}/packaging-form`, payload);
         return response.data;
     },
+    upsertProductionBatchFinishedInspectionForm: async (batchId: string, payload: UpsertProductionBatchFinishedInspectionFormPayload): Promise<ProductionBatch> => {
+        const response = await api.post<ProductionBatch>(`/mrp/production-batches/${batchId}/finished-inspection-form`, payload);
+        return response.data;
+    },
     getProductionBatchPackagingForm: async (batchId: string): Promise<{
         batchId: string;
         batchCode: string;
@@ -617,6 +622,29 @@ export const mrpApi = {
     },
     getProductionBatchPackagingFormPdf: async (batchId: string): Promise<Blob> => {
         const response = await api.get(`/mrp/production-batches/${batchId}/packaging-form/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    getProductionBatchFinishedInspectionForm: async (batchId: string): Promise<{
+        batchId: string;
+        batchCode: string;
+        productionOrderCode: string;
+        productName: string;
+        variantName: string;
+        formCompleted: boolean;
+        formFilledBy?: string;
+        formFilledAt?: string;
+        documentControlCode?: string;
+        documentControlTitle?: string;
+        documentControlVersion?: number;
+        documentControlDate?: string;
+        inspectionStatus?: string;
+        data: Record<string, unknown> | null;
+    }> => {
+        const response = await api.get(`/mrp/production-batches/${batchId}/finished-inspection-form`);
+        return response.data;
+    },
+    getProductionBatchFinishedInspectionFormPdf: async (batchId: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/production-batches/${batchId}/finished-inspection-form/pdf`, { responseType: 'blob' });
         return response.data as Blob;
     },
 

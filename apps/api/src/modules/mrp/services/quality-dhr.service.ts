@@ -335,6 +335,7 @@ export class QualityDhrService {
                 plannedQty: Number(batch.plannedQty),
                 producedQty: Number(batch.producedQty),
                 qcStatus: batch.qcStatus,
+                finishedInspectionStatus: batch.finishedInspectionStatus,
                 packagingStatus: batch.packagingStatus,
                 status: batch.status,
                 productionOrder: batch.productionOrder ? {
@@ -427,6 +428,7 @@ export class QualityDhrService {
         lines.push(toCsvRow(['batch', 'plannedQty', data.productionBatch.plannedQty]));
         lines.push(toCsvRow(['batch', 'producedQty', data.productionBatch.producedQty]));
         lines.push(toCsvRow(['batch', 'qcStatus', data.productionBatch.qcStatus]));
+        lines.push(toCsvRow(['batch', 'finishedInspectionStatus', data.productionBatch.finishedInspectionStatus || '']));
         lines.push(toCsvRow(['batch', 'packagingStatus', data.productionBatch.packagingStatus]));
         lines.push(toCsvRow(['batch', 'status', data.productionBatch.status]));
         lines.push(toCsvRow(['batch', 'generatedAt', new Date(data.generatedAt).toISOString()]));

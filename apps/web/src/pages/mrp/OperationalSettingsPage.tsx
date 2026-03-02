@@ -154,6 +154,7 @@ export default function OperationalSettingsPage() {
                 defaultPurchaseOrderControlledDocumentCode: config.defaultPurchaseOrderControlledDocumentCode || undefined,
                 defaultIncomingInspectionControlledDocumentCode: config.defaultIncomingInspectionControlledDocumentCode || undefined,
                 defaultPackagingControlledDocumentCode: config.defaultPackagingControlledDocumentCode || undefined,
+                defaultFinishedInspectionControlledDocumentCode: config.defaultFinishedInspectionControlledDocumentCode || undefined,
                 defaultLabelingControlledDocumentCode: config.defaultLabelingControlledDocumentCode || undefined,
                 defaultBatchReleaseControlledDocumentCode: config.defaultBatchReleaseControlledDocumentCode || undefined,
             };
@@ -721,6 +722,33 @@ export default function OperationalSettingsPage() {
                                             <option value="">Sin formato global</option>
                                             {documentCodeOptions.map((doc) => (
                                                 <option key={`pack-${doc.code}`} value={doc.code}>
+                                                    {doc.code} (v{doc.version}) - {doc.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="defaultFinishedInspectionControlledDocumentCode" className="text-base font-semibold">
+                                            Inspección producto terminado
+                                        </Label>
+                                        <p className="text-sm text-muted-foreground pb-2">
+                                            Formato global para FOR de inspección de producto terminado.
+                                        </p>
+                                        <select
+                                            id="defaultFinishedInspectionControlledDocumentCode"
+                                            className="w-full h-10 px-3 py-2 bg-white border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                                            value={config.defaultFinishedInspectionControlledDocumentCode || ''}
+                                            onChange={(e) =>
+                                                setConfig({
+                                                    ...config,
+                                                    defaultFinishedInspectionControlledDocumentCode: e.target.value || undefined,
+                                                })
+                                            }
+                                        >
+                                            <option value="">Sin formato global</option>
+                                            {documentCodeOptions.map((doc) => (
+                                                <option key={`fins-${doc.code}`} value={doc.code}>
                                                     {doc.code} (v{doc.version}) - {doc.title}
                                                 </option>
                                             ))}

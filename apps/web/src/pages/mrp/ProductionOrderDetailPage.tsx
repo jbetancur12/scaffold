@@ -5,6 +5,7 @@ import {
     BatchRelease,
     BatchReleaseStatus,
     DocumentApprovalMethod,
+    ProductionBatchFinishedInspectionStatus,
     Product,
     ProductionOrderItem,
     ProductionOrderStatus,
@@ -57,6 +58,7 @@ import {
     useUpdateProductionBatchUnitQcMutation,
     useUpdateProductionOrderStatusMutation,
     useUpsertProductionMaterialAllocationMutation,
+    useUpsertProductionBatchFinishedInspectionFormMutation,
     useUpsertProductionBatchPackagingFormMutation,
 } from '@/hooks/mrp/useProductionOrders';
 
@@ -73,6 +75,7 @@ export default function ProductionOrderDetailPage() {
     const [newBatchCode, setNewBatchCode] = useState<string>('');
     const [autoGeneratingBatches, setAutoGeneratingBatches] = useState(false);
     const [packagingFormBatchId, setPackagingFormBatchId] = useState<string | null>(null);
+    const [finishedInspectionFormBatchId, setFinishedInspectionFormBatchId] = useState<string | null>(null);
     const [packagingForm, setPackagingForm] = useState({
         operatorName: '',
         verifierName: '',
@@ -84,6 +87,22 @@ export default function ProductionOrderDetailPage() {
         hasPackagingMaterial: false,
         hasTools: false,
         inventoryRecorded: false,
+        observations: '',
+        nonConformity: '',
+        correctiveAction: '',
+        preventiveAction: '',
+    });
+    const [finishedInspectionForm, setFinishedInspectionForm] = useState({
+        inspectorName: '',
+        verifierName: '',
+        quantityInspected: '0',
+        quantityApproved: '0',
+        quantityRejected: '0',
+        sizeCheck: false,
+        stitchingCheck: false,
+        visualCheck: false,
+        labelingCheck: false,
+        productMatchesOrder: false,
         observations: '',
         nonConformity: '',
         correctiveAction: '',
@@ -138,6 +157,7 @@ export default function ProductionOrderDetailPage() {
     const { execute: updateUnitQc } = useUpdateProductionBatchUnitQcMutation();
     const { execute: updateUnitPackaging } = useUpdateProductionBatchUnitPackagingMutation();
     const { execute: upsertPackagingForm, loading: savingPackagingForm } = useUpsertProductionBatchPackagingFormMutation();
+    const { execute: upsertFinishedInspectionForm, loading: savingFinishedInspectionForm } = useUpsertProductionBatchFinishedInspectionFormMutation();
     const { execute: upsertMaterialAllocation, loading: savingMaterialAllocation } = useUpsertProductionMaterialAllocationMutation();
     const { execute: returnMaterial, loading: returningMaterial } = useReturnProductionMaterialMutation();
 
@@ -388,7 +408,9 @@ export default function ProductionOrderDetailPage() {
             operatorName: String(data.operatorName || ''),
             verifierName: String(data.verifierName || ''),
             quantityToPack: String(data.quantityToPack || batch?.plannedQty || 0),
-            quantityPacked: String(data.quantityPacked || batch?.producedQty || 0),
+            quantityPacked: batch?.finishedInspectionStatus === ProductionBatchFinishedInspectionStatus.PASSED
+                ? String(data.quantityPacked || batch?.producedQty || 0)
+                : '0',
             lotLabel: String(data.lotLabel || batch?.code || ''),
             hasTechnicalSheet: Boolean(data.hasTechnicalSheet),
             hasLabels: Boolean(data.hasLabels),
@@ -403,6 +425,33 @@ export default function ProductionOrderDetailPage() {
     };
 
     const closePackagingFormDialog = () => setPackagingFormBatchId(null);
+
+    const openFinishedInspectionFormDialog = (batchId: string) => {
+        const batch = batches.find((b) => b.id === batchId);
+        const data = (batch?.finishedInspectionFormData || {}) as Record<string, unknown>;
+        setFinishedInspectionFormBatchId(batchId);
+        setFinishedInspectionForm({
+            inspectorName: String(data.inspectorName || ''),
+            verifierName: String(data.verifierName || ''),
+            quantityInspected: String(data.quantityInspected || batch?.plannedQty || 0),
+            quantityApproved: String(data.quantityApproved || 0),
+            quantityRejected: String(data.quantityRejected || 0),
+            sizeCheck: Boolean(data.sizeCheck),
+            stitchingCheck: Boolean(data.stitchingCheck),
+            visualCheck: Boolean(data.visualCheck),
+            labelingCheck: Boolean(data.labelingCheck),
+            productMatchesOrder: Boolean(data.productMatchesOrder),
+            observations: String(data.observations || ''),
+            nonConformity: String(data.nonConformity || ''),
+            correctiveAction: String(data.correctiveAction || ''),
+            preventiveAction: String(data.preventiveAction || ''),
+        });
+    };
+
+    const closeFinishedInspectionFormDialog = () => setFinishedInspectionFormBatchId(null);
+
+    const selectedPackagingBatch = packagingFormBatchId ? batches.find((b) => b.id === packagingFormBatchId) : undefined;
+    const canEditPackedQuantity = selectedPackagingBatch?.finishedInspectionStatus === ProductionBatchFinishedInspectionStatus.PASSED;
 
     const submitPackagingForm = async () => {
         if (!id || !packagingFormBatchId) return;
@@ -424,6 +473,14 @@ export default function ProductionOrderDetailPage() {
         }
         if (quantityPacked > quantityToPack) {
             toast({ title: 'Error', description: 'Cantidad empacada no puede superar la cantidad a empacar', variant: 'destructive' });
+            return;
+        }
+        if (batch?.finishedInspectionStatus !== ProductionBatchFinishedInspectionStatus.PASSED && quantityPacked > 0) {
+            toast({
+                title: 'Error',
+                description: 'Solo puedes registrar cantidad empacada cuando la Inspección PT esté aprobada.',
+                variant: 'destructive',
+            });
             return;
         }
         try {
@@ -456,6 +513,59 @@ export default function ProductionOrderDetailPage() {
         }
     };
 
+    const submitFinishedInspectionForm = async () => {
+        if (!id || !finishedInspectionFormBatchId) return;
+        const batch = batches.find((row) => row.id === finishedInspectionFormBatchId);
+        const plannedQty = Number(batch?.plannedQty || 0);
+        const quantityInspected = Number(finishedInspectionForm.quantityInspected || 0);
+        const quantityApproved = Number(finishedInspectionForm.quantityApproved || 0);
+        const quantityRejected = Number(finishedInspectionForm.quantityRejected || 0);
+        if (quantityInspected <= 0) {
+            toast({ title: 'Error', description: 'Cantidad inspeccionada debe ser mayor a 0', variant: 'destructive' });
+            return;
+        }
+        if (quantityApproved < 0 || quantityRejected < 0) {
+            toast({ title: 'Error', description: 'Cantidad aprobada/rechazada no puede ser negativa', variant: 'destructive' });
+            return;
+        }
+        if (plannedQty > 0 && quantityInspected > plannedQty) {
+            toast({ title: 'Error', description: `Cantidad inspeccionada no puede superar el plan del lote (${plannedQty})`, variant: 'destructive' });
+            return;
+        }
+        if (quantityApproved + quantityRejected > quantityInspected) {
+            toast({ title: 'Error', description: 'Aprobada + rechazada no puede superar inspeccionada', variant: 'destructive' });
+            return;
+        }
+        try {
+            await upsertFinishedInspectionForm({
+                orderId: id,
+                batchId: finishedInspectionFormBatchId,
+                payload: {
+                    inspectorName: finishedInspectionForm.inspectorName.trim(),
+                    verifierName: finishedInspectionForm.verifierName.trim(),
+                    quantityInspected,
+                    quantityApproved,
+                    quantityRejected,
+                    sizeCheck: finishedInspectionForm.sizeCheck,
+                    stitchingCheck: finishedInspectionForm.stitchingCheck,
+                    visualCheck: finishedInspectionForm.visualCheck,
+                    labelingCheck: finishedInspectionForm.labelingCheck,
+                    productMatchesOrder: finishedInspectionForm.productMatchesOrder,
+                    observations: finishedInspectionForm.observations.trim() || undefined,
+                    nonConformity: finishedInspectionForm.nonConformity.trim() || undefined,
+                    correctiveAction: finishedInspectionForm.correctiveAction.trim() || undefined,
+                    preventiveAction: finishedInspectionForm.preventiveAction.trim() || undefined,
+                    actor: 'sistema-web',
+                },
+            });
+            toast({ title: 'FOR guardado', description: 'Inspección final guardada correctamente.' });
+            closeFinishedInspectionFormDialog();
+            await reloadBatches({ force: true });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo guardar el FOR de inspección final'), variant: 'destructive' });
+        }
+    };
+
     const downloadPackagingFormPdf = async (batchId: string) => {
         try {
             const blob = await mrpApi.getProductionBatchPackagingFormPdf(batchId);
@@ -469,6 +579,22 @@ export default function ProductionOrderDetailPage() {
             URL.revokeObjectURL(url);
         } catch (err) {
             toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo descargar el FOR de empaque'), variant: 'destructive' });
+        }
+    };
+
+    const downloadFinishedInspectionFormPdf = async (batchId: string) => {
+        try {
+            const blob = await mrpApi.getProductionBatchFinishedInspectionFormPdf(batchId);
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `FOR-INSPECCION-PT-${batchId.slice(0, 8).toUpperCase()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo descargar el FOR de inspección final'), variant: 'destructive' });
         }
     };
 
@@ -568,8 +694,8 @@ export default function ProductionOrderDetailPage() {
             setLotCenterChecklist({
                 qcApproved: release?.qcApproved ?? batch.qcStatus === 'passed',
                 labelingValidated: release?.labelingValidated ?? lotLabel?.status === RegulatoryLabelStatus.VALIDADA,
-                documentsCurrent: release?.documentsCurrent ?? Boolean(batch.packagingFormCompleted),
-                evidencesComplete: release?.evidencesComplete ?? Boolean(batch.packagingFormCompleted),
+                documentsCurrent: release?.documentsCurrent ?? Boolean(batch.packagingFormCompleted && batch.finishedInspectionFormCompleted),
+                evidencesComplete: release?.evidencesComplete ?? Boolean(batch.packagingFormCompleted && batch.finishedInspectionFormCompleted),
                 checklistNotes: release?.checklistNotes || '',
                 rejectedReason: release?.rejectedReason || '',
             });
@@ -667,6 +793,18 @@ export default function ProductionOrderDetailPage() {
         }
     };
 
+    const getFinishedInspectionStatusLabel = (status?: string) => {
+        switch (status) {
+            case 'passed':
+                return 'Aprobada';
+            case 'failed':
+                return 'Rechazada';
+            case 'pending':
+            default:
+                return 'Pendiente';
+        }
+    };
+
     const getPackagingStatusLabel = (status?: string) => {
         switch (status) {
             case 'packed':
@@ -678,6 +816,18 @@ export default function ProductionOrderDetailPage() {
     };
 
     const getQcBadgeClass = (status?: string) => {
+        switch (status) {
+            case 'passed':
+                return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+            case 'failed':
+                return 'border-red-200 bg-red-50 text-red-700';
+            case 'pending':
+            default:
+                return 'border-amber-200 bg-amber-50 text-amber-700';
+        }
+    };
+
+    const getFinishedInspectionBadgeClass = (status?: string) => {
         switch (status) {
             case 'passed':
                 return 'border-emerald-200 bg-emerald-50 text-emerald-700';
@@ -774,6 +924,7 @@ export default function ProductionOrderDetailPage() {
         form: Boolean(activeLotBatch?.packagingFormCompleted),
         label: lotCenterLotLabel?.status === RegulatoryLabelStatus.VALIDADA,
         qc: activeLotBatch?.qcStatus === 'passed',
+        finishedInspection: activeLotBatch?.finishedInspectionStatus === 'passed',
         packed: activeLotBatch?.packagingStatus === 'packed',
         qa: lotCenterRelease?.status === BatchReleaseStatus.LIBERADO_QA,
     };
@@ -790,17 +941,21 @@ export default function ProductionOrderDetailPage() {
             ? 'label'
             : !lotStepStatus.qc
                 ? 'qc'
+                : !lotStepStatus.finishedInspection
+                    ? 'finishedInspection'
                 : !lotStepStatus.packed
                     ? 'pack'
                     : !lotStepStatus.qa
                         ? (checklistReadyForSign ? 'sign' : 'checklist')
                         : 'done';
     const nextLotStepLabel = nextLotStep === 'for'
-        ? 'Diligenciar FOR'
+        ? 'Diligenciar pre-chequeo'
         : nextLotStep === 'label'
             ? 'Validar etiqueta'
             : nextLotStep === 'qc'
                 ? 'Aprobar QC'
+                : nextLotStep === 'finishedInspection'
+                    ? 'Inspección PT'
                 : nextLotStep === 'pack'
                     ? 'Empacar lote'
                     : nextLotStep === 'checklist'
@@ -808,6 +963,9 @@ export default function ProductionOrderDetailPage() {
                         : nextLotStep === 'sign'
                             ? 'Firmar liberación QA'
                         : 'Lote completo';
+    const nextTimelineStep = nextLotStep === 'checklist' || nextLotStep === 'sign' || nextLotStep === 'done'
+        ? 'qa'
+        : nextLotStep;
 
     const formatShortDate = (value?: string | Date | null) => {
         if (!value) return '—';
@@ -817,9 +975,10 @@ export default function ProductionOrderDetailPage() {
     };
 
     const lotTimeline = [
-        { key: 'for', label: 'FOR Empaque', done: lotStepStatus.form },
+        { key: 'for', label: 'Pre-chequeo Empaque', done: lotStepStatus.form },
         { key: 'label', label: 'Etiquetado', done: lotStepStatus.label },
         { key: 'qc', label: 'QC', done: lotStepStatus.qc },
+        { key: 'finishedInspection', label: 'Inspección PT', done: lotStepStatus.finishedInspection },
         { key: 'pack', label: 'Empaque', done: lotStepStatus.packed },
         { key: 'qa', label: 'Liberación QA', done: lotStepStatus.qa },
     ];
@@ -832,6 +991,14 @@ export default function ProductionOrderDetailPage() {
             version: activeLotBatch?.packagingFormDocumentVersion,
             date: activeLotBatch?.packagingFormDocumentDate,
             status: lotStepStatus.form ? 'Listo' : 'Pendiente',
+        },
+        {
+            key: 'finishedInspection',
+            title: 'FOR Inspección PT',
+            code: activeLotBatch?.finishedInspectionFormDocumentCode,
+            version: activeLotBatch?.finishedInspectionFormDocumentVersion,
+            date: activeLotBatch?.finishedInspectionFormDocumentDate,
+            status: lotStepStatus.finishedInspection ? 'Aprobado' : 'Pendiente',
         },
         {
             key: 'labeling',
@@ -863,6 +1030,10 @@ export default function ProductionOrderDetailPage() {
         }
         if (nextLotStep === 'pack') {
             await handleBatchPackaging(activeLotBatch.id, true);
+            return;
+        }
+        if (nextLotStep === 'finishedInspection') {
+            openFinishedInspectionFormDialog(activeLotBatch.id);
             return;
         }
         if (nextLotStep === 'qc') {
@@ -1105,6 +1276,9 @@ export default function ProductionOrderDetailPage() {
                                                                 <Badge variant="outline" className={getQcBadgeClass(batch.qcStatus)}>
                                                                     QC: {getQcStatusLabel(batch.qcStatus)}
                                                                 </Badge>
+                                                                <Badge variant="outline" className={getFinishedInspectionBadgeClass(batch.finishedInspectionStatus)}>
+                                                                    Inspección PT: {getFinishedInspectionStatusLabel(batch.finishedInspectionStatus)}
+                                                                </Badge>
                                                                 <Badge variant="outline" className={getPackagingBadgeClass(batch.packagingStatus)}>
                                                                     Empaque: {getPackagingStatusLabel(batch.packagingStatus)}
                                                                 </Badge>
@@ -1147,12 +1321,16 @@ export default function ProductionOrderDetailPage() {
                                                     const hasUnits = units.length > 0;
                                                     const allUnitsQcPassed = hasUnits ? units.every((u) => u.rejected || u.qcPassed) : true;
                                                     const hasPackagingForm = Boolean(batch.packagingFormCompleted);
+                                                    const finalInspectionPassed = batch.finishedInspectionStatus === ProductionBatchFinishedInspectionStatus.PASSED;
                                                     const canPackBatch = batch.qcStatus === 'passed'
+                                                        && finalInspectionPassed
                                                         && batch.packagingStatus !== 'packed'
                                                         && hasPackagingForm
                                                         && allUnitsQcPassed;
                                                     const packDisabledReason = batch.qcStatus !== 'passed'
                                                         ? 'Debes aprobar QC del lote antes de empacar.'
+                                                        : !finalInspectionPassed
+                                                            ? 'Debes aprobar la inspección final del producto antes de empacar.'
                                                         : !hasPackagingForm
                                                             ? 'Debes diligenciar el FOR de empaque antes de empacar.'
                                                             : !allUnitsQcPassed
@@ -1317,7 +1495,7 @@ export default function ProductionOrderDetailPage() {
                                     <DialogTitle className="text-lg font-bold text-slate-900 font-mono">
                                         Centro de Lote{activeLotBatch ? ` — ${activeLotBatch.code}` : ''}
                                     </DialogTitle>
-                                    <p className="text-xs text-slate-500 mt-0.5">Flujo de liberación: FOR → Etiqueta → QC → Empaque → QA</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">Flujo de liberación: FOR → Etiqueta → QC → Inspección PT → Empaque → QA</p>
                                 </div>
                             </div>
                         </DialogHeader>
@@ -1355,6 +1533,15 @@ export default function ProductionOrderDetailPage() {
                                             disabled={!lotStepStatus.form}
                                         >
                                             PDF FOR Empaque
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="rounded-xl border-slate-200"
+                                            onClick={() => activeLotBatch && downloadFinishedInspectionFormPdf(activeLotBatch.id)}
+                                            disabled={!lotStepStatus.finishedInspection}
+                                        >
+                                            PDF Inspección PT
                                         </Button>
                                         <Button
                                             size="sm"
@@ -1495,9 +1682,12 @@ export default function ProductionOrderDetailPage() {
                                 </div>
 
                                 {/* Progress stepper */}
-                                <div className="grid grid-cols-5 gap-2">
+                                <div className="grid grid-cols-6 gap-2">
                                     {lotTimeline.map(({ key, label, done }, index) => (
-                                        <div key={key} className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition-all ${done ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                                        <div
+                                            key={key}
+                                            className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-2.5 text-center transition-all ${done ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'} ${!done && key === nextTimelineStep ? 'ring-2 ring-violet-300 bg-violet-50/60 border-violet-200' : ''}`}
+                                        >
                                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${done ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
                                                 {done ? '✓' : index + 1}
                                             </div>
@@ -1507,13 +1697,13 @@ export default function ProductionOrderDetailPage() {
                                     ))}
                                 </div>
 
-                                {/* Paso 1: FOR */}
+                                {/* Paso 1: Pre-chequeo FOR */}
                                 <div className={`bg-white border rounded-2xl overflow-hidden ${lotStepStatus.form ? 'border-emerald-100' : 'border-slate-200'}`}>
                                     <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
                                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${lotStepStatus.form ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
                                             {lotStepStatus.form ? '✓' : '1'}
                                         </div>
-                                        <h3 className="font-semibold text-slate-800 text-sm">FOR de Empaque</h3>
+                                        <h3 className="font-semibold text-slate-800 text-sm">Pre-chequeo de Empaque (FOR)</h3>
                                         {lotStepStatus.form && <span className="ml-auto text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">Completo</span>}
                                     </div>
                                     <div className="px-5 py-4 flex flex-wrap items-center gap-2">
@@ -1523,7 +1713,7 @@ export default function ProductionOrderDetailPage() {
                                             className={lotStepStatus.form ? 'rounded-xl border-slate-200' : 'bg-violet-600 hover:bg-violet-700 text-white rounded-xl'}
                                         >
                                             <Package className="mr-2 h-4 w-4" />
-                                            {lotStepStatus.form ? 'Editar FOR' : 'Diligenciar FOR'}
+                                            {lotStepStatus.form ? 'Editar pre-chequeo' : 'Diligenciar pre-chequeo'}
                                         </Button>
                                         <Button
                                             variant="outline"
@@ -1602,15 +1792,65 @@ export default function ProductionOrderDetailPage() {
                                     </div>
                                 </div>
 
-                                {/* Pasos 3, 4 y 5: QC, Empaque, Checklist QA */}
+                                {/* Paso 4: Inspección PT */}
+                                <div className={`bg-white border rounded-2xl overflow-hidden ${lotStepStatus.finishedInspection ? 'border-emerald-100' : 'border-slate-200'}`}>
+                                    <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+                                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${lotStepStatus.finishedInspection ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                                            {lotStepStatus.finishedInspection ? '✓' : '4'}
+                                        </div>
+                                        <h3 className="font-semibold text-slate-800 text-sm">Inspección de Producto Terminado</h3>
+                                        {lotStepStatus.finishedInspection && <span className="ml-auto text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">Aprobada</span>}
+                                    </div>
+                                    <div className="px-5 py-4 flex flex-wrap items-center gap-2">
+                                        <Button
+                                            variant={lotStepStatus.finishedInspection ? 'outline' : 'default'}
+                                            onClick={() => activeLotBatch && openFinishedInspectionFormDialog(activeLotBatch.id)}
+                                            disabled={!lotStepStatus.form || !lotStepStatus.label || !lotStepStatus.qc}
+                                            className={lotStepStatus.finishedInspection ? 'rounded-xl border-slate-200' : 'bg-violet-600 hover:bg-violet-700 text-white rounded-xl'}
+                                        >
+                                            <Package className="mr-2 h-4 w-4" />
+                                            {lotStepStatus.finishedInspection ? 'Editar FOR Inspección PT' : 'Diligenciar FOR Inspección PT'}
+                                        </Button>
+                                        {!lotStepStatus.qc && (
+                                            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-1">
+                                                Primero debes aprobar QC (Paso 3)
+                                            </span>
+                                        )}
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => activeLotBatch && downloadFinishedInspectionFormPdf(activeLotBatch.id)}
+                                            disabled={!lotStepStatus.finishedInspection}
+                                            className="rounded-xl border-slate-200"
+                                        >
+                                            <Printer className="mr-2 h-4 w-4" />
+                                            PDF Inspección PT
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {/* Pasos 3, 5 y 6: QC, Empaque, Checklist QA */}
                                 <div className={`bg-white border rounded-2xl overflow-hidden ${lotStepStatus.qa ? 'border-emerald-100' : 'border-slate-200'}`}>
                                     <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
                                         <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${lotStepStatus.qa ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                                            {lotStepStatus.qa ? '✓' : '3–5'}
+                                            {lotStepStatus.qa ? '✓' : '3 · 5 · 6'}
                                         </div>
-                                        <h3 className="font-semibold text-slate-800 text-sm">QC · Empaque · Liberación QA</h3>
+                                        <h3 className="font-semibold text-slate-800 text-sm">QC (Paso 3) · Empaque (Paso 5) · Liberación QA (Paso 6)</h3>
                                     </div>
                                     <div className="px-5 py-4 space-y-4">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {!lotStepStatus.qc ? (
+                                                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">Bloqueo empaque: falta QC</Badge>
+                                            ) : null}
+                                            {!lotStepStatus.finishedInspection ? (
+                                                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">Bloqueo empaque: falta Inspección PT</Badge>
+                                            ) : null}
+                                            {!lotStepStatus.form ? (
+                                                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">Bloqueo empaque: falta pre-chequeo FOR</Badge>
+                                            ) : null}
+                                            {!lotStepStatus.label ? (
+                                                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">Bloqueo empaque: falta etiqueta validada</Badge>
+                                            ) : null}
+                                        </div>
                                         {/* Checklist */}
                                         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {[
@@ -1668,7 +1908,7 @@ export default function ProductionOrderDetailPage() {
                                             <Button
                                                 variant="outline"
                                                 onClick={() => activeLotBatch && handleBatchPackaging(activeLotBatch.id, true)}
-                                                disabled={!lotStepStatus.form || !lotStepStatus.label || !lotStepStatus.qc || lotStepStatus.packed}
+                                                disabled={!lotStepStatus.form || !lotStepStatus.label || !lotStepStatus.qc || !lotStepStatus.finishedInspection || lotStepStatus.packed}
                                                 className={`rounded-xl ${lotStepStatus.packed ? 'border-emerald-200 text-emerald-700 bg-emerald-50' : 'border-slate-200'}`}
                                             >
                                                 <Boxes className="mr-2 h-4 w-4" />
@@ -1747,6 +1987,133 @@ export default function ProductionOrderDetailPage() {
                     </DialogContent>
                 </Dialog>
 
+                <Dialog open={Boolean(finishedInspectionFormBatchId)} onOpenChange={(open) => !open && closeFinishedInspectionFormDialog()}>
+                    <DialogContent className="max-w-3xl">
+                        <DialogHeader className="pb-2 border-b border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-violet-50 rounded-xl">
+                                    <Package className="h-5 w-5 text-violet-600" />
+                                </div>
+                                <div>
+                                    <DialogTitle className="text-lg font-bold text-slate-900">FOR de Inspección Producto Terminado</DialogTitle>
+                                    <p className="text-xs text-slate-500 mt-0.5">Validación de talla, costuras y conformidad final antes de empaque.</p>
+                                </div>
+                            </div>
+                        </DialogHeader>
+                        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1 py-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-slate-600">Inspector</label>
+                                    <input
+                                        className="h-10 rounded-xl border border-slate-200 px-3 text-sm w-full"
+                                        value={finishedInspectionForm.inspectorName}
+                                        onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, inspectorName: e.target.value }))}
+                                        placeholder="Nombre inspector"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-slate-600">Verificador</label>
+                                    <input
+                                        className="h-10 rounded-xl border border-slate-200 px-3 text-sm w-full"
+                                        value={finishedInspectionForm.verifierName}
+                                        onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, verifierName: e.target.value }))}
+                                        placeholder="Nombre verificador"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-slate-600">Cantidad inspeccionada</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        className="h-10 rounded-xl border border-slate-200 px-3 text-sm w-full"
+                                        value={finishedInspectionForm.quantityInspected}
+                                        onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, quantityInspected: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-slate-600">Cantidad aprobada</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        className="h-10 rounded-xl border border-slate-200 px-3 text-sm w-full"
+                                        value={finishedInspectionForm.quantityApproved}
+                                        onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, quantityApproved: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-slate-600">Cantidad rechazada</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        className="h-10 rounded-xl border border-slate-200 px-3 text-sm w-full"
+                                        value={finishedInspectionForm.quantityRejected}
+                                        onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, quantityRejected: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                {[
+                                    ['sizeCheck', 'Talla / dimensiones correctas'],
+                                    ['stitchingCheck', 'Costuras / integridad correctas'],
+                                    ['visualCheck', 'Inspección visual general OK'],
+                                    ['labelingCheck', 'Etiquetado correcto'],
+                                    ['productMatchesOrder', 'Producto corresponde al pedido'],
+                                ].map(([key, label]) => (
+                                    <label key={key} className="flex items-center gap-2 text-sm text-slate-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(finishedInspectionForm[key as keyof typeof finishedInspectionForm])}
+                                            onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, [key]: e.target.checked }))}
+                                        />
+                                        {label}
+                                    </label>
+                                ))}
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-slate-600">Observaciones</label>
+                                <textarea
+                                    className="w-full min-h-[70px] rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none"
+                                    value={finishedInspectionForm.observations}
+                                    onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, observations: e.target.value }))}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-slate-600">No conformidad (si aplica)</label>
+                                <textarea
+                                    className="w-full min-h-[70px] rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none"
+                                    value={finishedInspectionForm.nonConformity}
+                                    onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, nonConformity: e.target.value }))}
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-slate-600">Acción correctiva</label>
+                                    <textarea
+                                        className="w-full min-h-[70px] rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none"
+                                        value={finishedInspectionForm.correctiveAction}
+                                        onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, correctiveAction: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-medium text-slate-600">Acción preventiva</label>
+                                    <textarea
+                                        className="w-full min-h-[70px] rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none"
+                                        value={finishedInspectionForm.preventiveAction}
+                                        onChange={(e) => setFinishedInspectionForm((p) => ({ ...p, preventiveAction: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter className="pt-3 border-t border-slate-100">
+                            <Button variant="outline" onClick={closeFinishedInspectionFormDialog} className="rounded-xl">Cancelar</Button>
+                            <Button onClick={submitFinishedInspectionForm} disabled={savingFinishedInspectionForm} className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl">
+                                {savingFinishedInspectionForm ? 'Guardando...' : 'Guardar FOR'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 <Dialog open={Boolean(packagingFormBatchId)} onOpenChange={(open) => !open && closePackagingFormDialog()}>
                     <DialogContent className="max-w-3xl">
@@ -1757,7 +2124,7 @@ export default function ProductionOrderDetailPage() {
                                 </div>
                                 <div>
                                     <DialogTitle className="text-lg font-bold text-slate-900">FOR de Empaque por Lote</DialogTitle>
-                                    <p className="text-xs text-slate-500 mt-0.5">Diligencia el formato de empaque para este lote de producción.</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">Diligencia el pre-chequeo y registro de empaque para este lote.</p>
                                 </div>
                             </div>
                         </DialogHeader>
@@ -1790,9 +2157,12 @@ export default function ProductionOrderDetailPage() {
                             {/* Cantidades */}
                             <div>
                                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Cantidades</p>
+                                <p className="text-xs text-slate-500 mb-3">
+                                    Antes del paso de empaque puedes dejar <span className="font-semibold">Empacada = 0</span>. Ese campo se confirma cuando ejecutas empaque.
+                                </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
-                                        <Label className="text-sm font-medium text-slate-700">A empacar</Label>
+                                        <Label className="text-sm font-medium text-slate-700">Cantidad objetivo a empacar</Label>
                                         <input
                                             type="number" min={1}
                                             className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500"
@@ -1801,13 +2171,17 @@ export default function ProductionOrderDetailPage() {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label className="text-sm font-medium text-slate-700">Empacada</Label>
+                                        <Label className="text-sm font-medium text-slate-700">Cantidad efectivamente empacada (Paso 5)</Label>
                                         <input
                                             type="number" min={0}
                                             className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm w-full focus:outline-none focus:ring-2 focus:ring-violet-500"
                                             value={packagingForm.quantityPacked}
                                             onChange={(e) => setPackagingForm((prev) => ({ ...prev, quantityPacked: e.target.value }))}
+                                            disabled={!canEditPackedQuantity}
                                         />
+                                        {!canEditPackedQuantity && (
+                                            <p className="text-xs text-amber-700">Se habilita cuando la Inspección PT esté aprobada.</p>
+                                        )}
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-sm font-medium text-slate-700">Etiqueta de lote</Label>

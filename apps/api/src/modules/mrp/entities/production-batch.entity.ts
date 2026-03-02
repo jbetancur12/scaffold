@@ -1,5 +1,6 @@
 import { Collection, Entity, Enum, ManyToOne, OneToMany, Property } from '@mikro-orm/core';
 import {
+    ProductionBatchFinishedInspectionStatus,
     ProductionBatchPackagingStatus,
     ProductionBatchQcStatus,
     ProductionBatchStatus,
@@ -39,6 +40,9 @@ export class ProductionBatch extends BaseEntity {
     @Enum(() => ProductionBatchQcStatus)
     qcStatus: ProductionBatchQcStatus = ProductionBatchQcStatus.PENDING;
 
+    @Enum(() => ProductionBatchFinishedInspectionStatus)
+    finishedInspectionStatus: ProductionBatchFinishedInspectionStatus = ProductionBatchFinishedInspectionStatus.PENDING;
+
     @Enum(() => ProductionBatchPackagingStatus)
     packagingStatus: ProductionBatchPackagingStatus = ProductionBatchPackagingStatus.PENDING;
 
@@ -74,6 +78,33 @@ export class ProductionBatch extends BaseEntity {
 
     @Property({ nullable: true })
     packagingFormDocumentDate?: Date;
+
+    @Property({ type: 'json', nullable: true })
+    finishedInspectionFormData?: Record<string, unknown>;
+
+    @Property({ default: false })
+    finishedInspectionFormCompleted: boolean = false;
+
+    @Property({ nullable: true })
+    finishedInspectionFormFilledBy?: string;
+
+    @Property({ nullable: true })
+    finishedInspectionFormFilledAt?: Date;
+
+    @Property({ nullable: true })
+    finishedInspectionFormDocumentId?: string;
+
+    @Property({ nullable: true })
+    finishedInspectionFormDocumentCode?: string;
+
+    @Property({ nullable: true })
+    finishedInspectionFormDocumentTitle?: string;
+
+    @Property({ nullable: true })
+    finishedInspectionFormDocumentVersion?: number;
+
+    @Property({ nullable: true })
+    finishedInspectionFormDocumentDate?: Date;
 
     @OneToMany(() => ProductionBatchUnit, (unit) => unit.batch)
     units = new Collection<ProductionBatchUnit>(this);
