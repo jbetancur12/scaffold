@@ -1126,6 +1126,8 @@ export const CreateSalesOrderSchema = z.object({
     })).min(1, 'El pedido debe tener al menos un ítem'),
 });
 
+export const UpdateSalesOrderSchema = CreateSalesOrderSchema;
+
 export const ListSalesOrdersQuerySchema = z.object({
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().optional(),
@@ -1209,5 +1211,6 @@ export type RegisterBatchEquipmentUsagePayload = DateInputValue<z.input<typeof R
 export type ListOperationalAlertsPayload = DateInputValue<z.input<typeof ListOperationalAlertsQuerySchema>>;
 export type ExportWeeklyComplianceReportPayload = DateInputValue<z.input<typeof ExportWeeklyComplianceReportQuerySchema>>;
 export type CreateSalesOrderPayload = DateInputValue<z.input<typeof CreateSalesOrderSchema>>;
+export type UpdateSalesOrderPayload = DateInputValue<z.input<typeof UpdateSalesOrderSchema>>;
 export type ListSalesOrdersFilters = DateInputValue<z.input<typeof ListSalesOrdersQuerySchema>>;
 export type UpdateSalesOrderStatusPayload = DateInputValue<z.input<typeof UpdateSalesOrderStatusSchema>>;

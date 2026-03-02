@@ -162,6 +162,7 @@ export default function App() {
 
                         <Route path="/mrp/sales-orders" element={<SalesOrderListPage />} />
                         <Route path="/mrp/sales-orders/new" element={<SalesOrderFormPage />} />
+                        <Route path="/mrp/sales-orders/:id/edit" element={<SalesOrderFormPage />} />
                         <Route path="/mrp/sales-orders/:id" element={<SalesOrderDetailPage />} />
 
                         <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />

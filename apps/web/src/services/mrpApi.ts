@@ -134,6 +134,7 @@ import type {
     CreatePurchaseRequisitionPayload,
     CreatePurchaseRequisitionFromProductionOrderPayload,
     CreateSalesOrderPayload,
+    UpdateSalesOrderPayload,
     ListSalesOrdersFilters,
     UpdateSalesOrderStatusPayload,
     UpsertProductionMaterialAllocationPayload,
@@ -374,6 +375,10 @@ export const mrpApi = {
     // Sales Orders
     createSalesOrder: async (data: CreateSalesOrderPayload): Promise<SalesOrder> => {
         const response = await api.post<SalesOrder>('/mrp/sales-orders', data);
+        return response.data;
+    },
+    updateSalesOrder: async (id: string, data: UpdateSalesOrderPayload): Promise<SalesOrder> => {
+        const response = await api.put<SalesOrder>(`/mrp/sales-orders/${id}`, data);
         return response.data;
     },
     listSalesOrders: async (

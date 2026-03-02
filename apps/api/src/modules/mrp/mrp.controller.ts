@@ -123,6 +123,7 @@ import {
     ReturnProductionMaterialSchema,
     UpsertProductionMaterialAllocationSchema,
     CreateSalesOrderSchema,
+    UpdateSalesOrderSchema,
     ListSalesOrdersQuerySchema,
     UpdateSalesOrderStatusSchema,
     ProductCsvImportSchema,
@@ -1804,6 +1805,17 @@ export class MrpController {
             const payload = CreateSalesOrderSchema.parse(req.body);
             const order = await this.salesOrderService.createSalesOrder(payload);
             return ApiResponse.success(res, order, 'Pedido de cliente creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateSalesOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateSalesOrderSchema.parse(req.body);
+            const order = await this.salesOrderService.updateSalesOrder(id, payload);
+            return ApiResponse.success(res, order, 'Pedido de cliente actualizado');
         } catch (error) {
             next(error);
         }

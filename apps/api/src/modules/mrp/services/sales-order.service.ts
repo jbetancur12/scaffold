@@ -147,6 +147,78 @@ export class SalesOrderService {
         });
     }
 
+    async updateSalesOrder(id: string, data: CreateSalesOrderPayload): Promise<SalesOrder> {
+        return this.em.transactional(async (tx) => {
+            const salesOrderRepo = tx.getRepository(SalesOrder);
+            const customerRepo = tx.getRepository(Customer);
+            const productRepo = tx.getRepository(Product);
+            const variantRepo = tx.getRepository(ProductVariant);
+            const itemRepo = tx.getRepository(SalesOrderItem);
+
+            const order = await salesOrderRepo.findOneOrFail(
+                { id },
+                { populate: ['items', 'productionOrders'] }
+            );
+
+            if (order.status !== SalesOrderStatus.PENDING) {
+                throw new AppError('Solo se puede editar un pedido en estado pendiente', 400);
+            }
+
+            if (order.productionOrders.length > 0) {
+                throw new AppError('No se puede editar: el pedido ya tiene orden(es) de producción vinculadas', 400);
+            }
+
+            const customer = await customerRepo.findOneOrFail({ id: data.customerId });
+            order.customer = customer;
+            order.expectedDeliveryDate = data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : undefined;
+            order.notes = data.notes;
+
+            for (const existing of order.items.getItems()) {
+                await tx.remove(existing);
+            }
+            order.items.removeAll();
+
+            let subtotalBase = 0;
+            let taxTotal = 0;
+
+            for (const itemData of data.items) {
+                const product = await productRepo.findOneOrFail({ id: itemData.productId });
+                let variant;
+                if (itemData.variantId) {
+                    variant = await variantRepo.findOneOrFail({ id: itemData.variantId });
+                }
+
+                const subtotal = itemData.quantity * itemData.unitPrice;
+                const taxRate = itemData.taxRate || 0;
+                const taxAmount = subtotal * (taxRate / 100);
+
+                const item = itemRepo.create({
+                    salesOrder: order,
+                    product,
+                    variant,
+                    quantity: itemData.quantity,
+                    unitPrice: itemData.unitPrice,
+                    taxRate,
+                    taxAmount,
+                    subtotal,
+                } as unknown as SalesOrderItem);
+
+                order.items.add(item);
+                subtotalBase += subtotal;
+                taxTotal += taxAmount;
+            }
+
+            const totalAmount = subtotalBase + taxTotal;
+            order.subtotalBase = subtotalBase;
+            order.taxTotal = taxTotal;
+            order.totalAmount = totalAmount;
+            order.netTotalAmount = totalAmount - Number(order.discountAmount || 0);
+
+            await tx.persistAndFlush(order);
+            return order;
+        });
+    }
+
     async updateSalesOrderStatus(id: string, status: SalesOrderStatus): Promise<SalesOrder> {
         return this.em.transactional(async (tx) => {
             const order = await tx.getRepository(SalesOrder).findOneOrFail(

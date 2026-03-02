@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -8,15 +8,16 @@ import { Plus, Trash2, ArrowLeft, Loader2, Users, Package, FileText, ChevronsUpD
 import { useToast } from '@/components/ui/use-toast';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CreateSalesOrderSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
 import { useCustomersQuery } from '@/hooks/mrp/useCustomers';
 import { useProductsQuery } from '@/hooks/mrp/useProducts';
-import { useCreateSalesOrderMutation } from '@/hooks/mrp/useSalesOrders';
+import { useCreateSalesOrderMutation, useSalesOrderQuery, useUpdateSalesOrderMutation } from '@/hooks/mrp/useSalesOrders';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { CreateCustomerDialog } from './components/CreateCustomerDialog';
 import { cn } from '@/lib/utils';
-import { Product } from '@scaffold/types';
+import { Product, SalesOrderStatus } from '@scaffold/types';
 
 interface OrderItem {
     productId: string;
@@ -26,7 +27,21 @@ interface OrderItem {
     unitPrice: number;
 }
 
+interface VariantPickerState {
+    open: boolean;
+    index: number;
+    productId: string;
+}
+
+interface VariantDraft {
+    selected: boolean;
+    quantity: number;
+    unitPrice: number;
+}
+
 export default function SalesOrderFormPage() {
+    const { id } = useParams<{ id: string }>();
+    const isEditMode = Boolean(id);
     const navigate = useNavigate();
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
@@ -35,6 +50,8 @@ export default function SalesOrderFormPage() {
     const [catalogSearch, setCatalogSearch] = useState('');
     const [debouncedCatalogSearch, setDebouncedCatalogSearch] = useState('');
     const [showValidation, setShowValidation] = useState(false);
+    const [variantPicker, setVariantPicker] = useState<VariantPickerState>({ open: false, index: -1, productId: '' });
+    const [variantDrafts, setVariantDrafts] = useState<Record<string, VariantDraft>>({});
 
     // Customer Combobox State
     const [openCustomerCombobox, setOpenCustomerCombobox] = useState(false);
@@ -59,7 +76,9 @@ export default function SalesOrderFormPage() {
 
     const { data: customersResponse, error: customersError } = useCustomersQuery();
     const { data: productsResponse, error: productsError } = useProductsQuery(1, 50, debouncedCatalogSearch);
+    const { data: existingOrder, loading: loadingExistingOrder, error: existingOrderError } = useSalesOrderQuery(id);
     const { execute: createSalesOrder } = useCreateSalesOrderMutation();
+    const { execute: updateSalesOrder } = useUpdateSalesOrderMutation();
 
     const customers = customersResponse || [];
     const products = productsResponse?.products ?? [];
@@ -83,6 +102,46 @@ export default function SalesOrderFormPage() {
 
     useMrpQueryErrorToast(customersError, 'No se pudo cargar los clientes');
     useMrpQueryErrorToast(productsError, 'No se pudieron cargar los productos');
+    useMrpQueryErrorToast(existingOrderError, 'No se pudo cargar el pedido');
+
+    useEffect(() => {
+        if (!isEditMode || !existingOrder) return;
+
+        const hasLinkedPo = (existingOrder.productionOrders || []).length > 0;
+        if (existingOrder.status !== SalesOrderStatus.PENDING || hasLinkedPo) {
+            toast({
+                title: 'Edición bloqueada',
+                description: 'Solo puedes editar pedidos pendientes sin órdenes de producción vinculadas.',
+                variant: 'destructive',
+            });
+            navigate(`/mrp/sales-orders/${existingOrder.id}`);
+            return;
+        }
+
+        setFormData({
+            customerId: existingOrder.customer?.id || '',
+            expectedDeliveryDate: existingOrder.expectedDeliveryDate
+                ? new Date(existingOrder.expectedDeliveryDate).toISOString().slice(0, 10)
+                : '',
+            notes: existingOrder.notes || '',
+        });
+
+        const mappedItems: OrderItem[] = (existingOrder.items || []).map((item) => ({
+            productId: item.product?.id || '',
+            variantId: item.variant?.id,
+            productSearch: item.product ? `${item.product.sku} ${item.product.name}` : '',
+            quantity: item.quantity || 1,
+            unitPrice: item.unitPrice || 0,
+        }));
+
+        setItems(mappedItems.length > 0 ? mappedItems : [{
+            productId: '',
+            variantId: undefined,
+            productSearch: '',
+            quantity: 1,
+            unitPrice: 0,
+        }]);
+    }, [isEditMode, existingOrder, navigate, toast]);
 
     const addItem = () => {
         setItems((prev) => [
@@ -133,6 +192,93 @@ export default function SalesOrderFormPage() {
             clonedLine,
             ...prev.slice(index + 1),
         ]);
+    };
+
+    const openVariantPicker = (index: number) => {
+        const source = items[index];
+        if (!source?.productId) {
+            toast({
+                title: 'Selecciona producto',
+                description: 'Primero selecciona un producto para elegir varias variantes.',
+                variant: 'destructive',
+            });
+            return;
+        }
+        const product = getProductById(source.productId);
+        const variants = product?.variants || [];
+        if (variants.length === 0) {
+            toast({
+                title: 'Sin variantes',
+                description: 'Este producto no tiene variantes configuradas.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        const drafts: Record<string, VariantDraft> = {};
+        for (const variant of variants) {
+            drafts[variant.id] = {
+                selected: false,
+                quantity: 1,
+                unitPrice: variant.price || source.unitPrice || 0,
+            };
+        }
+        setVariantDrafts(drafts);
+        setVariantPicker({ open: true, index, productId: source.productId });
+    };
+
+    const applyVariantPicker = () => {
+        if (!variantPicker.open || variantPicker.index < 0) return;
+        const baseItem = items[variantPicker.index];
+        if (!baseItem) return;
+
+        const selectedEntries = Object.entries(variantDrafts)
+            .filter(([, draft]) => draft.selected)
+            .map(([variantId, draft]) => ({ variantId, ...draft }));
+
+        if (selectedEntries.length === 0) {
+            toast({
+                title: 'Sin selección',
+                description: 'Marca al menos una variante para agregar.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        const newLines: OrderItem[] = selectedEntries.map((entry) => ({
+            productId: baseItem.productId,
+            productSearch: baseItem.productSearch,
+            variantId: entry.variantId,
+            quantity: entry.quantity > 0 ? entry.quantity : 1,
+            unitPrice: entry.unitPrice >= 0 ? entry.unitPrice : 0,
+        }));
+
+        setItems((prev) => {
+            const current = prev[variantPicker.index];
+            if (!current) return prev;
+
+            const canReplaceCurrent =
+                !current.variantId &&
+                (current.quantity === 1 || current.quantity === 0) &&
+                (current.unitPrice === 0 || current.unitPrice === getRefPrice(current.productId));
+
+            if (canReplaceCurrent) {
+                return [
+                    ...prev.slice(0, variantPicker.index),
+                    ...newLines,
+                    ...prev.slice(variantPicker.index + 1),
+                ];
+            }
+
+            return [
+                ...prev.slice(0, variantPicker.index + 1),
+                ...newLines,
+                ...prev.slice(variantPicker.index + 1),
+            ];
+        });
+
+        setVariantPicker({ open: false, index: -1, productId: '' });
+        setVariantDrafts({});
     };
 
     const removeItem = (index: number) => {
@@ -281,18 +427,22 @@ export default function SalesOrderFormPage() {
             };
 
             const validatedData = CreateSalesOrderSchema.parse(submitData);
-            await createSalesOrder(validatedData);
+            if (isEditMode && id) {
+                await updateSalesOrder({ id, payload: validatedData });
+            } else {
+                await createSalesOrder(validatedData);
+            }
 
             toast({
                 title: 'Éxito',
-                description: 'Pedido creado exitosamente',
+                description: isEditMode ? 'Pedido actualizado exitosamente' : 'Pedido creado exitosamente',
                 variant: 'default',
             });
-            navigate('/mrp/sales-orders');
+            navigate(isEditMode && id ? `/mrp/sales-orders/${id}` : '/mrp/sales-orders');
         } catch (error: unknown) {
             toast({
                 title: 'Error',
-                description: getErrorMessage(error, 'No se pudo crear el pedido'),
+                description: getErrorMessage(error, isEditMode ? 'No se pudo actualizar el pedido' : 'No se pudo crear el pedido'),
                 variant: 'destructive',
             });
         } finally {
@@ -300,19 +450,31 @@ export default function SalesOrderFormPage() {
         }
     };
 
+    if (isEditMode && loadingExistingOrder) {
+        return (
+            <div className="p-6 flex items-center justify-center min-h-[320px]">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            </div>
+        );
+    }
+
     return (
         <div className="p-6">
             <div className="mb-6">
                 <Button
                     variant="ghost"
-                    onClick={() => navigate('/mrp/sales-orders')}
+                    onClick={() => navigate(isEditMode && id ? `/mrp/sales-orders/${id}` : '/mrp/sales-orders')}
                     className="mb-4"
                 >
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Volver
                 </Button>
-                <h1 className="text-3xl font-bold">Nuevo Pedido de Cliente</h1>
-                <p className="text-slate-600">Crea un nuevo pedido seleccionando los productos requeridos.</p>
+                <h1 className="text-3xl font-bold">{isEditMode ? 'Editar Pedido de Cliente' : 'Nuevo Pedido de Cliente'}</h1>
+                <p className="text-slate-600">
+                    {isEditMode
+                        ? 'Actualiza el pedido mientras siga pendiente y sin producción vinculada.'
+                        : 'Crea un nuevo pedido seleccionando los productos requeridos.'}
+                </p>
             </div>
 
             <form onSubmit={handleSubmit} className="flex flex-col xl:flex-row gap-6 items-start">
@@ -523,7 +685,18 @@ export default function SalesOrderFormPage() {
 
                                             {item.productId && getProductById(item.productId)?.variants && getProductById(item.productId)!.variants!.length > 0 && (
                                                 <div className="mt-3">
-                                                    <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Variante (Opcional)</Label>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Variante (Opcional)</Label>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-7 text-xs"
+                                                            onClick={() => openVariantPicker(index)}
+                                                        >
+                                                            Seleccionar varias
+                                                        </Button>
+                                                    </div>
                                                     <select
                                                         className="w-full text-sm px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                                         value={item.variantId || ''}
@@ -631,7 +804,7 @@ export default function SalesOrderFormPage() {
                                 disabled={loading}
                             >
                                 {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                                Crear Pedido
+                                {isEditMode ? 'Guardar Cambios' : 'Crear Pedido'}
                             </Button>
                         </div>
                     </div>
@@ -651,6 +824,95 @@ export default function SalesOrderFormPage() {
                     });
                 }}
             />
+
+            <Dialog
+                open={variantPicker.open}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setVariantPicker({ open: false, index: -1, productId: '' });
+                        setVariantDrafts({});
+                    }
+                }}
+            >
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Seleccionar Variantes</DialogTitle>
+                        <DialogDescription>
+                            Marca varias variantes y agrega todas en un solo paso.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3 max-h-[55vh] overflow-auto pr-1">
+                        {(getProductById(variantPicker.productId)?.variants || []).map((variant) => {
+                            const draft = variantDrafts[variant.id] || { selected: false, quantity: 1, unitPrice: variant.price || 0 };
+                            return (
+                                <div key={variant.id} className="rounded-lg border border-slate-200 p-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <label className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                                            <input
+                                                type="checkbox"
+                                                checked={draft.selected}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setVariantDrafts((prev) => ({
+                                                        ...prev,
+                                                        [variant.id]: { ...(prev[variant.id] || draft), selected: checked },
+                                                    }));
+                                                }}
+                                            />
+                                            <span>{variant.name} - {variant.sku}</span>
+                                        </label>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 mt-2">
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            step={1}
+                                            value={draft.quantity}
+                                            onChange={(e) => {
+                                                const quantity = Number(e.target.value) || 1;
+                                                setVariantDrafts((prev) => ({
+                                                    ...prev,
+                                                    [variant.id]: { ...(prev[variant.id] || draft), quantity },
+                                                }));
+                                            }}
+                                            placeholder="Cantidad"
+                                        />
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            step={0.01}
+                                            value={draft.unitPrice}
+                                            onChange={(e) => {
+                                                const unitPrice = Number(e.target.value) || 0;
+                                                setVariantDrafts((prev) => ({
+                                                    ...prev,
+                                                    [variant.id]: { ...(prev[variant.id] || draft), unitPrice },
+                                                }));
+                                            }}
+                                            placeholder="Precio unitario"
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                setVariantPicker({ open: false, index: -1, productId: '' });
+                                setVariantDrafts({});
+                            }}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button type="button" onClick={applyVariantPicker}>
+                            Agregar variantes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

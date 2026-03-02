@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { mrpApi } from '@/services/mrpApi';
-import { CreateSalesOrderPayload, ListSalesOrdersFilters, UpdateSalesOrderStatusPayload } from '@scaffold/schemas';
+import { CreateSalesOrderPayload, ListSalesOrdersFilters, UpdateSalesOrderPayload, UpdateSalesOrderStatusPayload } from '@scaffold/schemas';
 import { SalesOrder, SalesOrderListResponse } from '@scaffold/types';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 import { invalidateMrpQueriesByPrefix, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
@@ -32,6 +32,18 @@ export const useSalesOrderQuery = (id?: string) => {
 export const useCreateSalesOrderMutation = () => {
     return useMrpMutation<CreateSalesOrderPayload, SalesOrder>(
         async (payload) => mrpApi.createSalesOrder(payload),
+        {
+            onSuccess: async (order) => {
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.salesOrders);
+                invalidateMrpQuery(mrpQueryKeys.salesOrder(order.id));
+            },
+        }
+    );
+};
+
+export const useUpdateSalesOrderMutation = () => {
+    return useMrpMutation<{ id: string; payload: UpdateSalesOrderPayload }, SalesOrder>(
+        async ({ id, payload }) => mrpApi.updateSalesOrder(id, payload),
         {
             onSuccess: async (order) => {
                 invalidateMrpQueriesByPrefix(mrpQueryKeys.salesOrders);

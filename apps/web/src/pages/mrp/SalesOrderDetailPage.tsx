@@ -20,7 +20,8 @@ import {
     Lock,
     Link,
     ExternalLink,
-    Unlink
+    Unlink,
+    Edit2
 } from 'lucide-react';
 import {
     Dialog,
@@ -174,6 +175,9 @@ export default function SalesOrderDetailPage() {
     }
 
     const StatusIcon = statusIcons[order.status];
+    const canEditOrder =
+        order.status === SalesOrderStatus.PENDING &&
+        (!order.productionOrders || order.productionOrders.length === 0);
 
     const handleUpdateStatus = async (newStatus: SalesOrderStatus) => {
         try {
@@ -385,6 +389,15 @@ export default function SalesOrderDetailPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
+                    {canEditOrder && (
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate(`/mrp/sales-orders/${order.id}/edit`)}
+                            className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                        >
+                            <Edit2 className="mr-2 h-4 w-4" />Editar
+                        </Button>
+                    )}
                     <Button variant="outline" onClick={() => setShowPdfDialog(true)} className="border-slate-200 text-slate-700 hover:bg-slate-50">
                         <Download className="mr-2 h-4 w-4" />Exportar PDF
                     </Button>
