@@ -417,6 +417,22 @@ export class QualityService {
         return this.postmarketService.deleteCustomer(id, actor);
     }
 
+    async exportCustomersCsv() {
+        return this.postmarketService.exportCustomersCsv();
+    }
+
+    async getCustomerImportTemplateCsv() {
+        return this.postmarketService.getCustomerImportTemplateCsv();
+    }
+
+    async previewCustomerImportCsv(csvText: string) {
+        return this.postmarketService.previewCustomerImportCsv(csvText);
+    }
+
+    async importCustomersCsv(csvText: string, actor?: string) {
+        return this.postmarketService.importCustomersCsv(csvText, actor);
+    }
+
     async createShipment(payload: {
         customerId: string;
         commercialDocument: string;

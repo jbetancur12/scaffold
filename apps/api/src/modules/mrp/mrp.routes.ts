@@ -115,6 +115,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/recalls', (req, res, next) => mrpController.listRecallCases(req, res, next));
     router.post('/quality/customers', (req, res, next) => mrpController.createCustomer(req, res, next));
     router.get('/quality/customers', (req, res, next) => mrpController.listCustomers(req, res, next));
+    router.get('/quality/customers/export/csv', (req, res, next) => mrpController.exportCustomersCsv(req, res, next));
+    router.get('/quality/customers/import/template/csv', (req, res, next) => mrpController.getCustomersImportTemplateCsv(req, res, next));
+    router.post('/quality/customers/import/preview', (req, res, next) => mrpController.previewCustomersImport(req, res, next));
+    router.post('/quality/customers/import', (req, res, next) => mrpController.importCustomersCsv(req, res, next));
     router.get('/quality/customers/:id', (req, res, next) => mrpController.getCustomer(req, res, next));
     router.patch('/quality/customers/:id', (req, res, next) => mrpController.updateCustomer(req, res, next));
     router.delete('/quality/customers/:id', (req, res, next) => mrpController.deleteCustomer(req, res, next));

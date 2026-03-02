@@ -48,6 +48,16 @@ export class QualityPostmarketService {
     private readonly logEvent: QualityAuditLogger;
     private readonly validateDispatchReadiness: DispatchValidator;
     private readonly getBatchBlockingIssues: BatchBlockingValidator;
+    private readonly customerImportHeaders = [
+        'name',
+        'document_type',
+        'document_number',
+        'contact_name',
+        'email',
+        'phone',
+        'address',
+        'notes',
+    ] as const;
 
     constructor(
         em: EntityManager,
@@ -66,6 +76,122 @@ export class QualityPostmarketService {
         this.shipmentRepo = em.getRepository(Shipment);
         this.shipmentItemRepo = em.getRepository(ShipmentItem);
         this.batchReleaseRepo = em.getRepository(BatchRelease);
+    }
+
+    private toCsvRow(values: ReadonlyArray<string | number | boolean | undefined | null>) {
+        return values
+            .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
+            .join(',');
+    }
+
+    private parseCsvLine(line: string): string[] {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i += 1) {
+            const char = line[i];
+            if (char === '"') {
+                if (inQuotes && line[i + 1] === '"') {
+                    current += '"';
+                    i += 1;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+                continue;
+            }
+            if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+                continue;
+            }
+            current += char;
+        }
+        result.push(current.trim());
+        return result;
+    }
+
+    private normalizeCustomerNameKey(value: string) {
+        return value.trim().toUpperCase();
+    }
+
+    private normalizeCustomerDocumentKey(value?: string) {
+        return String(value || '').trim().toUpperCase();
+    }
+
+    private parseCustomerImportCsv(csvText: string) {
+        const lines = csvText
+            .replace(/\r/g, '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+        if (lines.length <= 1) {
+            throw new AppError('El CSV no contiene filas de datos', 400);
+        }
+
+        const header = this.parseCsvLine(lines[0]).map((h) => h.toLowerCase());
+        const expected = [...this.customerImportHeaders];
+        const invalidHeader = expected.some((key, idx) => header[idx] !== key);
+        if (invalidHeader) {
+            throw new AppError(`Encabezado CSV inválido. Debe ser: ${expected.join(', ')}`, 400);
+        }
+
+        const rows: Array<{
+            rowNumber: number;
+            name: string;
+            documentType?: string;
+            documentNumber?: string;
+            contactName?: string;
+            email?: string;
+            phone?: string;
+            address?: string;
+            notes?: string;
+        }> = [];
+        const errors: Array<{ rowNumber: number; message: string }> = [];
+        const keysInFile = new Set<string>();
+
+        for (let index = 1; index < lines.length; index += 1) {
+            const rowNumber = index + 1;
+            const values = this.parseCsvLine(lines[index]);
+            const row = Object.fromEntries(
+                expected.map((key, keyIndex) => [key, (values[keyIndex] || '').trim()])
+            ) as Record<(typeof expected)[number], string>;
+
+            const name = row.name.trim();
+            if (!name) {
+                errors.push({ rowNumber, message: 'name es obligatorio' });
+                continue;
+            }
+
+            if (row.email) {
+                const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email);
+                if (!isValidEmail) {
+                    errors.push({ rowNumber, message: 'email inválido' });
+                    continue;
+                }
+            }
+
+            const docKey = this.normalizeCustomerDocumentKey(row.document_number);
+            const uniqueKey = docKey || `NAME:${this.normalizeCustomerNameKey(name)}`;
+            if (keysInFile.has(uniqueKey)) {
+                errors.push({ rowNumber, message: 'Cliente duplicado en archivo (mismo documento o nombre)' });
+                continue;
+            }
+            keysInFile.add(uniqueKey);
+
+            rows.push({
+                rowNumber,
+                name,
+                documentType: row.document_type || undefined,
+                documentNumber: row.document_number || undefined,
+                contactName: row.contact_name || undefined,
+                email: row.email || undefined,
+                phone: row.phone || undefined,
+                address: row.address || undefined,
+                notes: row.notes || undefined,
+            });
+        }
+
+        return { rows, errors, totalRows: lines.length - 1 };
     }
 
     async createTechnovigilanceCase(payload: {
@@ -462,6 +588,167 @@ export class QualityPostmarketService {
         });
 
         return { success: true };
+    }
+
+    async exportCustomersCsv(): Promise<{ fileName: string; content: string }> {
+        const rows = await this.customerRepo.findAll({ orderBy: { name: 'ASC' } });
+        const csvRows: string[] = [this.toCsvRow(this.customerImportHeaders)];
+        for (const row of rows) {
+            csvRows.push(this.toCsvRow([
+                row.name,
+                row.documentType,
+                row.documentNumber,
+                row.contactName,
+                row.email,
+                row.phone,
+                row.address,
+                row.notes,
+            ]));
+        }
+        return {
+            fileName: `clientes_${new Date().toISOString().slice(0, 10)}.csv`,
+            content: csvRows.join('\n'),
+        };
+    }
+
+    async getCustomerImportTemplateCsv(): Promise<{ fileName: string; content: string }> {
+        const csvRows: string[] = [this.toCsvRow(this.customerImportHeaders)];
+        csvRows.push(this.toCsvRow([
+            'Clinica Ejemplo SAS',
+            'NIT',
+            '900123456-7',
+            'Laura Gomez',
+            'compras@clinica-ejemplo.com',
+            '3000000000',
+            'Calle 10 # 20-30',
+            'Cliente institucional',
+        ]));
+        return {
+            fileName: 'plantilla_clientes.csv',
+            content: csvRows.join('\n'),
+        };
+    }
+
+    async previewCustomerImportCsv(csvText: string): Promise<{
+        summary: {
+            totalRows: number;
+            customersInFile: number;
+            customersToCreate: number;
+            customersToUpdate: number;
+            errorCount: number;
+        };
+        errors: Array<{ rowNumber: number; message: string }>;
+    }> {
+        const parsed = this.parseCustomerImportCsv(csvText);
+        const existing = await this.customerRepo.findAll();
+        const byDocument = new Map(
+            existing
+                .map((row) => [this.normalizeCustomerDocumentKey(row.documentNumber), row] as const)
+                .filter(([key]) => Boolean(key))
+        );
+        const byName = new Map(existing.map((row) => [this.normalizeCustomerNameKey(row.name), row]));
+
+        let toCreate = 0;
+        let toUpdate = 0;
+        for (const row of parsed.rows) {
+            const docKey = this.normalizeCustomerDocumentKey(row.documentNumber);
+            const existingRow = (docKey ? byDocument.get(docKey) : undefined) || byName.get(this.normalizeCustomerNameKey(row.name));
+            if (existingRow) toUpdate += 1;
+            else toCreate += 1;
+        }
+
+        return {
+            summary: {
+                totalRows: parsed.totalRows,
+                customersInFile: parsed.rows.length,
+                customersToCreate: toCreate,
+                customersToUpdate: toUpdate,
+                errorCount: parsed.errors.length,
+            },
+            errors: parsed.errors,
+        };
+    }
+
+    async importCustomersCsv(csvText: string, actor?: string): Promise<{
+        actor?: string;
+        customersToCreate: number;
+        customersToUpdate: number;
+    }> {
+        const parsed = this.parseCustomerImportCsv(csvText);
+        if (parsed.errors.length > 0) {
+            throw new AppError(`No se puede importar: hay ${parsed.errors.length} error(es) en el archivo`, 400);
+        }
+
+        const existing = await this.customerRepo.findAll();
+        const byDocument = new Map(
+            existing
+                .map((row) => [this.normalizeCustomerDocumentKey(row.documentNumber), row] as const)
+                .filter(([key]) => Boolean(key))
+        );
+        const byName = new Map(existing.map((row) => [this.normalizeCustomerNameKey(row.name), row]));
+
+        let toCreate = 0;
+        let toUpdate = 0;
+
+        await this.em.transactional(async (tx) => {
+            const repo = tx.getRepository(Customer);
+
+            for (const row of parsed.rows) {
+                const docKey = this.normalizeCustomerDocumentKey(row.documentNumber);
+                const current =
+                    (docKey ? byDocument.get(docKey) : undefined) ||
+                    byName.get(this.normalizeCustomerNameKey(row.name));
+
+                if (current) {
+                    repo.assign(current, {
+                        name: row.name,
+                        documentType: row.documentType,
+                        documentNumber: row.documentNumber,
+                        contactName: row.contactName,
+                        email: row.email,
+                        phone: row.phone,
+                        address: row.address,
+                        notes: row.notes,
+                    } as Partial<Customer>);
+                    await tx.persist(current);
+                    if (docKey) byDocument.set(docKey, current);
+                    byName.set(this.normalizeCustomerNameKey(row.name), current);
+                    toUpdate += 1;
+                    continue;
+                }
+
+                const created = repo.create({
+                    name: row.name,
+                    documentType: row.documentType,
+                    documentNumber: row.documentNumber,
+                    contactName: row.contactName,
+                    email: row.email,
+                    phone: row.phone,
+                    address: row.address,
+                    notes: row.notes,
+                } as unknown as Customer);
+                await tx.persist(created);
+                if (docKey) byDocument.set(docKey, created);
+                byName.set(this.normalizeCustomerNameKey(row.name), created);
+                toCreate += 1;
+            }
+
+            await tx.flush();
+        });
+
+        await this.logEvent({
+            entityType: 'customer',
+            entityId: 'bulk-import',
+            action: 'imported',
+            actor,
+            metadata: { customersToCreate: toCreate, customersToUpdate: toUpdate },
+        });
+
+        return {
+            actor,
+            customersToCreate: toCreate,
+            customersToUpdate: toUpdate,
+        };
     }
 
     async createShipment(payload: {

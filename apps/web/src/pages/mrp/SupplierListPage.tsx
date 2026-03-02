@@ -147,32 +147,34 @@ export default function SupplierListPage() {
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-                    <Button
-                        onClick={handleDownloadTemplate}
-                        variant="outline"
-                        className="h-11 px-5 border-slate-200 w-full sm:w-auto"
-                    >
-                        <Download className="mr-2 h-4 w-4" />
-                        Plantilla CSV
-                    </Button>
-                    <Button
-                        onClick={handleExportCsv}
-                        variant="outline"
-                        className="h-11 px-5 border-slate-200 w-full sm:w-auto"
-                    >
-                        <Download className="mr-2 h-4 w-4" />
-                        Exportar CSV
-                    </Button>
-                    <Button
-                        onClick={() => fileInputRef.current?.click()}
-                        variant="outline"
-                        className="h-11 px-5 border-slate-200 w-full sm:w-auto"
-                        disabled={previewingImport}
-                    >
-                        <Upload className="mr-2 h-4 w-4" />
-                        {previewingImport ? 'Validando...' : 'Importar CSV'}
-                    </Button>
+                <div className="flex flex-col lg:flex-row gap-3 w-full md:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-2 p-1.5 rounded-xl border border-slate-200 bg-white/80">
+                        <Button
+                            onClick={handleDownloadTemplate}
+                            variant="ghost"
+                            className="h-10 px-4 text-slate-700 hover:text-slate-900 hover:bg-slate-100 w-full sm:w-auto"
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Plantilla
+                        </Button>
+                        <Button
+                            onClick={handleExportCsv}
+                            variant="ghost"
+                            className="h-10 px-4 text-slate-700 hover:text-slate-900 hover:bg-slate-100 w-full sm:w-auto"
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar
+                        </Button>
+                        <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            variant="outline"
+                            className="h-10 px-4 border-violet-200 text-violet-700 hover:bg-violet-50 hover:text-violet-800 w-full sm:w-auto"
+                            disabled={previewingImport}
+                        >
+                            <Upload className="mr-2 h-4 w-4" />
+                            {previewingImport ? 'Validando...' : 'Importar CSV'}
+                        </Button>
+                    </div>
                     <input
                         ref={fileInputRef}
                         type="file"
@@ -391,11 +393,12 @@ export default function SupplierListPage() {
                             )}
                         </div>
                     )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setImportPreviewOpen(false)}>Cerrar</Button>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" className="border-slate-300" onClick={() => setImportPreviewOpen(false)}>Cerrar</Button>
                         <Button
                             onClick={handleApplyImport}
                             disabled={!importPreview || importPreview.summary.errorCount > 0 || applyingImport}
+                            className="bg-violet-600 hover:bg-violet-700 text-white"
                         >
                             {applyingImport ? 'Importando...' : 'Confirmar importación'}
                         </Button>

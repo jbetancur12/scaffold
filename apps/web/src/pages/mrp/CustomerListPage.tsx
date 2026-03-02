@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -7,24 +8,122 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Users, Plus, Edit2, UserSquare2, Phone, ArrowUpRight } from 'lucide-react';
+import { Users, Plus, Edit2, UserSquare2, Phone, ArrowUpRight, Download, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomersQuery } from '@/hooks/mrp/useCustomers';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
+import { getErrorMessage } from '@/lib/api-error';
+import { mrpApi } from '@/services/mrpApi';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function CustomerListPage() {
     const navigate = useNavigate();
+    const { toast } = useToast();
 
     const { data: customersResponse, loading, error } = useCustomersQuery();
     // The API might return an array directly or an object with a properties. Let's assume it's an array for now based on listCustomers endpoint returning `Customer[]`
     const customers = Array.isArray(customersResponse) ? customersResponse : [];
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const [importCsvText, setImportCsvText] = useState('');
+    const [importFileName, setImportFileName] = useState('');
+    const [importPreview, setImportPreview] = useState<{
+        summary: {
+            totalRows: number;
+            customersInFile: number;
+            customersToCreate: number;
+            customersToUpdate: number;
+            errorCount: number;
+        };
+        errors: Array<{ rowNumber: number; message: string }>;
+    } | null>(null);
+    const [importPreviewOpen, setImportPreviewOpen] = useState(false);
+    const [previewingImport, setPreviewingImport] = useState(false);
+    const [applyingImport, setApplyingImport] = useState(false);
 
     useMrpQueryErrorToast(error, 'No se pudieron cargar los clientes');
 
     // Stats calculation for KPIs
     const totalCustomers = customers.length;
     const activeContacts = customers.filter(c => c.contactName || c.email || c.phone).length;
+
+    const downloadBlob = (blob: Blob, fileName: string) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportCsv = async () => {
+        try {
+            const blob = await mrpApi.exportCustomersCsv();
+            downloadBlob(blob, `clientes-${new Date().toISOString().slice(0, 10)}.csv`);
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo exportar el directorio'), variant: 'destructive' });
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            const blob = await mrpApi.downloadCustomersImportTemplateCsv();
+            downloadBlob(blob, 'plantilla_clientes.csv');
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo descargar la plantilla'), variant: 'destructive' });
+        }
+    };
+
+    const handleSelectImportFile = async (file: File | undefined) => {
+        if (!file) return;
+        setPreviewingImport(true);
+        try {
+            const csvText = await file.text();
+            const preview = await mrpApi.previewCustomersImport({
+                csvText,
+                actor: 'sistema-web',
+            });
+            setImportCsvText(csvText);
+            setImportFileName(file.name);
+            setImportPreview(preview);
+            setImportPreviewOpen(true);
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo previsualizar el archivo CSV'), variant: 'destructive' });
+        } finally {
+            setPreviewingImport(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleApplyImport = async () => {
+        if (!importPreview || !importCsvText) return;
+        setApplyingImport(true);
+        try {
+            const result = await mrpApi.importCustomersCsv({
+                csvText: importCsvText,
+                actor: 'sistema-web',
+            });
+            toast({
+                title: 'Importación completada',
+                description: `Clientes C/U: ${result.customersToCreate}/${result.customersToUpdate}`,
+            });
+            setImportPreviewOpen(false);
+            window.location.reload();
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo importar el directorio'), variant: 'destructive' });
+        } finally {
+            setApplyingImport(false);
+        }
+    };
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
@@ -49,7 +148,41 @@ export default function CustomerListPage() {
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div className="flex flex-col lg:flex-row gap-3 w-full md:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-2 p-1.5 rounded-xl border border-slate-200 bg-white/80">
+                        <Button
+                            onClick={handleDownloadTemplate}
+                            variant="ghost"
+                            className="h-10 px-4 text-slate-700 hover:text-slate-900 hover:bg-slate-100 w-full sm:w-auto"
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Plantilla
+                        </Button>
+                        <Button
+                            onClick={handleExportCsv}
+                            variant="ghost"
+                            className="h-10 px-4 text-slate-700 hover:text-slate-900 hover:bg-slate-100 w-full sm:w-auto"
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar
+                        </Button>
+                        <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            variant="outline"
+                            className="h-10 px-4 border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800 w-full sm:w-auto"
+                            disabled={previewingImport}
+                        >
+                            <Upload className="mr-2 h-4 w-4" />
+                            {previewingImport ? 'Validando...' : 'Importar CSV'}
+                        </Button>
+                    </div>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="hidden"
+                        onChange={(e) => handleSelectImportFile(e.target.files?.[0])}
+                    />
                     <Button
                         onClick={() => navigate('/mrp/customers/new')}
                         className="h-11 px-6 shadow-md shadow-blue-600/20 bg-blue-600 hover:bg-blue-700 text-white font-medium w-full sm:w-auto transition-colors"
@@ -224,6 +357,51 @@ export default function CustomerListPage() {
                     </Table>
                 </div>
             </div>
+
+            <Dialog open={importPreviewOpen} onOpenChange={setImportPreviewOpen}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Previsualización de importación</DialogTitle>
+                    </DialogHeader>
+                    {!importPreview ? null : (
+                        <div className="space-y-4 text-sm">
+                            <p className="text-slate-600">Archivo: <span className="font-semibold">{importFileName || 'N/A'}</span></p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                <div className="rounded-lg border p-2">Filas: <b>{importPreview.summary.totalRows}</b></div>
+                                <div className="rounded-lg border p-2">En archivo: <b>{importPreview.summary.customersInFile}</b></div>
+                                <div className="rounded-lg border p-2">Crear: <b>{importPreview.summary.customersToCreate}</b></div>
+                                <div className="rounded-lg border p-2">Actualizar: <b>{importPreview.summary.customersToUpdate}</b></div>
+                                <div className="rounded-lg border p-2">Errores: <b>{importPreview.summary.errorCount}</b></div>
+                            </div>
+
+                            {importPreview.errors.length > 0 ? (
+                                <div className="rounded-lg border border-red-200 bg-red-50 p-3 max-h-64 overflow-auto">
+                                    <p className="font-semibold text-red-700 mb-2">Errores detectados (corrige antes de importar):</p>
+                                    <ul className="list-disc pl-5 space-y-1 text-red-700">
+                                        {importPreview.errors.map((row, idx) => (
+                                            <li key={`${row.rowNumber}-${idx}`}>Fila {row.rowNumber}: {row.message}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-700">
+                                    Archivo válido. Puedes continuar con la importación.
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" className="border-slate-300" onClick={() => setImportPreviewOpen(false)}>Cerrar</Button>
+                        <Button
+                            onClick={handleApplyImport}
+                            disabled={!importPreview || importPreview.summary.errorCount > 0 || applyingImport}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            {applyingImport ? 'Importando...' : 'Confirmar importación'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -141,6 +141,7 @@ import type {
     ReturnProductionMaterialPayload,
     ProductCsvImportPayload,
     SupplierCsvImportPayload,
+    CustomerCsvImportPayload,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -787,6 +788,35 @@ export const mrpApi = {
     },
     deleteCustomer: async (id: string): Promise<void> => {
         await api.delete(`/mrp/quality/customers/${id}`);
+    },
+    exportCustomersCsv: async (): Promise<Blob> => {
+        const response = await api.get('/mrp/quality/customers/export/csv', { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    downloadCustomersImportTemplateCsv: async (): Promise<Blob> => {
+        const response = await api.get('/mrp/quality/customers/import/template/csv', { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    previewCustomersImport: async (payload: CustomerCsvImportPayload): Promise<{
+        summary: {
+            totalRows: number;
+            customersInFile: number;
+            customersToCreate: number;
+            customersToUpdate: number;
+            errorCount: number;
+        };
+        errors: Array<{ rowNumber: number; message: string }>;
+    }> => {
+        const response = await api.post('/mrp/quality/customers/import/preview', payload);
+        return response.data;
+    },
+    importCustomersCsv: async (payload: CustomerCsvImportPayload): Promise<{
+        actor?: string;
+        customersToCreate: number;
+        customersToUpdate: number;
+    }> => {
+        const response = await api.post('/mrp/quality/customers/import', payload);
+        return response.data;
     },
     createShipment: async (data: CreateShipmentPayload): Promise<Shipment> => {
         const response = await api.post<Shipment>('/mrp/quality/shipments', data);

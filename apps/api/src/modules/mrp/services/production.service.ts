@@ -69,6 +69,42 @@ export class ProductionService {
         this.materialAllocationRepo = em.getRepository(ProductionMaterialAllocation);
     }
 
+    private formatBatchDateToken(date = new Date()) {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = String(date.getFullYear());
+        return `${day}${month}${year}`;
+    }
+
+    private getVariantMarker(order: ProductionOrder, variantId: string) {
+        const index = order.items.getItems().findIndex((item) => item.variant?.id === variantId);
+        const markerNumber = index >= 0 ? index + 1 : 1;
+        return `V${markerNumber}`;
+    }
+
+    private async generateAutoBatchCode(order: ProductionOrder, variantId: string) {
+        const dateToken = this.formatBatchDateToken();
+        const variantMarker = this.getVariantMarker(order, variantId);
+        const prefix = `${dateToken}-${variantMarker}-`;
+
+        const existing = await this.batchRepo.find(
+            { code: { $ilike: `${prefix}%` } },
+            { orderBy: { createdAt: 'DESC' } }
+        );
+
+        let maxSequence = 0;
+        for (const row of existing) {
+            const code = String(row.code || '').trim().toUpperCase();
+            const maybeSeq = Number(code.slice(prefix.length));
+            if (Number.isFinite(maybeSeq) && maybeSeq > maxSequence) {
+                maxSequence = maybeSeq;
+            }
+        }
+
+        const next = maxSequence + 1;
+        return `${dateToken}-${variantMarker}-${String(next).padStart(2, '0')}`;
+    }
+
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
         // Ensure dates are properly instantiated as Date objects and handle potential string inputs
         const orderData = { ...data };
@@ -226,7 +262,7 @@ export class ProductionService {
             );
         }
 
-        const code = payload.code || `LOT-${Date.now().toString(36).toUpperCase()}`;
+        const code = payload.code?.trim() || await this.generateAutoBatchCode(order, payload.variantId);
         const exists = await this.batchRepo.findOne({ code });
         if (exists) {
             throw new AppError('El código de lote ya existe', 409);

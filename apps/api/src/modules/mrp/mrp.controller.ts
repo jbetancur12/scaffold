@@ -128,6 +128,7 @@ import {
     UpdateSalesOrderStatusSchema,
     ProductCsvImportSchema,
     SupplierCsvImportSchema,
+    CustomerCsvImportSchema,
 } from '@scaffold/schemas';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -1129,6 +1130,48 @@ export class MrpController {
             const { id } = req.params;
             await this.qualityService.deleteCustomer(id);
             return ApiResponse.success(res, null, 'Cliente eliminado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async exportCustomersCsv(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const file = await this.qualityService.exportCustomersCsv();
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getCustomersImportTemplateCsv(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const file = await this.qualityService.getCustomerImportTemplateCsv();
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async previewCustomersImport(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CustomerCsvImportSchema.parse(req.body);
+            const preview = await this.qualityService.previewCustomerImportCsv(payload.csvText);
+            return ApiResponse.success(res, preview, 'Previsualización de importación generada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async importCustomersCsv(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CustomerCsvImportSchema.parse(req.body);
+            const result = await this.qualityService.importCustomersCsv(payload.csvText, payload.actor);
+            return ApiResponse.success(res, result, 'Clientes importados');
         } catch (error) {
             next(error);
         }
