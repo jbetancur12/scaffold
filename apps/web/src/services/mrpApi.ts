@@ -140,6 +140,7 @@ import type {
     UpsertProductionMaterialAllocationPayload,
     ReturnProductionMaterialPayload,
     ProductCsvImportPayload,
+    SupplierCsvImportPayload,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -436,6 +437,35 @@ export const mrpApi = {
     // Suppliers
     getSuppliers: async (page = 1, limit = 10) => {
         const response = await api.get<{ suppliers: Supplier[], total: number }>(`/mrp/suppliers?page=${page}&limit=${limit}`);
+        return response.data;
+    },
+    exportSuppliersCsv: async (): Promise<Blob> => {
+        const response = await api.get('/mrp/suppliers/export/csv', { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    downloadSuppliersImportTemplateCsv: async (): Promise<Blob> => {
+        const response = await api.get('/mrp/suppliers/import/template/csv', { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    previewSuppliersImport: async (payload: SupplierCsvImportPayload): Promise<{
+        summary: {
+            totalRows: number;
+            suppliersInFile: number;
+            suppliersToCreate: number;
+            suppliersToUpdate: number;
+            errorCount: number;
+        };
+        errors: Array<{ rowNumber: number; message: string }>;
+    }> => {
+        const response = await api.post('/mrp/suppliers/import/preview', payload);
+        return response.data;
+    },
+    importSuppliersCsv: async (payload: SupplierCsvImportPayload): Promise<{
+        actor?: string;
+        suppliersToCreate: number;
+        suppliersToUpdate: number;
+    }> => {
+        const response = await api.post('/mrp/suppliers/import', payload);
         return response.data;
     },
     getSupplier: async (id: string) => {

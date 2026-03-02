@@ -127,6 +127,7 @@ import {
     ListSalesOrdersQuerySchema,
     UpdateSalesOrderStatusSchema,
     ProductCsvImportSchema,
+    SupplierCsvImportSchema,
 } from '@scaffold/schemas';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -327,6 +328,48 @@ export class MrpController {
             const data = SupplierSchema.parse(req.body);
             const supplier = await this.supplierService.createSupplier(data);
             return ApiResponse.success(res, supplier, 'Proveedor creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async exportSuppliersCsv(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const file = await this.supplierService.exportSuppliersCsv();
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getSuppliersImportTemplateCsv(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const file = await this.supplierService.getSupplierImportTemplateCsv();
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async previewSuppliersImport(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = SupplierCsvImportSchema.parse(req.body);
+            const preview = await this.supplierService.previewSupplierImportCsv(payload.csvText);
+            return ApiResponse.success(res, preview, 'Previsualización de importación generada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async importSuppliersCsv(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = SupplierCsvImportSchema.parse(req.body);
+            const result = await this.supplierService.importSuppliersCsv(payload.csvText, payload.actor);
+            return ApiResponse.success(res, result, 'Proveedores importados');
         } catch (error) {
             next(error);
         }

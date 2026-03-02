@@ -37,6 +37,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     // Suppliers
     router.post('/suppliers', (req, res, next) => mrpController.createSupplier(req, res, next));
     router.get('/suppliers', (req, res, next) => mrpController.listSuppliers(req, res, next));
+    router.get('/suppliers/export/csv', (req, res, next) => mrpController.exportSuppliersCsv(req, res, next));
+    router.get('/suppliers/import/template/csv', (req, res, next) => mrpController.getSuppliersImportTemplateCsv(req, res, next));
+    router.post('/suppliers/import/preview', (req, res, next) => mrpController.previewSuppliersImport(req, res, next));
+    router.post('/suppliers/import', (req, res, next) => mrpController.importSuppliersCsv(req, res, next));
     router.get('/suppliers/:id', (req, res, next) => mrpController.getSupplier(req, res, next));
     router.put('/suppliers/:id', (req, res, next) => mrpController.updateSupplier(req, res, next));
     router.get('/suppliers/:id/materials', (req, res, next) => mrpController.getSupplierMaterials(req, res, next));
