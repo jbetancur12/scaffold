@@ -131,6 +131,7 @@ import {
     ProductCsvImportSchema,
     SupplierCsvImportSchema,
     CustomerCsvImportSchema,
+    RawMaterialCsvImportSchema,
 } from '@scaffold/schemas';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -470,6 +471,48 @@ export class MrpController {
             const { page, limit, search } = ListRawMaterialsQuerySchema.parse(req.query);
             const result = await this.mrpService.listRawMaterials(page || 1, limit || 10, search);
             return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async exportRawMaterialsCsv(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const file = await this.mrpService.exportRawMaterialsCsv();
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getRawMaterialsImportTemplateCsv(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const file = await this.mrpService.getRawMaterialImportTemplateCsv();
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async previewRawMaterialsImport(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = RawMaterialCsvImportSchema.parse(req.body);
+            const preview = await this.mrpService.previewRawMaterialImportCsv(payload.csvText);
+            return ApiResponse.success(res, preview, 'Previsualización de importación generada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async importRawMaterialsCsv(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = RawMaterialCsvImportSchema.parse(req.body);
+            const result = await this.mrpService.importRawMaterialsCsv(payload.csvText, payload.actor);
+            return ApiResponse.success(res, result, 'Materias primas importadas');
         } catch (error) {
             next(error);
         }

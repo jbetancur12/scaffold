@@ -115,6 +115,11 @@ export const CustomerCsvImportSchema = z.object({
     actor: z.string().optional(),
 });
 
+export const RawMaterialCsvImportSchema = z.object({
+    csvText: z.string().min(1, 'El contenido CSV es obligatorio'),
+    actor: z.string().optional(),
+});
+
 export const RawMaterialSchema = z.object({
     name: z.string().min(1, 'El nombre es obligatorio'),
     sku: z.string().min(1, 'SKU es obligatorio'),
@@ -1230,6 +1235,7 @@ export type CreateDmrTemplatePayload = DateInputValue<z.input<typeof CreateDmrTe
 export type ProductCsvImportPayload = DateInputValue<z.input<typeof ProductCsvImportSchema>>;
 export type SupplierCsvImportPayload = DateInputValue<z.input<typeof SupplierCsvImportSchema>>;
 export type CustomerCsvImportPayload = DateInputValue<z.input<typeof CustomerCsvImportSchema>>;
+export type RawMaterialCsvImportPayload = DateInputValue<z.input<typeof RawMaterialCsvImportSchema>>;
 export type UpsertProductionBatchFinishedInspectionFormPayload = DateInputValue<z.input<typeof UpsertProductionBatchFinishedInspectionFormSchema>>;
 export type UpsertRegulatoryLabelPayload = DateInputValue<z.input<typeof UpsertRegulatoryLabelSchema>>;
 export type ValidateDispatchReadinessPayload = DateInputValue<z.input<typeof ValidateDispatchReadinessSchema>>;

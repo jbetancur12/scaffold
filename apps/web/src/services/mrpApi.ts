@@ -143,6 +143,7 @@ import type {
     ProductCsvImportPayload,
     SupplierCsvImportPayload,
     CustomerCsvImportPayload,
+    RawMaterialCsvImportPayload,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -494,6 +495,35 @@ export const mrpApi = {
     // Raw Materials
     getRawMaterials: async (page = 1, limit = 10, search = '') => {
         const response = await api.get<{ materials: RawMaterial[], total: number }>(`/mrp/raw-materials?page=${page}&limit=${limit}&search=${search}`);
+        return response.data;
+    },
+    exportRawMaterialsCsv: async (): Promise<Blob> => {
+        const response = await api.get('/mrp/raw-materials/export/csv', { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    downloadRawMaterialsImportTemplateCsv: async (): Promise<Blob> => {
+        const response = await api.get('/mrp/raw-materials/import/template/csv', { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    previewRawMaterialsImport: async (payload: RawMaterialCsvImportPayload): Promise<{
+        summary: {
+            totalRows: number;
+            materialsInFile: number;
+            materialsToCreate: number;
+            materialsToUpdate: number;
+            errorCount: number;
+        };
+        errors: Array<{ rowNumber: number; message: string }>;
+    }> => {
+        const response = await api.post('/mrp/raw-materials/import/preview', payload);
+        return response.data;
+    },
+    importRawMaterialsCsv: async (payload: RawMaterialCsvImportPayload): Promise<{
+        actor?: string;
+        materialsToCreate: number;
+        materialsToUpdate: number;
+    }> => {
+        const response = await api.post('/mrp/raw-materials/import', payload);
         return response.data;
     },
     getRawMaterial: async (id: string) => {

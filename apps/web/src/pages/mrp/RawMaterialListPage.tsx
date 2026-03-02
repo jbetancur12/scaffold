@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -9,21 +9,48 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Database, Plus, Edit2, Search, ChevronLeft, ChevronRight, Copy, Package, Leaf, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { Database, Plus, Edit2, Search, ChevronLeft, ChevronRight, Copy, Package, Leaf, AlertTriangle, ArrowUpRight, Download, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/utils';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
+import { getErrorMessage } from '@/lib/api-error';
+import { mrpApi } from '@/services/mrpApi';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function RawMaterialListPage() {
     const navigate = useNavigate();
+    const { toast } = useToast();
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [page, setPage] = useState(1);
     const limit = 10;
 
-    const { materials, total, loading, error } = useRawMaterialsQuery(page, limit, debouncedSearch);
+    const { materials, total, loading, error, refetch } = useRawMaterialsQuery(page, limit, debouncedSearch);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const [importCsvText, setImportCsvText] = useState('');
+    const [importFileName, setImportFileName] = useState('');
+    const [importPreview, setImportPreview] = useState<{
+        summary: {
+            totalRows: number;
+            materialsInFile: number;
+            materialsToCreate: number;
+            materialsToUpdate: number;
+            errorCount: number;
+        };
+        errors: Array<{ rowNumber: number; message: string }>;
+    } | null>(null);
+    const [importPreviewOpen, setImportPreviewOpen] = useState(false);
+    const [previewingImport, setPreviewingImport] = useState(false);
+    const [applyingImport, setApplyingImport] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -34,6 +61,77 @@ export default function RawMaterialListPage() {
     }, [search]);
 
     useMrpQueryErrorToast(error, 'No se pudo cargar la materia prima');
+
+    const downloadBlob = (blob: Blob, fileName: string) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportCsv = async () => {
+        try {
+            const blob = await mrpApi.exportRawMaterialsCsv();
+            downloadBlob(blob, `materias-primas-${new Date().toISOString().slice(0, 10)}.csv`);
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo exportar el catálogo'), variant: 'destructive' });
+        }
+    };
+
+    const handleDownloadTemplate = async () => {
+        try {
+            const blob = await mrpApi.downloadRawMaterialsImportTemplateCsv();
+            downloadBlob(blob, 'plantilla_materias_primas.csv');
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo descargar la plantilla'), variant: 'destructive' });
+        }
+    };
+
+    const handleSelectImportFile = async (file: File | undefined) => {
+        if (!file) return;
+        setPreviewingImport(true);
+        try {
+            const csvText = await file.text();
+            const preview = await mrpApi.previewRawMaterialsImport({
+                csvText,
+                actor: 'sistema-web',
+            });
+            setImportCsvText(csvText);
+            setImportFileName(file.name);
+            setImportPreview(preview);
+            setImportPreviewOpen(true);
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo previsualizar el archivo CSV'), variant: 'destructive' });
+        } finally {
+            setPreviewingImport(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleApplyImport = async () => {
+        if (!importPreview || !importCsvText) return;
+        setApplyingImport(true);
+        try {
+            const result = await mrpApi.importRawMaterialsCsv({
+                csvText: importCsvText,
+                actor: 'sistema-web',
+            });
+            toast({
+                title: 'Importación completada',
+                description: `Materias primas C/U: ${result.materialsToCreate}/${result.materialsToUpdate}`,
+            });
+            setImportPreviewOpen(false);
+            await refetch({ force: true });
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo importar el catálogo'), variant: 'destructive' });
+        } finally {
+            setApplyingImport(false);
+        }
+    };
 
     // Calculate some basic stats if we have data on the current page
     // In a real app, these might come from a separate summary endpoint
@@ -47,6 +145,7 @@ export default function RawMaterialListPage() {
     }, [materials, total]);
 
     return (
+        <>
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
             {/* Hero Header Section */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
@@ -69,7 +168,41 @@ export default function RawMaterialListPage() {
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div className="flex flex-col lg:flex-row gap-3 w-full md:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-2 p-1.5 rounded-xl border border-slate-200 bg-white/80">
+                        <Button
+                            onClick={handleDownloadTemplate}
+                            variant="ghost"
+                            className="h-10 px-4 text-slate-700 hover:text-slate-900 hover:bg-slate-100 w-full sm:w-auto"
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Plantilla
+                        </Button>
+                        <Button
+                            onClick={handleExportCsv}
+                            variant="ghost"
+                            className="h-10 px-4 text-slate-700 hover:text-slate-900 hover:bg-slate-100 w-full sm:w-auto"
+                        >
+                            <Download className="mr-2 h-4 w-4" />
+                            Exportar
+                        </Button>
+                        <Button
+                            onClick={() => fileInputRef.current?.click()}
+                            variant="outline"
+                            className="h-10 px-4 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-800 w-full sm:w-auto"
+                            disabled={previewingImport}
+                        >
+                            <Upload className="mr-2 h-4 w-4" />
+                            {previewingImport ? 'Validando...' : 'Importar CSV'}
+                        </Button>
+                    </div>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,text/csv"
+                        className="hidden"
+                        onChange={(e) => handleSelectImportFile(e.target.files?.[0])}
+                    />
                     <Button
                         onClick={() => navigate('/mrp/raw-materials/new')}
                         className="h-11 px-6 shadow-md shadow-indigo-600/20 bg-indigo-600 hover:bg-indigo-700 text-white font-medium w-full sm:w-auto"
@@ -309,5 +442,68 @@ export default function RawMaterialListPage() {
                 )}
             </div>
         </div>
+        <Dialog open={importPreviewOpen} onOpenChange={setImportPreviewOpen}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Previsualización de importación de materias primas</DialogTitle>
+                </DialogHeader>
+                {importPreview && (
+                    <div className="space-y-4 text-sm">
+                        <p className="text-slate-600">
+                            Archivo: <span className="font-medium text-slate-900">{importFileName || 'CSV cargado'}</span>
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                            <div className="rounded border p-2">
+                                <p className="text-xs text-slate-500">Filas</p>
+                                <p className="font-semibold">{importPreview.summary.totalRows}</p>
+                            </div>
+                            <div className="rounded border p-2">
+                                <p className="text-xs text-slate-500">Materiales</p>
+                                <p className="font-semibold">{importPreview.summary.materialsInFile}</p>
+                            </div>
+                            <div className="rounded border p-2">
+                                <p className="text-xs text-slate-500">Crear</p>
+                                <p className="font-semibold text-emerald-700">{importPreview.summary.materialsToCreate}</p>
+                            </div>
+                            <div className="rounded border p-2">
+                                <p className="text-xs text-slate-500">Actualizar</p>
+                                <p className="font-semibold text-blue-700">{importPreview.summary.materialsToUpdate}</p>
+                            </div>
+                            <div className="rounded border p-2">
+                                <p className="text-xs text-slate-500">Errores</p>
+                                <p className={`font-semibold ${importPreview.summary.errorCount > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+                                    {importPreview.summary.errorCount}
+                                </p>
+                            </div>
+                        </div>
+                        {importPreview.summary.errorCount > 0 ? (
+                            <div className="max-h-56 overflow-auto rounded-lg border border-red-200 bg-red-50 p-3">
+                                <p className="font-semibold text-red-700 mb-2">Errores detectados (corrige antes de importar):</p>
+                                <ul className="list-disc pl-5 space-y-1 text-red-700">
+                                    {importPreview.errors.map((row, idx) => (
+                                        <li key={`${row.rowNumber}-${idx}`}>Fila {row.rowNumber}: {row.message}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : (
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-700">
+                                Archivo válido. Puedes continuar con la importación.
+                            </div>
+                        )}
+                    </div>
+                )}
+                <DialogFooter className="gap-2">
+                    <Button variant="outline" className="border-slate-300" onClick={() => setImportPreviewOpen(false)}>Cerrar</Button>
+                    <Button
+                        onClick={handleApplyImport}
+                        disabled={!importPreview || importPreview.summary.errorCount > 0 || applyingImport}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    >
+                        {applyingImport ? 'Importando...' : 'Confirmar importación'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }

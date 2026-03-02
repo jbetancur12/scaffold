@@ -80,6 +80,7 @@ export default function PurchaseRequisitionFormPage() {
             return;
         }
         try {
+            const opReference = selectedProductionOrder?.code || form.productionOrderId.trim();
             const requirements = await mrpApi.getMaterialRequirements(form.productionOrderId.trim());
             const shortages = requirements
                 .filter((req) => Number(req.required) > Number(req.available))
@@ -87,7 +88,7 @@ export default function PurchaseRequisitionFormPage() {
                     rawMaterialId: req.material.id,
                     quantity: Number((Number(req.required) - Number(req.available)).toFixed(4)),
                     suggestedSupplierId: req.potentialSuppliers[0]?.supplier?.id || '',
-                    notes: `Faltante OP ${form.productionOrderId.trim()}`,
+                    notes: `Faltante OP ${opReference}`,
                 }));
 
             if (shortages.length === 0) {

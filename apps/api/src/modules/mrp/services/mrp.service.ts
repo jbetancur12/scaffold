@@ -7,6 +7,8 @@ import { OperationalConfig } from '../entities/operational-config.entity';
 import { Supplier } from '../entities/supplier.entity';
 import { RawMaterialSchema, BOMItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
+import { UnitType } from '@scaffold/types';
+import { AppError } from '../../../shared/utils/response';
 
 export class MrpService {
     private readonly em: EntityManager;
@@ -19,6 +21,134 @@ export class MrpService {
         this.rawMaterialRepo = em.getRepository(RawMaterial);
         this.bomItemRepo = em.getRepository(BOMItem);
         this.variantRepo = em.getRepository(ProductVariant);
+    }
+
+    private readonly rawMaterialImportHeaders = [
+        'name',
+        'sku',
+        'unit',
+        'cost',
+        'min_stock_level',
+        'supplier_name',
+    ] as const;
+
+    private toCsvRow(values: ReadonlyArray<string | number | boolean | undefined | null>) {
+        return values
+            .map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`)
+            .join(',');
+    }
+
+    private parseCsvLine(line: string): string[] {
+        const result: string[] = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i += 1) {
+            const char = line[i];
+            if (char === '"') {
+                if (inQuotes && line[i + 1] === '"') {
+                    current += '"';
+                    i += 1;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+                continue;
+            }
+            if (char === ',' && !inQuotes) {
+                result.push(current.trim());
+                current = '';
+                continue;
+            }
+            current += char;
+        }
+        result.push(current.trim());
+        return result;
+    }
+
+    private parseRawMaterialImportCsv(csvText: string) {
+        const lines = csvText
+            .replace(/\r/g, '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+        if (lines.length <= 1) {
+            throw new AppError('El CSV no contiene filas de datos', 400);
+        }
+
+        const expected = [...this.rawMaterialImportHeaders];
+        const header = this.parseCsvLine(lines[0]).map((h) => h.toLowerCase());
+        const invalidHeader = expected.some((key, idx) => header[idx] !== key);
+        if (invalidHeader) {
+            throw new AppError(`Encabezado CSV inválido. Debe ser: ${expected.join(', ')}`, 400);
+        }
+
+        const rows: Array<{
+            rowNumber: number;
+            name: string;
+            sku: string;
+            unit: UnitType;
+            cost: number;
+            minStockLevel: number;
+            supplierName?: string;
+        }> = [];
+        const errors: Array<{ rowNumber: number; message: string }> = [];
+        const skusInFile = new Set<string>();
+        const unitValues = new Set(Object.values(UnitType));
+
+        for (let index = 1; index < lines.length; index += 1) {
+            const rowNumber = index + 1;
+            const values = this.parseCsvLine(lines[index]);
+            const row = Object.fromEntries(
+                expected.map((key, keyIndex) => [key, (values[keyIndex] || '').trim()])
+            ) as Record<(typeof expected)[number], string>;
+
+            const name = row.name.trim();
+            const sku = row.sku.trim().toUpperCase();
+            const unit = row.unit.trim().toLowerCase() as UnitType;
+            const cost = Number.parseFloat(row.cost);
+            const minStockLevelRaw = row.min_stock_level.trim();
+            const minStockLevel = minStockLevelRaw ? Number.parseFloat(minStockLevelRaw) : 0;
+            const supplierName = row.supplier_name.trim() || undefined;
+
+            if (!name) {
+                errors.push({ rowNumber, message: 'name es obligatorio' });
+                continue;
+            }
+            if (!sku) {
+                errors.push({ rowNumber, message: 'sku es obligatorio' });
+                continue;
+            }
+            if (skusInFile.has(sku)) {
+                errors.push({ rowNumber, message: `SKU duplicado en archivo: ${sku}` });
+                continue;
+            }
+            skusInFile.add(sku);
+
+            if (!unitValues.has(unit)) {
+                errors.push({ rowNumber, message: `unit inválido (${row.unit}). Valores válidos: ${Array.from(unitValues).join(', ')}` });
+                continue;
+            }
+            if (!Number.isFinite(cost) || cost < 0) {
+                errors.push({ rowNumber, message: 'cost debe ser un número mayor o igual a 0' });
+                continue;
+            }
+            if (!Number.isFinite(minStockLevel) || minStockLevel < 0) {
+                errors.push({ rowNumber, message: 'min_stock_level debe ser un número mayor o igual a 0' });
+                continue;
+            }
+
+            rows.push({
+                rowNumber,
+                name,
+                sku,
+                unit,
+                cost,
+                minStockLevel,
+                supplierName,
+            });
+        }
+
+        return { rows, errors, totalRows: lines.length - 1 };
     }
 
     async createRawMaterial(data: z.infer<typeof RawMaterialSchema>): Promise<RawMaterial> {
@@ -106,6 +236,206 @@ export class MrpService {
             }
         );
         return { materials, total };
+    }
+
+    async exportRawMaterialsCsv(): Promise<{ fileName: string; content: string }> {
+        const materials = await this.rawMaterialRepo.findAll({
+            populate: ['supplier'],
+            orderBy: { name: 'ASC' },
+        });
+        const rows: string[] = [this.toCsvRow(this.rawMaterialImportHeaders)];
+        for (const material of materials) {
+            rows.push(this.toCsvRow([
+                material.name,
+                material.sku,
+                material.unit,
+                material.cost,
+                material.minStockLevel ?? 0,
+                material.supplier?.name,
+            ]));
+        }
+        return {
+            fileName: `materias_primas_${new Date().toISOString().slice(0, 10)}.csv`,
+            content: rows.join('\n'),
+        };
+    }
+
+    async getRawMaterialImportTemplateCsv(): Promise<{ fileName: string; content: string }> {
+        const rows: string[] = [this.toCsvRow(this.rawMaterialImportHeaders)];
+        rows.push(this.toCsvRow([
+            'Tela antialergica 150cm',
+            'TELA-150-A',
+            UnitType.METER,
+            '12000',
+            '50',
+            'Proveedor Ejemplo SAS',
+        ]));
+        rows.push(this.toCsvRow([
+            'Espuma densidad 26',
+            'ESP-026',
+            UnitType.KG,
+            '18000',
+            '20',
+            '',
+        ]));
+        return {
+            fileName: 'plantilla_materias_primas.csv',
+            content: rows.join('\n'),
+        };
+    }
+
+    async previewRawMaterialImportCsv(csvText: string): Promise<{
+        summary: {
+            totalRows: number;
+            materialsInFile: number;
+            materialsToCreate: number;
+            materialsToUpdate: number;
+            errorCount: number;
+        };
+        errors: Array<{ rowNumber: number; message: string }>;
+    }> {
+        const parsed = this.parseRawMaterialImportCsv(csvText);
+        const [existingMaterials, suppliers] = await Promise.all([
+            this.rawMaterialRepo.find({ sku: { $in: parsed.rows.map((row) => row.sku) } }),
+            this.em.getRepository(Supplier).findAll(),
+        ]);
+        const existingSkuSet = new Set(existingMaterials.map((row) => row.sku.trim().toUpperCase()));
+        const supplierByName = new Map(suppliers.map((row) => [row.name.trim().toUpperCase(), row]));
+        const supplierErrors: Array<{ rowNumber: number; message: string }> = [];
+
+        for (const row of parsed.rows) {
+            if (!row.supplierName) continue;
+            const supplier = supplierByName.get(row.supplierName.trim().toUpperCase());
+            if (!supplier) {
+                supplierErrors.push({
+                    rowNumber: row.rowNumber,
+                    message: `supplier_name no encontrado: ${row.supplierName}`,
+                });
+            }
+        }
+
+        const materialsToCreate = parsed.rows.filter((row) => !existingSkuSet.has(row.sku)).length;
+        const materialsToUpdate = parsed.rows.length - materialsToCreate;
+        const allErrors = [...parsed.errors, ...supplierErrors];
+
+        return {
+            summary: {
+                totalRows: parsed.totalRows,
+                materialsInFile: parsed.rows.length,
+                materialsToCreate,
+                materialsToUpdate,
+                errorCount: allErrors.length,
+            },
+            errors: allErrors.slice(0, 200),
+        };
+    }
+
+    async importRawMaterialsCsv(csvText: string, actor?: string): Promise<{
+        actor?: string;
+        materialsToCreate: number;
+        materialsToUpdate: number;
+    }> {
+        const preview = await this.previewRawMaterialImportCsv(csvText);
+        if (preview.summary.errorCount > 0) {
+            throw new AppError(`El archivo tiene ${preview.summary.errorCount} errores. Corrige y vuelve a intentar.`, 400);
+        }
+
+        const parsed = this.parseRawMaterialImportCsv(csvText);
+        const changedMaterialIds = new Set<string>();
+
+        await this.em.transactional(async (tx) => {
+            const rawMaterialRepo = tx.getRepository(RawMaterial);
+            const supplierRepo = tx.getRepository(Supplier);
+            const supplierMaterialRepo = tx.getRepository(SupplierMaterial);
+
+            const existingMaterials = await rawMaterialRepo.find({
+                sku: { $in: parsed.rows.map((row) => row.sku) },
+            }, { populate: ['supplier'] });
+            const materialBySku = new Map(existingMaterials.map((row) => [row.sku.trim().toUpperCase(), row]));
+
+            const supplierNames = parsed.rows
+                .map((row) => row.supplierName?.trim().toUpperCase())
+                .filter((name): name is string => Boolean(name));
+            const suppliers = supplierNames.length
+                ? await supplierRepo.findAll()
+                : [];
+            const supplierByName = new Map(suppliers.map((row) => [row.name.trim().toUpperCase(), row]));
+
+            for (const row of parsed.rows) {
+                const existing = materialBySku.get(row.sku);
+                const supplier = row.supplierName
+                    ? supplierByName.get(row.supplierName.trim().toUpperCase())
+                    : undefined;
+
+                if (row.supplierName && !supplier) {
+                    throw new AppError(`supplier_name no encontrado: ${row.supplierName} (fila ${row.rowNumber})`, 400);
+                }
+
+                if (existing) {
+                    const oldCost = Number(existing.cost);
+                    existing.name = row.name;
+                    existing.unit = row.unit;
+                    existing.cost = row.cost;
+                    existing.minStockLevel = row.minStockLevel;
+                    existing.supplier = supplier;
+                    tx.persist(existing);
+
+                    if (oldCost !== row.cost) {
+                        changedMaterialIds.add(existing.id);
+                    }
+
+                    if (supplier) {
+                        let link = await supplierMaterialRepo.findOne({
+                            supplier: supplier.id,
+                            rawMaterial: existing.id,
+                        });
+                        if (!link) {
+                            link = supplierMaterialRepo.create({
+                                supplier,
+                                rawMaterial: existing,
+                                lastPurchasePrice: existing.lastPurchasePrice ?? existing.cost,
+                                lastPurchaseDate: existing.lastPurchaseDate ?? new Date(),
+                            } as unknown as SupplierMaterial);
+                            tx.persist(link);
+                        }
+                    }
+                    continue;
+                }
+
+                const created = rawMaterialRepo.create({
+                    name: row.name,
+                    sku: row.sku,
+                    unit: row.unit,
+                    cost: row.cost,
+                    minStockLevel: row.minStockLevel,
+                    supplier,
+                } as unknown as RawMaterial);
+                tx.persist(created);
+                materialBySku.set(row.sku, created);
+
+                if (supplier) {
+                    const link = supplierMaterialRepo.create({
+                        supplier,
+                        rawMaterial: created,
+                        lastPurchasePrice: created.cost,
+                        lastPurchaseDate: new Date(),
+                    } as unknown as SupplierMaterial);
+                    tx.persist(link);
+                }
+            }
+
+            await tx.flush();
+        });
+
+        for (const materialId of changedMaterialIds) {
+            await this.recalculateVariantsByMaterial(materialId);
+        }
+
+        return {
+            actor,
+            materialsToCreate: preview.summary.materialsToCreate,
+            materialsToUpdate: preview.summary.materialsToUpdate,
+        };
     }
 
     async addBOMItem(data: z.infer<typeof BOMItemSchema>): Promise<BOMItem> {

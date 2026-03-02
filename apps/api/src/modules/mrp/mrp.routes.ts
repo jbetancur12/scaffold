@@ -50,6 +50,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     // Raw Materials & BOM
     router.post('/raw-materials', (req, res, next) => mrpController.createRawMaterial(req, res, next));
     router.get('/raw-materials', (req, res, next) => mrpController.listRawMaterials(req, res, next));
+    router.get('/raw-materials/export/csv', (req, res, next) => mrpController.exportRawMaterialsCsv(req, res, next));
+    router.get('/raw-materials/import/template/csv', (req, res, next) => mrpController.getRawMaterialsImportTemplateCsv(req, res, next));
+    router.post('/raw-materials/import/preview', (req, res, next) => mrpController.previewRawMaterialsImport(req, res, next));
+    router.post('/raw-materials/import', (req, res, next) => mrpController.importRawMaterialsCsv(req, res, next));
     router.get('/raw-materials/:id', (req, res, next) => mrpController.getRawMaterial(req, res, next));
     router.patch('/raw-materials/:id', (req, res, next) => mrpController.updateRawMaterial(req, res, next));
     router.get('/raw-materials/:id/suppliers', (req, res, next) => mrpController.getRawMaterialSuppliers(req, res, next));
