@@ -18,6 +18,7 @@ import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { CreateCustomerDialog } from './components/CreateCustomerDialog';
 import { cn } from '@/lib/utils';
 import { Product, SalesOrderStatus } from '@scaffold/types';
+import { mrpApi } from '@/services/mrpApi';
 
 interface OrderItem {
     productId: string;
@@ -142,6 +143,49 @@ export default function SalesOrderFormPage() {
             unitPrice: 0,
         }]);
     }, [isEditMode, existingOrder, navigate, toast]);
+
+    useEffect(() => {
+        if (!isEditMode || !existingOrder?.items?.length) return;
+
+        const productIds = Array.from(
+            new Set(
+                existingOrder.items
+                    .map((item) => item.product?.id)
+                    .filter((id): id is string => Boolean(id))
+            )
+        );
+
+        const missingVariantPayloadIds = productIds.filter((productId) => {
+            const cached = selectedProductsById[productId];
+            return !cached || !cached.variants || cached.variants.length === 0;
+        });
+
+        if (missingVariantPayloadIds.length === 0) return;
+
+        let mounted = true;
+        void Promise.all(
+            missingVariantPayloadIds.map(async (productId) => {
+                try {
+                    return await mrpApi.getProduct(productId);
+                } catch {
+                    return null;
+                }
+            })
+        ).then((fullProducts) => {
+            if (!mounted) return;
+            setSelectedProductsById((prev) => {
+                const next = { ...prev };
+                for (const product of fullProducts) {
+                    if (product) next[product.id] = product;
+                }
+                return next;
+            });
+        });
+
+        return () => {
+            mounted = false;
+        };
+    }, [isEditMode, existingOrder, selectedProductsById]);
 
     const addItem = () => {
         setItems((prev) => [

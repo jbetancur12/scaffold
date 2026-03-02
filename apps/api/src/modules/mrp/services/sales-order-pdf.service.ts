@@ -355,14 +355,22 @@ export class SalesOrderPdfService {
     const processLabel = this.resolveProcessLabelByDocCode(docCode);
     const docDate = docOptions?.docDate || this.formatHeaderDate(order.createdAt);
 
-    const items = order.items.getItems().map((item) => ({
-      description: (item.product as any)?.name || 'Producto',
-      variant: (item.variant as any)?.name || '-',
-      sku: (item.variant as any)?.sku || (item.product as any)?.sku || '-',
-      quantity: Number(item.quantity || 0).toLocaleString('es-CO'),
-      unitPrice: this.formatCurrency(Number(item.unitPrice || 0)),
-      lineTotal: this.formatCurrency(Number(item.quantity || 0) * Number(item.unitPrice || 0)),
-    }));
+    const items = order.items
+      .getItems()
+      .slice()
+      .sort((a, b) => {
+        const skuA = String((a.variant as any)?.sku || (a.product as any)?.sku || '').trim().toUpperCase();
+        const skuB = String((b.variant as any)?.sku || (b.product as any)?.sku || '').trim().toUpperCase();
+        return skuA.localeCompare(skuB, 'es', { numeric: true, sensitivity: 'base' });
+      })
+      .map((item) => ({
+        description: (item.product as any)?.name || 'Producto',
+        variant: (item.variant as any)?.name || '-',
+        sku: (item.variant as any)?.sku || (item.product as any)?.sku || '-',
+        quantity: Number(item.quantity || 0).toLocaleString('es-CO'),
+        unitPrice: this.formatCurrency(Number(item.unitPrice || 0)),
+        lineTotal: this.formatCurrency(Number(item.quantity || 0) * Number(item.unitPrice || 0)),
+      }));
 
     const html = compile({
       orderNumber: order.code,
