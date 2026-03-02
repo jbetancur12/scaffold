@@ -106,6 +106,24 @@ export class ProductionService {
         return `${dateToken}-${variantMarker}-${String(next).padStart(2, '0')}`;
     }
 
+    async generateNextOrderCode(tx?: EntityManager): Promise<string> {
+        const manager = tx ?? this.em;
+        const repo = manager.getRepository(ProductionOrder);
+        const rows = await repo.findAll({ fields: ['code'] as never, orderBy: { createdAt: 'ASC' } });
+
+        let maxNumber = 0;
+        for (const row of rows) {
+            const rawCode = String(row.code || '').trim();
+            if (!/^\d+$/.test(rawCode)) continue;
+            const parsed = Number.parseInt(rawCode, 10);
+            if (Number.isFinite(parsed) && parsed > maxNumber) {
+                maxNumber = parsed;
+            }
+        }
+
+        return String(maxNumber + 1).padStart(5, '0');
+    }
+
     private calculateRequiredMaterialFromFabrication(
         bomQuantityPerUnit: number,
         productionUnits: number,
@@ -237,6 +255,9 @@ export class ProductionService {
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
         // Ensure dates are properly instantiated as Date objects and handle potential string inputs
         const orderData = { ...data };
+        if (!orderData.code?.trim()) {
+            orderData.code = await this.generateNextOrderCode();
+        }
 
         if (orderData.startDate && typeof orderData.startDate === 'string') {
             const date = new Date(orderData.startDate);

@@ -323,14 +323,16 @@ export class SalesOrderService {
 
     private async generateProductionOrderCode(tx: EntityManager): Promise<string> {
         const repo = tx.getRepository(ProductionOrder);
-        let tries = 0;
-        while (tries < 10) {
-            const token = Date.now().toString(36).toUpperCase();
-            const candidate = `PO-${token}${tries > 0 ? String(tries) : ''}`;
-            const exists = await repo.findOne({ code: candidate });
-            if (!exists) return candidate;
-            tries += 1;
+        const rows = await repo.findAll({ fields: ['code'] as never, orderBy: { createdAt: 'ASC' } });
+        let maxNumber = 0;
+        for (const row of rows) {
+            const rawCode = String(row.code || '').trim();
+            if (!/^\d+$/.test(rawCode)) continue;
+            const parsed = Number.parseInt(rawCode, 10);
+            if (Number.isFinite(parsed) && parsed > maxNumber) {
+                maxNumber = parsed;
+            }
         }
-        throw new AppError('No se pudo generar código único para orden de producción', 500);
+        return String(maxNumber + 1).padStart(5, '0');
     }
 }

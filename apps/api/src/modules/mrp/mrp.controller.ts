@@ -609,11 +609,8 @@ export class MrpController {
             const { items, ...baseOrderData } = CreateProductionOrderSchema.parse(req.body);
             const orderData: Record<string, unknown> = { ...baseOrderData };
 
-            // Auto-generate code if not provided
-            if (!orderData.code) {
-                const timestamp = Date.now().toString(36).toUpperCase();
-                orderData.code = `PO-${timestamp}`;
-            }
+            // Always generate consecutive numeric code (00001, 00002, ...).
+            orderData.code = await this.productionService.generateNextOrderCode();
 
             // Set default status if not provided
             if (!orderData.status) {
