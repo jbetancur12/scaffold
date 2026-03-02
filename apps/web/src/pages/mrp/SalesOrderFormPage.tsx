@@ -97,6 +97,44 @@ export default function SalesOrderFormPage() {
         ]);
     };
 
+    const addVariantForItem = (index: number) => {
+        const source = items[index];
+        if (!source?.productId) {
+            toast({
+                title: 'Selecciona producto',
+                description: 'Primero selecciona un producto para agregar otra variante.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        const product = getProductById(source.productId);
+        const productVariants = product?.variants || [];
+        const usedVariantIds = new Set(
+            items
+                .filter((item) => item.productId === source.productId && item.variantId)
+                .map((item) => item.variantId as string)
+        );
+
+        const nextVariant = productVariants.find((variant) => !usedVariantIds.has(variant.id));
+        const suggestedVariantId = nextVariant?.id;
+        const suggestedUnitPrice = nextVariant?.price ?? source.unitPrice;
+
+        const clonedLine: OrderItem = {
+            productId: source.productId,
+            variantId: suggestedVariantId,
+            productSearch: source.productSearch,
+            quantity: 1,
+            unitPrice: suggestedUnitPrice,
+        };
+
+        setItems((prev) => [
+            ...prev.slice(0, index + 1),
+            clonedLine,
+            ...prev.slice(index + 1),
+        ]);
+    };
+
     const removeItem = (index: number) => {
         if (items.length === 1) {
             toast({
@@ -534,7 +572,17 @@ export default function SalesOrderFormPage() {
                                         </div>
 
                                         {/* Actions */}
-                                        <div className="md:col-span-1 flex items-end justify-end">
+                                        <div className="md:col-span-1 flex items-end justify-end gap-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => addVariantForItem(index)}
+                                                title="Agregar variante del mismo producto"
+                                                className="text-slate-400 hover:text-blue-600 hover:bg-blue-50/50"
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
                                             <Button
                                                 type="button"
                                                 variant="ghost"
