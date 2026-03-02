@@ -174,6 +174,66 @@ export class ProductionService {
         return Number(((rowsNeeded * pieceLengthCm) / 100).toFixed(4));
     }
 
+    private calculateFabricationConsumptionBreakdown(
+        bomQuantityPerUnit: number,
+        productionUnits: number,
+        fabricationParams?: {
+            calculationType?: 'area' | 'linear';
+            quantityPerUnit?: number;
+            rollWidth: number;
+            pieceWidth: number;
+            pieceLength: number;
+            orientation: 'normal' | 'rotated';
+        }
+    ): { requiredGross: number; remnantRecoverable: number } {
+        const requiredGross = this.calculateRequiredMaterialFromFabrication(
+            bomQuantityPerUnit,
+            productionUnits,
+            fabricationParams
+        );
+        if (!fabricationParams || fabricationParams.quantityPerUnit === undefined) {
+            return {
+                requiredGross: Number(requiredGross.toFixed(4)),
+                remnantRecoverable: 0,
+            };
+        }
+
+        const units = Number(productionUnits);
+        const quantityPerUnit = Math.max(1, Math.floor(Number(fabricationParams.quantityPerUnit)));
+        const totalPieces = units * quantityPerUnit;
+        const calculationType = fabricationParams.calculationType ?? 'area';
+
+        if (calculationType === 'linear') {
+            const materialLengthCm = Number(fabricationParams.rollWidth);
+            const cutLengthCm = Number(fabricationParams.pieceLength);
+            if (!Number.isFinite(materialLengthCm) || !Number.isFinite(cutLengthCm) || materialLengthCm <= 0 || cutLengthCm <= 0 || totalPieces <= 0) {
+                return { requiredGross: Number(requiredGross.toFixed(4)), remnantRecoverable: 0 };
+            }
+            const netUsed = Number(((totalPieces * cutLengthCm) / 100).toFixed(4));
+            const remnant = Math.max(0, Number((requiredGross - netUsed).toFixed(4)));
+            return {
+                requiredGross: Number(requiredGross.toFixed(4)),
+                remnantRecoverable: remnant,
+            };
+        }
+
+        const rollWidthCm = Number(fabricationParams.rollWidth);
+        const basePieceWidth = Number(fabricationParams.pieceWidth);
+        const basePieceLength = Number(fabricationParams.pieceLength);
+        if (!Number.isFinite(rollWidthCm) || !Number.isFinite(basePieceWidth) || !Number.isFinite(basePieceLength)
+            || rollWidthCm <= 0 || basePieceWidth <= 0 || basePieceLength <= 0 || totalPieces <= 0) {
+            return { requiredGross: Number(requiredGross.toFixed(4)), remnantRecoverable: 0 };
+        }
+        const pieceWidthCm = fabricationParams.orientation === 'rotated' ? basePieceLength : basePieceWidth;
+        const pieceLengthCm = fabricationParams.orientation === 'rotated' ? basePieceWidth : basePieceLength;
+        const netUsedEquivalent = Number(((totalPieces * pieceWidthCm * pieceLengthCm) / (rollWidthCm * 100)).toFixed(4));
+        const remnant = Math.max(0, Number((requiredGross - netUsedEquivalent).toFixed(4)));
+        return {
+            requiredGross: Number(requiredGross.toFixed(4)),
+            remnantRecoverable: remnant,
+        };
+    }
+
     async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
         // Ensure dates are properly instantiated as Date objects and handle potential string inputs
         const orderData = { ...data };
@@ -1139,6 +1199,7 @@ export class ProductionService {
                 // Consume released raw materials based on actual completed production quantities.
                 const materialRequirements = new Map<string, {
                     required: number;
+                    remnantRecoverable: number;
                     materialName: string;
                 }>();
 
@@ -1152,7 +1213,7 @@ export class ProductionService {
                             continue;
                         }
                         const rawMaterialId = bomItem.rawMaterial.id;
-                        const requiredQty = this.calculateRequiredMaterialFromFabrication(
+                        const breakdown = this.calculateFabricationConsumptionBreakdown(
                             Number(bomItem.quantity),
                             Number(producedQty),
                             bomItem.fabricationParams as {
@@ -1164,15 +1225,17 @@ export class ProductionService {
                                 orientation: 'normal' | 'rotated';
                             } | undefined
                         );
-                        if (requiredQty <= 0) {
+                        if (breakdown.requiredGross <= 0) {
                             continue;
                         }
                         const current = materialRequirements.get(rawMaterialId);
                         if (current) {
-                            current.required += requiredQty;
+                            current.required += breakdown.requiredGross;
+                            current.remnantRecoverable += breakdown.remnantRecoverable;
                         } else {
                             materialRequirements.set(rawMaterialId, {
-                                required: requiredQty,
+                                required: breakdown.requiredGross,
+                                remnantRecoverable: breakdown.remnantRecoverable,
                                 materialName: bomItem.rawMaterial.name,
                             });
                         }
@@ -1215,6 +1278,10 @@ export class ProductionService {
                     }
 
                     const consumedByMaterialWarehouse = new Map<string, number>();
+                    const consumedByLot = new Map<string, {
+                        qty: number;
+                        lot: RawMaterialLot;
+                    }>();
                     for (const [materialId, requirement] of materialRequirements.entries()) {
                         let pending = Number(requirement.required);
                         const rows = lotsByMaterial.get(materialId) || [];
@@ -1235,6 +1302,13 @@ export class ProductionService {
                             pending -= consume;
                             const key = `${materialId}::${lot.warehouse.id}`;
                             consumedByMaterialWarehouse.set(key, Number(consumedByMaterialWarehouse.get(key) || 0) + consume);
+                            const lotKey = `${materialId}::${lot.id}`;
+                            const consumedLot = consumedByLot.get(lotKey);
+                            if (consumedLot) {
+                                consumedLot.qty += consume;
+                            } else {
+                                consumedByLot.set(lotKey, { qty: consume, lot });
+                            }
                             const kardex = kardexRepo.create({
                                 rawMaterial: lot.rawMaterial,
                                 warehouse: lot.warehouse,
@@ -1273,6 +1347,81 @@ export class ProductionService {
                             }
                             if (allocation?.lot && lot.id === allocation.lot.id) continue;
                             consumeFromLot(lot, pending);
+                        }
+                    }
+
+                    const remnantByMaterial = new Map<string, number>();
+                    for (const [materialId, requirement] of materialRequirements.entries()) {
+                        const remnant = Math.max(0, Number(requirement.remnantRecoverable || 0));
+                        if (remnant > 0) {
+                            remnantByMaterial.set(materialId, remnant);
+                        }
+                    }
+
+                    if (remnantByMaterial.size > 0) {
+                        for (const [materialId, totalRemnant] of remnantByMaterial.entries()) {
+                            let pendingRemnant = totalRemnant;
+                            const materialLotConsumptions = Array.from(consumedByLot.entries())
+                                .filter(([key]) => key.startsWith(`${materialId}::`))
+                                .map(([, value]) => value)
+                                .sort((a, b) => b.qty - a.qty);
+
+                            for (let i = 0; i < materialLotConsumptions.length && pendingRemnant > 0; i += 1) {
+                                const consumed = materialLotConsumptions[i];
+                                if (!consumed?.lot || consumed.qty <= 0) continue;
+
+                                const remnantFromLot = Math.min(pendingRemnant, consumed.qty);
+                                if (remnantFromLot <= 0) continue;
+
+                                const sourceLot = consumed.lot;
+                                const remCode = `${sourceLot.supplierLotCode}-REM-${Date.now().toString(36).toUpperCase()}${i > 0 ? `-${i + 1}` : ''}`;
+                                const remLot = lotRepo.create({
+                                    rawMaterial: sourceLot.rawMaterial,
+                                    warehouse: sourceLot.warehouse,
+                                    supplierLotCode: remCode.slice(0, 120),
+                                    quantityInitial: Number(remnantFromLot.toFixed(4)),
+                                    quantityAvailable: Number(remnantFromLot.toFixed(4)),
+                                    unitCost: sourceLot.unitCost,
+                                    receivedAt: new Date(),
+                                    notes: `Remanente recuperable generado en OP ${order.code} desde lote ${sourceLot.supplierLotCode}`,
+                                } as unknown as RawMaterialLot);
+                                tx.persist(remLot);
+
+                                const row = await inventoryRepo.findOne({
+                                    rawMaterial: materialId,
+                                    warehouse: sourceLot.warehouse.id,
+                                });
+                                if (row) {
+                                    row.quantity = Number((Number(row.quantity) + remnantFromLot).toFixed(4));
+                                } else {
+                                    const created = inventoryRepo.create({
+                                        rawMaterial: sourceLot.rawMaterial,
+                                        warehouse: sourceLot.warehouse,
+                                        quantity: Number(remnantFromLot.toFixed(4)),
+                                        lastUpdated: new Date(),
+                                    } as unknown as InventoryItem);
+                                    tx.persist(created);
+                                }
+
+                                const balanceAfter = row
+                                    ? Number(row.quantity)
+                                    : Number(remnantFromLot.toFixed(4));
+                                const remKardex = kardexRepo.create({
+                                    rawMaterial: sourceLot.rawMaterial,
+                                    warehouse: sourceLot.warehouse,
+                                    lot: remLot,
+                                    movementType: 'REMANENTE_PRODUCCION',
+                                    quantity: Number(remnantFromLot.toFixed(4)),
+                                    balanceAfter,
+                                    referenceType: 'production_order',
+                                    referenceId: order.id,
+                                    notes: `Remanente recuperable OP ${order.code}`,
+                                    occurredAt: new Date(),
+                                } as unknown as RawMaterialKardex);
+                                tx.persist(remKardex);
+
+                                pendingRemnant = Number((pendingRemnant - remnantFromLot).toFixed(4));
+                            }
                         }
                     }
 
