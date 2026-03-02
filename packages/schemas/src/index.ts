@@ -359,6 +359,10 @@ export const ListRawMaterialsQuerySchema = PaginationQuerySchema.extend({
     search: z.string().optional(),
 });
 
+export const ListProductsQuerySchema = PaginationQuerySchema.extend({
+    search: z.string().optional(),
+});
+
 export const AddSupplierMaterialSchema = z.object({
     rawMaterialId: z.string().uuid(),
     price: z.number().min(0).optional(),

@@ -1,4 +1,4 @@
-import { EntityManager, EntityRepository } from '@mikro-orm/core';
+import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { ProductSchema, UpdateProductSchema } from '@scaffold/schemas';
@@ -80,7 +80,25 @@ export class ProductService {
 
     private parseNumber(value?: string): number | undefined {
         if (value == null || value.trim() === '') return undefined;
-        const normalized = value.replace(/\./g, '').replace(',', '.').trim();
+        const raw = value.trim().replace(/\s/g, '');
+        let normalized = raw;
+
+        // Handle locales:
+        // - 1.234,56 => 1234.56
+        // - 1,234.56 => 1234.56
+        // - 0.4 / 0,4 => 0.4
+        if (raw.includes(',') && raw.includes('.')) {
+            const lastComma = raw.lastIndexOf(',');
+            const lastDot = raw.lastIndexOf('.');
+            if (lastComma > lastDot) {
+                normalized = raw.replace(/\./g, '').replace(',', '.');
+            } else {
+                normalized = raw.replace(/,/g, '');
+            }
+        } else if (raw.includes(',')) {
+            normalized = raw.replace(',', '.');
+        }
+
         const parsed = Number(normalized);
         return Number.isFinite(parsed) ? parsed : undefined;
     }
@@ -368,12 +386,22 @@ export class ProductService {
         return this.productRepo.findOne({ id }, { populate: ['variants', 'invimaRegistration'] });
     }
 
-    async listProducts(page = 1, limit = 10): Promise<{ products: Product[]; total: number }> {
+    async listProducts(page = 1, limit = 10, search?: string): Promise<{ products: Product[]; total: number }> {
+        const filters: FilterQuery<Product> = {};
+        if (search && search.trim().length > 0) {
+            filters.$or = [
+                { name: { $ilike: `%${search.trim()}%` } },
+                { sku: { $ilike: `%${search.trim()}%` } },
+                { productReference: { $ilike: `%${search.trim()}%` } },
+            ];
+        }
+
         const [products, total] = await this.productRepo.findAndCount(
-            {},
+            filters,
             {
                 limit,
                 offset: (page - 1) * limit,
+                orderBy: { name: 'ASC' },
                 populate: ['variants', 'invimaRegistration'],
             }
         );

@@ -213,8 +213,10 @@ export interface ListResponse<T> {
 
 export const mrpApi = {
     // Products
-    getProducts: async (page = 1, limit = 10) => {
-        const response = await api.get<{ products: Product[], total: number }>(`/mrp/products?page=${page}&limit=${limit}`);
+    getProducts: async (page = 1, limit = 10, search = '') => {
+        const response = await api.get<{ products: Product[], total: number }>(`/mrp/products`, {
+            params: { page, limit, search },
+        });
         return response.data;
     },
     getProduct: async (id: string) => {

@@ -1,6 +1,6 @@
 export const mrpQueryKeys = {
     products: 'mrp.products',
-    productsList: (page: number, limit: number) => `mrp.products.${page}.${limit}`,
+    productsList: (page: number, limit: number, search: string = '') => `mrp.products.${page}.${limit}.${search || ''}`,
     product: (id: string) => `mrp.product.${id}`,
     suppliers: 'mrp.suppliers',
     suppliersList: (page: number, limit: number) => `mrp.suppliers.${page}.${limit}`,

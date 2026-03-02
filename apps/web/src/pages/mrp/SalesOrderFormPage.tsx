@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -16,6 +16,7 @@ import { useCreateSalesOrderMutation } from '@/hooks/mrp/useSalesOrders';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { CreateCustomerDialog } from './components/CreateCustomerDialog';
 import { cn } from '@/lib/utils';
+import { Product } from '@scaffold/types';
 
 interface OrderItem {
     productId: string;
@@ -31,6 +32,8 @@ export default function SalesOrderFormPage() {
     const [loading, setLoading] = useState(false);
     const [activeCatalogComboboxIdx, setActiveCatalogComboboxIdx] = useState<number | null>(null);
     const [catalogHighlightByIndex, setCatalogHighlightByIndex] = useState<Record<number, number>>({});
+    const [catalogSearch, setCatalogSearch] = useState('');
+    const [debouncedCatalogSearch, setDebouncedCatalogSearch] = useState('');
     const [showValidation, setShowValidation] = useState(false);
 
     // Customer Combobox State
@@ -55,11 +58,28 @@ export default function SalesOrderFormPage() {
     ]);
 
     const { data: customersResponse, error: customersError } = useCustomersQuery();
-    const { data: productsResponse, error: productsError } = useProductsQuery(1, 100);
+    const { data: productsResponse, error: productsError } = useProductsQuery(1, 50, debouncedCatalogSearch);
     const { execute: createSalesOrder } = useCreateSalesOrderMutation();
 
     const customers = customersResponse || [];
     const products = productsResponse?.products ?? [];
+    const [selectedProductsById, setSelectedProductsById] = useState<Record<string, Product>>({});
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedCatalogSearch(catalogSearch.trim()), 250);
+        return () => clearTimeout(timer);
+    }, [catalogSearch]);
+
+    useEffect(() => {
+        if (products.length === 0) return;
+        setSelectedProductsById((prev) => {
+            const next = { ...prev };
+            for (const p of products) {
+                next[p.id] = p;
+            }
+            return next;
+        });
+    }, [products]);
 
     useMrpQueryErrorToast(customersError, 'No se pudo cargar los clientes');
     useMrpQueryErrorToast(productsError, 'No se pudieron cargar los productos');
@@ -98,16 +118,18 @@ export default function SalesOrderFormPage() {
     };
 
     const getProductById = (id: string) => {
-        return products.find(p => p.id === id);
+        return selectedProductsById[id] || products.find(p => p.id === id);
     };
 
     const getFilteredProducts = (search: string) => {
         const normalized = search.trim().toLowerCase();
-        if (!normalized) return products.slice(0, 50);
-        return products
+        const source = products;
+        if (!normalized) return source.slice(0, 50);
+        return source
             .filter((product) =>
                 product.name.toLowerCase().includes(normalized) ||
-                product.sku.toLowerCase().includes(normalized)
+                product.sku.toLowerCase().includes(normalized) ||
+                (product.productReference || '').toLowerCase().includes(normalized)
             )
             .slice(0, 100);
     };
@@ -119,10 +141,11 @@ export default function SalesOrderFormPage() {
     };
 
     const handleProductChange = (index: number, productId: string) => {
-        const selectedProduct = getProductById(productId);
+        const selectedProduct = products.find(p => p.id === productId) || getProductById(productId);
         updateItem(index, 'productId', productId);
         updateItem(index, 'variantId', undefined);
         if (selectedProduct) {
+            setSelectedProductsById((prev) => ({ ...prev, [selectedProduct.id]: selectedProduct }));
             updateItem(index, 'productSearch', `${selectedProduct.sku} ${selectedProduct.name}`);
             const refPrice = getRefPrice(productId);
             if (refPrice > 0) updateItem(index, 'unitPrice', refPrice);
@@ -404,12 +427,14 @@ export default function SalesOrderFormPage() {
                                                     value={item.productSearch}
                                                     onChange={(e) => {
                                                         updateItem(index, 'productSearch', e.target.value);
+                                                        setCatalogSearch(e.target.value);
                                                         setActiveCatalogComboboxIdx(index);
                                                         if (!e.target.value) {
                                                             updateItem(index, 'productId', '');
                                                         }
                                                     }}
                                                     onFocus={() => {
+                                                        setCatalogSearch(item.productSearch || '');
                                                         setActiveCatalogComboboxIdx(index);
                                                     }}
                                                     onBlur={() => {

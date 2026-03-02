@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
     Table,
     TableBody,
@@ -8,7 +9,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Package, Plus, Layers, Trash2, Edit2, BoxSelect, AlertCircle, Download, Upload } from 'lucide-react';
+import { Package, Plus, Layers, Trash2, Edit2, BoxSelect, AlertCircle, Download, Upload, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
@@ -28,9 +29,14 @@ import {
 export default function ProductListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(10);
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
 
-    const { data: productsResponse, loading, error, execute: reloadProducts } = useProductsQuery();
+    const { data: productsResponse, loading, error, execute: reloadProducts } = useProductsQuery(page, limit, debouncedSearch);
     const products = productsResponse?.products ?? [];
+    const total = productsResponse?.total ?? 0;
     const { execute: deleteProduct } = useDeleteProductMutation();
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [importCsvText, setImportCsvText] = useState('');
@@ -51,6 +57,11 @@ export default function ProductListPage() {
     const [importPreviewOpen, setImportPreviewOpen] = useState(false);
     const [previewingImport, setPreviewingImport] = useState(false);
     const [applyingImport, setApplyingImport] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 300);
+        return () => clearTimeout(timer);
+    }, [search]);
 
     useMrpQueryErrorToast(error, 'No se pudieron cargar los productos');
 
@@ -143,8 +154,11 @@ export default function ProductListPage() {
     };
 
     // Calculate KPIs
-    const totalProducts = products.length;
+    const totalProducts = total;
     const productsWithVariants = products.filter(p => p.variants && p.variants.length > 0).length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const firstRow = total === 0 ? 0 : ((page - 1) * limit) + 1;
+    const lastRow = total === 0 ? 0 : ((page - 1) * limit) + products.length;
 
     // Simple heuristic for low margin products (less than 30%)
     const lowMarginProducts = products.filter(product => {
@@ -272,8 +286,22 @@ export default function ProductListPage() {
             {/* Main Content Area */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                 <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                    <div className="text-sm text-slate-500 font-medium">
-                        {totalProducts > 0 ? `Mostrando ${totalProducts} productos` : ''}
+                    <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div className="relative w-full sm:max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            <Input
+                                placeholder="Buscar por nombre, SKU o referencia..."
+                                value={search}
+                                onChange={(e) => {
+                                    setSearch(e.target.value);
+                                    setPage(1);
+                                }}
+                                className="pl-9 h-10 bg-white border-slate-200 shadow-sm"
+                            />
+                        </div>
+                        <div className="text-sm text-slate-500 font-medium">
+                            {totalProducts > 0 ? `Mostrando ${firstRow}-${lastRow} de ${totalProducts} productos` : ''}
+                        </div>
                     </div>
                 </div>
 
@@ -425,6 +453,45 @@ export default function ProductListPage() {
                         </TableBody>
                     </Table>
                 </div>
+
+                {total > limit && (
+                    <div className="px-5 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-2">
+                        <label className="text-sm text-slate-600 mr-1" htmlFor="products-page-size">Filas</label>
+                        <select
+                            id="products-page-size"
+                            value={limit}
+                            onChange={(e) => {
+                                setLimit(Number(e.target.value));
+                                setPage(1);
+                            }}
+                            className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm"
+                            disabled={loading}
+                        >
+                            <option value={10}>10</option>
+                            <option value={25}>25</option>
+                            <option value={50}>50</option>
+                        </select>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                            disabled={page === 1 || loading}
+                        >
+                            Anterior
+                        </Button>
+                        <span className="text-sm text-slate-600 px-2">
+                            Página {page} de {totalPages}
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                            disabled={page >= totalPages || loading}
+                        >
+                            Siguiente
+                        </Button>
+                    </div>
+                )}
             </div>
         </div>
         <Dialog open={importPreviewOpen} onOpenChange={setImportPreviewOpen}>

@@ -33,6 +33,7 @@ import {
     UpdateInvimaRegistrationSchema,
     ListInvimaRegistrationsQuerySchema,
     PaginationQuerySchema,
+    ListProductsQuerySchema,
     ListRawMaterialsQuerySchema,
     AddSupplierMaterialSchema,
     UpdateProductionOrderStatusSchema,
@@ -171,8 +172,8 @@ export class MrpController {
 
     async listProducts(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit } = PaginationQuerySchema.parse(req.query);
-            const result = await this.productService.listProducts(page || 1, limit || 10);
+            const { page, limit, search } = ListProductsQuerySchema.parse(req.query);
+            const result = await this.productService.listProducts(page || 1, limit || 10, search);
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);

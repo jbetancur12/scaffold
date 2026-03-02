@@ -5,12 +5,12 @@ import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 import { invalidateMrpQueriesByPrefix, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
-export const useProductsQuery = (page = 1, limit = 10) => {
+export const useProductsQuery = (page = 1, limit = 10, search = '') => {
     const fetchProducts = useCallback(async (): Promise<{ products: Product[]; total: number }> => {
-        return mrpApi.getProducts(page, limit);
-    }, [page, limit]);
+        return mrpApi.getProducts(page, limit, search);
+    }, [page, limit, search]);
 
-    return useMrpQuery(fetchProducts, true, mrpQueryKeys.productsList(page, limit));
+    return useMrpQuery(fetchProducts, true, mrpQueryKeys.productsList(page, limit, search));
 };
 
 export const useProductQuery = (id?: string) => {
