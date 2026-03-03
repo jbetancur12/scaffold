@@ -28,34 +28,6 @@ async function seed() {
             winstonLogger.info(`Superadmin ${superadminEmail} already exists`);
         }
 
-        // 2. Transferencista/Minorista (andreinacampos0510@gmail.com)
-        const userEmail = 'andreinacampos0510@gmail.com';
-        const existingUser = await em.findOne(User, { email: userEmail });
-
-        if (!existingUser) {
-            const user = new User();
-            user.email = userEmail;
-            user.password = password;
-            user.role = UserRole.ADMIN; // Assuming Admin for Transferencista based on context
-            em.persist(user);
-            winstonLogger.info(`✅ Created User: ${userEmail}`);
-        } else {
-            winstonLogger.info(`User ${userEmail} already exists`);
-        }
-
-        // 3. Fallback Local Superadmin (admin@scaffold.local)
-        // Keep this for local dev convenience if needed, or remove. keeping for safety.
-        const localAdminEmail = 'admin@scaffold.local';
-        const existingLocalAdmin = await em.findOne(User, { email: localAdminEmail });
-
-        if (!existingLocalAdmin) {
-            const localAdmin = new User();
-            localAdmin.email = localAdminEmail;
-            localAdmin.password = await argon2.hash('Admin123!');
-            localAdmin.role = UserRole.SUPERADMIN;
-            em.persist(localAdmin);
-            winstonLogger.info(`✅ Created Local Admin: ${localAdminEmail}`);
-        }
 
         await em.flush();
 

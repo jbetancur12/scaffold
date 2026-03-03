@@ -4,12 +4,12 @@ export class Migration20260224150000_AddRawMaterialLotsAndKardex extends Migrati
     override async up(): Promise<void> {
         this.addSql(`
             create table if not exists "raw_material_lot" (
-                "id" varchar(255) not null,
+                "id" uuid not null,
                 "created_at" timestamptz not null,
                 "updated_at" timestamptz not null,
-                "raw_material_id" varchar(255) not null,
-                "warehouse_id" varchar(255) not null,
-                "incoming_inspection_id" varchar(255) null,
+                "raw_material_id" uuid not null,
+                "warehouse_id" uuid not null,
+                "incoming_inspection_id" uuid null,
                 "supplier_lot_code" varchar(120) not null,
                 "quantity_initial" numeric(12,4) not null,
                 "quantity_available" numeric(12,4) not null,
@@ -58,12 +58,12 @@ export class Migration20260224150000_AddRawMaterialLotsAndKardex extends Migrati
 
         this.addSql(`
             create table if not exists "raw_material_kardex" (
-                "id" varchar(255) not null,
+                "id" uuid not null,
                 "created_at" timestamptz not null,
                 "updated_at" timestamptz not null,
-                "raw_material_id" varchar(255) not null,
-                "warehouse_id" varchar(255) not null,
-                "lot_id" varchar(255) null,
+                "raw_material_id" uuid not null,
+                "warehouse_id" uuid not null,
+                "lot_id" uuid null,
                 "movement_type" varchar(60) not null,
                 "quantity" numeric(12,4) not null,
                 "balance_after" numeric(12,4) not null,
