@@ -22,7 +22,14 @@ export class Migration20260303012000_AddSalesOrders extends Migration {
                 constraint "sales_order_pkey" primary key ("id")
             );
         `);
-        this.addSql(`alter table "sales_order" add constraint if not exists "sales_order_code_unique" unique ("code");`);
+        this.addSql(`
+            do $$ begin
+                if not exists (select 1 from pg_constraint where conname = 'sales_order_code_unique') then
+                    alter table "sales_order"
+                    add constraint "sales_order_code_unique" unique ("code");
+                end if;
+            end $$;
+        `);
         this.addSql(`
             do $$ begin
                 if not exists (select 1 from pg_constraint where conname = 'sales_order_customer_id_foreign') then
@@ -108,4 +115,3 @@ export class Migration20260303012000_AddSalesOrders extends Migration {
         this.addSql(`drop table if exists "sales_order" cascade;`);
     }
 }
-
