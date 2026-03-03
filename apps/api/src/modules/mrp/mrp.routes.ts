@@ -203,6 +203,16 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.patch('/sales-orders/:id/status', (req, res, next) => mrpController.updateSalesOrderStatus(req, res, next));
     router.get('/sales-orders/:id/pdf', (req, res, next) => mrpController.downloadSalesOrderPdf(req, res, next));
 
+    // Quotations
+    router.post('/quotations', (req, res, next) => mrpController.createQuotation(req, res, next));
+    router.get('/quotations', (req, res, next) => mrpController.listQuotations(req, res, next));
+    router.get('/quotations/:id', (req, res, next) => mrpController.getQuotation(req, res, next));
+    router.put('/quotations/:id', (req, res, next) => mrpController.updateQuotation(req, res, next));
+    router.patch('/quotations/:id/status', (req, res, next) => mrpController.updateQuotationStatus(req, res, next));
+    router.post('/quotations/:id/approve', (req, res, next) => mrpController.approveQuotation(req, res, next));
+    router.post('/quotations/:id/convert', (req, res, next) => mrpController.convertQuotationToSalesOrder(req, res, next));
+    router.get('/quotations/:id/pdf', (req, res, next) => mrpController.downloadQuotationPdf(req, res, next));
+
     // Inventory
     router.get('/inventory', (req, res, next) => mrpController.getInventory(req, res, next));
     router.get('/inventory/kardex', (req, res, next) => mrpController.getInventoryKardex(req, res, next));

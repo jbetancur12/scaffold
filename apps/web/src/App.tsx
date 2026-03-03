@@ -28,6 +28,9 @@ import PurchaseRequisitionFormPage from '@/pages/mrp/PurchaseRequisitionFormPage
 import SalesOrderListPage from '@/pages/mrp/SalesOrderListPage';
 import SalesOrderFormPage from '@/pages/mrp/SalesOrderFormPage';
 import SalesOrderDetailPage from '@/pages/mrp/SalesOrderDetailPage';
+import QuotationListPage from '@/pages/mrp/QuotationListPage';
+import QuotationFormPage from '@/pages/mrp/QuotationFormPage';
+import QuotationDetailPage from '@/pages/mrp/QuotationDetailPage';
 import ProductionOrderDetailPage from '@/pages/mrp/ProductionOrderDetailPage';
 import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
 import ThreadCalculatorPage from '@/pages/mrp/ThreadCalculatorPage';
@@ -165,6 +168,10 @@ export default function App() {
                         <Route path="/mrp/sales-orders/new" element={<SalesOrderFormPage />} />
                         <Route path="/mrp/sales-orders/:id/edit" element={<SalesOrderFormPage />} />
                         <Route path="/mrp/sales-orders/:id" element={<SalesOrderDetailPage />} />
+                        <Route path="/mrp/quotations" element={<QuotationListPage />} />
+                        <Route path="/mrp/quotations/new" element={<QuotationFormPage />} />
+                        <Route path="/mrp/quotations/:id/edit" element={<QuotationFormPage />} />
+                        <Route path="/mrp/quotations/:id" element={<QuotationDetailPage />} />
 
                         <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
                         <Route path="/mrp/thread-calculator" element={<ThreadCalculatorPage />} />

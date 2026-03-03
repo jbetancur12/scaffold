@@ -45,6 +45,7 @@ import {
     EquipmentMaintenanceResult,
     OperationalAlertRole,
     SalesOrderStatus,
+    QuotationStatus,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -1182,6 +1183,62 @@ export const UpdateSalesOrderStatusSchema = z.object({
     status: z.nativeEnum(SalesOrderStatus),
 });
 
+const QuotationCatalogItemSchema = z.object({
+    isCatalogItem: z.literal(true).optional(),
+    productId: z.string().uuid(),
+    variantId: z.string().uuid().optional(),
+    quantity: z.number().positive(),
+    approvedQuantity: z.number().min(0).optional(),
+    unitPrice: z.number().min(0),
+    discountPercent: z.number().min(0).max(100).optional(),
+    taxRate: z.number().min(0).max(100).optional(),
+    approved: z.boolean().optional(),
+});
+
+const QuotationCustomItemSchema = z.object({
+    isCatalogItem: z.literal(false),
+    customDescription: z.string().min(2),
+    customSku: z.string().optional(),
+    quantity: z.number().positive(),
+    approvedQuantity: z.number().min(0).optional(),
+    unitPrice: z.number().min(0),
+    discountPercent: z.number().min(0).max(100).optional(),
+    taxRate: z.number().min(0).max(100).optional(),
+    approved: z.boolean().optional(),
+});
+
+export const CreateQuotationSchema = z.object({
+    customerId: z.string().uuid(),
+    validUntil: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    notes: z.string().optional(),
+    items: z.array(z.union([QuotationCatalogItemSchema, QuotationCustomItemSchema])).min(1),
+});
+
+export const UpdateQuotationSchema = CreateQuotationSchema;
+
+export const ListQuotationsQuerySchema = z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    search: z.string().optional(),
+    status: z.nativeEnum(QuotationStatus).optional(),
+});
+
+export const UpdateQuotationStatusSchema = z.object({
+    status: z.nativeEnum(QuotationStatus),
+});
+
+export const ApproveQuotationSchema = z.object({
+    items: z.array(z.object({
+        quotationItemId: z.string().uuid(),
+        approved: z.boolean().optional().default(true),
+        approvedQuantity: z.number().min(0).optional(),
+    })).optional(),
+});
+
+export const ConvertQuotationSchema = z.object({
+    quotationItemIds: z.array(z.string().uuid()).optional(),
+});
+
 export const ThreadConsumptionOperationSchema = z.object({
     name: z.string().min(1).optional(),
     stitchType: z.enum(['101', '301', '401', '406', '503', '504', '512', '516', '602', '605', 'custom']),
@@ -1318,3 +1375,12 @@ export type UpdateSalesOrderStatusPayload = DateInputValue<z.input<typeof Update
 export type CalculateThreadConsumptionPayload = DateInputValue<z.input<typeof CalculateThreadConsumptionSchema>>;
 export type CreateProductThreadProcessPayload = DateInputValue<z.input<typeof CreateProductThreadProcessSchema>>;
 export type UpdateProductThreadProcessPayload = DateInputValue<z.input<typeof UpdateProductThreadProcessSchema>>;
+export type CreateQuotationPayload = DateInputValue<z.input<typeof CreateQuotationSchema>>;
+export type UpdateQuotationPayload = DateInputValue<z.input<typeof UpdateQuotationSchema>>;
+export type ListQuotationsFilters = DateInputValue<z.input<typeof ListQuotationsQuerySchema>>;
+export type UpdateQuotationStatusPayload = DateInputValue<z.input<typeof UpdateQuotationStatusSchema>>;
+export type ApproveQuotationPayload = DateInputValue<z.input<typeof ApproveQuotationSchema>>;
+export type ConvertQuotationPayload = DateInputValue<z.input<typeof ConvertQuotationSchema>>;
+
+export type CreateQuotationDto = z.infer<typeof CreateQuotationSchema>;
+export type UpdateQuotationDto = z.infer<typeof UpdateQuotationSchema>;

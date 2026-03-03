@@ -77,6 +77,9 @@ import {
     PurchaseRequisitionListResponse,
     SalesOrder,
     SalesOrderListResponse,
+    Quotation,
+    QuotationStatus,
+    QuotationListResponse,
     UpsertProductionBatchPackagingFormPayload,
     UpsertProductionBatchFinishedInspectionFormPayload,
 } from '@scaffold/types';
@@ -138,6 +141,12 @@ import type {
     UpdateSalesOrderPayload,
     ListSalesOrdersFilters,
     UpdateSalesOrderStatusPayload,
+    CreateQuotationPayload,
+    UpdateQuotationPayload,
+    ListQuotationsFilters,
+    UpdateQuotationStatusPayload,
+    ApproveQuotationPayload,
+    ConvertQuotationPayload,
     UpsertProductionMaterialAllocationPayload,
     ReturnProductionMaterialPayload,
     ProductCsvImportPayload,
@@ -481,6 +490,52 @@ export const mrpApi = {
     },
     linkProductionToSalesOrder: async (productionOrderId: string, salesOrderId: string | null): Promise<void> => {
         await api.patch(`/mrp/production-orders/${productionOrderId}/link-sales-order`, { salesOrderId });
+    },
+
+    // Quotations
+    createQuotation: async (data: CreateQuotationPayload): Promise<Quotation> => {
+        const response = await api.post<Quotation>('/mrp/quotations', data);
+        return response.data;
+    },
+    updateQuotation: async (id: string, data: UpdateQuotationPayload): Promise<Quotation> => {
+        const response = await api.put<Quotation>(`/mrp/quotations/${id}`, data);
+        return response.data;
+    },
+    listQuotations: async (
+        page = 1,
+        limit = 20,
+        filters?: ListQuotationsFilters
+    ): Promise<QuotationListResponse> => {
+        const response = await api.get<QuotationListResponse>('/mrp/quotations', {
+            params: { page, limit, ...filters },
+        });
+        return response.data;
+    },
+    getQuotation: async (id: string): Promise<Quotation> => {
+        const response = await api.get<Quotation>(`/mrp/quotations/${id}`);
+        return response.data;
+    },
+    updateQuotationStatus: async (id: string, data: UpdateQuotationStatusPayload): Promise<Quotation> => {
+        const response = await api.patch<Quotation>(`/mrp/quotations/${id}/status`, data);
+        return response.data;
+    },
+    approveQuotation: async (id: string, data: ApproveQuotationPayload): Promise<Quotation> => {
+        const response = await api.post<Quotation>(`/mrp/quotations/${id}/approve`, data);
+        return response.data;
+    },
+    convertQuotation: async (id: string, data: ConvertQuotationPayload): Promise<{
+        quotationId: string;
+        quotationCode: string;
+        salesOrderId: string;
+        salesOrderCode: string;
+        status: QuotationStatus;
+    }> => {
+        const response = await api.post(`/mrp/quotations/${id}/convert`, data);
+        return response.data;
+    },
+    getQuotationPdf: async (id: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/quotations/${id}/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
     },
 
     // Warehouses

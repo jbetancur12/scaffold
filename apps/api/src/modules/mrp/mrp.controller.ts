@@ -19,6 +19,8 @@ import { QualityLabelingPdfService } from './services/quality-labeling-pdf.servi
 import { QualityBatchReleasePdfService } from './services/quality-batch-release-pdf.service';
 import { ThreadConsumptionService } from './services/thread-consumption.service';
 import { ThreadProcessService } from './services/thread-process.service';
+import { QuotationService } from './services/quotation.service';
+import { QuotationPdfService } from './services/quotation-pdf.service';
 import {
     ProductSchema,
     UpdateProductSchema,
@@ -130,6 +132,12 @@ import {
     UpdateSalesOrderSchema,
     ListSalesOrdersQuerySchema,
     UpdateSalesOrderStatusSchema,
+    CreateQuotationSchema,
+    UpdateQuotationSchema,
+    ListQuotationsQuerySchema,
+    UpdateQuotationStatusSchema,
+    ApproveQuotationSchema,
+    ConvertQuotationSchema,
     ProductCsvImportSchema,
     SupplierCsvImportSchema,
     CustomerCsvImportSchema,
@@ -171,6 +179,7 @@ export class MrpController {
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
     private get salesOrderService() { return new SalesOrderService(this.em); }
+    private get quotationService() { return new QuotationService(this.em); }
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
     private get threadProcessService() { return new ThreadProcessService(this.em); }
 
@@ -2089,6 +2098,98 @@ export class MrpController {
             const em = RequestContext.getEntityManager()!;
             const pdfService = new SalesOrderPdfService(em);
             const { fileName, buffer } = await pdfService.generateSalesOrderPdf(id, mode, docOptions);
+            res.set({
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `attachment; filename="${fileName}"`,
+                'Content-Length': buffer.length,
+            });
+            return res.send(buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // --- Quotations ---
+    async createQuotation(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateQuotationSchema.parse(req.body);
+            const row = await this.quotationService.create(payload);
+            return ApiResponse.success(res, row, 'Cotización creada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateQuotation(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateQuotationSchema.parse(req.body);
+            const row = await this.quotationService.update(id, payload);
+            return ApiResponse.success(res, row, 'Cotización actualizada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listQuotations(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { page, limit, search, status } = ListQuotationsQuerySchema.parse(req.query);
+            const rows = await this.quotationService.list(page || 1, limit || 20, search, status);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getQuotation(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const row = await this.quotationService.getById(id);
+            return ApiResponse.success(res, row);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateQuotationStatus(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const { status } = UpdateQuotationStatusSchema.parse(req.body);
+            const row = await this.quotationService.updateStatus(id, status);
+            return ApiResponse.success(res, row, 'Estado de cotización actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async approveQuotation(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = ApproveQuotationSchema.parse(req.body);
+            const row = await this.quotationService.approve(id, payload);
+            return ApiResponse.success(res, row, 'Cotización aprobada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async convertQuotationToSalesOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = ConvertQuotationSchema.parse(req.body);
+            const row = await this.quotationService.convertToSalesOrder(id, payload);
+            return ApiResponse.success(res, row, 'Cotización convertida a pedido');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadQuotationPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const em = RequestContext.getEntityManager()!;
+            const pdfService = new QuotationPdfService(em);
+            const { fileName, buffer } = await pdfService.generateQuotationPdf(id);
             res.set({
                 'Content-Type': 'application/pdf',
                 'Content-Disposition': `attachment; filename="${fileName}"`,

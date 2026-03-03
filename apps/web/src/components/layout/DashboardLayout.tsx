@@ -75,6 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: ShoppingCart, label: 'Proveedores', path: '/mrp/suppliers', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: ShoppingCart, label: 'Requisiciones de Compra', path: '/mrp/purchase-requisitions', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: ShoppingCart, label: 'Órdenes de Compra', path: '/mrp/purchase-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: ShoppingCart, label: 'Cotizaciones', path: '/mrp/quotations', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Package, label: 'Pedidos de Clientes', path: '/mrp/sales-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Factory, label: 'Órdenes de Producción', path: '/mrp/production-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Inventario', path: '/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
@@ -94,7 +95,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         },
         {
             label: 'Operación',
-            items: ['/mrp/sales-orders', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/inventory', '/mrp/warehouses', '/mrp/thread-calculator'],
+            items: ['/mrp/sales-orders', '/mrp/quotations', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/inventory', '/mrp/warehouses', '/mrp/thread-calculator'],
         },
         {
             label: 'Parámetros',

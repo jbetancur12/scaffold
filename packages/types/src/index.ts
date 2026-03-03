@@ -50,6 +50,15 @@ export enum SalesOrderStatus {
     CANCELLED = 'cancelled',
 }
 
+export enum QuotationStatus {
+    DRAFT = 'draft',
+    SENT = 'sent',
+    APPROVED_PARTIAL = 'approved_partial',
+    APPROVED_FULL = 'approved_full',
+    REJECTED = 'rejected',
+    CONVERTED = 'converted',
+}
+
 export enum PurchaseRequisitionStatus {
     PENDIENTE = 'pendiente',
     APROBADA = 'aprobada',
@@ -476,6 +485,52 @@ export interface SalesOrder {
     shipments?: Shipment[];
     createdAt: string | Date;
     updatedAt: string | Date;
+}
+
+export interface QuotationItem {
+    id: string;
+    quotationId: string;
+    isCatalogItem: boolean;
+    productId?: string;
+    variantId?: string;
+    customDescription?: string;
+    customSku?: string;
+    quantity: number;
+    approvedQuantity: number;
+    unitPrice: number;
+    baseUnitCost: number;
+    targetMargin: number;
+    minAllowedMargin: number;
+    discountPercent: number;
+    taxRate: number;
+    taxAmount: number;
+    subtotal: number;
+    netSubtotal: number;
+    approved: boolean;
+}
+
+export interface Quotation {
+    id: string;
+    code: string;
+    customerId: string;
+    status: QuotationStatus;
+    quotationDate: string | Date;
+    validUntil?: string | Date;
+    notes?: string;
+    subtotalBase: number;
+    taxTotal: number;
+    discountAmount: number;
+    totalAmount: number;
+    netTotalAmount: number;
+    convertedSalesOrderId?: string;
+    items?: QuotationItem[];
+}
+
+export interface QuotationListResponse {
+    data: Quotation[];
+    total: number;
+    page: number;
+    limit: number;
 }
 
 export interface SalesOrderListResponse {
@@ -1874,6 +1929,27 @@ export interface CreateSalesOrderPayload {
     expectedDeliveryDate?: string | Date;
     notes?: string;
     items: CreateSalesOrderItemPayload[];
+}
+
+export interface CreateQuotationItemPayload {
+    isCatalogItem?: boolean;
+    productId?: string;
+    variantId?: string;
+    customDescription?: string;
+    customSku?: string;
+    quantity: number;
+    approvedQuantity?: number;
+    unitPrice: number;
+    discountPercent?: number;
+    taxRate?: number;
+    approved?: boolean;
+}
+
+export interface CreateQuotationPayload {
+    customerId: string;
+    validUntil?: string | Date;
+    notes?: string;
+    items: CreateQuotationItemPayload[];
 }
 
 export type ThreadStitchType =
