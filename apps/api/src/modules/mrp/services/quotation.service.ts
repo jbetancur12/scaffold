@@ -26,6 +26,7 @@ type CreateQuotationInput = {
     customerId: string;
     validUntil?: Date;
     notes?: string;
+    globalDiscountPercent?: number;
     items: QuotationInputItem[];
 };
 
@@ -65,6 +66,7 @@ export class QuotationService {
     private validateMarginAndDiscount(params: {
         baseUnitCost: number;
         targetMargin: number;
+        listedUnitPrice: number;
         finalUnitPrice: number;
         itemLabel: string;
     }) {
@@ -74,15 +76,34 @@ export class QuotationService {
         }
         const finalMargin = (params.finalUnitPrice - params.baseUnitCost) / params.finalUnitPrice;
         if (finalMargin + 1e-9 < minAllowedMargin) {
+            const minAllowedUnitPrice = minAllowedMargin >= 1
+                ? Number.POSITIVE_INFINITY
+                : (params.baseUnitCost / (1 - minAllowedMargin));
+            const maxDiscountPercent = params.listedUnitPrice > 0
+                ? Math.max(0, (1 - (minAllowedUnitPrice / params.listedUnitPrice)) * 100)
+                : 0;
+            const maxDiscountValue = Math.max(0, params.listedUnitPrice - minAllowedUnitPrice);
+            const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', {
+                style: 'currency',
+                currency: 'COP',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 2,
+            }).format(Number.isFinite(value) ? value : 0);
             throw new AppError(
-                `Descuento excede límite en ítem ${params.itemLabel}. El margen no puede bajar de ${(minAllowedMargin * 100).toFixed(2)}%.`,
+                `Descuento excede límite en ítem ${params.itemLabel}. Máximo ${(maxDiscountPercent).toFixed(2)}% (${formatCurrency(maxDiscountValue)}). Margen mínimo ${(minAllowedMargin * 100).toFixed(2)}%.`,
                 400
             );
         }
         return minAllowedMargin;
     }
 
-    private async buildItem(tx: EntityManager, quotation: Quotation, row: QuotationInputItem, index: number) {
+    private async buildItem(
+        tx: EntityManager,
+        quotation: Quotation,
+        row: QuotationInputItem,
+        index: number,
+        globalDiscountPercent: number
+    ) {
         const isCatalogItem = row.isCatalogItem !== false;
         let product: Product | undefined;
         let variant: ProductVariant | undefined;
@@ -112,7 +133,9 @@ export class QuotationService {
 
         const quantity = Number(row.quantity || 0);
         const approvedQuantity = Number(row.approvedQuantity ?? quantity);
-        const discountPercent = Number(row.discountPercent || 0);
+        const discountPercent = globalDiscountPercent > 0
+            ? globalDiscountPercent
+            : Number(row.discountPercent || 0);
         const taxRate = Number(row.taxRate || 0);
         const listedUnitPrice = Number(row.unitPrice || 0);
         const finalUnitPrice = this.round(listedUnitPrice * (1 - (discountPercent / 100)), 4);
@@ -126,6 +149,7 @@ export class QuotationService {
         const minAllowedMargin = this.validateMarginAndDiscount({
             baseUnitCost,
             targetMargin,
+            listedUnitPrice,
             finalUnitPrice,
             itemLabel: label,
         });
@@ -161,15 +185,23 @@ export class QuotationService {
         let subtotalBase = 0;
         let taxTotal = 0;
         let grossTotal = 0;
+        let discountTotal = 0;
         for (const item of quotation.items.getItems()) {
             subtotalBase += Number(item.subtotal || 0);
             taxTotal += Number(item.taxAmount || 0);
             grossTotal += Number(item.netSubtotal || 0);
+            const discountPercent = Number(item.discountPercent || 0);
+            const finalUnitPrice = Number(item.unitPrice || 0);
+            const qty = Number(item.quantity || 0);
+            if (discountPercent > 0 && discountPercent < 100 && finalUnitPrice > 0 && qty > 0) {
+                const listUnitPrice = finalUnitPrice / (1 - (discountPercent / 100));
+                discountTotal += (listUnitPrice - finalUnitPrice) * qty;
+            }
         }
         const netTotal = grossTotal;
         quotation.subtotalBase = this.round(subtotalBase);
         quotation.taxTotal = this.round(taxTotal);
-        quotation.discountAmount = this.round(0);
+        quotation.discountAmount = this.round(discountTotal);
         quotation.totalAmount = this.round(grossTotal);
         quotation.netTotalAmount = this.round(netTotal);
     }
@@ -217,10 +249,18 @@ export class QuotationService {
             quotation.quotationDate = new Date();
             quotation.validUntil = payload.validUntil ? new Date(payload.validUntil) : undefined;
             quotation.notes = payload.notes;
+            quotation.globalDiscountPercent = Number(payload.globalDiscountPercent || 0);
             quotation.status = QuotationStatus.DRAFT;
 
+            if (quotation.globalDiscountPercent > 0) {
+                const hasPerItemDiscount = payload.items.some((it) => Number(it.discountPercent || 0) > 0);
+                if (hasPerItemDiscount) {
+                    throw new AppError('No puedes aplicar descuento global y descuento por ítem al mismo tiempo', 400);
+                }
+            }
+
             for (let i = 0; i < payload.items.length; i += 1) {
-                const item = await this.buildItem(tx, quotation, payload.items[i], i);
+                const item = await this.buildItem(tx, quotation, payload.items[i], i, quotation.globalDiscountPercent);
                 quotation.items.add(item);
             }
             this.recalculateHeader(quotation);
@@ -243,6 +283,14 @@ export class QuotationService {
             quotation.customer = await tx.getRepository(Customer).findOneOrFail({ id: payload.customerId, deletedAt: null as never });
             quotation.validUntil = payload.validUntil ? new Date(payload.validUntil) : undefined;
             quotation.notes = payload.notes;
+            quotation.globalDiscountPercent = Number(payload.globalDiscountPercent || 0);
+
+            if (quotation.globalDiscountPercent > 0) {
+                const hasPerItemDiscount = payload.items.some((it) => Number(it.discountPercent || 0) > 0);
+                if (hasPerItemDiscount) {
+                    throw new AppError('No puedes aplicar descuento global y descuento por ítem al mismo tiempo', 400);
+                }
+            }
 
             for (const old of quotation.items.getItems()) {
                 tx.remove(old);
@@ -250,7 +298,7 @@ export class QuotationService {
             quotation.items.removeAll();
 
             for (let i = 0; i < payload.items.length; i += 1) {
-                const item = await this.buildItem(tx, quotation, payload.items[i], i);
+                const item = await this.buildItem(tx, quotation, payload.items[i], i, quotation.globalDiscountPercent);
                 quotation.items.add(item);
             }
 

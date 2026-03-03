@@ -1211,6 +1211,7 @@ export const CreateQuotationSchema = z.object({
     customerId: z.string().uuid(),
     validUntil: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
     notes: z.string().optional(),
+    globalDiscountPercent: z.number().min(0).max(100).optional(),
     items: z.array(z.union([QuotationCatalogItemSchema, QuotationCustomItemSchema])).min(1),
 });
 

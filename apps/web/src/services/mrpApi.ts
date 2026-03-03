@@ -533,8 +533,14 @@ export const mrpApi = {
         const response = await api.post(`/mrp/quotations/${id}/convert`, data);
         return response.data;
     },
-    getQuotationPdf: async (id: string): Promise<Blob> => {
-        const response = await api.get(`/mrp/quotations/${id}/pdf`, { responseType: 'blob' });
+    getQuotationPdf: async (
+        id: string,
+        docOptions?: { docCode?: string; docTitle?: string; docVersion?: number; docDate?: string }
+    ): Promise<Blob> => {
+        const response = await api.get(`/mrp/quotations/${id}/pdf`, {
+            responseType: 'blob',
+            params: { ...docOptions },
+        });
         return response.data as Blob;
     },
 

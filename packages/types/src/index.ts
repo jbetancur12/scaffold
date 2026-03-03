@@ -520,6 +520,7 @@ export interface Quotation {
     subtotalBase: number;
     taxTotal: number;
     discountAmount: number;
+    globalDiscountPercent: number;
     totalAmount: number;
     netTotalAmount: number;
     convertedSalesOrderId?: string;
@@ -1949,6 +1950,7 @@ export interface CreateQuotationPayload {
     customerId: string;
     validUntil?: string | Date;
     notes?: string;
+    globalDiscountPercent?: number;
     items: CreateQuotationItemPayload[];
 }
 

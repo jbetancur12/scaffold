@@ -10,6 +10,7 @@ import { mrpApi } from '@/services/mrpApi';
 
 type ItemForm = {
     isCatalogItem: boolean;
+    productSearch: string;
     productId?: string;
     variantId?: string;
     customDescription?: string;
@@ -23,6 +24,7 @@ type ItemForm = {
 
 const createItem = (): ItemForm => ({
     isCatalogItem: true,
+    productSearch: '',
     productId: undefined,
     variantId: undefined,
     customDescription: '',
@@ -41,12 +43,14 @@ export default function QuotationFormPage() {
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
     const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
-    const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string; variants?: Array<{ id: string; name: string }> }>>([]);
+    const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string; reference?: string; variants?: Array<{ id: string; name: string; price: number; cost: number; targetMargin: number }> }>>([]);
 
     const [customerId, setCustomerId] = useState('');
     const [validUntil, setValidUntil] = useState('');
     const [notes, setNotes] = useState('');
+    const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
     const [items, setItems] = useState<ItemForm[]>([createItem()]);
+    const [focusedDiscountIndex, setFocusedDiscountIndex] = useState<number | null>(null);
 
     useEffect(() => {
         const load = async () => {
@@ -63,28 +67,44 @@ export default function QuotationFormPage() {
                         id: full.id,
                         name: full.name,
                         sku: full.sku,
-                        variants: full.variants?.map((v) => ({ id: v.id, name: v.name })) || [],
+                        reference: (full as any).productReference || '',
+                        variants: full.variants?.map((v) => ({
+                            id: v.id,
+                            name: v.name,
+                            price: Number(v.price || 0),
+                            cost: Number(v.cost || 0),
+                            targetMargin: Number(v.targetMargin ?? 0.4),
+                        })) || [],
                     };
                 }));
                 setProducts(productRows);
 
                 if (isEdit && id) {
                     const q = await mrpApi.getQuotation(id);
-                    setCustomerId(q.customerId);
+                    setCustomerId((q as any).customerId || (q as any).customer?.id || '');
                     setValidUntil(q.validUntil ? new Date(q.validUntil as string).toISOString().slice(0, 10) : '');
                     setNotes(q.notes || '');
-                    setItems((q.items || []).map((it: any) => ({
-                        isCatalogItem: it.isCatalogItem,
-                        productId: it.productId,
-                        variantId: it.variantId,
-                        customDescription: it.customDescription || '',
-                        customSku: it.customSku || '',
-                        quantity: Number(it.quantity || 0),
-                        approvedQuantity: Number(it.approvedQuantity || 0),
-                        unitPrice: Number(it.unitPrice || 0),
-                        discountPercent: Number(it.discountPercent || 0),
-                        taxRate: Number(it.taxRate || 0),
-                    })));
+                    setGlobalDiscountPercent(Number((q as any).globalDiscountPercent || 0));
+                    setItems((q.items || []).map((it: any) => {
+                        const netUnitPrice = Number(it.unitPrice || 0);
+                        const discountPercent = Number(it.discountPercent || 0);
+                        const listUnitPrice = discountPercent > 0 && discountPercent < 100
+                            ? netUnitPrice / (1 - (discountPercent / 100))
+                            : netUnitPrice;
+                        return {
+                            isCatalogItem: it.isCatalogItem !== false,
+                            productSearch: '',
+                            productId: it.productId || it.product?.id,
+                            variantId: it.variantId || it.variant?.id,
+                            customDescription: it.customDescription || '',
+                            customSku: it.customSku || '',
+                            quantity: Number(it.quantity || 0),
+                            approvedQuantity: Number(it.approvedQuantity ?? it.quantity ?? 0),
+                            unitPrice: Number.isFinite(listUnitPrice) ? Number(listUnitPrice.toFixed(4)) : 0,
+                            discountPercent,
+                            taxRate: Number(it.taxRate || 0),
+                        };
+                    }));
                 } else if (customersData.length > 0) {
                     setCustomerId((prev) => prev || customersData[0].id);
                 }
@@ -100,20 +120,115 @@ export default function QuotationFormPage() {
     const addItem = () => setItems((prev) => [...prev, createItem()]);
     const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
     const patchItem = (idx: number, patch: Partial<ItemForm>) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
+    const hasPerItemDiscount = useMemo(() => items.some((it) => Number(it.discountPercent || 0) > 0), [items]);
 
-    const totalPreview = useMemo(() => items.reduce((acc, it) => {
-        const unit = Number(it.unitPrice || 0) * (1 - Number(it.discountPercent || 0) / 100);
-        const subtotal = unit * Number(it.quantity || 0);
-        const tax = subtotal * (Number(it.taxRate || 0) / 100);
-        return acc + subtotal + tax;
-    }, 0), [items]);
+    const updateGlobalDiscount = (value: number) => {
+        const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
+        const limited = globalDiscountLimit === null ? safe : Math.min(safe, globalDiscountLimit);
+        setGlobalDiscountPercent(limited);
+        if (limited > 0) {
+            setItems((prev) => prev.map((it) => ({ ...it, discountPercent: 0 })));
+        }
+    };
+
+    const resolveCatalogUnitPrice = (productId?: string, variantId?: string): number => {
+        if (!productId) return 0;
+        const product = products.find((p) => p.id === productId);
+        if (!product) return 0;
+        if (variantId) {
+            const variant = product.variants?.find((v) => v.id === variantId);
+            return Number(variant?.price || 0);
+        }
+        const firstVariantPrice = Number(product.variants?.[0]?.price || 0);
+        return firstVariantPrice;
+    };
+
+    const resolveDiscountLimit = (item: ItemForm) => {
+        if (!item.isCatalogItem || !item.productId) return null;
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) return null;
+        const variant = item.variantId
+            ? product.variants?.find((v) => v.id === item.variantId)
+            : product.variants?.[0];
+        if (!variant) return null;
+
+        const listPrice = Number(item.unitPrice || 0);
+        if (listPrice <= 0) return null;
+
+        const minAllowedMargin = Math.max(0, Number(variant.targetMargin || 0.4) - 0.1);
+        const minAllowedPrice = minAllowedMargin >= 1
+            ? Number.POSITIVE_INFINITY
+            : Number(variant.cost || 0) / (1 - minAllowedMargin);
+
+        const maxDiscountPercent = Math.max(0, (1 - (minAllowedPrice / listPrice)) * 100);
+        const maxDiscountValue = Math.max(0, listPrice - minAllowedPrice);
+        return {
+            maxDiscountPercent: Number.isFinite(maxDiscountPercent) ? maxDiscountPercent : 0,
+            maxDiscountValue: Number.isFinite(maxDiscountValue) ? maxDiscountValue : 0,
+            minAllowedMarginPercent: minAllowedMargin * 100,
+        };
+    };
+
+    const globalDiscountLimit = useMemo(() => {
+        const limits = items
+            .map((it) => resolveDiscountLimit(it)?.maxDiscountPercent)
+            .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+        if (limits.length === 0) return null;
+        return Math.max(0, Math.min(...limits));
+    }, [items, products]);
+
+    const totalsPreview = useMemo(() => {
+        const summary = items.reduce((acc, it) => {
+            const qty = Number(it.quantity || 0);
+            const listUnit = Number(it.unitPrice || 0);
+            const listSubtotal = listUnit * qty;
+            const effectiveDiscount = globalDiscountPercent > 0 ? globalDiscountPercent : Number(it.discountPercent || 0);
+            const netUnit = listUnit * (1 - effectiveDiscount / 100);
+            const discountedSubtotal = netUnit * qty;
+            const tax = discountedSubtotal * (Number(it.taxRate || 0) / 100);
+            return {
+                listSubtotal: acc.listSubtotal + listSubtotal,
+                discountedSubtotal: acc.discountedSubtotal + discountedSubtotal,
+                taxTotal: acc.taxTotal + tax,
+            };
+        }, { listSubtotal: 0, discountedSubtotal: 0, taxTotal: 0 });
+
+        return {
+            listSubtotal: summary.listSubtotal,
+            discountAmount: summary.listSubtotal - summary.discountedSubtotal,
+            discountedSubtotal: summary.discountedSubtotal,
+            taxTotal: summary.taxTotal,
+            total: summary.discountedSubtotal + summary.taxTotal,
+        };
+    }, [globalDiscountPercent, items]);
 
     const onSubmit = async () => {
         try {
+            for (let i = 0; i < items.length; i += 1) {
+                const row = items[i];
+                if (row.isCatalogItem && !row.productId) {
+                    toast({
+                        title: 'Dato requerido',
+                        description: `Ítem ${i + 1}: selecciona un producto o cambia el tipo a Libre.`,
+                        variant: 'destructive',
+                    });
+                    return;
+                }
+                if (!row.isCatalogItem && !(row.customDescription || '').trim()) {
+                    toast({
+                        title: 'Dato requerido',
+                        description: `Ítem ${i + 1}: ingresa una descripción para el ítem libre.`,
+                        variant: 'destructive',
+                    });
+                    return;
+                }
+            }
+
             const payload = {
                 customerId,
                 validUntil: validUntil || undefined,
                 notes,
+                globalDiscountPercent: Number(globalDiscountPercent || 0),
                 items: items.map((it) => it.isCatalogItem ? ({
                     isCatalogItem: true as const,
                     productId: it.productId!,
@@ -168,6 +283,31 @@ export default function QuotationFormPage() {
                         <Label>Notas</Label>
                         <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
                     </div>
+                    <div className="space-y-1.5 md:col-span-3">
+                        <Label>Descuento global (%)</Label>
+                        <Input
+                            type="number"
+                            min={0}
+                            max={globalDiscountLimit ?? undefined}
+                            step={0.01}
+                            value={globalDiscountPercent}
+                            onChange={(e) => updateGlobalDiscount(Number(e.target.value))}
+                            disabled={hasPerItemDiscount && globalDiscountPercent <= 0}
+                        />
+                        <p className="text-xs text-slate-500">
+                            Si usas descuento global, se bloquea descuento por ítem y viceversa.
+                        </p>
+                        {globalDiscountPercent > 0 && (
+                            <p className="text-xs text-slate-600">
+                                Con descuento global, el subtotal queda en {totalsPreview.discountedSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })} (ahorras {totalsPreview.discountAmount.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}).
+                            </p>
+                        )}
+                        {globalDiscountLimit !== null && (
+                            <p className="text-xs text-amber-700">
+                                Máximo global permitido con los ítems actuales: {globalDiscountLimit.toFixed(2)}%.
+                            </p>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
 
@@ -179,6 +319,10 @@ export default function QuotationFormPage() {
                 <CardContent className="space-y-4">
                     {items.map((it, idx) => {
                         const variants = products.find((p) => p.id === it.productId)?.variants || [];
+                        const effectiveDiscount = globalDiscountPercent > 0 ? Number(globalDiscountPercent || 0) : Number(it.discountPercent || 0);
+                        const unitListPrice = Number(it.unitPrice || 0);
+                        const unitNetPrice = unitListPrice * (1 - (effectiveDiscount / 100));
+                        const formatMoney = (value: number) => value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 2 });
                         return (
                             <div key={idx} className="border border-slate-200 rounded-xl p-4 space-y-3">
                                 <div className="flex justify-between items-center">
@@ -196,15 +340,55 @@ export default function QuotationFormPage() {
                                     {it.isCatalogItem ? (
                                         <>
                                             <div className="space-y-1.5">
+                                                <Label>Buscar (nombre o referencia)</Label>
+                                                <Input
+                                                    placeholder="Ej: cabestrillo o CLM015"
+                                                    value={it.productSearch}
+                                                    onChange={(e) => patchItem(idx, { productSearch: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
                                                 <Label>Producto</Label>
-                                                <select className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm" value={it.productId || ''} onChange={(e) => patchItem(idx, { productId: e.target.value, variantId: undefined })}>
+                                                {(() => {
+                                                    const filteredProducts = products.filter((p) => {
+                                                        const needle = (it.productSearch || '').trim().toLowerCase();
+                                                        if (!needle) return true;
+                                                        return p.name.toLowerCase().includes(needle)
+                                                            || p.sku.toLowerCase().includes(needle)
+                                                            || (p.reference || '').toLowerCase().includes(needle);
+                                                    });
+                                                    return (
+                                                <select
+                                                    className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm"
+                                                    value={it.productId || ''}
+                                                    onChange={(e) => {
+                                                        const productId = e.target.value || undefined;
+                                                        patchItem(idx, {
+                                                            productId,
+                                                            variantId: undefined,
+                                                            unitPrice: resolveCatalogUnitPrice(productId, undefined),
+                                                        });
+                                                    }}
+                                                >
                                                     <option value="">Seleccionar</option>
-                                                    {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                                    {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                                                 </select>
+                                                    );
+                                                })()}
                                             </div>
                                             <div className="space-y-1.5">
                                                 <Label>Variante</Label>
-                                                <select className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm" value={it.variantId || ''} onChange={(e) => patchItem(idx, { variantId: e.target.value || undefined })}>
+                                                <select
+                                                    className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm"
+                                                    value={it.variantId || ''}
+                                                    onChange={(e) => {
+                                                        const variantId = e.target.value || undefined;
+                                                        patchItem(idx, {
+                                                            variantId,
+                                                            unitPrice: resolveCatalogUnitPrice(it.productId, variantId),
+                                                        });
+                                                    }}
+                                                >
                                                     <option value="">(Opcional)</option>
                                                     {variants.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
                                                 </select>
@@ -224,9 +408,53 @@ export default function QuotationFormPage() {
                                     )}
                                     <div className="space-y-1.5"><Label>Cantidad</Label><Input type="number" min={0.001} value={it.quantity} onChange={(e) => patchItem(idx, { quantity: Number(e.target.value) })} /></div>
                                     <div className="space-y-1.5"><Label>Aprobada</Label><Input type="number" min={0} value={it.approvedQuantity} onChange={(e) => patchItem(idx, { approvedQuantity: Number(e.target.value) })} /></div>
-                                    <div className="space-y-1.5"><Label>Vr Unit</Label><Input type="number" min={0} value={it.unitPrice} onChange={(e) => patchItem(idx, { unitPrice: Number(e.target.value) })} /></div>
-                                    <div className="space-y-1.5"><Label>Desc %</Label><Input type="number" min={0} value={it.discountPercent} onChange={(e) => patchItem(idx, { discountPercent: Number(e.target.value) })} /></div>
+                                    <div className="space-y-1.5">
+                                        <Label>Vr Unit</Label>
+                                        <Input type="number" min={0} value={it.unitPrice} onChange={(e) => patchItem(idx, { unitPrice: Number(e.target.value) })} />
+                                        {effectiveDiscount > 0 && (
+                                            <p className="text-xs text-slate-600">
+                                                Con descuento queda en {formatMoney(unitNetPrice)} por unidad.
+                                            </p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Desc %</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            value={it.discountPercent}
+                                            onFocus={() => setFocusedDiscountIndex(idx)}
+                                            onBlur={() => setFocusedDiscountIndex((current) => (current === idx ? null : current))}
+                                            onChange={(e) => patchItem(idx, { discountPercent: Number(e.target.value) })}
+                                            disabled={globalDiscountPercent > 0}
+                                        />
+                                        {focusedDiscountIndex === idx && (() => {
+                                            const limit = resolveDiscountLimit(it);
+                                            if (!limit) {
+                                                return <p className="text-xs text-slate-500">Selecciona producto/variante con precio para calcular el máximo.</p>;
+                                            }
+                                            return (
+                                                <p className="text-xs text-amber-700">
+                                                    Máx descuento: {limit.maxDiscountPercent.toFixed(2)}% ({limit.maxDiscountValue.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}) · margen mínimo {limit.minAllowedMarginPercent.toFixed(2)}%
+                                                </p>
+                                            );
+                                        })()}
+                                    </div>
                                     <div className="space-y-1.5"><Label>IVA %</Label><Input type="number" min={0} value={it.taxRate} onChange={(e) => patchItem(idx, { taxRate: Number(e.target.value) })} /></div>
+                                    <div className="space-y-1.5">
+                                        <Label className="opacity-0">IVA 19%</Label>
+                                        <button
+                                            type="button"
+                                            onClick={() => patchItem(idx, { taxRate: Number(it.taxRate) === 19 ? 0 : 19 })}
+                                            className={`h-10 w-full rounded-md border text-sm font-medium transition-colors ${
+                                                Number(it.taxRate) === 19
+                                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                            }`}
+                                        >
+                                            {Number(it.taxRate) === 19 ? 'IVA 19% activo' : 'Aplicar IVA 19%'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -235,7 +463,13 @@ export default function QuotationFormPage() {
             </Card>
 
             <div className="flex items-center justify-between">
-                <p className="text-sm text-slate-600">Total estimado: {totalPreview.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
+                <div className="text-sm text-slate-600 space-y-1">
+                    <p>Subtotal lista (sin descuento): {totalsPreview.listSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
+                    <p>Descuento total: -{totalsPreview.discountAmount.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
+                    <p>Subtotal con descuento: {totalsPreview.discountedSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
+                    <p>IVA total: {totalsPreview.taxTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
+                    <p className="font-semibold text-slate-800">Total estimado: {totalsPreview.total.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
+                </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => navigate('/mrp/quotations')}>Cancelar</Button>
                     <Button onClick={onSubmit}>Guardar</Button>

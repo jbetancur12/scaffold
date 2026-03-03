@@ -2187,9 +2187,15 @@ export class MrpController {
     async downloadQuotationPdf(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
+            const docOptions = {
+                docCode: req.query.docCode as string | undefined,
+                docTitle: req.query.docTitle as string | undefined,
+                docVersion: req.query.docVersion ? Number(req.query.docVersion) : undefined,
+                docDate: req.query.docDate as string | undefined,
+            };
             const em = RequestContext.getEntityManager()!;
             const pdfService = new QuotationPdfService(em);
-            const { fileName, buffer } = await pdfService.generateQuotationPdf(id);
+            const { fileName, buffer } = await pdfService.generateQuotationPdf(id, docOptions);
             res.set({
                 'Content-Type': 'application/pdf',
                 'Content-Disposition': `attachment; filename="${fileName}"`,

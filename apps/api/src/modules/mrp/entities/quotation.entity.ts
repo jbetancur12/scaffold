@@ -34,6 +34,9 @@ export class Quotation extends BaseEntity {
     @Property({ type: 'decimal', precision: 12, scale: 2, default: 0 })
     discountAmount: number = 0;
 
+    @Property({ type: 'decimal', precision: 6, scale: 2, default: 0 })
+    globalDiscountPercent: number = 0;
+
     @Property({ type: 'decimal', precision: 12, scale: 2, default: 0 })
     totalAmount: number = 0;
 
