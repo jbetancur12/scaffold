@@ -4,16 +4,68 @@ export class Migration20260224162000_AddProductionMaterialAllocation extends Mig
     override async up(): Promise<void> {
         this.addSql(`
             create table if not exists "production_material_allocation" (
-                "id" varchar(255) not null,
+                "id" uuid not null,
                 "created_at" timestamptz not null,
                 "updated_at" timestamptz not null,
-                "production_order_id" varchar(255) not null,
-                "raw_material_id" varchar(255) not null,
-                "lot_id" varchar(255) null,
+                "production_order_id" uuid not null,
+                "raw_material_id" uuid not null,
+                "lot_id" uuid null,
                 "quantity_requested" numeric(12,4) null,
                 "notes" text null,
                 constraint "production_material_allocation_pkey" primary key ("id")
             );
+        `);
+        this.addSql(`
+            do $$ begin
+                if exists (
+                    select 1 from information_schema.columns
+                    where table_name = 'production_material_allocation'
+                      and column_name = 'id'
+                      and data_type in ('character varying', 'text')
+                ) then
+                    alter table "production_material_allocation"
+                    alter column "id" type uuid using "id"::uuid;
+                end if;
+            end $$;
+        `);
+        this.addSql(`
+            do $$ begin
+                if exists (
+                    select 1 from information_schema.columns
+                    where table_name = 'production_material_allocation'
+                      and column_name = 'production_order_id'
+                      and data_type in ('character varying', 'text')
+                ) then
+                    alter table "production_material_allocation"
+                    alter column "production_order_id" type uuid using "production_order_id"::uuid;
+                end if;
+            end $$;
+        `);
+        this.addSql(`
+            do $$ begin
+                if exists (
+                    select 1 from information_schema.columns
+                    where table_name = 'production_material_allocation'
+                      and column_name = 'raw_material_id'
+                      and data_type in ('character varying', 'text')
+                ) then
+                    alter table "production_material_allocation"
+                    alter column "raw_material_id" type uuid using "raw_material_id"::uuid;
+                end if;
+            end $$;
+        `);
+        this.addSql(`
+            do $$ begin
+                if exists (
+                    select 1 from information_schema.columns
+                    where table_name = 'production_material_allocation'
+                      and column_name = 'lot_id'
+                      and data_type in ('character varying', 'text')
+                ) then
+                    alter table "production_material_allocation"
+                    alter column "lot_id" type uuid using nullif("lot_id", '')::uuid;
+                end if;
+            end $$;
         `);
         this.addSql(`
             do $$ begin
@@ -52,4 +104,3 @@ export class Migration20260224162000_AddProductionMaterialAllocation extends Mig
         this.addSql('drop table if exists "production_material_allocation" cascade;');
     }
 }
-
