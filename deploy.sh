@@ -22,9 +22,9 @@ docker compose -f $COMPOSE_FILE up -d
 echo "🧹 Limpiando imágenes antiguas..."
 docker image prune -f
 
-# 5. Ejecutar migraciones automáticamente
+# 5. Ejecutar migraciones automáticamente (modo producción)
 echo "🗄️  Ejecutando migraciones de base de datos..."
-docker exec -it $API_CONTAINER npm run migration:up --workspace=api
+docker compose -f $COMPOSE_FILE exec -T api npm run migration:prod --workspace=api
 
 echo "✅ ¡Despliegue completado con éxito!"
 echo "🌐 Revisa tu sitio en: https://color.betancur.work"
