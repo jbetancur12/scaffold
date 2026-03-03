@@ -18,6 +18,7 @@ import { QualityIncomingPdfService } from './services/quality-incoming-pdf.servi
 import { QualityLabelingPdfService } from './services/quality-labeling-pdf.service';
 import { QualityBatchReleasePdfService } from './services/quality-batch-release-pdf.service';
 import { ThreadConsumptionService } from './services/thread-consumption.service';
+import { ThreadProcessService } from './services/thread-process.service';
 import {
     ProductSchema,
     UpdateProductSchema,
@@ -134,6 +135,9 @@ import {
     CustomerCsvImportSchema,
     RawMaterialCsvImportSchema,
     CalculateThreadConsumptionSchema,
+    CreateProductThreadProcessSchema,
+    ListProductThreadProcessesQuerySchema,
+    UpdateProductThreadProcessSchema,
 } from '@scaffold/schemas';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -168,6 +172,7 @@ export class MrpController {
     private get documentControlService() { return new DocumentControlService(this.em); }
     private get salesOrderService() { return new SalesOrderService(this.em); }
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
+    private get threadProcessService() { return new ThreadProcessService(this.em); }
 
     // --- Products ---
     async createProduct(req: Request, res: Response, next: NextFunction) {
@@ -666,6 +671,47 @@ export class MrpController {
             const payload = CalculateThreadConsumptionSchema.parse(req.body);
             const result = this.threadConsumptionService.calculate(payload);
             return ApiResponse.success(res, result, 'Cálculo de consumo de hilo generado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listProductThreadProcesses(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productId } = ListProductThreadProcessesQuerySchema.parse(req.query);
+            const result = await this.threadProcessService.listByProduct(productId);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createProductThreadProcess(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateProductThreadProcessSchema.parse(req.body);
+            const result = await this.threadProcessService.create(payload);
+            return ApiResponse.success(res, result, 'Proceso de hilo creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateProductThreadProcess(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateProductThreadProcessSchema.parse(req.body);
+            const result = await this.threadProcessService.update(id, payload);
+            return ApiResponse.success(res, result, 'Proceso de hilo actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteProductThreadProcess(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const result = await this.threadProcessService.remove(id);
+            return ApiResponse.success(res, result, 'Proceso de hilo eliminado');
         } catch (error) {
             next(error);
         }

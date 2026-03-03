@@ -145,6 +145,8 @@ import type {
     CustomerCsvImportPayload,
     RawMaterialCsvImportPayload,
     CalculateThreadConsumptionPayload,
+    CreateProductThreadProcessPayload,
+    UpdateProductThreadProcessPayload,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -243,6 +245,35 @@ export interface ThreadConsumptionResult {
         maxMachineCount: number;
     };
     operations: ThreadConsumptionOperationResult[];
+}
+
+export interface ProductThreadProcessRow {
+    id: string;
+    productId: string;
+    processName?: string;
+    machineKey: string;
+    sewnCentimeters: number;
+    wastePercent: number;
+    coneLengthMeters: number;
+    needles: number;
+    stitchesPerCm: number;
+    ratio: number;
+    sortOrder: number;
+    baseMetersPerUnit: number;
+    totalMetersPerUnit: number;
+    conesPerUnit: number;
+}
+
+export interface ProductThreadProcessesResult {
+    product: { id: string; name: string; sku: string };
+    totals: {
+        baseMetersPerUnit: number;
+        totalMetersPerUnit: number;
+        conesPerUnit: number;
+        totalMetersPerDozen: number;
+        conesPerDozen: number;
+    };
+    processes: ProductThreadProcessRow[];
 }
 
 export type IncomingInspectionEvidenceType = 'invoice' | 'certificate';
@@ -615,6 +646,22 @@ export const mrpApi = {
     },
     calculateThreadConsumption: async (payload: CalculateThreadConsumptionPayload): Promise<ThreadConsumptionResult> => {
         const response = await api.post<ThreadConsumptionResult>('/mrp/thread-consumption/calculate', payload);
+        return response.data;
+    },
+    listProductThreadProcesses: async (productId: string): Promise<ProductThreadProcessesResult> => {
+        const response = await api.get<ProductThreadProcessesResult>('/mrp/thread-consumption/processes', { params: { productId } });
+        return response.data;
+    },
+    createProductThreadProcess: async (payload: CreateProductThreadProcessPayload): Promise<ProductThreadProcessRow> => {
+        const response = await api.post<ProductThreadProcessRow>('/mrp/thread-consumption/processes', payload);
+        return response.data;
+    },
+    updateProductThreadProcess: async (id: string, payload: UpdateProductThreadProcessPayload): Promise<ProductThreadProcessRow> => {
+        const response = await api.put<ProductThreadProcessRow>(`/mrp/thread-consumption/processes/${id}`, payload);
+        return response.data;
+    },
+    deleteProductThreadProcess: async (id: string): Promise<{ id: string; deleted: boolean }> => {
+        const response = await api.delete<{ id: string; deleted: boolean }>(`/mrp/thread-consumption/processes/${id}`);
         return response.data;
     },
     upsertProductionMaterialAllocation: async (orderId: string, payload: UpsertProductionMaterialAllocationPayload) => {

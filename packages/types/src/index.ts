@@ -1910,3 +1910,26 @@ export interface CalculateThreadConsumptionPayload {
     coneLengthMeters?: number;
     operations: ThreadConsumptionOperationPayload[];
 }
+
+export type ThreadProcessMachineKey =
+    | 'plana_1'
+    | 'plana_2'
+    | 'zigzadora'
+    | 'fileteadora_3'
+    | 'fileteadora_4'
+    | 'fileteadora_5'
+    | 'flatseamer'
+    | 'reboteadora';
+
+export interface ProductThreadProcessPayload {
+    productId: string;
+    processName?: string;
+    machineKey: ThreadProcessMachineKey;
+    sewnCentimeters: number;
+    wastePercent?: number;
+    coneLengthMeters?: number;
+    needles?: number;
+    stitchesPerCm?: number;
+    ratio?: number;
+    sortOrder?: number;
+}

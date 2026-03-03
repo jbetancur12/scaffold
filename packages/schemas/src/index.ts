@@ -1204,6 +1204,38 @@ export const CalculateThreadConsumptionSchema = z.object({
     operations: z.array(ThreadConsumptionOperationSchema).min(1, 'Debe agregar al menos una operación'),
 });
 
+export const ThreadProcessMachineSchema = z.enum([
+    'plana_1',
+    'plana_2',
+    'zigzadora',
+    'fileteadora_3',
+    'fileteadora_4',
+    'fileteadora_5',
+    'flatseamer',
+    'reboteadora',
+]);
+
+export const CreateProductThreadProcessSchema = z.object({
+    productId: z.string().uuid(),
+    processName: z.string().min(1).optional(),
+    machineKey: ThreadProcessMachineSchema,
+    sewnCentimeters: z.number().positive(),
+    wastePercent: z.number().min(0).max(100).optional(),
+    coneLengthMeters: z.number().positive().optional(),
+    needles: z.number().int().positive().optional(),
+    stitchesPerCm: z.number().positive().optional(),
+    ratio: z.number().positive().optional(),
+    sortOrder: z.number().int().min(0).optional(),
+});
+
+export const UpdateProductThreadProcessSchema = CreateProductThreadProcessSchema
+    .omit({ productId: true })
+    .partial();
+
+export const ListProductThreadProcessesQuerySchema = z.object({
+    productId: z.string().uuid(),
+});
+
 export type CreateUserDto = z.infer<typeof CreateUserSchema>;
 export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
 export type CreatePurchaseOrderDto = z.infer<typeof CreatePurchaseOrderSchema>;
@@ -1284,3 +1316,5 @@ export type UpdateSalesOrderPayload = DateInputValue<z.input<typeof UpdateSalesO
 export type ListSalesOrdersFilters = DateInputValue<z.input<typeof ListSalesOrdersQuerySchema>>;
 export type UpdateSalesOrderStatusPayload = DateInputValue<z.input<typeof UpdateSalesOrderStatusSchema>>;
 export type CalculateThreadConsumptionPayload = DateInputValue<z.input<typeof CalculateThreadConsumptionSchema>>;
+export type CreateProductThreadProcessPayload = DateInputValue<z.input<typeof CreateProductThreadProcessSchema>>;
+export type UpdateProductThreadProcessPayload = DateInputValue<z.input<typeof UpdateProductThreadProcessSchema>>;
