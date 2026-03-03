@@ -17,6 +17,7 @@ import { SalesOrderPdfService } from './services/sales-order-pdf.service';
 import { QualityIncomingPdfService } from './services/quality-incoming-pdf.service';
 import { QualityLabelingPdfService } from './services/quality-labeling-pdf.service';
 import { QualityBatchReleasePdfService } from './services/quality-batch-release-pdf.service';
+import { ThreadConsumptionService } from './services/thread-consumption.service';
 import {
     ProductSchema,
     UpdateProductSchema,
@@ -132,6 +133,7 @@ import {
     SupplierCsvImportSchema,
     CustomerCsvImportSchema,
     RawMaterialCsvImportSchema,
+    CalculateThreadConsumptionSchema,
 } from '@scaffold/schemas';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
@@ -165,6 +167,7 @@ export class MrpController {
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
     private get salesOrderService() { return new SalesOrderService(this.em); }
+    private get threadConsumptionService() { return new ThreadConsumptionService(); }
 
     // --- Products ---
     async createProduct(req: Request, res: Response, next: NextFunction) {
@@ -653,6 +656,16 @@ export class MrpController {
             const { id } = req.params;
             const requirements = await this.productionService.calculateMaterialRequirements(id);
             return ApiResponse.success(res, requirements);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async calculateThreadConsumption(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CalculateThreadConsumptionSchema.parse(req.body);
+            const result = this.threadConsumptionService.calculate(payload);
+            return ApiResponse.success(res, result, 'Cálculo de consumo de hilo generado');
         } catch (error) {
             next(error);
         }

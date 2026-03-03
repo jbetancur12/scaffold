@@ -144,6 +144,7 @@ import type {
     SupplierCsvImportPayload,
     CustomerCsvImportPayload,
     RawMaterialCsvImportPayload,
+    CalculateThreadConsumptionPayload,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -207,6 +208,41 @@ export interface RawMaterialKardexRow {
         id: string;
         name: string;
     };
+}
+
+export interface ThreadConsumptionOperationResult {
+    operationIndex: number;
+    name: string;
+    stitchType: string;
+    needles: number;
+    machineCount: number;
+    seamLengthCmPerUnit: number;
+    totalSeamCm: number;
+    effectiveRatioCmPerCm: number;
+    threadMeters: number;
+    needleThreadMeters: number;
+    looperThreadMeters: number;
+}
+
+export interface ThreadConsumptionResult {
+    input: CalculateThreadConsumptionPayload;
+    assumptions: {
+        note: string;
+        referenceStitchesPerCm: number;
+    };
+    totals: {
+        preLossMeters: number;
+        wastePercent: number;
+        setupLossPercent: number;
+        totalMeters: number;
+        needleThreadMeters: number;
+        looperThreadMeters: number;
+        conesNeeded: number;
+        conesNeededRoundedUp: number;
+        suggestedMetersPerMachine: number;
+        maxMachineCount: number;
+    };
+    operations: ThreadConsumptionOperationResult[];
 }
 
 export type IncomingInspectionEvidenceType = 'invoice' | 'certificate';
@@ -575,6 +611,10 @@ export const mrpApi = {
     },
     getMaterialRequirements: async (orderId: string): Promise<MaterialRequirement[]> => {
         const response = await api.get<MaterialRequirement[]>(`/mrp/production-orders/${orderId}/requirements`);
+        return response.data;
+    },
+    calculateThreadConsumption: async (payload: CalculateThreadConsumptionPayload): Promise<ThreadConsumptionResult> => {
+        const response = await api.post<ThreadConsumptionResult>('/mrp/thread-consumption/calculate', payload);
         return response.data;
     },
     upsertProductionMaterialAllocation: async (orderId: string, payload: UpsertProductionMaterialAllocationPayload) => {

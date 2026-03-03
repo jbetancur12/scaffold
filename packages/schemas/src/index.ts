@@ -1182,6 +1182,28 @@ export const UpdateSalesOrderStatusSchema = z.object({
     status: z.nativeEnum(SalesOrderStatus),
 });
 
+export const ThreadConsumptionOperationSchema = z.object({
+    name: z.string().min(1).optional(),
+    stitchType: z.enum(['101', '301', '401', '406', '503', '504', '512', '516', '602', '605', 'custom']),
+    seamLengthCm: z.number().positive('La longitud de costura debe ser mayor a 0'),
+    seamsPerUnit: z.number().positive('Las repeticiones por unidad deben ser mayor a 0').default(1),
+    stitchesPerCm: z.number().positive('Las puntadas por cm deben ser mayor a 0').optional(),
+    threadRatioCmPerCm: z.number().positive('El ratio de hilo debe ser mayor a 0').optional(),
+    needles: z.number().int().positive('El número de agujas debe ser mayor a 0').optional(),
+    machineCount: z.number().int().positive('El número de máquinas debe ser mayor a 0').optional(),
+    seamThicknessFactor: z.number().min(0.5).max(2).default(1),
+    startEndAllowanceCm: z.number().min(0).default(0),
+    reworkPercent: z.number().min(0).max(100).default(0),
+});
+
+export const CalculateThreadConsumptionSchema = z.object({
+    plannedUnits: z.number().int().positive('Las unidades planeadas deben ser mayor a 0'),
+    wastePercent: z.number().min(0).max(100).default(8),
+    setupLossPercent: z.number().min(0).max(100).default(2),
+    coneLengthMeters: z.number().positive('La longitud por cono debe ser mayor a 0').default(5000),
+    operations: z.array(ThreadConsumptionOperationSchema).min(1, 'Debe agregar al menos una operación'),
+});
+
 export type CreateUserDto = z.infer<typeof CreateUserSchema>;
 export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
 export type CreatePurchaseOrderDto = z.infer<typeof CreatePurchaseOrderSchema>;
@@ -1261,3 +1283,4 @@ export type CreateSalesOrderPayload = DateInputValue<z.input<typeof CreateSalesO
 export type UpdateSalesOrderPayload = DateInputValue<z.input<typeof UpdateSalesOrderSchema>>;
 export type ListSalesOrdersFilters = DateInputValue<z.input<typeof ListSalesOrdersQuerySchema>>;
 export type UpdateSalesOrderStatusPayload = DateInputValue<z.input<typeof UpdateSalesOrderStatusSchema>>;
+export type CalculateThreadConsumptionPayload = DateInputValue<z.input<typeof CalculateThreadConsumptionSchema>>;

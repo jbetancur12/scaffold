@@ -1875,3 +1875,38 @@ export interface CreateSalesOrderPayload {
     notes?: string;
     items: CreateSalesOrderItemPayload[];
 }
+
+export type ThreadStitchType =
+    | '101'
+    | '301'
+    | '401'
+    | '406'
+    | '503'
+    | '504'
+    | '512'
+    | '516'
+    | '602'
+    | '605'
+    | 'custom';
+
+export interface ThreadConsumptionOperationPayload {
+    name?: string;
+    stitchType: ThreadStitchType;
+    seamLengthCm: number;
+    seamsPerUnit?: number;
+    stitchesPerCm?: number;
+    threadRatioCmPerCm?: number;
+    needles?: number;
+    machineCount?: number;
+    seamThicknessFactor?: number;
+    startEndAllowanceCm?: number;
+    reworkPercent?: number;
+}
+
+export interface CalculateThreadConsumptionPayload {
+    plannedUnits: number;
+    wastePercent?: number;
+    setupLossPercent?: number;
+    coneLengthMeters?: number;
+    operations: ThreadConsumptionOperationPayload[];
+}

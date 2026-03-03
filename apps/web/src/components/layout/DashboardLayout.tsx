@@ -17,6 +17,7 @@ import {
     Factory,
     Warehouse,
     Settings,
+    Scissors,
     ShieldCheck,
     Megaphone,
     ChevronDown,
@@ -78,6 +79,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: Factory, label: 'Órdenes de Producción', path: '/mrp/production-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Inventario', path: '/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Almacenes', path: '/mrp/warehouses', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Scissors, label: 'Calculadora de Hilo', path: '/mrp/thread-calculator', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Settings, label: 'Configuración Operativa', path: '/mrp/operational-settings', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
     ];
 
@@ -92,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         },
         {
             label: 'Operación',
-            items: ['/mrp/sales-orders', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/inventory', '/mrp/warehouses'],
+            items: ['/mrp/sales-orders', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/inventory', '/mrp/warehouses', '/mrp/thread-calculator'],
         },
         {
             label: 'Parámetros',

@@ -30,6 +30,7 @@ import SalesOrderFormPage from '@/pages/mrp/SalesOrderFormPage';
 import SalesOrderDetailPage from '@/pages/mrp/SalesOrderDetailPage';
 import ProductionOrderDetailPage from '@/pages/mrp/ProductionOrderDetailPage';
 import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
+import ThreadCalculatorPage from '@/pages/mrp/ThreadCalculatorPage';
 import WarehouseListPage from '@/pages/mrp/WarehouseListPage';
 import WarehouseFormPage from '@/pages/mrp/WarehouseFormPage';
 import { qualitySections } from '@/constants/mrpNavigation';
@@ -166,6 +167,7 @@ export default function App() {
                         <Route path="/mrp/sales-orders/:id" element={<SalesOrderDetailPage />} />
 
                         <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
+                        <Route path="/mrp/thread-calculator" element={<ThreadCalculatorPage />} />
                         <Route path="/quality" element={<Navigate to="/quality/nc" replace />} />
                         <Route path="/quality/nc" element={<QualityNcPage />} />
                         <Route path="/quality/capa" element={<QualityCapaPage />} />
