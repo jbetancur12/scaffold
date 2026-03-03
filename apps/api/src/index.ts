@@ -12,7 +12,6 @@ import { createAuthRoutes } from './modules/auth/auth.routes';
 import { createUserRoutes } from './modules/user/user.routes';
 import { createHealthRoutes } from './modules/health/health.routes';
 import { createMrpRoutes } from './modules/mrp/mrp.routes';
-import { rateLimit } from 'express-rate-limit';
 import { errorHandler } from './shared/middleware/error.middleware';
 import { setupSwagger } from './config/swagger';
 import { ApiResponse } from './shared/utils/response';
@@ -38,18 +37,6 @@ app.use(express.json({ limit: '15mb' }));
 app.use(cookieParser());
 app.use(requestObservabilityMiddleware);
 setupSwagger(app);
-
-// Rate limiting - only in production
-if (process.env.NODE_ENV === 'production') {
-    const limiter = rateLimit({
-        windowMs: 15 * 60 * 1000, // 15 minutes
-        limit: 100, // Limit each IP to 100 requests per windowMs
-        standardHeaders: 'draft-7',
-        legacyHeaders: false,
-    });
-    app.use(limiter);
-}
-
 
 const main = async () => {
     try {
