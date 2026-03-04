@@ -7,6 +7,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { mrpApi } from '@/services/mrpApi';
+import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
+import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
+import { calculateShippingSplit } from '@/utils/shipping';
 
 type ItemForm = {
     isCatalogItem: boolean;
@@ -49,8 +52,11 @@ export default function QuotationFormPage() {
     const [validUntil, setValidUntil] = useState('');
     const [notes, setNotes] = useState('');
     const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
+    const [shippingAmount, setShippingAmount] = useState(0);
     const [items, setItems] = useState<ItemForm[]>([createItem()]);
     const [focusedDiscountIndex, setFocusedDiscountIndex] = useState<number | null>(null);
+    const { data: operationalConfig, error: operationalConfigError } = useOperationalConfigQuery();
+    useMrpQueryErrorToast(operationalConfigError, 'No se pudo cargar configuración de envíos');
 
     useEffect(() => {
         const load = async () => {
@@ -201,6 +207,19 @@ export default function QuotationFormPage() {
             total: summary.discountedSubtotal + summary.taxTotal,
         };
     }, [globalDiscountPercent, items]);
+
+    const shippingSplit = useMemo(() => {
+        const orderThreshold = Number(operationalConfig?.shippingOrderCoverageThreshold || 0);
+        const fullLimit = Number(operationalConfig?.shippingCoverageLimitFull || 0);
+        const sharedLimit = Number(operationalConfig?.shippingCoverageLimitShared || 0);
+        return calculateShippingSplit(totalsPreview.total, shippingAmount, orderThreshold, fullLimit, sharedLimit);
+    }, [
+        shippingAmount,
+        totalsPreview.total,
+        operationalConfig?.shippingOrderCoverageThreshold,
+        operationalConfig?.shippingCoverageLimitFull,
+        operationalConfig?.shippingCoverageLimitShared,
+    ]);
 
     const onSubmit = async () => {
         try {
@@ -469,6 +488,28 @@ export default function QuotationFormPage() {
                     <p>Subtotal con descuento: {totalsPreview.discountedSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
                     <p>IVA total: {totalsPreview.taxTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
                     <p className="font-semibold text-slate-800">Total estimado: {totalsPreview.total.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
+                    <div className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 p-3 space-y-1">
+                        <p className="text-xs font-semibold text-cyan-900 uppercase tracking-wide">Calculadora de envío</p>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="quotationShippingValue">Valor envío</Label>
+                            <Input
+                                id="quotationShippingValue"
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={shippingAmount}
+                                onChange={(e) => setShippingAmount(Number(e.target.value) || 0)}
+                            />
+                        </div>
+                        <p className="text-xs text-cyan-900">
+                            Tope mínimo de pedido: {Number(operationalConfig?.shippingOrderCoverageThreshold || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}
+                        </p>
+                        <p>Pagas tú: {shippingSplit.wePay.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
+                        <p>Paga cliente: {shippingSplit.clientPays.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
+                        {!shippingSplit.policyApplies && (
+                            <p className="text-xs text-amber-700">El pedido no supera el tope mínimo, por eso el cliente asume 100% del envío.</p>
+                        )}
+                    </div>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => navigate('/mrp/quotations')}>Cancelar</Button>

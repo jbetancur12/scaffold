@@ -82,6 +82,15 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
     @Property({ nullable: true })
     operationMode?: 'lote' | 'serial';
 
+    @Property({ type: 'integer', default: 0 })
+    shippingOrderCoverageThreshold: number = 0;
+
+    @Property({ type: 'integer', default: 0 })
+    shippingCoverageLimitFull: number = 0;
+
+    @Property({ type: 'integer', default: 0 })
+    shippingCoverageLimitShared: number = 0;
+
     @Property({ type: 'integer', nullable: true })
     uvtValue?: number | null;
 

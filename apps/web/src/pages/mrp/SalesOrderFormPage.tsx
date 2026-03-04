@@ -15,10 +15,12 @@ import { useCustomersQuery } from '@/hooks/mrp/useCustomers';
 import { useProductsQuery } from '@/hooks/mrp/useProducts';
 import { useCreateSalesOrderMutation, useSalesOrderQuery, useUpdateSalesOrderMutation } from '@/hooks/mrp/useSalesOrders';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
+import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
 import { CreateCustomerDialog } from './components/CreateCustomerDialog';
 import { cn } from '@/lib/utils';
 import { Product, SalesOrderStatus } from '@scaffold/types';
 import { mrpApi } from '@/services/mrpApi';
+import { calculateShippingSplit } from '@/utils/shipping';
 
 interface OrderItem {
     productId: string;
@@ -51,6 +53,7 @@ export default function SalesOrderFormPage() {
     const [catalogSearch, setCatalogSearch] = useState('');
     const [debouncedCatalogSearch, setDebouncedCatalogSearch] = useState('');
     const [showValidation, setShowValidation] = useState(false);
+    const [shippingAmount, setShippingAmount] = useState(0);
     const [variantPicker, setVariantPicker] = useState<VariantPickerState>({ open: false, index: -1, productId: '' });
     const [variantDrafts, setVariantDrafts] = useState<Record<string, VariantDraft>>({});
 
@@ -78,6 +81,7 @@ export default function SalesOrderFormPage() {
     const { data: customersResponse, error: customersError } = useCustomersQuery();
     const { data: productsResponse, error: productsError } = useProductsQuery(1, 50, debouncedCatalogSearch);
     const { data: existingOrder, loading: loadingExistingOrder, error: existingOrderError } = useSalesOrderQuery(id);
+    const { data: operationalConfig, error: operationalConfigError } = useOperationalConfigQuery();
     const { execute: createSalesOrder } = useCreateSalesOrderMutation();
     const { execute: updateSalesOrder } = useUpdateSalesOrderMutation();
 
@@ -104,6 +108,7 @@ export default function SalesOrderFormPage() {
     useMrpQueryErrorToast(customersError, 'No se pudo cargar los clientes');
     useMrpQueryErrorToast(productsError, 'No se pudieron cargar los productos');
     useMrpQueryErrorToast(existingOrderError, 'No se pudo cargar el pedido');
+    useMrpQueryErrorToast(operationalConfigError, 'No se pudo cargar configuración de envíos');
 
     useEffect(() => {
         if (!isEditMode || !existingOrder) return;
@@ -428,6 +433,13 @@ export default function SalesOrderFormPage() {
     };
 
     const totals = calculateTotals();
+    const shippingSplit = calculateShippingSplit(
+        totals.total,
+        shippingAmount,
+        Number(operationalConfig?.shippingOrderCoverageThreshold || 0),
+        Number(operationalConfig?.shippingCoverageLimitFull || 0),
+        Number(operationalConfig?.shippingCoverageLimitShared || 0)
+    );
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -831,6 +843,40 @@ export default function SalesOrderFormPage() {
                             <div className="flex justify-between items-center text-sm">
                                 <span className="text-slate-500">Cantidad de Ítems</span>
                                 <span className="font-medium text-slate-900">{items.length}</span>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="salesShippingValue" className="text-xs uppercase tracking-wide text-slate-500">Valor envío</Label>
+                                <Input
+                                    id="salesShippingValue"
+                                    type="number"
+                                    min={0}
+                                    step={0.01}
+                                    value={shippingAmount}
+                                    onChange={(e) => setShippingAmount(Number(e.target.value) || 0)}
+                                />
+                            </div>
+
+                            <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm space-y-1">
+                                <p className="text-cyan-900 font-semibold">Reparto de envío</p>
+                                <p className="text-xs text-cyan-900">
+                                    Tope mínimo de pedido: {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(Number(operationalConfig?.shippingOrderCoverageThreshold || 0))}
+                                </p>
+                                <div className="flex justify-between">
+                                    <span className="text-cyan-800">Pagas tú</span>
+                                    <span className="font-medium text-cyan-950">
+                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(shippingSplit.wePay)}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-cyan-800">Paga cliente</span>
+                                    <span className="font-medium text-cyan-950">
+                                        {new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(shippingSplit.clientPays)}
+                                    </span>
+                                </div>
+                                {!shippingSplit.policyApplies && (
+                                    <p className="text-xs text-amber-700">Pedido debajo del tope mínimo: el cliente asume el envío completo.</p>
+                                )}
                             </div>
 
                             <div className="pt-4 border-t border-slate-100 flex justify-between items-center">

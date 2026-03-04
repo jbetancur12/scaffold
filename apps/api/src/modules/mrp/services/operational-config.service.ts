@@ -1,5 +1,6 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { OperationalConfig } from '../entities/operational-config.entity';
+import { AppError } from '../../../shared/utils/response';
 
 
 
@@ -67,6 +68,9 @@ export class OperationalConfigService {
         config.defaultLabelingControlledDocumentCode = undefined;
         config.defaultBatchReleaseControlledDocumentCode = undefined;
         config.operationMode = 'lote';
+        config.shippingOrderCoverageThreshold = 0;
+        config.shippingCoverageLimitFull = 0;
+        config.shippingCoverageLimitShared = 0;
         config.purchaseWithholdingRules = [
             { key: 'compra', label: 'Compra', rate: 2.5, active: true },
             { key: 'servicio', label: 'Servicio', rate: 4, active: true },
@@ -127,6 +131,15 @@ export class OperationalConfigService {
         if (data.operationMode !== undefined) {
             config.operationMode = data.operationMode;
         }
+        if (data.shippingOrderCoverageThreshold !== undefined) {
+            config.shippingOrderCoverageThreshold = Number(data.shippingOrderCoverageThreshold) || 0;
+        }
+        if (data.shippingCoverageLimitFull !== undefined) {
+            config.shippingCoverageLimitFull = Number(data.shippingCoverageLimitFull) || 0;
+        }
+        if (data.shippingCoverageLimitShared !== undefined) {
+            config.shippingCoverageLimitShared = Number(data.shippingCoverageLimitShared) || 0;
+        }
         if (data.uvtValue !== undefined) {
             config.uvtValue = data.uvtValue;
         }
@@ -135,6 +148,9 @@ export class OperationalConfigService {
                 ...rule,
                 active: rule.active ?? true,
             }));
+        }
+        if (config.shippingCoverageLimitShared < config.shippingCoverageLimitFull) {
+            throw new AppError('El tope compartido de envío debe ser mayor o igual al tope de cobertura total', 400);
         }
 
         // Calculations

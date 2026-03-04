@@ -6,13 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { ControlledDocument, DocumentCategory, DocumentStatus, OperationalConfig } from '@scaffold/types';
-import { Save, Calculator, Users, Building, ShoppingBag, FileText } from 'lucide-react';
+import { Save, Calculator, Users, Building, ShoppingBag, FileText, Truck } from 'lucide-react';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
 import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/hooks/mrp/useOperationalConfig';
 import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
+import { calculateShippingSplit } from '@/utils/shipping';
 
 export default function OperationalSettingsPage() {
     const { toast } = useToast();
@@ -22,6 +23,9 @@ export default function OperationalSettingsPage() {
     const [loadingCosts, setLoadingCosts] = useState(false);
     const [loadingPurchases, setLoadingPurchases] = useState(false);
     const [loadingDocs, setLoadingDocs] = useState(false);
+    const [loadingShipping, setLoadingShipping] = useState(false);
+    const [shippingOrderTotal, setShippingOrderTotal] = useState(0);
+    const [shippingValue, setShippingValue] = useState(0);
 
     const [config, setConfig] = useState<OperationalConfig>({
         id: '',
@@ -43,6 +47,9 @@ export default function OperationalSettingsPage() {
             { key: 'compra', label: 'Compra', rate: 2.5, active: true, baseUvtLimit: 0 },
             { key: 'servicio', label: 'Servicio', rate: 4, active: true, baseUvtLimit: 0 },
         ],
+        shippingOrderCoverageThreshold: 0,
+        shippingCoverageLimitFull: 0,
+        shippingCoverageLimitShared: 0,
         uvtValue: 47065,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -175,6 +182,39 @@ export default function OperationalSettingsPage() {
         }
     };
 
+    const handleSaveShipping = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            setLoadingShipping(true);
+            const fullLimit = Number(config.shippingCoverageLimitFull || 0);
+            const sharedLimit = Number(config.shippingCoverageLimitShared || 0);
+            const orderThreshold = Number(config.shippingOrderCoverageThreshold || 0);
+            if (sharedLimit < fullLimit) {
+                throw new Error('El tope compartido debe ser mayor o igual al tope de cobertura total');
+            }
+
+            const payload: Partial<OperationalConfig> = {
+                shippingOrderCoverageThreshold: orderThreshold,
+                shippingCoverageLimitFull: fullLimit,
+                shippingCoverageLimitShared: sharedLimit,
+            };
+            const updated = await saveOperationalConfig(payload);
+            setConfig(updated);
+            toast({
+                title: 'Configuración de envíos actualizada',
+                description: 'Se guardaron los topes de cobertura para el cálculo de envío.',
+            });
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo guardar la configuración de envíos.'),
+                variant: 'destructive',
+            });
+        } finally {
+            setLoadingShipping(false);
+        }
+    };
+
     const updatePaymentMethod = (index: number, value: string) => {
         const next = [...config.purchasePaymentMethods];
         next[index] = value;
@@ -224,6 +264,17 @@ export default function OperationalSettingsPage() {
     const adminCostPerMinute = totalFactoryMinutes > 0
         ? (config.adminSalaries || 0) / totalFactoryMinutes
         : 0;
+    const shippingOrderThreshold = Math.max(0, Number(config.shippingOrderCoverageThreshold || 0));
+    const shippingFullLimit = Math.max(0, Number(config.shippingCoverageLimitFull || 0));
+    const shippingSharedLimit = Math.max(shippingFullLimit, Number(config.shippingCoverageLimitShared || 0));
+    const shippingInputAmount = Math.max(0, Number(shippingValue || 0));
+    const shippingSplit = calculateShippingSplit(
+        Number(shippingOrderTotal || 0),
+        shippingInputAmount,
+        shippingOrderThreshold,
+        shippingFullLimit,
+        shippingSharedLimit
+    );
     const latestDocByCode = (controlledDocuments ?? []).reduce<Record<string, ControlledDocument>>((acc, doc) => {
         const current = acc[doc.code];
         if (!current || doc.version > current.version) acc[doc.code] = doc;
@@ -243,7 +294,7 @@ export default function OperationalSettingsPage() {
             </div>
 
             <Tabs defaultValue="costs" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 md:w-auto h-auto p-1 mb-8">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 md:w-auto h-auto p-1 mb-8">
                     <TabsTrigger value="costs" className="flex items-center gap-2 py-3 px-6 rounded-md">
                         <Calculator className="h-4 w-4" />
                         <span className="hidden sm:inline">Costos MOD / CIF</span>
@@ -258,6 +309,11 @@ export default function OperationalSettingsPage() {
                         <FileText className="h-4 w-4" />
                         <span className="hidden sm:inline">Documentos Globales</span>
                         <span className="sm:hidden">Documentos</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="shipping" className="flex items-center gap-2 py-3 px-6 rounded-md">
+                        <Truck className="h-4 w-4" />
+                        <span className="hidden sm:inline">Envíos</span>
+                        <span className="sm:hidden">Envíos</span>
                     </TabsTrigger>
                 </TabsList>
 
@@ -811,6 +867,138 @@ export default function OperationalSettingsPage() {
                                 </div>
                             </CardContent>
                         </Card>
+                    </form>
+                </TabsContent>
+
+                {/* --- TAB: ENVÍOS --- */}
+                <TabsContent value="shipping">
+                    <form onSubmit={handleSaveShipping}>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <Card className="border-slate-200">
+                                <CardHeader className="bg-slate-50 border-b border-slate-100 rounded-t-xl pb-4">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <CardTitle className="text-lg flex items-center gap-2">
+                                                <Truck className="h-5 w-5 text-cyan-600" />
+                                                Topes de Cobertura de Envío
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Define cuánto asumes tú y cuánto asume el cliente por tramos.
+                                            </CardDescription>
+                                        </div>
+                                        <Button type="submit" size="default" disabled={loadingShipping} className="bg-cyan-600 hover:bg-cyan-700">
+                                            <Save className="mr-2 h-4 w-4" />
+                                            {loadingShipping ? 'Guardando...' : 'Guardar Topes'}
+                                        </Button>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-5 pt-6">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="shippingOrderCoverageThreshold">Tope mínimo de pedido para cubrir envío</Label>
+                                        <CurrencyInput
+                                            id="shippingOrderCoverageThreshold"
+                                            className="pl-8"
+                                            value={shippingOrderThreshold}
+                                            onValueChange={(val) => setConfig({ ...config, shippingOrderCoverageThreshold: val || 0 })}
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Si el pedido no supera este valor, el cliente paga 100% del envío.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="shippingCoverageLimitFull">Tope 1: Cobertura total (100% tú)</Label>
+                                        <CurrencyInput
+                                            id="shippingCoverageLimitFull"
+                                            className="pl-8"
+                                            value={shippingFullLimit}
+                                            onValueChange={(val) => setConfig({ ...config, shippingCoverageLimitFull: val || 0 })}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="shippingCoverageLimitShared">Tope 2: Fin tramo compartido (50/50)</Label>
+                                        <CurrencyInput
+                                            id="shippingCoverageLimitShared"
+                                            className="pl-8"
+                                            value={shippingSharedLimit}
+                                            onValueChange={(val) => setConfig({ ...config, shippingCoverageLimitShared: val || 0 })}
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Desde el Tope 1 hasta este Tope 2, se divide mitad y mitad.
+                                        </p>
+                                    </div>
+
+                                    <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3 text-xs text-cyan-900">
+                                        Reglas activas:
+                                        <br />
+                                        1) Si pedido &lt; {formatCurrency(shippingOrderThreshold)}: cliente paga 100% envío.
+                                        <br />
+                                        2) Si pedido &gt;= {formatCurrency(shippingOrderThreshold)} y envío de $0 a {formatCurrency(shippingFullLimit)}: pagas tú 100%.
+                                        <br />
+                                        3) De {formatCurrency(shippingFullLimit)} a {formatCurrency(shippingSharedLimit)}: 50% tú y 50% cliente.
+                                        <br />
+                                        4) Desde {formatCurrency(shippingSharedLimit)} en adelante: el excedente lo paga el cliente.
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-slate-200">
+                                <CardHeader className="bg-slate-50 border-b border-slate-100 rounded-t-xl pb-4">
+                                    <CardTitle className="text-lg flex items-center gap-2">
+                                        <Calculator className="h-5 w-5 text-violet-600" />
+                                        Calculadora de Reparto de Envío
+                                    </CardTitle>
+                                    <CardDescription>
+                                        Ingresa el valor del envío y revisa cuánto pagas tú y cuánto paga el cliente.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-5 pt-6">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="shippingOrderTotal">Valor del pedido</Label>
+                                        <CurrencyInput
+                                            id="shippingOrderTotal"
+                                            className="pl-8"
+                                            value={Number(shippingOrderTotal || 0)}
+                                            onValueChange={(val) => setShippingOrderTotal(val || 0)}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="shippingValue">Valor del envío</Label>
+                                        <CurrencyInput
+                                            id="shippingValue"
+                                            className="pl-8"
+                                            value={shippingInputAmount}
+                                            onValueChange={(val) => setShippingValue(val || 0)}
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+                                            <p className="text-xs uppercase tracking-wide text-violet-700 font-semibold">Pagas tú</p>
+                                            <p className="text-2xl font-bold text-violet-900 mt-1">{formatCurrency(shippingSplit.wePay)}</p>
+                                        </div>
+                                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                                            <p className="text-xs uppercase tracking-wide text-emerald-700 font-semibold">Paga cliente</p>
+                                            <p className="text-2xl font-bold text-emerald-900 mt-1">{formatCurrency(shippingSplit.clientPays)}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
+                                        {!shippingSplit.policyApplies ? (
+                                            <p>Pedido por debajo del tope mínimo: cliente cubre {formatCurrency(shippingInputAmount)}.</p>
+                                        ) : (
+                                            <>
+                                                <p>Tramo 1 (100% tú): {formatCurrency(shippingSplit.fullCoveredByUs)}</p>
+                                                <p>Tramo 2 (50/50): tú {formatCurrency(shippingSplit.sharedCoveredByUs)} / cliente {formatCurrency(shippingSplit.sharedCoveredByUs)}</p>
+                                                <p>Tramo 3 (excedente cliente): {formatCurrency(shippingSplit.extraCoveredByClient)}</p>
+                                            </>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </form>
                 </TabsContent>
             </Tabs>
