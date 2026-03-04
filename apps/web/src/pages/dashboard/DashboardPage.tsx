@@ -10,11 +10,12 @@ import {
     ShoppingCart,
     ClipboardList,
     TrendingUp,
+    TrendingDown,
     CheckCircle2,
     Clock,
     UserCircle2
 } from 'lucide-react';
-import { UserRole, ProductionOrder, NonConformity, ProductionOrderStatus, NonConformityStatus, PurchaseOrderStatus, QualitySeverity } from '@scaffold/types';
+import { UserRole, ProductionOrder, NonConformity, ProductionOrderStatus, NonConformityStatus, PurchaseOrderStatus, QualitySeverity, Product } from '@scaffold/types';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { Button } from '@/components/ui/button';
 import { RoleGuard } from '@/components/auth/RoleGuard';
@@ -31,8 +32,18 @@ export default function DashboardPage() {
         activeOrders: 0,
         openNCs: 0,
         pendingPurchases: 0,
-        totalProducts: 0
+        totalProducts: 0,
+        productsBelowMargin: 0,
     });
+    const [productsBelowMargin, setProductsBelowMargin] = useState<Array<{
+        productId: string;
+        productName: string;
+        variantId: string;
+        variantName: string;
+        margin: number;
+        targetMargin: number;
+        deficit: number;
+    }>>([]);
 
     // Recent activity data
     const [recentOrders, setRecentOrders] = useState<ProductionOrder[]>([]);
@@ -49,6 +60,22 @@ export default function DashboardPage() {
             try {
                 setLoading(true);
 
+                const fetchAllProducts = async (): Promise<{ products: Product[]; total: number }> => {
+                    const firstPage = await mrpApi.getProducts(1, 100);
+                    const total = firstPage.total;
+                    const totalPages = Math.ceil(total / 100);
+                    if (totalPages <= 1) return firstPage;
+
+                    const remainingPages = await Promise.all(
+                        Array.from({ length: totalPages - 1 }, (_, index) => mrpApi.getProducts(index + 2, 100))
+                    );
+
+                    return {
+                        total,
+                        products: [firstPage, ...remainingPages].flatMap((page) => page.products),
+                    };
+                };
+
                 // Fetch metrics in parallel
                 const [
                     ordersRes,
@@ -59,7 +86,7 @@ export default function DashboardPage() {
                     mrpApi.getProductionOrders(1, 5), // Get latest 5 for activity
                     mrpApi.listNonConformities(), // Get all to filter open ones
                     mrpApi.listPurchaseOrders(1, 10, { status: PurchaseOrderStatus.PENDING }),
-                    mrpApi.getProducts(1, 1) // Just need total count
+                    fetchAllProducts()
                 ]);
 
                 const activeOrdersCount = ordersRes.orders.filter(o =>
@@ -71,15 +98,43 @@ export default function DashboardPage() {
                     nc.status !== NonConformityStatus.CERRADA
                 );
 
+                const belowMarginEntries = productsRes.products
+                    .map((product) => {
+                        const worstVariant = (product.variants ?? [])
+                            .map((variant) => {
+                                const margin = variant.price > 0 ? (variant.price - (variant.cost || 0)) / variant.price : null;
+                                const targetMargin = variant.targetMargin ?? 0.4;
+                                if (margin === null || margin >= targetMargin) return null;
+
+                                return {
+                                    productId: product.id,
+                                    productName: product.name,
+                                    variantId: variant.id,
+                                    variantName: variant.name,
+                                    margin,
+                                    targetMargin,
+                                    deficit: targetMargin - margin,
+                                };
+                            })
+                            .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+                            .sort((a, b) => b.deficit - a.deficit)[0];
+
+                        return worstVariant ?? null;
+                    })
+                    .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
+                    .sort((a, b) => b.deficit - a.deficit);
+
                 setMetrics({
                     activeOrders: activeOrdersCount,
                     openNCs: openNCs.length,
                     pendingPurchases: purchasesRes.total,
                     totalProducts: productsRes.total,
+                    productsBelowMargin: belowMarginEntries.length,
                 });
 
                 setRecentOrders(ordersRes.orders.slice(0, 4));
                 setRecentNCs(openNCs.slice(0, 4));
+                setProductsBelowMargin(belowMarginEntries.slice(0, 6));
 
             } catch (error) {
                 console.error("Error loading dashboard data:", error);
@@ -155,7 +210,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 <StatsCard
                     title="Órdenes Activas"
                     value={loading ? '-' : metrics.activeOrders.toString()}
@@ -187,12 +242,77 @@ export default function DashboardPage() {
                     description="Total de referencias activas"
                     className="border-violet-100/50 shadow-sm hover:shadow-md transition-shadow"
                 />
+                <StatsCard
+                    title="Bajo Margen"
+                    value={loading ? '-' : metrics.productsBelowMargin.toString()}
+                    icon={TrendingDown}
+                    trend={metrics.productsBelowMargin > 0 ? { value: 'Requieren ajuste', positive: false } : { value: 'Sin alertas', positive: true }}
+                    description="Productos por debajo del margen objetivo"
+                    className="border-red-100/50 shadow-sm hover:shadow-md transition-shadow"
+                />
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">
 
                 {/* Operations Feed (Left 2 cols) */}
                 <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-red-50/40">
+                            <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-red-100 text-red-700 rounded-lg">
+                                    <TrendingDown className="h-4 w-4" />
+                                </div>
+                                <h3 className="text-lg font-bold text-slate-900">Productos Bajo Margen Objetivo</h3>
+                            </div>
+                            <Button variant="ghost" size="sm" asChild className="text-red-600 hover:text-red-700 hover:bg-red-50 rounded-xl -mr-2">
+                                <Link to="/mrp/products">
+                                    Ver catálogo <ArrowRight className="ml-1.5 h-4 w-4" />
+                                </Link>
+                            </Button>
+                        </div>
+                        <div className="p-0">
+                            {loading ? (
+                                <div className="p-8 flex justify-center"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-red-600" /></div>
+                            ) : productsBelowMargin.length === 0 ? (
+                                <div className="p-8 flex flex-col items-center justify-center text-center">
+                                    <div className="h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center mb-3">
+                                        <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                                    </div>
+                                    <p className="text-slate-600 font-medium">No hay productos por debajo del margen objetivo</p>
+                                    <p className="text-slate-400 text-sm mt-1">Todos los productos visibles cumplen su rentabilidad mínima.</p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-slate-100">
+                                    {productsBelowMargin.map((entry) => (
+                                        <Link
+                                            key={entry.variantId}
+                                            to={`/mrp/products/${entry.productId}`}
+                                            className="p-4 sm:px-6 hover:bg-slate-50/80 transition-colors flex items-center justify-between gap-4 group"
+                                        >
+                                            <div>
+                                                <p className="font-bold text-slate-900 line-clamp-1 group-hover:text-violet-700 transition-colors">{entry.productName}</p>
+                                                <p className="text-sm text-slate-500 mt-0.5 line-clamp-1">
+                                                    Variante: {entry.variantName}
+                                                </p>
+                                            </div>
+                                            <div className="text-right shrink-0 flex items-center gap-3">
+                                                <ArrowRight className="h-4 w-4 text-slate-300 group-hover:text-violet-600 transition-colors" />
+                                                <div>
+                                                <p className="text-xs font-medium text-slate-500">
+                                                    Actual {(entry.margin * 100).toFixed(1)}% / Objetivo {(entry.targetMargin * 100).toFixed(1)}%
+                                                </p>
+                                                <Badge variant="outline" className="mt-1 text-red-700 bg-red-50 border-red-200">
+                                                    Brecha {(entry.deficit * 100).toFixed(1)}%
+                                                </Badge>
+                                                </div>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Recent Production Orders */}
                     <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
                         <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
