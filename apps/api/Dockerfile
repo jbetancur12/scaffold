@@ -48,9 +48,11 @@ COPY --from=builder /app/apps/api/package.json ./apps/api/
 # Install ONLY production dependencies
 RUN npm ci --omit=dev --workspace=api --workspace=@scaffold/types --workspace=@scaffold/schemas
 
-# PDF rendering dependencies (Playwright + Chromium only)
-RUN npm install --no-save playwright pug && \
-    npx playwright install --with-deps chromium
+# Ensure Playwright installs browser binaries in the same path used at runtime.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+# PDF rendering dependency: install Chromium browser binary for Playwright
+RUN npx playwright install --with-deps chromium
 
 # Copy built packages (dist folders)
 COPY --from=builder /app/packages/types/dist ./packages/types/dist
@@ -79,7 +81,6 @@ RUN echo "=== BUSCANDO SCRIPT DE MIGRACION ===" && \
 
 # Set environment
 ENV NODE_ENV=production
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 # Expose API port
 EXPOSE 5050
