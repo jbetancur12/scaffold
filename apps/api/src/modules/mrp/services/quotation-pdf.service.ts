@@ -47,6 +47,20 @@ html(lang="es")
       .totals { margin-top: 12px; width: 260px; margin-left: auto; border: none; }
       .totals td { padding: 4px 6px; font-size: 11px; border-bottom: 1px solid #f1f5f9; color: #334155; }
       .totals tr:last-child td { border-bottom: none; font-weight: 700; font-size: 13px; color: #0f172a; border-top: 2px solid #e2e8f0; padding-top: 6px; }
+      
+      .notes-card { margin-top: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 16px 20px; }
+      .notes-title { margin: 0 0 12px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #334155; }
+      .notes-chip { display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #0f4c81; background: #e8f2fb; border: 1px solid #bfdbfe; border-radius: 999px; padding: 2px 8px; margin-bottom: 12px; }
+      .notes-intro { margin: 0 0 12px 0; font-size: 11px; color: #334155; }
+      .notes-section { padding: 12px 0; border-top: 1px dashed #cbd5e1; margin-top: 0; }
+      .notes-section:first-of-type { margin-top: 4px; padding-top: 12px; }
+      .notes-section:last-of-type { padding-bottom: 0; }
+      .notes-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 6px 0; font-size: 11px; color: #1e293b; font-weight: 700; line-height: 1.4; }
+      .notes-index { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700; }
+      .notes-paragraph { margin: 0 0 4px 28px; color: #334155; font-size: 11px; line-height: 1.5; }
+      .notes-bullets { margin: 0 0 4px 28px; padding: 0 0 0 16px; color: #334155; font-size: 11px; line-height: 1.5; }
+      .notes-bullets li { margin: 0 0 4px 0; padding-left: 2px; }
+      .notes-bullets li::marker { color: #64748b; font-size: 10px; }
   body
     h1 Cotización #{quotation.code}
     .muted Fecha: #{quotationDate} | Vigencia: #{validUntil}
@@ -92,10 +106,27 @@ html(lang="es")
       tr
         td Total Pagar
         td.right= totals.total
-    if quotation.notes
-      .card(style="margin-top:24px; background-color: #fff;")
-        .card-title Observaciones Adicionales
-        div(style="white-space: pre-wrap; font-size: 12px; color: #334155; margin-top: 4px;")= quotation.notes
+    if quotationNotes.hasContent
+      .notes-card
+        h2.notes-title Observaciones Adicionales
+        if quotationNotes.heading
+          .notes-chip= quotationNotes.heading
+        if quotationNotes.structured
+          each introLine in quotationNotes.introLines
+            p.notes-intro= introLine
+          each section in quotationNotes.sections
+            .notes-section
+              p.notes-section-title
+                span.notes-index= section.index
+                span= section.title
+              each paragraph in section.paragraphs
+                p.notes-paragraph= paragraph
+              if section.bullets.length > 0
+                ul.notes-bullets
+                  each bullet in section.bullets
+                    li= bullet
+        else
+          div(style="white-space: pre-wrap; font-size: 11px; color: #334155; margin-top: 4px; line-height: 1.4;")= quotation.notes
 `;
 
 export class QuotationPdfService {
@@ -147,6 +178,86 @@ export class QuotationPdfService {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
+    }
+
+    private parseQuotationNotes(notes?: string) {
+        const raw = (notes || '').trim();
+        if (!raw) {
+            return {
+                hasContent: false,
+                structured: false,
+                heading: '',
+                introLines: [] as string[],
+                sections: [] as Array<{ index: number; title: string; paragraphs: string[]; bullets: string[] }>,
+            };
+        }
+
+        const lines = raw
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+        if (lines.length === 0) {
+            return {
+                hasContent: false,
+                structured: false,
+                heading: '',
+                introLines: [] as string[],
+                sections: [] as Array<{ index: number; title: string; paragraphs: string[]; bullets: string[] }>,
+            };
+        }
+
+        let cursor = 0;
+        let heading = '';
+        if (lines[0].toUpperCase().startsWith('CONDICIONES COMERCIALES')) {
+            heading = lines[0];
+            cursor = 1;
+        }
+
+        const introLines: string[] = [];
+        const sections: Array<{ index: number; title: string; paragraphs: string[]; bullets: string[] }> = [];
+        let currentSection: { index: number; title: string; paragraphs: string[]; bullets: string[] } | null = null;
+
+        for (let i = cursor; i < lines.length; i += 1) {
+            const line = lines[i];
+            const numberedMatch = line.match(/^(\d+)\.\s*(.+)$/);
+            if (numberedMatch) {
+                if (currentSection) sections.push(currentSection);
+                currentSection = {
+                    index: Number(numberedMatch[1]) || (sections.length + 1),
+                    title: numberedMatch[2].trim(),
+                    paragraphs: [],
+                    bullets: [],
+                };
+                continue;
+            }
+
+            if (line.startsWith('-')) {
+                const bullet = line.replace(/^-+\s*/, '').trim();
+                if (currentSection) {
+                    currentSection.bullets.push(bullet || line);
+                } else {
+                    introLines.push(line);
+                }
+                continue;
+            }
+
+            if (currentSection) {
+                currentSection.paragraphs.push(line);
+            } else {
+                introLines.push(line);
+            }
+        }
+
+        if (currentSection) sections.push(currentSection);
+
+        return {
+            hasContent: true,
+            structured: sections.length > 0,
+            heading,
+            introLines,
+            sections,
+        };
     }
 
     private resolveProcessLabelByDocCode(code?: string | null) {
@@ -355,6 +466,7 @@ export class QuotationPdfService {
             quotationDate: this.formatDate(quotation.quotationDate),
             validUntil: this.formatDate(quotation.validUntil),
             items,
+            quotationNotes: this.parseQuotationNotes(quotation.notes),
             totals: {
                 listSubtotal: this.formatCurrency(listSubtotal),
                 discount: this.formatCurrency(discount),
