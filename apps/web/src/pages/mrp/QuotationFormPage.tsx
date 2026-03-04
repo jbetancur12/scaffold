@@ -99,6 +99,42 @@ const mergeCommercialTermsTemplate = (template?: Partial<CommercialTermsForm> | 
     },
 });
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const parseInputDate = (value: string) => {
+    if (!value) return null;
+    const [y, m, d] = value.split('-').map((row) => Number(row));
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+};
+
+const formatInputDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getTodayAtMidnight = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
+const validityDaysFromDate = (validUntil: string) => {
+    const target = parseInputDate(validUntil);
+    if (!target) return 0;
+    const today = getTodayAtMidnight();
+    const diff = Math.round((target.getTime() - today.getTime()) / DAY_MS);
+    return Math.max(0, diff);
+};
+
+const validUntilFromDays = (days: number) => {
+    const safeDays = Math.max(0, Number(days || 0));
+    const date = getTodayAtMidnight();
+    date.setDate(date.getDate() + safeDays);
+    return formatInputDate(date);
+};
+
 const splitCustomNotes = (raw?: string) => {
     const content = (raw || '').trim();
     if (!content) return '';
@@ -223,6 +259,7 @@ export default function QuotationFormPage() {
     const [saveAsCustomerTemplate, setSaveAsCustomerTemplate] = useState(false);
     const [manualTermsEnabled, setManualTermsEnabled] = useState(false);
     const [manualTermsText, setManualTermsText] = useState('');
+    const [syncValidityWithDate, setSyncValidityWithDate] = useState(true);
     const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
     const [shippingAmount, setShippingAmount] = useState(0);
     const [items, setItems] = useState<ItemForm[]>([createItem()]);
@@ -709,9 +746,25 @@ export default function QuotationFormPage() {
                                 <Input
                                     type="date"
                                     value={validUntil}
-                                    onChange={(e) => setValidUntil(e.target.value)}
+                                    onChange={(e) => {
+                                        const nextDate = e.target.value;
+                                        setValidUntil(nextDate);
+                                        if (syncValidityWithDate && nextDate) {
+                                            const days = Math.max(1, validityDaysFromDate(nextDate));
+                                            setCommercialTerms((prev) => ({ ...prev, validityDays: days }));
+                                        }
+                                    }}
                                     className="h-10 border-slate-300"
                                 />
+                                <label className="inline-flex items-center gap-2 mt-1.5 text-[11px] text-slate-600">
+                                    <input
+                                        type="checkbox"
+                                        checked={syncValidityWithDate}
+                                        onChange={(e) => setSyncValidityWithDate(e.target.checked)}
+                                        className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    Sincronizar con “Vigencia (días)”
+                                </label>
                             </div>
                         </div>
 
@@ -801,9 +854,20 @@ export default function QuotationFormPage() {
                                                 type="number"
                                                 min={1}
                                                 value={commercialTerms.validityDays}
-                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, validityDays: Number(e.target.value) || 1 }))}
+                                                onChange={(e) => {
+                                                    const days = Math.max(1, Number(e.target.value) || 1);
+                                                    setCommercialTerms((prev) => ({ ...prev, validityDays: days }));
+                                                    if (syncValidityWithDate) {
+                                                        setValidUntil(validUntilFromDays(days));
+                                                    }
+                                                }}
                                                 className="h-9 border-indigo-200 bg-white"
                                             />
+                                            {syncValidityWithDate && (
+                                                <p className="text-[10px] text-slate-500 mt-1">
+                                                    Fecha sugerida: {validUntilFromDays(commercialTerms.validityDays)}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
 
