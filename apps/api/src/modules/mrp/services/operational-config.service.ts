@@ -1,6 +1,7 @@
 import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import { OperationalConfig } from '../entities/operational-config.entity';
 import { AppError } from '../../../shared/utils/response';
+import { QuotationTermsTemplate } from '@scaffold/types';
 
 
 
@@ -23,6 +24,41 @@ export class OperationalConfigService {
         return Math.round((44 * 52 * 60) / 12);
     }
 
+    private getDefaultQuotationTermsTemplate(): QuotationTermsTemplate {
+        return {
+            manualText: '',
+            enabled: true,
+            companyName: 'Fabricacion Ortopedicos Pereira',
+            validityDays: 30,
+            advancePaymentPercent: 50,
+            deliveryPaymentPercent: 50,
+            habitualClientTermLabel: 'Neto 15/30 dias',
+            lateFeePercent: 1.5,
+            ivaPercent: 19,
+            includeDianRetention: true,
+            productionMinDays: 7,
+            productionMaxDays: 15,
+            materialConstraintLabel: 'cuerina, neopreno, barras plasticas/metalicas',
+            highVolumeThresholdUnits: 100,
+            highVolumeExtraDays: 5,
+            shippingMinDays: 2,
+            shippingMaxDays: 5,
+            shippingCarrierLabel: 'Servientrega',
+            customerPaysFreight: true,
+            transitRiskBuyer: true,
+            warrantyMonths: 6,
+            restockPercent: 10,
+            sections: {
+                validity: true,
+                payment: true,
+                production: true,
+                warranty: true,
+                cancellations: true,
+                legal: true,
+            },
+        };
+    }
+
     async getConfig(): Promise<OperationalConfig> {
         const configs = await this.configRepo.findAll({ limit: 1 });
         if (configs.length > 0) {
@@ -35,6 +71,9 @@ export class OperationalConfigService {
                     { key: 'compra', label: 'Compra', rate: 2.5, active: true },
                     { key: 'servicio', label: 'Servicio', rate: 4, active: true },
                 ];
+            }
+            if (!config.quotationTermsTemplate) {
+                config.quotationTermsTemplate = this.getDefaultQuotationTermsTemplate();
             }
             return config;
         }
@@ -75,6 +114,7 @@ export class OperationalConfigService {
             { key: 'compra', label: 'Compra', rate: 2.5, active: true },
             { key: 'servicio', label: 'Servicio', rate: 4, active: true },
         ];
+        config.quotationTermsTemplate = this.getDefaultQuotationTermsTemplate();
 
         config.createdAt = new Date();
         config.updatedAt = new Date();
@@ -148,6 +188,9 @@ export class OperationalConfigService {
                 ...rule,
                 active: rule.active ?? true,
             }));
+        }
+        if (data.quotationTermsTemplate !== undefined) {
+            config.quotationTermsTemplate = data.quotationTermsTemplate || this.getDefaultQuotationTermsTemplate();
         }
         if (config.shippingCoverageLimitShared < config.shippingCoverageLimitFull) {
             throw new AppError('El tope compartido de envío debe ser mayor o igual al tope de cobertura total', 400);

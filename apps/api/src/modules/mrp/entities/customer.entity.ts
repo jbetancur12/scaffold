@@ -28,4 +28,7 @@ export class Customer extends BaseEntity implements ICustomer {
 
     @Property({ nullable: true, type: 'text' })
     notes?: string;
+
+    @Property({ type: 'json', nullable: true })
+    quotationTermsTemplate?: ICustomer['quotationTermsTemplate'];
 }

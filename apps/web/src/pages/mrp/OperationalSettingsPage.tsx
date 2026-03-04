@@ -15,6 +15,39 @@ import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { calculateShippingSplit } from '@/utils/shipping';
 
+const defaultQuotationTermsTemplate: NonNullable<OperationalConfig['quotationTermsTemplate']> = {
+    manualText: '',
+    enabled: true,
+    companyName: 'Fabricacion Ortopedicos Pereira',
+    validityDays: 30,
+    advancePaymentPercent: 50,
+    deliveryPaymentPercent: 50,
+    habitualClientTermLabel: 'Neto 15/30 dias',
+    lateFeePercent: 1.5,
+    ivaPercent: 19,
+    includeDianRetention: true,
+    productionMinDays: 7,
+    productionMaxDays: 15,
+    materialConstraintLabel: 'cuerina, neopreno, barras plasticas/metalicas',
+    highVolumeThresholdUnits: 100,
+    highVolumeExtraDays: 5,
+    shippingMinDays: 2,
+    shippingMaxDays: 5,
+    shippingCarrierLabel: 'Servientrega',
+    customerPaysFreight: true,
+    transitRiskBuyer: true,
+    warrantyMonths: 6,
+    restockPercent: 10,
+    sections: {
+        validity: true,
+        payment: true,
+        production: true,
+        warranty: true,
+        cancellations: true,
+        legal: true,
+    },
+};
+
 export default function OperationalSettingsPage() {
     const { toast } = useToast();
     const defaultMonthlyProductiveMinutes = Math.round((44 * 52 * 60) / 12); // 11440
@@ -24,6 +57,7 @@ export default function OperationalSettingsPage() {
     const [loadingPurchases, setLoadingPurchases] = useState(false);
     const [loadingDocs, setLoadingDocs] = useState(false);
     const [loadingShipping, setLoadingShipping] = useState(false);
+    const [loadingQuotationTerms, setLoadingQuotationTerms] = useState(false);
     const [shippingOrderTotal, setShippingOrderTotal] = useState(0);
     const [shippingValue, setShippingValue] = useState(0);
 
@@ -51,6 +85,7 @@ export default function OperationalSettingsPage() {
         shippingCoverageLimitFull: 0,
         shippingCoverageLimitShared: 0,
         uvtValue: 47065,
+        quotationTermsTemplate: defaultQuotationTermsTemplate,
         createdAt: new Date(),
         updatedAt: new Date()
     });
@@ -215,6 +250,39 @@ export default function OperationalSettingsPage() {
         }
     };
 
+    const handleSaveQuotationTerms = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            setLoadingQuotationTerms(true);
+            const tpl = config.quotationTermsTemplate || defaultQuotationTermsTemplate;
+            const payload: Partial<OperationalConfig> = {
+                quotationTermsTemplate: {
+                    ...tpl,
+                    companyName: tpl.companyName.trim() || defaultQuotationTermsTemplate.companyName,
+                    habitualClientTermLabel: tpl.habitualClientTermLabel.trim() || defaultQuotationTermsTemplate.habitualClientTermLabel,
+                    materialConstraintLabel: tpl.materialConstraintLabel.trim() || defaultQuotationTermsTemplate.materialConstraintLabel,
+                    shippingCarrierLabel: tpl.shippingCarrierLabel.trim() || defaultQuotationTermsTemplate.shippingCarrierLabel,
+                    productionMaxDays: Math.max(Number(tpl.productionMaxDays || 1), Number(tpl.productionMinDays || 1)),
+                    shippingMaxDays: Math.max(Number(tpl.shippingMaxDays || 0), Number(tpl.shippingMinDays || 0)),
+                },
+            };
+            const updated = await saveOperationalConfig(payload);
+            setConfig(updated);
+            toast({
+                title: 'Plantilla comercial actualizada',
+                description: 'La configuración por defecto para cotizaciones fue guardada.',
+            });
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo guardar la plantilla comercial de cotizaciones.'),
+                variant: 'destructive',
+            });
+        } finally {
+            setLoadingQuotationTerms(false);
+        }
+    };
+
     const updatePaymentMethod = (index: number, value: string) => {
         const next = [...config.purchasePaymentMethods];
         next[index] = value;
@@ -281,6 +349,7 @@ export default function OperationalSettingsPage() {
         return acc;
     }, {});
     const documentCodeOptions = Object.values(latestDocByCode).sort((a, b) => a.code.localeCompare(b.code));
+    const quotationTermsTemplate = config.quotationTermsTemplate || defaultQuotationTermsTemplate;
 
     return (
         <div className="container mx-auto py-6 max-w-5xl space-y-6">
@@ -294,7 +363,7 @@ export default function OperationalSettingsPage() {
             </div>
 
             <Tabs defaultValue="costs" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 md:w-auto h-auto p-1 mb-8">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 md:w-auto h-auto p-1 mb-8">
                     <TabsTrigger value="costs" className="flex items-center gap-2 py-3 px-6 rounded-md">
                         <Calculator className="h-4 w-4" />
                         <span className="hidden sm:inline">Costos MOD / CIF</span>
@@ -314,6 +383,11 @@ export default function OperationalSettingsPage() {
                         <Truck className="h-4 w-4" />
                         <span className="hidden sm:inline">Envíos</span>
                         <span className="sm:hidden">Envíos</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="quotations" className="flex items-center gap-2 py-3 px-6 rounded-md">
+                        <FileText className="h-4 w-4" />
+                        <span className="hidden sm:inline">Cotizaciones</span>
+                        <span className="sm:hidden">Cotiza</span>
                     </TabsTrigger>
                 </TabsList>
 
@@ -999,6 +1073,248 @@ export default function OperationalSettingsPage() {
                                 </CardContent>
                             </Card>
                         </div>
+                    </form>
+                </TabsContent>
+
+                <TabsContent value="quotations">
+                    <form onSubmit={handleSaveQuotationTerms}>
+                        <Card className="border-slate-200">
+                            <CardHeader className="bg-slate-50 border-b border-slate-100 rounded-t-xl pb-4">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <FileText className="h-5 w-5 text-indigo-600" />
+                                            Plantilla Comercial de Cotizaciones
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Define los textos y valores por defecto que salen prellenados en Nueva Cotización.
+                                        </CardDescription>
+                                    </div>
+                                    <Button type="submit" size="default" disabled={loadingQuotationTerms} className="bg-indigo-600 hover:bg-indigo-700">
+                                        <Save className="mr-2 h-4 w-4" />
+                                        {loadingQuotationTerms ? 'Guardando...' : 'Guardar Plantilla'}
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="pt-6 space-y-5">
+                                <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={quotationTermsTemplate.enabled}
+                                        onChange={(e) => setConfig({
+                                            ...config,
+                                            quotationTermsTemplate: { ...quotationTermsTemplate, enabled: e.target.checked },
+                                        })}
+                                        className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    Habilitar términos comerciales automáticos en cotización
+                                </label>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Nombre de empresa</Label>
+                                        <Input
+                                            value={quotationTermsTemplate.companyName}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, companyName: e.target.value },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Plazo cliente habitual</Label>
+                                        <Input
+                                            value={quotationTermsTemplate.habitualClientTermLabel}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, habitualClientTermLabel: e.target.value },
+                                            })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Vigencia (días)</Label>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            value={quotationTermsTemplate.validityDays}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, validityDays: Number(e.target.value) || 1 },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Anticipo %</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={quotationTermsTemplate.advancePaymentPercent}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, advancePaymentPercent: Number(e.target.value) || 0 },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Contraentrega %</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={quotationTermsTemplate.deliveryPaymentPercent}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, deliveryPaymentPercent: Number(e.target.value) || 0 },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Mora % mensual</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            step={0.1}
+                                            value={quotationTermsTemplate.lateFeePercent}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, lateFeePercent: Number(e.target.value) || 0 },
+                                            })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Producción min (días)</Label>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            value={quotationTermsTemplate.productionMinDays}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, productionMinDays: Number(e.target.value) || 1 },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Producción max (días)</Label>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            value={quotationTermsTemplate.productionMaxDays}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, productionMaxDays: Number(e.target.value) || 1 },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Envío min (días)</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            value={quotationTermsTemplate.shippingMinDays}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, shippingMinDays: Number(e.target.value) || 0 },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Envío max (días)</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            value={quotationTermsTemplate.shippingMaxDays}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, shippingMaxDays: Number(e.target.value) || 0 },
+                                            })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Restricción de materiales</Label>
+                                        <Input
+                                            value={quotationTermsTemplate.materialConstraintLabel}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, materialConstraintLabel: e.target.value },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Transportadora / envío</Label>
+                                        <Input
+                                            value={quotationTermsTemplate.shippingCarrierLabel}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, shippingCarrierLabel: e.target.value },
+                                            })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>IVA %</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={quotationTermsTemplate.ivaPercent}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, ivaPercent: Number(e.target.value) || 0 },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Garantía (meses)</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            value={quotationTermsTemplate.warrantyMonths}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, warrantyMonths: Number(e.target.value) || 0 },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Restock %</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={quotationTermsTemplate.restockPercent}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, restockPercent: Number(e.target.value) || 0 },
+                                            })}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Umbral alto volumen (uds)</Label>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            value={quotationTermsTemplate.highVolumeThresholdUnits}
+                                            onChange={(e) => setConfig({
+                                                ...config,
+                                                quotationTermsTemplate: { ...quotationTermsTemplate, highVolumeThresholdUnits: Number(e.target.value) || 1 },
+                                            })}
+                                        />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </form>
                 </TabsContent>
             </Tabs>

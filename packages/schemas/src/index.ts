@@ -86,6 +86,39 @@ export const SupplierSchema = z.object({
     notes: z.string().optional(),
 });
 
+const QuotationTermsTemplateSchema = z.object({
+    manualText: z.string().optional(),
+    enabled: z.boolean(),
+    companyName: z.string().min(1),
+    validityDays: z.number().min(1),
+    advancePaymentPercent: z.number().min(0).max(100),
+    deliveryPaymentPercent: z.number().min(0).max(100),
+    habitualClientTermLabel: z.string().min(1),
+    lateFeePercent: z.number().min(0),
+    ivaPercent: z.number().min(0).max(100),
+    includeDianRetention: z.boolean(),
+    productionMinDays: z.number().min(1),
+    productionMaxDays: z.number().min(1),
+    materialConstraintLabel: z.string().min(1),
+    highVolumeThresholdUnits: z.number().min(1),
+    highVolumeExtraDays: z.number().min(0),
+    shippingMinDays: z.number().min(0),
+    shippingMaxDays: z.number().min(0),
+    shippingCarrierLabel: z.string().min(1),
+    customerPaysFreight: z.boolean(),
+    transitRiskBuyer: z.boolean(),
+    warrantyMonths: z.number().min(0),
+    restockPercent: z.number().min(0).max(100),
+    sections: z.object({
+        validity: z.boolean(),
+        payment: z.boolean(),
+        production: z.boolean(),
+        warranty: z.boolean(),
+        cancellations: z.boolean(),
+        legal: z.boolean(),
+    }),
+});
+
 export const CustomerSchema = z.object({
     name: z.string().min(2, 'El nombre es obligatorio'),
     documentType: z.string().optional(),
@@ -95,6 +128,7 @@ export const CustomerSchema = z.object({
     phone: z.string().optional(),
     address: z.string().optional(),
     notes: z.string().optional(),
+    quotationTermsTemplate: QuotationTermsTemplateSchema.nullish(),
 });
 
 export const ListCustomersQuerySchema = z.object({
@@ -1154,6 +1188,7 @@ export const OperationalConfigSchema = z.object({
     shippingCoverageLimitFull: z.number().min(0, 'El tope de cobertura total debe ser mayor o igual a 0').nullish(),
     shippingCoverageLimitShared: z.number().min(0, 'El tope de cobertura compartida debe ser mayor o igual a 0').nullish(),
     uvtValue: z.number().min(0, 'El valor del UVT debe ser mayor o igual a 0').nullish(),
+    quotationTermsTemplate: QuotationTermsTemplateSchema.nullish(),
     purchaseWithholdingRules: z.array(
         z.object({
             key: z.string().min(1),

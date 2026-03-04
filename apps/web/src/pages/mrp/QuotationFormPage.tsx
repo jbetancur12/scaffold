@@ -9,11 +9,12 @@ import { mrpApi } from '@/services/mrpApi';
 import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { calculateShippingSplit } from '@/utils/shipping';
-import { ArrowLeft, Plus, Users, Package, ChevronsUpDown, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Users, Package, ChevronsUpDown, Check, Loader2, FileText, ShieldCheck, ChevronDown, ChevronRight } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { QuotationTermsTemplate } from '@scaffold/types';
 
 type ItemForm = {
     isCatalogItem: boolean;
@@ -43,6 +44,158 @@ const createItem = (): ItemForm => ({
     taxRate: 0,
 });
 
+const COMMERCIAL_TERMS_HEADING_PREFIX = 'CONDICIONES COMERCIALES - ';
+
+type CommercialSections = {
+    validity: boolean;
+    payment: boolean;
+    production: boolean;
+    warranty: boolean;
+    cancellations: boolean;
+    legal: boolean;
+};
+
+type CommercialTermsForm = QuotationTermsTemplate;
+
+const defaultCommercialTerms: CommercialTermsForm = {
+    manualText: '',
+    enabled: true,
+    companyName: 'Fabricacion Ortopedicos Pereira',
+    validityDays: 30,
+    advancePaymentPercent: 50,
+    deliveryPaymentPercent: 50,
+    habitualClientTermLabel: 'Neto 15/30 dias',
+    lateFeePercent: 1.5,
+    ivaPercent: 19,
+    includeDianRetention: true,
+    productionMinDays: 7,
+    productionMaxDays: 15,
+    materialConstraintLabel: 'cuerina, neopreno, barras plasticas/metalicas',
+    highVolumeThresholdUnits: 100,
+    highVolumeExtraDays: 5,
+    shippingMinDays: 2,
+    shippingMaxDays: 5,
+    shippingCarrierLabel: 'Servientrega',
+    customerPaysFreight: true,
+    transitRiskBuyer: true,
+    warrantyMonths: 6,
+    restockPercent: 10,
+    sections: {
+        validity: true,
+        payment: true,
+        production: true,
+        warranty: true,
+        cancellations: true,
+        legal: true,
+    },
+};
+
+const mergeCommercialTermsTemplate = (template?: Partial<CommercialTermsForm> | null): CommercialTermsForm => ({
+    ...defaultCommercialTerms,
+    ...(template || {}),
+    sections: {
+        ...defaultCommercialTerms.sections,
+        ...(template?.sections || {}),
+    },
+});
+
+const splitCustomNotes = (raw?: string) => {
+    const content = (raw || '').trim();
+    if (!content) return '';
+    const sectionStart = content.indexOf(COMMERCIAL_TERMS_HEADING_PREFIX);
+    if (sectionStart < 0) return content;
+    return content.slice(0, sectionStart).trim();
+};
+
+const extractCommercialTermsBlock = (raw?: string) => {
+    const content = (raw || '').trim();
+    if (!content) return '';
+    const sectionStart = content.indexOf(COMMERCIAL_TERMS_HEADING_PREFIX);
+    if (sectionStart < 0) return '';
+    return content.slice(sectionStart).trim();
+};
+
+const buildCommercialTermsText = (terms: CommercialTermsForm) => {
+    if (!terms.enabled) return '';
+    const lines: string[] = [`${COMMERCIAL_TERMS_HEADING_PREFIX}${terms.companyName}`, ''];
+    let sectionNumber = 1;
+
+    if (terms.sections.validity) {
+        lines.push(
+            `${sectionNumber}. VIGENCIA: ${terms.validityDays} dias desde emision. Precios sujetos a cambios por materiales o variacion USD/COP.`,
+            '',
+        );
+        sectionNumber += 1;
+    }
+
+    if (terms.sections.payment) {
+        lines.push(`${sectionNumber}. PAGO:`);
+        lines.push(`- ${terms.advancePaymentPercent}% anticipo al aprobar (transferencia/PSE).`);
+        lines.push(`- ${terms.deliveryPaymentPercent}% contra entrega.`);
+        lines.push(`- Clientes habituales: ${terms.habitualClientTermLabel}.`);
+        lines.push(`- Mora: ${terms.lateFeePercent}% mensual. IVA ${terms.ivaPercent}%.`);
+        if (terms.includeDianRetention) {
+            lines.push('- Retencion DIAN aplica cuando corresponda.');
+        }
+        lines.push('');
+        sectionNumber += 1;
+    }
+
+    if (terms.sections.production) {
+        lines.push(`${sectionNumber}. PRODUCCION Y ENTREGA (Made to Order):`);
+        lines.push(`- Tiempo estimado: ${terms.productionMinDays}-${terms.productionMaxDays} dias habiles desde anticipo.`);
+        lines.push(`- Sujeto a disponibilidad de materiales (${terms.materialConstraintLabel}).`);
+        lines.push(`- Pedidos mayores a ${terms.highVolumeThresholdUnits} uds: +${terms.highVolumeExtraDays} dias habiles.`);
+        lines.push('- Actualizaciones por WhatsApp/plataforma.');
+        lines.push(
+            `- Envio nacional: +${terms.shippingMinDays}-${terms.shippingMaxDays} dias (${terms.shippingCarrierLabel}).`,
+        );
+        lines.push(`- Flete: ${terms.customerPaysFreight ? 'cliente asume costo' : 'empresa asume costo'}.`);
+        lines.push(`- Riesgo en transito: ${terms.transitRiskBuyer ? 'comprador' : 'vendedor'}.`);
+        lines.push('');
+        sectionNumber += 1;
+    }
+
+    if (terms.sections.warranty) {
+        lines.push(
+            `${sectionNumber}. GARANTIAS: ${terms.warrantyMonths} meses por defectos de fabrica. No aplica por mal uso. Devoluciones con autorizacion previa (${terms.restockPercent}% restock).`,
+            '',
+        );
+        sectionNumber += 1;
+    }
+
+    if (terms.sections.cancellations) {
+        lines.push(
+            `${sectionNumber}. CAMBIOS/CANCELACIONES: deben solicitarse por escrito. El anticipo no es reembolsable si la produccion ya inicio.`,
+            '',
+        );
+        sectionNumber += 1;
+    }
+
+    if (terms.sections.legal) {
+        lines.push(
+            `${sectionNumber}. GENERAL: fuerza mayor exime responsabilidades. Aceptacion por firma digital/plataforma. Legislacion aplicable en Colombia (DIAN/Ley 1480).`,
+            '',
+        );
+    }
+
+    return lines.join('\n').trim();
+};
+
+const composeQuotationNotes = (
+    freeNotes: string,
+    terms: CommercialTermsForm,
+    options?: { manualTermsEnabled?: boolean; manualTermsText?: string }
+) => {
+    const notesText = freeNotes.trim();
+    const manualTermsText = (options?.manualTermsText || '').trim();
+    const termsText = options?.manualTermsEnabled && manualTermsText
+        ? manualTermsText
+        : buildCommercialTermsText(terms);
+    if (notesText && termsText) return `${notesText}\n\n${termsText}`;
+    return notesText || termsText || '';
+};
+
 export default function QuotationFormPage() {
     const { id } = useParams();
     const isEditMode = Boolean(id);
@@ -52,13 +205,24 @@ export default function QuotationFormPage() {
     const [pageLoading, setPageLoading] = useState(true);
 
     // Select options
-    const [customers, setCustomers] = useState<Array<{ id: string; name: string; documentNumber?: string }>>([]);
+    const [customers, setCustomers] = useState<Array<{
+        id: string;
+        name: string;
+        documentNumber?: string;
+        quotationTermsTemplate?: QuotationTermsTemplate | null;
+    }>>([]);
     const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string; reference?: string; variants?: Array<{ id: string; name: string; price: number; cost: number; targetMargin: number }> }>>([]);
 
     // Data Form
     const [customerId, setCustomerId] = useState('');
     const [validUntil, setValidUntil] = useState('');
     const [notes, setNotes] = useState('');
+    const [commercialTerms, setCommercialTerms] = useState<CommercialTermsForm>(defaultCommercialTerms);
+    const [commercialTermsExpanded, setCommercialTermsExpanded] = useState(false);
+    const [templateHydrated, setTemplateHydrated] = useState(false);
+    const [saveAsCustomerTemplate, setSaveAsCustomerTemplate] = useState(false);
+    const [manualTermsEnabled, setManualTermsEnabled] = useState(false);
+    const [manualTermsText, setManualTermsText] = useState('');
     const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
     const [shippingAmount, setShippingAmount] = useState(0);
     const [items, setItems] = useState<ItemForm[]>([createItem()]);
@@ -74,6 +238,36 @@ export default function QuotationFormPage() {
     const { data: operationalConfig, error: operationalConfigError } = useOperationalConfigQuery();
     useMrpQueryErrorToast(operationalConfigError, 'No se pudo cargar configuración de envíos');
 
+    const getGlobalTermsTemplate = () =>
+        mergeCommercialTermsTemplate(operationalConfig?.quotationTermsTemplate || defaultCommercialTerms);
+
+    const applyTemplateForCustomer = (selectedCustomerId: string) => {
+        const globalTemplate = getGlobalTermsTemplate();
+        const customer = customers.find((row) => row.id === selectedCustomerId);
+        const customerTemplate = customer?.quotationTermsTemplate
+            ? mergeCommercialTermsTemplate(customer.quotationTermsTemplate)
+            : null;
+        const selectedTemplate = customerTemplate || globalTemplate;
+        setCommercialTerms(selectedTemplate);
+        if (selectedTemplate.manualText?.trim()) {
+            setManualTermsEnabled(true);
+            setManualTermsText(selectedTemplate.manualText.trim());
+        } else {
+            setManualTermsEnabled(false);
+            setManualTermsText('');
+        }
+    };
+
+    useEffect(() => {
+        if (templateHydrated) return;
+        if (!operationalConfig?.quotationTermsTemplate) {
+            setTemplateHydrated(true);
+            return;
+        }
+        setCommercialTerms(mergeCommercialTermsTemplate(operationalConfig.quotationTermsTemplate));
+        setTemplateHydrated(true);
+    }, [operationalConfig?.quotationTermsTemplate, templateHydrated]);
+
     useEffect(() => {
         const load = async () => {
             try {
@@ -82,7 +276,12 @@ export default function QuotationFormPage() {
                     mrpApi.listCustomers(''),
                     mrpApi.getProducts(1, 300, ''), // In a real app we'd paginate/search backend
                 ]);
-                setCustomers(customersData.map((c) => ({ id: c.id, name: c.name, documentNumber: c.documentNumber })));
+                setCustomers(customersData.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    documentNumber: c.documentNumber,
+                    quotationTermsTemplate: c.quotationTermsTemplate,
+                })));
                 const productRows = await Promise.all(productsData.products.map(async (p) => {
                     // This is inefficient but matching legacy behavior
                     const full = await mrpApi.getProduct(p.id);
@@ -104,9 +303,15 @@ export default function QuotationFormPage() {
 
                 if (isEditMode && id) {
                     const q = await mrpApi.getQuotation(id);
+                    const currentNotes = q.notes || '';
                     setCustomerId((q as any).customerId || (q as any).customer?.id || '');
                     setValidUntil(q.validUntil ? new Date(q.validUntil as string).toISOString().slice(0, 10) : '');
-                    setNotes(q.notes || '');
+                    setNotes(splitCustomNotes(currentNotes));
+                    const termsBlock = extractCommercialTermsBlock(currentNotes);
+                    if (termsBlock) {
+                        setManualTermsEnabled(true);
+                        setManualTermsText(termsBlock);
+                    }
                     setGlobalDiscountPercent(Number((q as any).globalDiscountPercent || 0));
                     setItems((q.items || []).map((it: any) => {
                         const netUnitPrice = Number(it.unitPrice || 0);
@@ -351,7 +556,10 @@ export default function QuotationFormPage() {
             const payload = {
                 customerId,
                 validUntil: validUntil || undefined,
-                notes,
+                notes: composeQuotationNotes(notes, commercialTerms, {
+                    manualTermsEnabled,
+                    manualTermsText,
+                }),
                 globalDiscountPercent: Number(globalDiscountPercent || 0),
                 items: items.map((it) => it.isCatalogItem ? ({
                     isCatalogItem: true as const,
@@ -377,6 +585,17 @@ export default function QuotationFormPage() {
             const row = isEditMode && id
                 ? await mrpApi.updateQuotation(id, payload)
                 : await mrpApi.createQuotation(payload);
+
+            if (saveAsCustomerTemplate && customerId) {
+                const customerTemplatePayload: QuotationTermsTemplate = {
+                    ...commercialTerms,
+                    manualText: manualTermsEnabled ? (manualTermsText.trim() || undefined) : '',
+                };
+                await mrpApi.updateCustomer(customerId, {
+                    quotationTermsTemplate: customerTemplatePayload,
+                });
+            }
+
             toast({ title: 'Éxito', description: isEditMode ? 'Cotización actualizada' : 'Cotización creada correctamente' });
             navigate(`/mrp/quotations/${row.id}`);
         } catch (error) {
@@ -462,6 +681,7 @@ export default function QuotationFormPage() {
                                                             value={customer.name}
                                                             onSelect={() => {
                                                                 setCustomerId(customer.id);
+                                                                applyTemplateForCustomer(customer.id);
                                                                 setOpenCustomerCombobox(false);
                                                             }}
                                                         >
@@ -500,10 +720,253 @@ export default function QuotationFormPage() {
                             <Textarea
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
-                                placeholder="Notas internas o comentarios para la cotización..."
+                                placeholder="Notas internas o comentarios extra de la cotizacion..."
                                 rows={2}
                                 className="border-slate-300 resize-none"
                             />
+                        </div>
+
+                        <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-cyan-50 p-4 space-y-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setCommercialTermsExpanded((prev) => !prev)}
+                                    className="flex items-center gap-2 text-left"
+                                >
+                                    {commercialTermsExpanded ? (
+                                        <ChevronDown className="h-4 w-4 text-indigo-600" />
+                                    ) : (
+                                        <ChevronRight className="h-4 w-4 text-indigo-600" />
+                                    )}
+                                    <div>
+                                        <p className="text-[11px] font-bold uppercase tracking-widest text-indigo-700">Terminos Comerciales</p>
+                                        <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mt-1">
+                                            <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                                            Bloque legal/comercial para cliente
+                                        </h3>
+                                    </div>
+                                </button>
+                                <div className="flex items-center gap-3">
+                                    <label className="inline-flex items-center gap-2 text-xs text-slate-700 font-medium">
+                                        <input
+                                            type="checkbox"
+                                            checked={commercialTerms.enabled}
+                                            onChange={(e) => setCommercialTerms((prev) => ({ ...prev, enabled: e.target.checked }))}
+                                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        Incluir
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCommercialTermsExpanded((prev) => !prev)}
+                                        className="text-[11px] font-semibold uppercase tracking-wide text-indigo-700"
+                                    >
+                                        {commercialTermsExpanded ? 'Ocultar' : 'Editar'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {commercialTerms.enabled && !commercialTermsExpanded && (
+                                <p className="text-xs text-slate-600">
+                                    Usando plantilla de <span className="font-semibold">{commercialTerms.companyName}</span>. Abre la sección para ajustar términos puntuales.
+                                </p>
+                            )}
+
+                            {customerId && (
+                                <label className="inline-flex items-center gap-2 text-xs text-slate-700 font-medium rounded-md bg-white/70 border border-indigo-100 px-2.5 py-2">
+                                    <input
+                                        type="checkbox"
+                                        checked={saveAsCustomerTemplate}
+                                        onChange={(e) => setSaveAsCustomerTemplate(e.target.checked)}
+                                        className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    Guardar esta configuración como plantilla de este cliente
+                                </label>
+                            )}
+
+                            {commercialTerms.enabled && commercialTermsExpanded && (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div className="md:col-span-2">
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-1 block">Nombre empresa</Label>
+                                            <Input
+                                                value={commercialTerms.companyName}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, companyName: e.target.value }))}
+                                                className="h-9 border-indigo-200 bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-1 block">Vigencia (dias)</Label>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                value={commercialTerms.validityDays}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, validityDays: Number(e.target.value) || 1 }))}
+                                                className="h-9 border-indigo-200 bg-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                                        {([
+                                            ['validity', 'Vigencia'],
+                                            ['payment', 'Pago'],
+                                            ['production', 'Produccion/Entrega'],
+                                            ['warranty', 'Garantias'],
+                                            ['cancellations', 'Cambios/Cancelaciones'],
+                                            ['legal', 'General legal'],
+                                        ] as Array<[keyof CommercialSections, string]>).map(([key, label]) => (
+                                            <label key={key} className="inline-flex items-center gap-2 rounded-md border border-indigo-100 bg-white px-2.5 py-2 text-slate-700">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={commercialTerms.sections[key]}
+                                                    onChange={(e) =>
+                                                        setCommercialTerms((prev) => ({
+                                                            ...prev,
+                                                            sections: { ...prev.sections, [key]: e.target.checked },
+                                                        }))
+                                                    }
+                                                    className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                />
+                                                <span>{label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                        <div>
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-1 block">Anticipo %</Label>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                value={commercialTerms.advancePaymentPercent}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, advancePaymentPercent: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }))}
+                                                className="h-9 border-indigo-200 bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-1 block">Contra entrega %</Label>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                value={commercialTerms.deliveryPaymentPercent}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, deliveryPaymentPercent: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }))}
+                                                className="h-9 border-indigo-200 bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-1 block">Prod. Min dias</Label>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                value={commercialTerms.productionMinDays}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, productionMinDays: Number(e.target.value) || 1 }))}
+                                                className="h-9 border-indigo-200 bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-1 block">Prod. Max dias</Label>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                value={commercialTerms.productionMaxDays}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, productionMaxDays: Number(e.target.value) || 1 }))}
+                                                className="h-9 border-indigo-200 bg-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                        <div className="md:col-span-2">
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-1 block">Condición cliente habitual</Label>
+                                            <Input
+                                                value={commercialTerms.habitualClientTermLabel}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, habitualClientTermLabel: e.target.value }))}
+                                                className="h-9 border-indigo-200 bg-white"
+                                                placeholder="Ej: Neto 15/30 dias"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-1 block">Mora % mensual</Label>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                step={0.1}
+                                                value={commercialTerms.lateFeePercent}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, lateFeePercent: Number(e.target.value) || 0 }))}
+                                                className="h-9 border-indigo-200 bg-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-1 block">IVA %</Label>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                value={commercialTerms.ivaPercent}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, ivaPercent: Math.max(0, Math.min(100, Number(e.target.value) || 0)) }))}
+                                                className="h-9 border-indigo-200 bg-white"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                        <label className="inline-flex items-center gap-2 rounded-md border border-indigo-100 bg-white px-2.5 py-2 text-slate-700">
+                                            <input
+                                                type="checkbox"
+                                                checked={commercialTerms.includeDianRetention}
+                                                onChange={(e) => setCommercialTerms((prev) => ({ ...prev, includeDianRetention: e.target.checked }))}
+                                                className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            <span>Incluir línea de retención DIAN</span>
+                                        </label>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <Label className="text-[11px] font-semibold uppercase text-slate-500 mb-0">Vista previa</Label>
+                                            <FileText className="h-3.5 w-3.5 text-slate-400" />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <label className="inline-flex items-center gap-2 text-xs text-slate-700 font-medium rounded-md border border-indigo-100 bg-white px-2.5 py-1.5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={manualTermsEnabled}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        setManualTermsEnabled(checked);
+                                                        if (checked && !manualTermsText.trim()) {
+                                                            setManualTermsText(buildCommercialTermsText(commercialTerms));
+                                                        }
+                                                    }}
+                                                    className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                />
+                                                Editar texto final manualmente
+                                            </label>
+                                            {manualTermsEnabled && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => setManualTermsText(buildCommercialTermsText(commercialTerms))}
+                                                    className="h-7 text-[11px]"
+                                                >
+                                                    Regenerar desde inputs
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <Textarea
+                                            value={manualTermsEnabled ? manualTermsText : buildCommercialTermsText(commercialTerms)}
+                                            onChange={(e) => manualTermsEnabled && setManualTermsText(e.target.value)}
+                                            readOnly={!manualTermsEnabled}
+                                            rows={8}
+                                            className={`border-indigo-200 bg-white text-[12px] leading-relaxed resize-y ${manualTermsEnabled ? '' : 'opacity-95'}`}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
 
                         <div>

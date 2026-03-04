@@ -2,6 +2,7 @@ import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import {
     BatchReleaseStatus,
     DispatchValidationResult,
+    QuotationTermsTemplate,
     RecallNotificationChannel,
     RecallNotificationStatus,
     RecallScopeType,
@@ -518,6 +519,7 @@ export class QualityPostmarketService {
         phone?: string;
         address?: string;
         notes?: string;
+        quotationTermsTemplate?: QuotationTermsTemplate | null;
     }, actor?: string) {
         const row = this.customerRepo.create({
             ...payload,
@@ -558,6 +560,7 @@ export class QualityPostmarketService {
         phone: string;
         address: string;
         notes: string;
+        quotationTermsTemplate: QuotationTermsTemplate | null;
     }>, actor?: string) {
         const customer = await this.customerRepo.findOneOrFail({ id });
         this.customerRepo.assign(customer, payload);

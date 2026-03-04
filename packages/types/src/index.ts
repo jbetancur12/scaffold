@@ -1219,6 +1219,7 @@ export interface Customer {
     phone?: string;
     address?: string;
     notes?: string;
+    quotationTermsTemplate?: QuotationTermsTemplate | null;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -1703,6 +1704,7 @@ export interface CreateCustomerPayload {
     phone?: string;
     address?: string;
     notes?: string;
+    quotationTermsTemplate?: QuotationTermsTemplate | null;
 }
 
 export interface CreateShipmentPayload {
@@ -1877,6 +1879,39 @@ export interface UpdateInvimaRegistrationPayload {
 
 export type ProductionTraceabilityMode = 'lote' | 'serial';
 
+export interface QuotationTermsTemplate {
+    manualText?: string;
+    enabled: boolean;
+    companyName: string;
+    validityDays: number;
+    advancePaymentPercent: number;
+    deliveryPaymentPercent: number;
+    habitualClientTermLabel: string;
+    lateFeePercent: number;
+    ivaPercent: number;
+    includeDianRetention: boolean;
+    productionMinDays: number;
+    productionMaxDays: number;
+    materialConstraintLabel: string;
+    highVolumeThresholdUnits: number;
+    highVolumeExtraDays: number;
+    shippingMinDays: number;
+    shippingMaxDays: number;
+    shippingCarrierLabel: string;
+    customerPaysFreight: boolean;
+    transitRiskBuyer: boolean;
+    warrantyMonths: number;
+    restockPercent: number;
+    sections: {
+        validity: boolean;
+        payment: boolean;
+        production: boolean;
+        warranty: boolean;
+        cancellations: boolean;
+        legal: boolean;
+    };
+}
+
 export interface OperationalConfig {
     id: string;
     // MOD (Mano de Obra Directa)
@@ -1896,6 +1931,7 @@ export interface OperationalConfig {
     cifCostPerMinute: number; // (Rent + Utils + Admin + Other) / (RealMinutes * Ops)
     costPerMinute: number; // MO Cost + CIF Cost
     purchasePaymentMethods: string[];
+    quotationTermsTemplate?: QuotationTermsTemplate | null;
     purchaseWithholdingRules: Array<{
         key: string;
         label: string;
