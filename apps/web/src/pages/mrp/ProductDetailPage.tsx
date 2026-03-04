@@ -172,6 +172,20 @@ export default function ProductDetailPage() {
                         <p className="text-slate-500 text-sm max-w-2xl mt-2 line-clamp-2">
                             {product.description || 'Sin descripción detallada configurada.'}
                         </p>
+                        {(product.lengthCm != null || product.widthCm != null || product.heightCm != null || product.weightKg != null) && (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                                {(product.lengthCm != null || product.widthCm != null || product.heightCm != null) && (
+                                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+                                        Dimensiones: {(product.lengthCm != null ? Number(product.lengthCm).toFixed(2) : '-')} x {(product.widthCm != null ? Number(product.widthCm).toFixed(2) : '-')} x {(product.heightCm != null ? Number(product.heightCm).toFixed(2) : '-')} cm
+                                    </Badge>
+                                )}
+                                {product.weightKg != null && (
+                                    <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">
+                                        Peso: {Math.round(Number(product.weightKg) * 1000)} g
+                                    </Badge>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -298,6 +312,33 @@ export default function ProductDetailPage() {
                             <div className="space-y-1">
                                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Referencia (EAN/UPC)</span>
                                 <div className="text-slate-900 font-medium">{product.productReference || <span className="text-slate-400 italic">No especificada</span>}</div>
+                            </div>
+
+                            <div className="md:col-span-2 mt-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Dimensiones</span>
+                                    <Badge variant="outline" className="bg-white text-slate-600 border-slate-200">
+                                        Unidad: cm / g
+                                    </Badge>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                        <p className="text-[11px] text-slate-500 uppercase tracking-wide">Largo</p>
+                                        <p className="text-base font-semibold text-slate-900">{product.lengthCm != null ? `${Number(product.lengthCm).toFixed(2)} cm` : '-'}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                        <p className="text-[11px] text-slate-500 uppercase tracking-wide">Ancho</p>
+                                        <p className="text-base font-semibold text-slate-900">{product.widthCm != null ? `${Number(product.widthCm).toFixed(2)} cm` : '-'}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                        <p className="text-[11px] text-slate-500 uppercase tracking-wide">Alto</p>
+                                        <p className="text-base font-semibold text-slate-900">{product.heightCm != null ? `${Number(product.heightCm).toFixed(2)} cm` : '-'}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                        <p className="text-[11px] text-slate-500 uppercase tracking-wide">Peso</p>
+                                        <p className="text-base font-semibold text-slate-900">{product.weightKg != null ? `${Math.round(Number(product.weightKg) * 1000)} g` : '-'}</p>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Invima Info Box */}

@@ -11,6 +11,21 @@ export class Product extends BaseEntity {
     @Property({ nullable: true })
     description?: string;
 
+    @Property({ nullable: true })
+    dimensions?: string;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    lengthCm?: number;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    widthCm?: number;
+
+    @Property({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+    heightCm?: number;
+
+    @Property({ type: 'decimal', precision: 10, scale: 3, nullable: true })
+    weightKg?: number;
+
     @Property({ unique: true })
     sku!: string;
 

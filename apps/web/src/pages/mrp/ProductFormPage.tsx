@@ -24,6 +24,10 @@ export default function ProductFormPage() {
         name: '',
         sku: '',
         description: '',
+        lengthCm: '',
+        widthCm: '',
+        heightCm: '',
+        weightGrams: '',
         requiresInvima: false,
         productReference: '',
         invimaRegistrationId: '',
@@ -50,6 +54,10 @@ export default function ProductFormPage() {
                 name: product.name,
                 sku: product.sku,
                 description: product.description || '',
+                lengthCm: product.lengthCm != null ? String(product.lengthCm) : '',
+                widthCm: product.widthCm != null ? String(product.widthCm) : '',
+                heightCm: product.heightCm != null ? String(product.heightCm) : '',
+                weightGrams: product.weightKg != null ? String(Number(product.weightKg) * 1000) : '',
                 requiresInvima: product.requiresInvima || false,
                 productReference: product.productReference || '',
                 invimaRegistrationId: product.invimaRegistrationId || '',
@@ -66,6 +74,10 @@ export default function ProductFormPage() {
             setLoading(true);
             const payload = {
                 ...formData,
+                lengthCm: formData.lengthCm !== '' ? Number(formData.lengthCm) : undefined,
+                widthCm: formData.widthCm !== '' ? Number(formData.widthCm) : undefined,
+                heightCm: formData.heightCm !== '' ? Number(formData.heightCm) : undefined,
+                weightKg: formData.weightGrams !== '' ? Number(formData.weightGrams) / 1000 : undefined,
                 productReference: formData.productReference || undefined,
                 invimaRegistrationId: formData.invimaRegistrationId || undefined,
             };
@@ -233,6 +245,69 @@ export default function ProductFormPage() {
                                     placeholder="Describe las características y beneficios del producto. Esta descripción podría usarse en catálogos y tiendas online..."
                                     className="min-h-[140px] bg-slate-50 border-slate-200 focus:bg-white transition-colors resize-y leading-relaxed"
                                 />
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                                <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
+                                    <Layers className="h-5 w-5" />
+                                </div>
+                                <h2 className="text-lg font-semibold text-slate-800">Ficha Técnica</h2>
+                            </div>
+                            <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div className="space-y-2">
+                                    <Label htmlFor="lengthCm" className="text-slate-700 font-medium">Largo (cm)</Label>
+                                    <Input
+                                        id="lengthCm"
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={formData.lengthCm}
+                                        onChange={(e) => setFormData({ ...formData, lengthCm: e.target.value })}
+                                        className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                                        placeholder="Ej. 30"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="widthCm" className="text-slate-700 font-medium">Ancho (cm)</Label>
+                                    <Input
+                                        id="widthCm"
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={formData.widthCm}
+                                        onChange={(e) => setFormData({ ...formData, widthCm: e.target.value })}
+                                        className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                                        placeholder="Ej. 20"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="heightCm" className="text-slate-700 font-medium">Alto (cm)</Label>
+                                    <Input
+                                        id="heightCm"
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={formData.heightCm}
+                                        onChange={(e) => setFormData({ ...formData, heightCm: e.target.value })}
+                                        className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                                        placeholder="Ej. 10"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="weightGrams" className="text-slate-700 font-medium">Peso (g)</Label>
+                                    <Input
+                                        id="weightGrams"
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        value={formData.weightGrams}
+                                        onChange={(e) => setFormData({ ...formData, weightGrams: e.target.value })}
+                                        className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors"
+                                        placeholder="Ej. 1250"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>

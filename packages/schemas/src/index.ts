@@ -140,6 +140,11 @@ export const PurchaseRecordSchema = z.object({
 const ProductBaseSchema = z.object({
     name: z.string().min(1, 'El nombre es obligatorio'),
     description: z.string().optional(),
+    dimensions: z.string().min(2).optional(),
+    lengthCm: z.number().min(0, 'El largo debe ser mayor o igual a 0').optional(),
+    widthCm: z.number().min(0, 'El ancho debe ser mayor o igual a 0').optional(),
+    heightCm: z.number().min(0, 'El alto debe ser mayor o igual a 0').optional(),
+    weightKg: z.number().min(0, 'El peso debe ser mayor o igual a 0').optional(),
     sku: z.string().min(1, 'SKU es obligatorio'),
     categoryId: z.string().uuid().optional(),
     requiresInvima: z.boolean().default(false),
@@ -1145,6 +1150,9 @@ export const OperationalConfigSchema = z.object({
     defaultSalesOrderBillingDocCode: z.string().min(1).nullish(),
     purchaseOrderPrefix: z.string().nullish(),
     operationMode: z.enum(['lote', 'serial']).nullish(),
+    shippingOrderCoverageThreshold: z.number().min(0, 'El tope mínimo de pedido debe ser mayor o igual a 0').nullish(),
+    shippingCoverageLimitFull: z.number().min(0, 'El tope de cobertura total debe ser mayor o igual a 0').nullish(),
+    shippingCoverageLimitShared: z.number().min(0, 'El tope de cobertura compartida debe ser mayor o igual a 0').nullish(),
     uvtValue: z.number().min(0, 'El valor del UVT debe ser mayor o igual a 0').nullish(),
     purchaseWithholdingRules: z.array(
         z.object({

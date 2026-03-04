@@ -586,6 +586,11 @@ export interface Product {
     id: string;
     name: string;
     description?: string;
+    dimensions?: string;
+    lengthCm?: number;
+    widthCm?: number;
+    heightCm?: number;
+    weightKg?: number;
     sku: string;
     categoryId?: string;
     requiresInvima: boolean;
@@ -1898,6 +1903,9 @@ export interface OperationalConfig {
         active: boolean;
         baseUvtLimit?: number;
     }>;
+    shippingOrderCoverageThreshold?: number;
+    shippingCoverageLimitFull?: number;
+    shippingCoverageLimitShared?: number;
     uvtValue?: number | null;
     defaultPurchaseOrderControlledDocumentId?: string | null;
     defaultPurchaseOrderControlledDocumentCode?: string | null;
