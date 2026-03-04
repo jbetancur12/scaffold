@@ -48,11 +48,11 @@ html(lang="es")
       .totals td { padding: 4px 6px; font-size: 11px; border-bottom: 1px solid #f1f5f9; color: #334155; }
       .totals tr:last-child td { border-bottom: none; font-weight: 700; font-size: 13px; color: #0f172a; border-top: 2px solid #e2e8f0; padding-top: 6px; }
       
-      .notes-card { margin-top: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 16px 20px; }
+      .notes-card { margin-top: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 16px 20px; break-inside: avoid; page-break-inside: avoid; }
       .notes-title { margin: 0 0 12px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #334155; }
       .notes-chip { display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #0f4c81; background: #e8f2fb; border: 1px solid #bfdbfe; border-radius: 999px; padding: 2px 8px; margin-bottom: 12px; }
       .notes-intro { margin: 0 0 12px 0; font-size: 11px; color: #334155; }
-      .notes-section { padding: 12px 0; border-top: 1px dashed #cbd5e1; margin-top: 0; }
+      .notes-section { padding: 12px 0; border-top: 1px dashed #cbd5e1; margin-top: 0; break-inside: avoid; page-break-inside: avoid; }
       .notes-section:first-of-type { margin-top: 4px; padding-top: 12px; }
       .notes-section:last-of-type { padding-bottom: 0; }
       .notes-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 6px 0; font-size: 11px; color: #1e293b; font-weight: 700; line-height: 1.4; }
