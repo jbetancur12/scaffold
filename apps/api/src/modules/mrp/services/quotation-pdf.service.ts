@@ -30,26 +30,32 @@ html(lang="es")
     meta(charset="UTF-8")
     title= quotation.code
     style.
-      body { font-family: Arial, sans-serif; color: #0f172a; font-size: 12px; margin: 0; padding: 24px; }
-      h1 { margin: 0 0 8px 0; font-size: 20px; }
-      .muted { color: #475569; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-      .card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 14px; }
-      th, td { border: 1px solid #334155; padding: 6px; font-size: 11px; }
-      th { background: #f1f5f9; text-align: left; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; color: #1e293b; font-size: 11px; margin: 0; padding: 12px 24px; line-height: 1.3; }
+      h1 { margin: 0 0 4px 0; font-size: 18px; color: #0f172a; font-weight: 700; letter-spacing: -0.5px; }
+      .muted { color: #64748b; font-size: 10px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+      .card { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; background-color: #f8fafc; }
+      .card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; color: #475569; margin-bottom: 2px; }
+      .card-content { font-size: 12px; color: #0f172a; font-weight: 600; }
+      
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+      th, td { padding: 4px 6px; font-size: 10px; border-bottom: 1px solid #e2e8f0; }
+      th { background: #f8fafc; text-align: left; font-weight: 600; color: #475569; text-transform: uppercase; border-top: 1px solid #e2e8f0; }
+      tr:last-child td { border-bottom: 1px solid #e2e8f0; }
       .right { text-align: right; }
-      .totals { margin-top: 14px; width: 340px; margin-left: auto; border-collapse: collapse; }
-      .totals td { border: 1px solid #334155; padding: 6px; }
+      
+      .totals { margin-top: 12px; width: 260px; margin-left: auto; border: none; }
+      .totals td { padding: 4px 6px; font-size: 11px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+      .totals tr:last-child td { border-bottom: none; font-weight: 700; font-size: 13px; color: #0f172a; border-top: 2px solid #e2e8f0; padding-top: 6px; }
   body
     h1 Cotización #{quotation.code}
     .muted Fecha: #{quotationDate} | Vigencia: #{validUntil}
     .grid
       .card
-        strong Cliente
-        div= quotation.customer.name
+        .card-title Cliente
+        .card-content= quotation.customer.name
         if quotation.customer.documentNumber
-          div= quotation.customer.documentNumber
+          .muted(style="margin-top: 2px;") NIT/CC: #{quotation.customer.documentNumber}
     table
       thead
         tr
@@ -62,33 +68,34 @@ html(lang="es")
         each item in items
           tr
             td
-              div= item.label
+              div(style="font-weight: 500; color: #0f172a; font-size: 12px;")= item.label
               if item.meta
-                div.muted= item.meta
+                div.muted(style="margin-top: 2px;")= item.meta
             td.right= item.quantity
             td.right= item.netUnitPrice
             td.right= item.taxRate
             td.right= item.netSubtotal
     table.totals
       tr
-        td Subtotal lista (sin descuento)
+        td Subtotal base
         td.right= totals.listSubtotal
+      if totals.discount !== '$ 0'
+        tr
+          td Descuento
+          td.right(style="color: #059669")= '-' + totals.discount
       tr
-        td Descuento
-        td.right= '-' + totals.discount
-      tr
-        td Subtotal con descuento
+        td Subtotal neto
         td.right= totals.subtotalWithDiscount
       tr
-        td IVA
+        td IVA Total
         td.right= totals.tax
       tr
-        td Total
+        td Total Pagar
         td.right= totals.total
     if quotation.notes
-      .card(style="margin-top:14px;")
-        strong Observaciones
-        div(style="white-space: pre-wrap")= quotation.notes
+      .card(style="margin-top:24px; background-color: #fff;")
+        .card-title Observaciones Adicionales
+        div(style="white-space: pre-wrap; font-size: 12px; color: #334155; margin-top: 4px;")= quotation.notes
 `;
 
 export class QuotationPdfService {

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,6 +9,11 @@ import { mrpApi } from '@/services/mrpApi';
 import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { calculateShippingSplit } from '@/utils/shipping';
+import { ArrowLeft, Plus, Users, Package, ChevronsUpDown, Check, Loader2 } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
 type ItemForm = {
     isCatalogItem: boolean;
@@ -41,19 +45,31 @@ const createItem = (): ItemForm => ({
 
 export default function QuotationFormPage() {
     const { id } = useParams();
-    const isEdit = Boolean(id);
+    const isEditMode = Boolean(id);
     const navigate = useNavigate();
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
-    const [customers, setCustomers] = useState<Array<{ id: string; name: string }>>([]);
+    const [pageLoading, setPageLoading] = useState(true);
+
+    // Select options
+    const [customers, setCustomers] = useState<Array<{ id: string; name: string; documentNumber?: string }>>([]);
     const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string; reference?: string; variants?: Array<{ id: string; name: string; price: number; cost: number; targetMargin: number }> }>>([]);
 
+    // Data Form
     const [customerId, setCustomerId] = useState('');
     const [validUntil, setValidUntil] = useState('');
     const [notes, setNotes] = useState('');
     const [globalDiscountPercent, setGlobalDiscountPercent] = useState(0);
     const [shippingAmount, setShippingAmount] = useState(0);
     const [items, setItems] = useState<ItemForm[]>([createItem()]);
+
+    // UI state
+    const [showValidation, setShowValidation] = useState(false);
+    const [openCustomerCombobox, setOpenCustomerCombobox] = useState(false);
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [activeCatalogComboboxIdx, setActiveCatalogComboboxIdx] = useState<number | null>(null);
+    const [catalogHighlightByIndex, setCatalogHighlightByIndex] = useState<Record<number, number>>({});
+
     const [focusedDiscountIndex, setFocusedDiscountIndex] = useState<number | null>(null);
     const { data: operationalConfig, error: operationalConfigError } = useOperationalConfigQuery();
     useMrpQueryErrorToast(operationalConfigError, 'No se pudo cargar configuración de envíos');
@@ -61,13 +77,14 @@ export default function QuotationFormPage() {
     useEffect(() => {
         const load = async () => {
             try {
-                setLoading(true);
+                setPageLoading(true);
                 const [customersData, productsData] = await Promise.all([
                     mrpApi.listCustomers(''),
-                    mrpApi.getProducts(1, 300, ''),
+                    mrpApi.getProducts(1, 300, ''), // In a real app we'd paginate/search backend
                 ]);
-                setCustomers(customersData.map((c) => ({ id: c.id, name: c.name })));
+                setCustomers(customersData.map((c) => ({ id: c.id, name: c.name, documentNumber: c.documentNumber })));
                 const productRows = await Promise.all(productsData.products.map(async (p) => {
+                    // This is inefficient but matching legacy behavior
                     const full = await mrpApi.getProduct(p.id);
                     return {
                         id: full.id,
@@ -85,7 +102,7 @@ export default function QuotationFormPage() {
                 }));
                 setProducts(productRows);
 
-                if (isEdit && id) {
+                if (isEditMode && id) {
                     const q = await mrpApi.getQuotation(id);
                     setCustomerId((q as any).customerId || (q as any).customer?.id || '');
                     setValidUntil(q.validUntil ? new Date(q.validUntil as string).toISOString().slice(0, 10) : '');
@@ -99,7 +116,7 @@ export default function QuotationFormPage() {
                             : netUnitPrice;
                         return {
                             isCatalogItem: it.isCatalogItem !== false,
-                            productSearch: '',
+                            productSearch: it.isCatalogItem ? (it.product?.sku ? `${it.product.sku} ${it.product?.name}` : '') : '',
                             productId: it.productId || it.product?.id,
                             variantId: it.variantId || it.variant?.id,
                             customDescription: it.customDescription || '',
@@ -111,20 +128,26 @@ export default function QuotationFormPage() {
                             taxRate: Number(it.taxRate || 0),
                         };
                     }));
-                } else if (customersData.length > 0) {
-                    setCustomerId((prev) => prev || customersData[0].id);
                 }
             } catch (error) {
                 toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo cargar formulario'), variant: 'destructive' });
             } finally {
-                setLoading(false);
+                setPageLoading(false);
             }
         };
         load();
-    }, [id, isEdit, toast]);
+    }, [id, isEditMode, toast]);
 
     const addItem = () => setItems((prev) => [...prev, createItem()]);
-    const removeItem = (idx: number) => setItems((prev) => prev.filter((_, i) => i !== idx));
+
+    const removeItem = (idx: number) => {
+        if (items.length === 1) {
+            toast({ title: 'Error', description: 'Debe haber al menos un ítem', variant: 'destructive' });
+            return;
+        }
+        setItems((prev) => prev.filter((_, i) => i !== idx));
+    };
+
     const patchItem = (idx: number, patch: Partial<ItemForm>) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
     const hasPerItemDiscount = useMemo(() => items.some((it) => Number(it.discountPercent || 0) > 0), [items]);
 
@@ -221,28 +244,110 @@ export default function QuotationFormPage() {
         operationalConfig?.shippingCoverageLimitShared,
     ]);
 
-    const onSubmit = async () => {
-        try {
-            for (let i = 0; i < items.length; i += 1) {
-                const row = items[i];
-                if (row.isCatalogItem && !row.productId) {
-                    toast({
-                        title: 'Dato requerido',
-                        description: `Ítem ${i + 1}: selecciona un producto o cambia el tipo a Libre.`,
-                        variant: 'destructive',
-                    });
-                    return;
-                }
-                if (!row.isCatalogItem && !(row.customDescription || '').trim()) {
-                    toast({
-                        title: 'Dato requerido',
-                        description: `Ítem ${i + 1}: ingresa una descripción para el ítem libre.`,
-                        variant: 'destructive',
-                    });
-                    return;
-                }
-            }
+    const getFilteredProducts = (search: string) => {
+        const normalized = search.trim().toLowerCase();
+        const source = products;
+        if (!normalized) return source.slice(0, 50);
+        return source
+            .filter((product) =>
+                product.name.toLowerCase().includes(normalized) ||
+                product.sku.toLowerCase().includes(normalized) ||
+                (product.reference || '').toLowerCase().includes(normalized)
+            )
+            .slice(0, 100);
+    };
 
+    const handleProductChange = (index: number, productId: string) => {
+        const selectedProduct = products.find(p => p.id === productId);
+        patchItem(index, {
+            productId,
+            variantId: undefined,
+            productSearch: selectedProduct ? `${selectedProduct.sku} ${selectedProduct.name}` : '',
+            unitPrice: resolveCatalogUnitPrice(productId, undefined)
+        });
+    };
+
+    const handleCatalogInputKeyDown = (index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
+        const list = getFilteredProducts(items[index]?.productSearch || '');
+        if (list.length === 0) return;
+        const current = catalogHighlightByIndex[index] ?? 0;
+
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setActiveCatalogComboboxIdx(index);
+            setCatalogHighlightByIndex((prev) => ({
+                ...prev,
+                [index]: Math.min(current + 1, list.length - 1),
+            }));
+            return;
+        }
+        if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setActiveCatalogComboboxIdx(index);
+            setCatalogHighlightByIndex((prev) => ({
+                ...prev,
+                [index]: Math.max(current - 1, 0),
+            }));
+            return;
+        }
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const selected = list[current] || list[0];
+            if (selected) {
+                handleProductChange(index, selected.id);
+                setActiveCatalogComboboxIdx(null);
+            }
+            return;
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            setActiveCatalogComboboxIdx(null);
+        }
+    };
+
+    const onSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setShowValidation(true);
+
+        if (!customerId) {
+            toast({
+                title: 'Dato requerido',
+                description: 'Selecciona un cliente.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        for (let i = 0; i < items.length; i += 1) {
+            const row = items[i];
+            if (row.isCatalogItem && !row.productId) {
+                toast({
+                    title: 'Dato requerido',
+                    description: `Ítem ${i + 1}: selecciona un producto o cambia el tipo a Libre.`,
+                    variant: 'destructive',
+                });
+                return;
+            }
+            if (!row.isCatalogItem && !(row.customDescription || '').trim()) {
+                toast({
+                    title: 'Dato requerido',
+                    description: `Ítem ${i + 1}: ingresa una descripción para el ítem libre.`,
+                    variant: 'destructive',
+                });
+                return;
+            }
+            if (row.quantity <= 0) {
+                toast({
+                    title: 'Error cant.',
+                    description: `Ítem ${i + 1}: la cantidad debe ser mayor a 0.`,
+                    variant: 'destructive',
+                });
+                return;
+            }
+        }
+
+        try {
+            setLoading(true);
             const payload = {
                 customerId,
                 validUntil: validUntil || undefined,
@@ -269,253 +374,468 @@ export default function QuotationFormPage() {
                 })),
             };
 
-            const row = isEdit && id
+            const row = isEditMode && id
                 ? await mrpApi.updateQuotation(id, payload)
                 : await mrpApi.createQuotation(payload);
-            toast({ title: 'Guardado', description: 'Cotización guardada correctamente' });
+            toast({ title: 'Éxito', description: isEditMode ? 'Cotización actualizada' : 'Cotización creada correctamente' });
             navigate(`/mrp/quotations/${row.id}`);
         } catch (error) {
-            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo guardar'), variant: 'destructive' });
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo guardar la cotización'), variant: 'destructive' });
+        } finally {
+            setLoading(false);
         }
     };
 
+    if (pageLoading) {
+        return (
+            <div className="p-6 flex justify-center items-center min-h-[400px]">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+            </div>
+        );
+    }
+
     return (
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200 p-6">
-                <h1 className="text-2xl font-bold text-slate-900">{isEdit ? 'Editar Cotización' : 'Nueva Cotización'}</h1>
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+            <div className="mb-6">
+                <Button
+                    variant="ghost"
+                    onClick={() => navigate(isEditMode && id ? `/mrp/quotations/${id}` : '/mrp/quotations')}
+                    className="mb-4 text-slate-500"
+                >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Volver
+                </Button>
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{isEditMode ? 'Editar Cotización' : 'Nueva Cotización'}</h1>
+                </div>
+                <p className="text-sm text-slate-500 mt-1">
+                    {isEditMode ? 'Actualiza los datos de la propuesta.' : 'Crea una nueva propuesta comercial para tu cliente.'}
+                </p>
             </div>
 
-            <Card>
-                <CardHeader><CardTitle>Cabecera</CardTitle></CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="space-y-1.5">
-                        <Label>Cliente</Label>
-                        <select className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm" value={customerId} onChange={(e) => setCustomerId(e.target.value)} disabled={loading}>
-                            {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                    </div>
-                    <div className="space-y-1.5">
-                        <Label>Válida hasta</Label>
-                        <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
-                    </div>
-                    <div className="space-y-1.5 md:col-span-3">
-                        <Label>Notas</Label>
-                        <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
-                    </div>
-                    <div className="space-y-1.5 md:col-span-3">
-                        <Label>Descuento global (%)</Label>
-                        <Input
-                            type="number"
-                            min={0}
-                            max={globalDiscountLimit ?? undefined}
-                            step={0.01}
-                            value={globalDiscountPercent}
-                            onChange={(e) => updateGlobalDiscount(Number(e.target.value))}
-                            disabled={hasPerItemDiscount && globalDiscountPercent <= 0}
-                        />
-                        <p className="text-xs text-slate-500">
-                            Si usas descuento global, se bloquea descuento por ítem y viceversa.
-                        </p>
-                        {globalDiscountPercent > 0 && (
-                            <p className="text-xs text-slate-600">
-                                Con descuento global, el subtotal queda en {totalsPreview.discountedSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })} (ahorras {totalsPreview.discountAmount.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}).
-                            </p>
-                        )}
-                        {globalDiscountLimit !== null && (
-                            <p className="text-xs text-amber-700">
-                                Máximo global permitido con los ítems actuales: {globalDiscountLimit.toFixed(2)}%.
-                            </p>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
+            <form onSubmit={onSubmit} className="flex flex-col xl:flex-row gap-6 items-start">
+                <div className="flex-1 space-y-6 w-full min-w-0">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
+                        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                            <Users className="h-5 w-5 text-indigo-600" />
+                            <h2 className="text-lg font-semibold text-slate-800">Cliente y Encabezado</h2>
+                        </div>
 
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>Ítems</CardTitle>
-                    <Button variant="outline" onClick={addItem}>Agregar ítem</Button>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {items.map((it, idx) => {
-                        const variants = products.find((p) => p.id === it.productId)?.variants || [];
-                        const effectiveDiscount = globalDiscountPercent > 0 ? Number(globalDiscountPercent || 0) : Number(it.discountPercent || 0);
-                        const unitListPrice = Number(it.unitPrice || 0);
-                        const unitNetPrice = unitListPrice * (1 - (effectiveDiscount / 100));
-                        const formatMoney = (value: number) => value.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 2 });
-                        return (
-                            <div key={idx} className="border border-slate-200 rounded-xl p-4 space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <p className="text-sm font-semibold">Ítem {idx + 1}</p>
-                                    {items.length > 1 && <Button variant="ghost" size="sm" onClick={() => removeItem(idx)}>Eliminar</Button>}
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                                    <div className="space-y-1.5">
-                                        <Label>Tipo</Label>
-                                        <select className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm" value={it.isCatalogItem ? 'catalog' : 'custom'} onChange={(e) => patchItem(idx, { isCatalogItem: e.target.value === 'catalog' })}>
-                                            <option value="catalog">Catálogo</option>
-                                            <option value="custom">Libre</option>
-                                        </select>
-                                    </div>
-                                    {it.isCatalogItem ? (
-                                        <>
-                                            <div className="space-y-1.5">
-                                                <Label>Buscar (nombre o referencia)</Label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <Label className="text-xs font-semibold uppercase text-slate-500 mb-1 block">Cliente *</Label>
+                                <Popover open={openCustomerCombobox} onOpenChange={setOpenCustomerCombobox}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={openCustomerCombobox}
+                                            className={`w-full justify-between h-10 font-normal ${showValidation && !customerId ? 'border-red-500 bg-red-50/50' : 'border-slate-300'}`}
+                                        >
+                                            <span className="truncate text-slate-700">
+                                                {customerId
+                                                    ? customers.find((c) => c.id === customerId)?.name
+                                                    : "Selecciona un cliente..."}
+                                            </span>
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-full p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                                        <Command>
+                                            <CommandInput
+                                                placeholder="Buscar por nombre o NIT..."
+                                                value={customerSearch}
+                                                onValueChange={setCustomerSearch}
+                                            />
+                                            <CommandList>
+                                                <CommandEmpty className="p-2 text-sm text-center text-slate-500">
+                                                    No se encontró el cliente.
+                                                </CommandEmpty>
+                                                <CommandGroup>
+                                                    {customers.filter(c =>
+                                                        !customerSearch ||
+                                                        c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+                                                        c.documentNumber?.includes(customerSearch)
+                                                    ).map((customer) => (
+                                                        <CommandItem
+                                                            key={customer.id}
+                                                            value={customer.name}
+                                                            onSelect={() => {
+                                                                setCustomerId(customer.id);
+                                                                setOpenCustomerCombobox(false);
+                                                            }}
+                                                        >
+                                                            <Check
+                                                                className={cn(
+                                                                    "mr-2 h-4 w-4",
+                                                                    customerId === customer.id ? "opacity-100" : "opacity-0"
+                                                                )}
+                                                            />
+                                                            {customer.name} {customer.documentNumber ? `(${customer.documentNumber})` : ''}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                                {showValidation && !customerId && (
+                                    <p className="text-xs text-red-500 mt-1">Selecciona un cliente.</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <Label className="text-xs font-semibold uppercase text-slate-500 mb-1 block">Válida hasta</Label>
+                                <Input
+                                    type="date"
+                                    value={validUntil}
+                                    onChange={(e) => setValidUntil(e.target.value)}
+                                    className="h-10 border-slate-300"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <Label className="text-xs font-semibold uppercase text-slate-500 mb-1 block">Notas adicionales</Label>
+                            <Textarea
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                placeholder="Notas internas o comentarios para la cotización..."
+                                rows={2}
+                                className="border-slate-300 resize-none"
+                            />
+                        </div>
+
+                        <div>
+                            <Label className="text-xs font-semibold uppercase text-slate-500 mb-1 block">Descuento Global (%)</Label>
+                            <Input
+                                type="number"
+                                min={0}
+                                max={globalDiscountLimit ?? undefined}
+                                step={0.01}
+                                value={globalDiscountPercent || ''}
+                                onChange={(e) => updateGlobalDiscount(Number(e.target.value))}
+                                disabled={hasPerItemDiscount && globalDiscountPercent <= 0}
+                                className="h-10 md:w-1/2 border-slate-300"
+                                placeholder="Ej: 5.0"
+                            />
+                            {globalDiscountPercent > 0 && (
+                                <p className="text-xs text-slate-600 mt-1.5">
+                                    Con descuento global, el subtotal neto queda en {totalsPreview.discountedSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })} (ahorras {totalsPreview.discountAmount.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}). Bloquea descuentos individuales.
+                                </p>
+                            )}
+                            {globalDiscountLimit !== null && (
+                                <p className="text-xs text-amber-700 mt-1">
+                                    Máximo descuento global permitido según costo/margen de ítems: {globalDiscountLimit.toFixed(2)}%.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-0 overflow-visible z-10">
+                        <div className="p-6 pb-4 flex justify-between items-center border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <Package className="h-5 w-5 text-indigo-600" />
+                                <h2 className="text-lg font-semibold text-slate-800">Ítems Cotizados</h2>
+                            </div>
+                            <Button type="button" onClick={addItem} variant="outline" size="sm" className="h-8">
+                                <Plus className="mr-2 h-4 w-4" />
+                                Agregar Ítem
+                            </Button>
+                        </div>
+
+                        <div className="flex flex-col">
+                            {items.map((it, idx) => {
+                                const variants = products.find((p) => p.id === it.productId)?.variants || [];
+                                const effectiveDiscount = globalDiscountPercent > 0 ? Number(globalDiscountPercent || 0) : Number(it.discountPercent || 0);
+                                const unitListPrice = Number(it.unitPrice || 0);
+                                const unitNetPrice = unitListPrice * (1 - (effectiveDiscount / 100));
+
+                                return (
+                                    <div key={idx} className={`bg-white border-b border-slate-100 last:border-0 p-5 relative ${activeCatalogComboboxIdx === idx ? 'z-50' : 'z-10'}`}>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <p className="text-xs font-bold text-slate-500 uppercase">Ítem {idx + 1}</p>
+                                            <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-6 text-xs text-red-600 hover:text-red-700 hover:bg-red-50">Eliminar</Button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                            <div className="md:col-span-2">
+                                                <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Tipo</Label>
+                                                <select
+                                                    className="w-full h-10 border border-slate-300 rounded-md px-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                                    value={it.isCatalogItem ? 'catalog' : 'custom'}
+                                                    onChange={(e) => patchItem(idx, { isCatalogItem: e.target.value === 'catalog', productId: undefined, customDescription: '' })}
+                                                >
+                                                    <option value="catalog">Catálogo</option>
+                                                    <option value="custom">Libre</option>
+                                                </select>
+                                            </div>
+
+                                            <div className="md:col-span-4 relative">
+                                                {it.isCatalogItem ? (
+                                                    <>
+                                                        <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Producto *</Label>
+                                                        <Input
+                                                            type="text"
+                                                            placeholder="Buscar por nombre o SKU..."
+                                                            value={it.productSearch}
+                                                            onChange={(e) => {
+                                                                patchItem(idx, { productSearch: e.target.value });
+                                                                setActiveCatalogComboboxIdx(idx);
+                                                                if (!e.target.value) patchItem(idx, { productId: '' });
+                                                            }}
+                                                            onFocus={() => setActiveCatalogComboboxIdx(idx)}
+                                                            onBlur={() => {
+                                                                setTimeout(() => {
+                                                                    if (activeCatalogComboboxIdx === idx) {
+                                                                        setActiveCatalogComboboxIdx(null);
+                                                                    }
+                                                                }, 200);
+                                                            }}
+                                                            onKeyDown={(e) => handleCatalogInputKeyDown(idx, e)}
+                                                            className={`w-full h-10 border-slate-300 ${showValidation && !it.productId ? 'border-red-500 ring-red-500' : ''}`}
+                                                        />
+                                                        {activeCatalogComboboxIdx === idx && (
+                                                            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-60 overflow-y-auto top-[60px]">
+                                                                {getFilteredProducts(it.productSearch).length > 0 ? (
+                                                                    getFilteredProducts(it.productSearch).map((p, pIndex) => (
+                                                                        <div
+                                                                            key={p.id}
+                                                                            className={`px-4 py-2 cursor-pointer text-sm ${catalogHighlightByIndex[idx] === pIndex ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50'}`}
+                                                                            onMouseDown={(e) => {
+                                                                                e.preventDefault();
+                                                                                handleProductChange(idx, p.id);
+                                                                            }}
+                                                                            onMouseEnter={() => setCatalogHighlightByIndex(prev => ({ ...prev, [idx]: pIndex }))}
+                                                                        >
+                                                                            <div className="font-semibold text-slate-800">{p.sku}</div>
+                                                                            <div className="text-slate-600 text-xs truncate">{p.name}</div>
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <div className="px-4 py-3 text-sm text-slate-500 italic text-center">Sin resultados</div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {showValidation && !it.productId && (
+                                                            <p className="text-[10px] text-red-500 mt-1">requerido.</p>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Descripción *</Label>
+                                                        <Input
+                                                            value={it.customDescription || ''}
+                                                            onChange={(e) => patchItem(idx, { customDescription: e.target.value })}
+                                                            placeholder="Descripción del ítem"
+                                                            className={`h-10 border-slate-300 ${showValidation && !it.customDescription?.trim() ? 'border-red-500' : ''}`}
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                                {it.isCatalogItem ? (
+                                                    <>
+                                                        <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Variante</Label>
+                                                        <select
+                                                            className="w-full h-10 border border-slate-300 rounded-md px-2 text-sm focus:ring-1 focus:ring-indigo-500"
+                                                            value={it.variantId || ''}
+                                                            onChange={(e) => {
+                                                                const variantId = e.target.value || undefined;
+                                                                patchItem(idx, {
+                                                                    variantId,
+                                                                    unitPrice: resolveCatalogUnitPrice(it.productId, variantId),
+                                                                });
+                                                            }}
+                                                        >
+                                                            <option value="">N/A</option>
+                                                            {variants.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                                                        </select>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">SKU/Ref</Label>
+                                                        <Input
+                                                            value={it.customSku || ''}
+                                                            onChange={(e) => patchItem(idx, { customSku: e.target.value })}
+                                                            placeholder="Opcional"
+                                                            className="h-10 border-slate-300"
+                                                        />
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                                <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Cantidad</Label>
                                                 <Input
-                                                    placeholder="Ej: cabestrillo o CLM015"
-                                                    value={it.productSearch}
-                                                    onChange={(e) => patchItem(idx, { productSearch: e.target.value })}
+                                                    type="number"
+                                                    min={0.001}
+                                                    step={0.001}
+                                                    value={it.quantity || ''}
+                                                    onChange={(e) => patchItem(idx, { quantity: Number(e.target.value) })}
+                                                    className="h-10 border-slate-300"
                                                 />
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <Label>Producto</Label>
-                                                {(() => {
-                                                    const filteredProducts = products.filter((p) => {
-                                                        const needle = (it.productSearch || '').trim().toLowerCase();
-                                                        if (!needle) return true;
-                                                        return p.name.toLowerCase().includes(needle)
-                                                            || p.sku.toLowerCase().includes(needle)
-                                                            || (p.reference || '').toLowerCase().includes(needle);
-                                                    });
+
+                                            <div className="md:col-span-2">
+                                                <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Vr. Unit.</Label>
+                                                <Input
+                                                    type="number"
+                                                    min={0}
+                                                    step={0.01}
+                                                    value={it.unitPrice || ''}
+                                                    onChange={(e) => patchItem(idx, { unitPrice: Number(e.target.value) })}
+                                                    className="h-10 border-slate-300"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-3 pl-0 md:pl-[58%]">
+                                            <div className="md:col-span-6">
+                                                <div className="flex items-center gap-2">
+                                                    <Label className="text-[11px] font-semibold text-slate-500 w-16 mb-0 block">Desc %</Label>
+                                                    <div className="flex-1 space-y-1">
+                                                        <Input
+                                                            type="number"
+                                                            min={0}
+                                                            step={0.1}
+                                                            value={it.discountPercent || ''}
+                                                            onFocus={() => setFocusedDiscountIndex(idx)}
+                                                            onBlur={() => setFocusedDiscountIndex((current) => (current === idx ? null : current))}
+                                                            onChange={(e) => patchItem(idx, { discountPercent: Number(e.target.value) })}
+                                                            disabled={globalDiscountPercent > 0}
+                                                            className="h-8 border-slate-300 text-sm py-1"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                {focusedDiscountIndex === idx && (() => {
+                                                    const limit = resolveDiscountLimit(it);
+                                                    if (!limit) return null;
                                                     return (
-                                                <select
-                                                    className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm"
-                                                    value={it.productId || ''}
-                                                    onChange={(e) => {
-                                                        const productId = e.target.value || undefined;
-                                                        patchItem(idx, {
-                                                            productId,
-                                                            variantId: undefined,
-                                                            unitPrice: resolveCatalogUnitPrice(productId, undefined),
-                                                        });
-                                                    }}
-                                                >
-                                                    <option value="">Seleccionar</option>
-                                                    {filteredProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                                </select>
+                                                        <p className="text-[10px] text-amber-600 mt-1 leading-tight ml-16 pl-2 border-l border-amber-200">
+                                                            Máx: {limit.maxDiscountPercent.toFixed(1)}% <br />(margen mín: {limit.minAllowedMarginPercent.toFixed(1)}%)
+                                                        </p>
                                                     );
                                                 })()}
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <Label>Variante</Label>
-                                                <select
-                                                    className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm"
-                                                    value={it.variantId || ''}
-                                                    onChange={(e) => {
-                                                        const variantId = e.target.value || undefined;
-                                                        patchItem(idx, {
-                                                            variantId,
-                                                            unitPrice: resolveCatalogUnitPrice(it.productId, variantId),
-                                                        });
-                                                    }}
-                                                >
-                                                    <option value="">(Opcional)</option>
-                                                    {variants.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                                                </select>
+
+                                            <div className="md:col-span-6">
+                                                <div className="flex items-center gap-2">
+                                                    <Label className="text-[11px] font-semibold text-slate-500 w-12 mb-0 block">IVA %</Label>
+                                                    <div className="flex-1 flex gap-2">
+                                                        <Input
+                                                            type="number"
+                                                            min={0}
+                                                            value={it.taxRate || ''}
+                                                            onChange={(e) => patchItem(idx, { taxRate: Number(e.target.value) })}
+                                                            className="h-8 border-slate-300 text-sm py-1"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => patchItem(idx, { taxRate: Number(it.taxRate) === 19 ? 0 : 19 })}
+                                                            className={`h-8 px-2 rounded-md border text-xs font-medium shrink-0 transition-colors ${Number(it.taxRate) === 19
+                                                                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                                                                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                                                }`}
+                                                        >
+                                                            19%
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="space-y-1.5">
-                                                <Label>Descripción libre</Label>
-                                                <Input value={it.customDescription || ''} onChange={(e) => patchItem(idx, { customDescription: e.target.value })} />
+                                        </div>
+
+                                        {effectiveDiscount > 0 && unitNetPrice !== unitListPrice && (
+                                            <div className="text-[11px] text-slate-500 text-right mt-2 pr-2">
+                                                Neto unitario: {unitNetPrice.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <Label>SKU libre</Label>
-                                                <Input value={it.customSku || ''} onChange={(e) => patchItem(idx, { customSku: e.target.value })} />
-                                            </div>
-                                        </>
-                                    )}
-                                    <div className="space-y-1.5"><Label>Cantidad</Label><Input type="number" min={0.001} value={it.quantity} onChange={(e) => patchItem(idx, { quantity: Number(e.target.value) })} /></div>
-                                    <div className="space-y-1.5"><Label>Aprobada</Label><Input type="number" min={0} value={it.approvedQuantity} onChange={(e) => patchItem(idx, { approvedQuantity: Number(e.target.value) })} /></div>
-                                    <div className="space-y-1.5">
-                                        <Label>Vr Unit</Label>
-                                        <Input type="number" min={0} value={it.unitPrice} onChange={(e) => patchItem(idx, { unitPrice: Number(e.target.value) })} />
-                                        {effectiveDiscount > 0 && (
-                                            <p className="text-xs text-slate-600">
-                                                Con descuento queda en {formatMoney(unitNetPrice)} por unidad.
-                                            </p>
                                         )}
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <Label>Desc %</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            value={it.discountPercent}
-                                            onFocus={() => setFocusedDiscountIndex(idx)}
-                                            onBlur={() => setFocusedDiscountIndex((current) => (current === idx ? null : current))}
-                                            onChange={(e) => patchItem(idx, { discountPercent: Number(e.target.value) })}
-                                            disabled={globalDiscountPercent > 0}
-                                        />
-                                        {focusedDiscountIndex === idx && (() => {
-                                            const limit = resolveDiscountLimit(it);
-                                            if (!limit) {
-                                                return <p className="text-xs text-slate-500">Selecciona producto/variante con precio para calcular el máximo.</p>;
-                                            }
-                                            return (
-                                                <p className="text-xs text-amber-700">
-                                                    Máx descuento: {limit.maxDiscountPercent.toFixed(2)}% ({limit.maxDiscountValue.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}) · margen mínimo {limit.minAllowedMarginPercent.toFixed(2)}%
-                                                </p>
-                                            );
-                                        })()}
-                                    </div>
-                                    <div className="space-y-1.5"><Label>IVA %</Label><Input type="number" min={0} value={it.taxRate} onChange={(e) => patchItem(idx, { taxRate: Number(e.target.value) })} /></div>
-                                    <div className="space-y-1.5">
-                                        <Label className="opacity-0">IVA 19%</Label>
-                                        <button
-                                            type="button"
-                                            onClick={() => patchItem(idx, { taxRate: Number(it.taxRate) === 19 ? 0 : 19 })}
-                                            className={`h-10 w-full rounded-md border text-sm font-medium transition-colors ${
-                                                Number(it.taxRate) === 19
-                                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                            }`}
-                                        >
-                                            {Number(it.taxRate) === 19 ? 'IVA 19% activo' : 'Aplicar IVA 19%'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </CardContent>
-            </Card>
-
-            <div className="flex items-center justify-between">
-                <div className="text-sm text-slate-600 space-y-1">
-                    <p>Subtotal lista (sin descuento): {totalsPreview.listSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
-                    <p>Descuento total: -{totalsPreview.discountAmount.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
-                    <p>Subtotal con descuento: {totalsPreview.discountedSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
-                    <p>IVA total: {totalsPreview.taxTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
-                    <p className="font-semibold text-slate-800">Total estimado: {totalsPreview.total.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
-                    <div className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50 p-3 space-y-1">
-                        <p className="text-xs font-semibold text-cyan-900 uppercase tracking-wide">Calculadora de envío</p>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="quotationShippingValue">Valor envío</Label>
-                            <Input
-                                id="quotationShippingValue"
-                                type="number"
-                                min={0}
-                                step={0.01}
-                                value={shippingAmount}
-                                onChange={(e) => setShippingAmount(Number(e.target.value) || 0)}
-                            />
+                                );
+                            })}
                         </div>
-                        <p className="text-xs text-cyan-900">
-                            Tope mínimo de pedido: {Number(operationalConfig?.shippingOrderCoverageThreshold || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}
-                        </p>
-                        <p>Pagas tú: {shippingSplit.wePay.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
-                        <p>Paga cliente: {shippingSplit.clientPays.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
-                        {!shippingSplit.policyApplies && (
-                            <p className="text-xs text-amber-700">El pedido no supera el tope mínimo, por eso el cliente asume 100% del envío.</p>
-                        )}
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => navigate('/mrp/quotations')}>Cancelar</Button>
-                    <Button onClick={onSubmit}>Guardar</Button>
+
+                <div className="w-full xl:w-96 shrink-0 space-y-6">
+                    <div className="bg-slate-50 rounded-xl border border-slate-200 p-6 sticky top-6">
+                        <h3 className="font-bold text-slate-800 text-lg mb-4 border-b border-slate-200 pb-2">Resumen Cotización</h3>
+                        <div className="space-y-3 text-sm">
+                            <div className="flex justify-between items-center text-slate-600">
+                                <span>Subtotal base</span>
+                                <span>{totalsPreview.listSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</span>
+                            </div>
+
+                            {totalsPreview.discountAmount > 0 && (
+                                <div className="flex justify-between items-center text-emerald-600">
+                                    <span>Descuento total</span>
+                                    <span>-{totalsPreview.discountAmount.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</span>
+                                </div>
+                            )}
+
+                            <div className="flex justify-between items-center text-slate-600">
+                                <span>Subtotal neto</span>
+                                <span>{totalsPreview.discountedSubtotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</span>
+                            </div>
+
+                            <div className="flex justify-between items-center text-slate-600">
+                                <span>Impuestos</span>
+                                <span>{totalsPreview.taxTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</span>
+                            </div>
+
+                            <div className="border-t border-slate-200 pt-3 mt-3 flex justify-between items-center">
+                                <span className="font-bold text-slate-800 text-base">Total a Pagar</span>
+                                <span className="font-black text-indigo-700 text-xl">{totalsPreview.total.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</span>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 rounded-lg border border-cyan-200 bg-cyan-50/50 p-4 space-y-3">
+                            <p className="text-[11px] font-bold text-cyan-800 uppercase tracking-widest">Simulador de Envío</p>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-cyan-900 font-medium font-semibold">Costo Real Flete</Label>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    step={1000}
+                                    value={shippingAmount || ''}
+                                    onChange={(e) => setShippingAmount(Number(e.target.value) || 0)}
+                                    className="h-9 border-cyan-200 bg-white"
+                                    placeholder="Ej: 15000"
+                                />
+                            </div>
+
+                            {shippingAmount > 0 ? (
+                                <div className="space-y-1.5 pt-2 border-t border-cyan-200 text-xs">
+                                    <div className="flex justify-between text-cyan-900">
+                                        <span>Asume Empresa:</span>
+                                        <span className="font-semibold">{shippingSplit.wePay.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</span>
+                                    </div>
+                                    <div className="flex justify-between text-cyan-800">
+                                        <span>Cobrar a Cliente:</span>
+                                        <span className="font-bold">{shippingSplit.clientPays.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</span>
+                                    </div>
+                                    {!shippingSplit.policyApplies && (
+                                        <p className="text-[10px] text-amber-700 leading-tight mt-1 bg-amber-50 p-1 rounded">Monto de cotización no supera el tope base ({Number(operationalConfig?.shippingOrderCoverageThreshold || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}). Cliente asume 100%.</p>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-[10px] text-cyan-700 leading-tight">Agrega un costo de envío para simular quién asume el pago basado en políticas (Tope Base {Number(operationalConfig?.shippingOrderCoverageThreshold || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })}).</p>
+                            )}
+                        </div>
+
+                        <div className="mt-6 space-y-3">
+                            <Button type="submit" disabled={loading} className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-base shadow-sm">
+                                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                {isEditMode ? 'Actualizar Cotización' : 'Crear Cotización'}
+                            </Button>
+                            <Button type="button" variant="outline" onClick={() => navigate('/mrp/quotations')} className="w-full h-11 border-slate-300">
+                                Cancelar
+                            </Button>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </form>
         </div>
     );
 }

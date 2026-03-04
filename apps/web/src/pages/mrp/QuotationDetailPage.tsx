@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { mrpApi } from '@/services/mrpApi';
 import { ControlledDocument, DocumentCategory, DocumentStatus, Quotation, QuotationStatus } from '@scaffold/types';
-import { FileDown, Pencil, RefreshCcw, Settings } from 'lucide-react';
+import { FileDown, Pencil, RefreshCcw, Settings, ArrowLeft, Package, User, Calculator, CheckCircle2 } from 'lucide-react';
 import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
 import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/hooks/mrp/useOperationalConfig';
+import { formatCurrency } from '@/lib/utils';
 
 const statusLabel: Record<QuotationStatus, string> = {
     [QuotationStatus.DRAFT]: 'Borrador',
@@ -20,6 +19,15 @@ const statusLabel: Record<QuotationStatus, string> = {
     [QuotationStatus.APPROVED_FULL]: 'Aprob. Total',
     [QuotationStatus.REJECTED]: 'Rechazada',
     [QuotationStatus.CONVERTED]: 'Convertida',
+};
+
+const statusColors: Record<QuotationStatus, string> = {
+    [QuotationStatus.DRAFT]: 'bg-slate-100 text-slate-800 border-slate-200',
+    [QuotationStatus.SENT]: 'bg-blue-100 text-blue-800 border-blue-200',
+    [QuotationStatus.APPROVED_PARTIAL]: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    [QuotationStatus.APPROVED_FULL]: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    [QuotationStatus.REJECTED]: 'bg-red-100 text-red-800 border-red-200',
+    [QuotationStatus.CONVERTED]: 'bg-purple-100 text-purple-800 border-purple-200',
 };
 
 export default function QuotationDetailPage() {
@@ -173,83 +181,192 @@ export default function QuotationDetailPage() {
         return <div className="p-6 text-sm text-slate-500">Cargando...</div>;
     }
 
-    const canManageApproval = row.status !== QuotationStatus.CONVERTED;
+    const canManageApproval = row.status !== QuotationStatus.CONVERTED && row.status !== QuotationStatus.REJECTED;
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-            <div className="bg-white rounded-2xl border border-slate-200 p-6 flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">{row.code}</h1>
-                    <p className="text-sm text-slate-500">{(row as any).customer?.name || row.customerId}</p>
-                    <Badge variant="secondary" className="mt-2">{statusLabel[row.status]}</Badge>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="icon" onClick={() => navigate('/mrp/quotations')} className="shrink-0">
+                        <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                    <div>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-3">
+                            {row.code}
+                            <span className={`inline-flex items-center px-2.5 py-1 text-xs font-semibold rounded-full border ${statusColors[row.status]}`}>
+                                {statusLabel[row.status]}
+                            </span>
+                        </h1>
+                        <p className="text-slate-500 mt-1 flex items-center gap-2">
+                            {(row as any).customer?.name || row.customerId}
+                        </p>
+                    </div>
                 </div>
-                <div className="flex flex-wrap gap-2 justify-end">
-                    <Button variant="outline" onClick={load}><RefreshCcw className="h-4 w-4 mr-1" />Recargar</Button>
-                    <Button variant="outline" onClick={() => navigate(`/mrp/quotations/${row.id}/edit`)}><Pencil className="h-4 w-4 mr-1" />Editar</Button>
-                    <Button variant="outline" onClick={downloadPdf}><FileDown className="h-4 w-4 mr-1" />PDF</Button>
+                <div className="flex items-center gap-3 flex-wrap">
+                    <Button variant="outline" onClick={load} className="border-slate-200 text-slate-700 hover:bg-slate-50"><RefreshCcw className="h-4 w-4 mr-2" />Recargar</Button>
+                    <Button variant="outline" onClick={() => navigate(`/mrp/quotations/${row.id}/edit`)} className="border-slate-200 text-slate-700 hover:bg-slate-50"><Pencil className="h-4 w-4 mr-2" />Editar</Button>
+                    <Button variant="outline" onClick={downloadPdf} className="border-slate-200 text-slate-700 hover:bg-slate-50"><FileDown className="h-4 w-4 mr-2" />PDF</Button>
                     <Button variant="outline" size="icon" onClick={() => setShowPdfSettings(true)} title="Configurar PDF">
                         <Settings className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" onClick={() => setStatus(QuotationStatus.SENT)} disabled={row.status !== QuotationStatus.DRAFT}>Marcar enviada</Button>
-                    <Button variant="outline" onClick={approveAll} disabled={!canManageApproval}>Aprobar todo</Button>
-                    <Button variant="outline" onClick={savePartialApproval} disabled={!canManageApproval}>Guardar aprobación parcial</Button>
-                    <Button onClick={convert} disabled={!canManageApproval}>Convertir a pedido</Button>
+
+                    {row.status === QuotationStatus.DRAFT && (
+                        <Button variant="default" className="bg-indigo-600 hover:bg-indigo-700" onClick={() => setStatus(QuotationStatus.SENT)}>
+                            Marcar enviada
+                        </Button>
+                    )}
+                    {canManageApproval && row.status !== QuotationStatus.APPROVED_FULL && (
+                        <Button variant="default" className="bg-emerald-600 hover:bg-emerald-700" onClick={approveAll}>
+                            Aprobar Todo
+                        </Button>
+                    )}
+                    {canManageApproval && (row.status === QuotationStatus.APPROVED_PARTIAL || row.status === QuotationStatus.APPROVED_FULL) && (
+                        <Button variant="default" className="bg-purple-600 hover:bg-purple-700" onClick={convert}>
+                            Convertir a Pedido
+                        </Button>
+                    )}
                 </div>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Ítems</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    {(row.items || []).map((it: any) => (
-                        <div key={it.id} className="border border-slate-200 rounded-xl p-3">
-                            <p className="font-semibold text-slate-900">
-                                {it.isCatalogItem
-                                    ? `${it.product?.name || 'Producto'}${it.variant ? ` - ${it.variant.name}` : ''}`
-                                    : it.customDescription || 'Ítem libre'}
-                            </p>
-                            <div className="mt-2 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-                                <div className="text-xs text-slate-500">
-                                    Cantidad solicitada
-                                    <p className="text-sm text-slate-800 font-medium">{it.quantity}</p>
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                    Vr unit
-                                    <p className="text-sm text-slate-800 font-medium">{Number(it.unitPrice || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p>
-                                </div>
-                                <div className="text-xs text-slate-500">
-                                    Desc
-                                    <p className="text-sm text-slate-800 font-medium">{Number(it.discountPercent || 0).toFixed(2)}%</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-xs text-slate-500">Cantidad aprobada</p>
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        max={Number(it.quantity || 0)}
-                                        step="0.001"
-                                        value={approvals[it.id] ?? Number(it.approvedQuantity || 0)}
-                                        onChange={(e) => {
-                                            const requested = Number(e.target.value);
-                                            const maxQty = Number(it.quantity || 0);
-                                            const safe = Number.isFinite(requested) ? Math.max(0, Math.min(maxQty, requested)) : 0;
-                                            setApprovals((prev) => ({ ...prev, [it.id]: safe }));
-                                        }}
-                                        disabled={!canManageApproval}
-                                        className="w-full h-9 border border-slate-200 rounded-md px-2 text-sm disabled:bg-slate-100"
-                                    />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <Package className="h-5 w-5 text-indigo-600" />
+                                Ítems de la Cotización
+                            </h2>
+                            <div className="flex items-center gap-3">
+                                {canManageApproval && (
+                                    <Button size="sm" variant="outline" onClick={savePartialApproval}>
+                                        <CheckCircle2 className="h-4 w-4 mr-2 text-emerald-600" />
+                                        Guardar cambios de cantidad
+                                    </Button>
+                                )}
+                                <div className="text-sm text-slate-500 font-medium">
+                                    {row.items?.length || 0} {row.items?.length === 1 ? 'ítem' : 'ítems'}
                                 </div>
                             </div>
                         </div>
-                    ))}
-                </CardContent>
-            </Card>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card><CardHeader><CardTitle className="text-sm">Subtotal</CardTitle></CardHeader><CardContent><p className="text-xl font-semibold">{Number(row.subtotalBase || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p></CardContent></Card>
-                <Card><CardHeader><CardTitle className="text-sm">Impuestos</CardTitle></CardHeader><CardContent><p className="text-xl font-semibold">{Number(row.taxTotal || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p></CardContent></Card>
-                <Card><CardHeader><CardTitle className="text-sm">Total Neto</CardTitle></CardHeader><CardContent><p className="text-xl font-semibold">{Number(row.netTotalAmount || 0).toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}</p></CardContent></Card>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm whitespace-nowrap">
+                                <thead className="bg-slate-50 border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4 font-semibold text-slate-600 min-w-[200px]">Producto/Detalle</th>
+                                        <th className="px-6 py-4 font-semibold text-slate-600 text-right">Cant. Solicitada</th>
+                                        <th className="px-6 py-4 font-semibold text-slate-600 text-right">Cant. Aprobada</th>
+                                        <th className="px-6 py-4 font-semibold text-slate-600 text-right">Vr Unit.</th>
+                                        <th className="px-6 py-4 font-semibold text-slate-600 text-right">Desc. %</th>
+                                        <th className="px-6 py-4 font-semibold text-slate-600 text-right">Total Neto</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {(row.items || []).map((it: any) => {
+                                        const subtotal = Number(it.quantity || 0) * Number(it.unitPrice || 0);
+                                        const discountVal = subtotal * (Number(it.discountPercent || 0) / 100);
+                                        const netItem = subtotal - discountVal;
+
+                                        return (
+                                            <tr key={it.id} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-medium text-slate-900">
+                                                        {it.isCatalogItem
+                                                            ? `${it.product?.name || 'Producto'}${it.variant ? ` - ${it.variant.name}` : ''}`
+                                                            : it.customDescription || 'Ítem libre'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-medium text-slate-600">
+                                                    {it.quantity}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={Number(it.quantity || 0)}
+                                                        step="0.001"
+                                                        value={approvals[it.id] ?? Number(it.approvedQuantity || 0)}
+                                                        onChange={(e) => {
+                                                            const requested = Number(e.target.value);
+                                                            const maxQty = Number(it.quantity || 0);
+                                                            const safe = Number.isFinite(requested) ? Math.max(0, Math.min(maxQty, requested)) : 0;
+                                                            setApprovals((prev) => ({ ...prev, [it.id]: safe }));
+                                                        }}
+                                                        disabled={!canManageApproval}
+                                                        className="w-24 h-8 border border-slate-200 rounded-md px-2 text-sm text-right focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-50 inline-block"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 text-right text-slate-600">
+                                                    {formatCurrency(Number(it.unitPrice || 0))}
+                                                </td>
+                                                <td className="px-6 py-4 text-right text-slate-600">
+                                                    {Number(it.discountPercent || 0).toFixed(2)}%
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-bold text-slate-900">
+                                                    {formatCurrency(netItem)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-5 border-b border-slate-100">
+                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <User className="h-5 w-5 text-indigo-600" />
+                                Información Cliente
+                            </h2>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Nombre</label>
+                                <div className="text-sm font-medium text-slate-900">{(row as any).customer?.name || row.customerId}</div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Identificación</label>
+                                <div className="text-sm text-slate-700">{(row as any).customer?.documentNumber || (row as any).customer?.taxId || 'No registrada'}</div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Email</label>
+                                <div className="text-sm text-slate-700">{(row as any).customer?.email || 'No registrado'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-5 border-b border-slate-100">
+                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <Calculator className="h-5 w-5 text-indigo-600" />
+                                Resumen Financiero
+                            </h2>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-500 font-medium">Subtotal</span>
+                                <span className="text-slate-900 font-medium">{formatCurrency(Number(row.subtotalBase || 0))}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-500 font-medium">Impuestos</span>
+                                <span className="text-slate-900 font-medium">{formatCurrency(Number(row.taxTotal || 0))}</span>
+                            </div>
+                            {Number(row.discountAmount || 0) > 0 && (
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-500 font-medium">Descuento Global</span>
+                                    <span className="text-slate-900 font-medium text-red-600">-{formatCurrency(Number(row.discountAmount || 0))}</span>
+                                </div>
+                            )}
+                            <div className="pt-3 flex justify-between items-center border-t border-slate-100 text-base">
+                                <span className="text-slate-900 font-bold">Total Neto</span>
+                                <span className="text-indigo-700 font-black">{formatCurrency(Number(row.netTotalAmount || 0))}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <Dialog open={showPdfSettings} onOpenChange={setShowPdfSettings}>
@@ -261,7 +378,7 @@ export default function QuotationDetailPage() {
                         <div className="space-y-1.5">
                             <Label>Documento controlado por defecto</Label>
                             <select
-                                className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm"
+                                className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                 value={draftPdfDocCode}
                                 onChange={(e) => setDraftPdfDocCode(e.target.value)}
                             >
@@ -279,7 +396,7 @@ export default function QuotationDetailPage() {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowPdfSettings(false)}>Cancelar</Button>
-                        <Button onClick={savePdfSettings} disabled={savingPdfSettings}>
+                        <Button onClick={savePdfSettings} disabled={savingPdfSettings} className="bg-indigo-600 hover:bg-indigo-700">
                             {savingPdfSettings ? 'Guardando...' : 'Guardar'}
                         </Button>
                     </DialogFooter>
