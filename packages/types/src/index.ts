@@ -607,7 +607,9 @@ export interface ProductVariant {
     productId: string;
     name: string; // e.g., "L", "XL", "Red"
     sku: string;
-    price: number; // Sale price
+    price: number; // Distributor price
+    pvpMargin: number; // Margin over distributor price (0-0.99)
+    pvpPrice: number; // Suggested public sale price
     cost: number; // Calculated Actual Cost (Avg)
     referenceCost: number; // Calculated Standard Cost
     laborCost: number;

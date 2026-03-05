@@ -23,6 +23,12 @@ export class ProductVariant extends BaseEntity implements IProductVariant {
     @Property()
     price!: number;
 
+    @Property({ fieldName: 'pvp_margin', type: 'decimal', precision: 10, scale: 4 })
+    pvpMargin: number = 0.25;
+
+    @Property({ fieldName: 'pvp_price', type: 'decimal', precision: 12, scale: 2 })
+    pvpPrice: number = 0;
+
     @Property()
     cost: number = 0; // Actual Cost (Avg)
 

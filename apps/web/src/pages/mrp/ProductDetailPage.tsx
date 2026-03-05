@@ -36,6 +36,8 @@ interface VariantFormData {
     name: string;
     sku: string;
     price: number;
+    pvpMargin: number;
+    pvpPrice?: number;
     targetMargin: number;
     productionMinutes?: number;
     cost?: number;
@@ -53,6 +55,7 @@ export default function ProductDetailPage() {
         name: '',
         sku: '',
         price: 0,
+        pvpMargin: 0.25,
         targetMargin: 0.4,
     });
 
@@ -75,7 +78,7 @@ export default function ProductDetailPage() {
 
     const handleAddVariant = () => {
         setEditingVariant(null);
-        setVariantFormData({ name: '', sku: '', price: 0, targetMargin: 0.4, productionMinutes: 0 });
+        setVariantFormData({ name: '', sku: '', price: 0, pvpMargin: 0.25, targetMargin: 0.4, productionMinutes: 0 });
         setShowVariantDialog(true);
     };
 
@@ -85,10 +88,18 @@ export default function ProductDetailPage() {
             name: variant.name,
             sku: variant.sku,
             price: variant.price,
+            pvpMargin: variant.pvpMargin ?? 0.25,
+            pvpPrice: variant.pvpPrice ?? 0,
             targetMargin: variant.targetMargin ?? 0.4,
             productionMinutes: variant.productionMinutes ?? 0
         });
         setShowVariantDialog(true);
+    };
+
+    const calculatePvpPrice = (distributorPrice: number, margin: number) => {
+        const safeMargin = Math.min(0.99, Math.max(0, margin || 0));
+        if (!distributorPrice || distributorPrice <= 0) return 0;
+        return distributorPrice / (1 - safeMargin);
     };
 
     const handleDeleteProduct = async () => {
@@ -398,8 +409,8 @@ export default function ProductDetailPage() {
                                     <TableHeader>
                                         <TableRow className="bg-slate-50 hover:bg-slate-50 border-b border-slate-200">
                                             <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap min-w-[200px]">Identificador</TableHead>
-                                            <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">Precio Lista</TableHead>
-                                            <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">Costo Proyectado</TableHead>
+                                            <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">Precio Distribuidor</TableHead>
+                                            <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">PVP Sugerido</TableHead>
                                             <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">Margen Objetivo</TableHead>
                                             <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap bg-fuchsia-50/30">Costo Actual (BOM)</TableHead>
                                             <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap bg-fuchsia-50/30">Margen Actual</TableHead>
@@ -434,8 +445,8 @@ export default function ProductDetailPage() {
                                                     <TableCell className="font-semibold text-slate-900">
                                                         ${variant.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </TableCell>
-                                                    <TableCell className="text-slate-500">
-                                                        ${(variant.referenceCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    <TableCell className="font-semibold text-fuchsia-700">
+                                                        ${(variant.pvpPrice || calculatePvpPrice(variant.price || 0, variant.pvpMargin || 0.25)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </TableCell>
                                                     <TableCell className="text-slate-500 text-sm font-medium">
                                                         {((variant.targetMargin || 0.4) * 100).toFixed(0)}%
@@ -550,7 +561,7 @@ export default function ProductDetailPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="variant-price" className="text-slate-700">Precio Público de Venta</Label>
+                                <Label htmlFor="variant-price" className="text-slate-700">Precio Distribuidor</Label>
                                 <div className="relative">
                                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                     <Input
@@ -564,6 +575,65 @@ export default function ProductDetailPage() {
                                         className="h-10 pl-9 font-semibold text-slate-900"
                                     />
                                 </div>
+                                {editingVariant && (editingVariant.cost || 0) > 0 && (
+                                    <p className="text-[11px] text-slate-500">
+                                        Sugerido por costo + margen objetivo:{" "}
+                                        <span className="font-semibold text-slate-700">
+                                            ${(() => {
+                                                const currentMinutes = variantFormData.productionMinutes || 0;
+                                                const oldMinutes = editingVariant.productionMinutes || 0;
+                                                let estimatedCost = editingVariant.cost || 0;
+
+                                                if (operationalConfig) {
+                                                    const costPerMinute = operationalConfig.costPerMinute || 0;
+                                                    const oldOpCost = oldMinutes * costPerMinute;
+                                                    const baseCost = Math.max(0, (editingVariant.cost || 0) - oldOpCost);
+                                                    const newOpCost = currentMinutes * costPerMinute;
+                                                    estimatedCost = baseCost + newOpCost;
+                                                }
+
+                                                const margin = variantFormData.targetMargin || 0.4;
+                                                if (margin >= 1) return 'N/A';
+                                                return (estimatedCost / (1 - margin)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                            })()}
+                                        </span>
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="variant-pvp-margin" className="text-slate-700">Margen PVP (%)</Label>
+                                <div className="relative">
+                                    <AreaChart className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <Input
+                                        id="variant-pvp-margin"
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        max="99"
+                                        value={variantFormData.pvpMargin ? (variantFormData.pvpMargin * 100) : ''}
+                                        onChange={(e) => setVariantFormData({ ...variantFormData, pvpMargin: Math.min(0.99, Math.max(0, (parseFloat(e.target.value) || 0) / 100)) })}
+                                        placeholder="25"
+                                        className="h-10 pl-9"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">%</span>
+                                </div>
+                            </div>
+
+                            <div className="md:col-span-2 space-y-2">
+                                <Label htmlFor="variant-pvp" className="text-slate-700">PVP Sugerido (automático)</Label>
+                                <div className="relative">
+                                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-fuchsia-500" />
+                                    <Input
+                                        id="variant-pvp"
+                                        readOnly
+                                        value={calculatePvpPrice(variantFormData.price || 0, variantFormData.pvpMargin || 0.25).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        className="h-10 pl-9 font-bold text-fuchsia-700 bg-fuchsia-50/40 border-fuchsia-100"
+                                    />
+                                </div>
+                                <p className="text-[11px] text-slate-500">
+                                    Fórmula: <span className="font-mono">precio_distribuidor / (1 - margen)</span>
+                                </p>
                             </div>
 
                             <div className="space-y-2">
@@ -668,7 +738,7 @@ export default function ProductDetailPage() {
                                             </span>
                                         </div>
                                         <div className="flex justify-between text-sm font-bold text-fuchsia-700 bg-white p-2 rounded-lg border border-fuchsia-100 mt-2 shadow-sm">
-                                            <span>Precio de Venta Sugerido:</span>
+                                            <span>Precio Distribuidor Sugerido:</span>
                                             <span>
                                                 ${(() => {
                                                     const currentMinutes = variantFormData.productionMinutes || 0;

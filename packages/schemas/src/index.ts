@@ -214,6 +214,7 @@ export const ProductVariantSchema = z.object({
     name: z.string().min(1, 'El nombre es obligatorio'),
     sku: z.string().min(1, 'SKU es obligatorio'),
     price: z.number().min(0),
+    pvpMargin: z.number().min(0).max(0.99).default(0.25),
     cost: z.number().min(0),
     referenceCost: z.number().min(0).optional(),
     laborCost: z.number().min(0),
@@ -226,6 +227,7 @@ export const CreateProductVariantSchema = z.object({
     name: z.string().min(1, 'El nombre es obligatorio'),
     sku: z.string().min(1, 'SKU es obligatorio'),
     price: z.number().min(0),
+    pvpMargin: z.number().min(0).max(0.99).default(0.25),
     targetMargin: z.number().min(0).max(1).default(0.4),
     productionMinutes: z.number().min(0).optional(),
 });

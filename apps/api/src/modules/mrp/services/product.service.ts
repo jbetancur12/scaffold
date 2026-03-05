@@ -103,6 +103,30 @@ export class ProductService {
         return Number.isFinite(parsed) ? parsed : undefined;
     }
 
+    private normalizePvpMargin(value?: number): number {
+        if (value == null || !Number.isFinite(value)) return 0.25;
+        return Math.min(0.99, Math.max(0, value));
+    }
+
+    private calculatePvpPrice(distributorPrice?: number, pvpMargin?: number): number {
+        const price = Number(distributorPrice || 0);
+        const margin = this.normalizePvpMargin(pvpMargin);
+        if (!Number.isFinite(price) || price <= 0) return 0;
+        const divisor = 1 - margin;
+        if (divisor <= 0) return 0;
+        return Number((price / divisor).toFixed(2));
+    }
+
+    private enrichVariantPricing(data: Partial<ProductVariant>, current?: ProductVariant): Partial<ProductVariant> {
+        const price = data.price ?? current?.price ?? 0;
+        const pvpMargin = this.normalizePvpMargin(data.pvpMargin ?? current?.pvpMargin);
+        return {
+            ...data,
+            pvpMargin,
+            pvpPrice: this.calculatePvpPrice(price, pvpMargin),
+        };
+    }
+
     private parseProductImportCsv(csvText: string) {
         const lines = csvText
             .replace(/\r/g, '')
@@ -363,7 +387,7 @@ export class ProductService {
 
     async createVariant(productId: string, data: Partial<ProductVariant>): Promise<ProductVariant> {
         const product = await this.productRepo.findOneOrFail({ id: productId });
-        const variant = this.variantRepo.create({ ...data, product } as unknown as ProductVariant);
+        const variant = this.variantRepo.create({ ...this.enrichVariantPricing(data), product } as unknown as ProductVariant);
         await this.em.persistAndFlush(variant);
         await this.calculateVariantCost(variant.id);
         return variant;
@@ -371,7 +395,7 @@ export class ProductService {
 
     async updateVariant(variantId: string, data: Partial<ProductVariant>): Promise<ProductVariant> {
         const variant = await this.variantRepo.findOneOrFail({ id: variantId });
-        this.variantRepo.assign(variant, data);
+        this.variantRepo.assign(variant, this.enrichVariantPricing(data, variant));
         await this.em.persistAndFlush(variant);
         await this.calculateVariantCost(variant.id);
         return variant;
@@ -604,7 +628,9 @@ export class ProductService {
                         product: parent,
                         sku: row.sku,
                         name: row.name,
-                        price: row.price,
+                        ...this.enrichVariantPricing({
+                            price: row.price,
+                        }),
                         laborCost: row.laborCost,
                         indirectCost: row.indirectCost,
                         targetMargin: row.targetMargin,
@@ -613,7 +639,10 @@ export class ProductService {
                 } else {
                     variant.product = parent;
                     variant.name = row.name;
-                    variant.price = row.price;
+                    const pricing = this.enrichVariantPricing({ price: row.price }, variant);
+                    variant.price = pricing.price ?? variant.price;
+                    variant.pvpMargin = pricing.pvpMargin ?? variant.pvpMargin;
+                    variant.pvpPrice = pricing.pvpPrice ?? variant.pvpPrice;
                     variant.laborCost = row.laborCost;
                     variant.indirectCost = row.indirectCost;
                     variant.targetMargin = row.targetMargin;
