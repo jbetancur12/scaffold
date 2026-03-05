@@ -82,7 +82,7 @@ export default function PurchaseOrderFormPage() {
     ]);
 
     const { data: suppliersResponse, error: suppliersError } = useSuppliersQuery(1, 100);
-    const { materials: rawMaterials, error: rawMaterialsError } = useRawMaterialsQuery(1, 100, '');
+    const { materials: rawMaterials, error: rawMaterialsError } = useRawMaterialsQuery(1, 1000, '');
     const { execute: createPurchaseOrder } = useCreatePurchaseOrderMutation();
     const { execute: markPurchaseRequisitionConverted } = useMarkPurchaseRequisitionConvertedMutation();
     const { data: requisition, error: requisitionError } = usePurchaseRequisitionQuery(requisitionId);
@@ -383,7 +383,7 @@ export default function PurchaseOrderFormPage() {
                 description: 'Orden de compra creada exitosamente',
                 variant: 'default',
             });
-            navigate('/mrp/purchase-orders');
+            navigate(`/mrp/purchase-orders/${createdOrder.id}`);
         } catch (error: unknown) {
             toast({
                 title: 'Error',

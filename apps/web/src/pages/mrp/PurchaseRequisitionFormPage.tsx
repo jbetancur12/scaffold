@@ -37,7 +37,7 @@ export default function PurchaseRequisitionFormPage() {
         { rawMaterialId: '', quantity: 0, suggestedSupplierId: '', notes: '' },
     ]);
 
-    const { materials } = useRawMaterialsQuery(1, 200, '');
+    const { materials } = useRawMaterialsQuery(1, 1000, '');
     const { data: suppliersResponse } = useSuppliersQuery(1, 200);
     const { data: productionOrdersResponse } = useProductionOrdersQuery(1, 200);
     const suppliers = suppliersResponse?.suppliers ?? [];
