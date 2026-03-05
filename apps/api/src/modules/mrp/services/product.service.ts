@@ -120,10 +120,18 @@ export class ProductService {
     private enrichVariantPricing(data: Partial<ProductVariant>, current?: ProductVariant): Partial<ProductVariant> {
         const price = data.price ?? current?.price ?? 0;
         const pvpMargin = this.normalizePvpMargin(data.pvpMargin ?? current?.pvpMargin);
+        const hasIncomingPrice = typeof data.price === 'number' && Number.isFinite(data.price);
+        const previousPrice = Number(current?.price ?? 0);
+        const nextPrice = Number(price || 0);
+        const isPriceChange = current ? (hasIncomingPrice && nextPrice !== previousPrice) : nextPrice > 0;
+        const distributorPriceUpdatedAt = isPriceChange
+            ? new Date()
+            : current?.distributorPriceUpdatedAt;
         return {
             ...data,
             pvpMargin,
             pvpPrice: this.calculatePvpPrice(price, pvpMargin),
+            distributorPriceUpdatedAt,
         };
     }
 

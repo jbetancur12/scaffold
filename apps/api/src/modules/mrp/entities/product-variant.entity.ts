@@ -23,6 +23,9 @@ export class ProductVariant extends BaseEntity implements IProductVariant {
     @Property()
     price!: number;
 
+    @Property({ fieldName: 'distributor_price_updated_at', type: 'datetime', nullable: true })
+    distributorPriceUpdatedAt?: Date;
+
     @Property({ fieldName: 'pvp_margin', type: 'decimal', precision: 10, scale: 4 })
     pvpMargin: number = 0.25;
 

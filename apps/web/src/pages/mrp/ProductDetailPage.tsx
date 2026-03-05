@@ -36,6 +36,7 @@ interface VariantFormData {
     name: string;
     sku: string;
     price: number;
+    distributorPriceUpdatedAt?: string | Date;
     pvpMargin: number;
     pvpPrice?: number;
     targetMargin: number;
@@ -88,6 +89,7 @@ export default function ProductDetailPage() {
             name: variant.name,
             sku: variant.sku,
             price: variant.price,
+            distributorPriceUpdatedAt: variant.distributorPriceUpdatedAt,
             pvpMargin: variant.pvpMargin ?? 0.25,
             pvpPrice: variant.pvpPrice ?? 0,
             targetMargin: variant.targetMargin ?? 0.4,
@@ -100,6 +102,16 @@ export default function ProductDetailPage() {
         const safeMargin = Math.min(0.99, Math.max(0, margin || 0));
         if (!distributorPrice || distributorPrice <= 0) return 0;
         return distributorPrice / (1 - safeMargin);
+    };
+
+    const formatDateOnly = (value?: string | Date) => {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
     };
 
     const handleDeleteProduct = async () => {
@@ -499,8 +511,8 @@ export default function ProductDetailPage() {
 
             {/* Variant Dialog */}
             <Dialog open={showVariantDialog} onOpenChange={setShowVariantDialog}>
-                <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden border-0 shadow-2xl rounded-2xl">
-                    <DialogHeader className="p-6 pb-0 border-b-0 space-y-1 bg-slate-50/50 rounded-t-2xl">
+                <DialogContent className="sm:max-w-[550px] w-[95vw] max-h-[90vh] p-0 overflow-hidden border-0 shadow-2xl rounded-2xl flex flex-col">
+                    <DialogHeader className="p-6 pb-0 border-b-0 space-y-1 bg-slate-50/50 rounded-t-2xl shrink-0">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="p-2 bg-fuchsia-100 text-fuchsia-600 rounded-lg">
                                 <Layers className="h-5 w-5" />
@@ -514,7 +526,7 @@ export default function ProductDetailPage() {
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="p-6 space-y-5 bg-white">
+                    <div className="p-6 space-y-5 bg-white overflow-y-auto flex-1 min-h-0">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="md:col-span-2 space-y-2">
                                 <Label htmlFor="variant-name" className="text-slate-700">Denominación / Tamaño</Label>
@@ -596,6 +608,14 @@ export default function ProductDetailPage() {
                                                 if (margin >= 1) return 'N/A';
                                                 return (estimatedCost / (1 - margin)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                                             })()}
+                                        </span>
+                                    </p>
+                                )}
+                                {editingVariant && variantFormData.distributorPriceUpdatedAt && (
+                                    <p className="text-[11px] text-slate-500">
+                                        Última actualización precio distribuidor:{" "}
+                                        <span className="font-semibold text-slate-700">
+                                            {formatDateOnly(variantFormData.distributorPriceUpdatedAt)}
                                         </span>
                                     </p>
                                 )}
@@ -768,7 +788,7 @@ export default function ProductDetailPage() {
                         )}
                     </div>
 
-                    <DialogFooter className="p-4 sm:p-6 bg-slate-50/50 border-t border-slate-100 rounded-b-2xl">
+                    <DialogFooter className="p-4 sm:p-6 bg-slate-50/50 border-t border-slate-100 rounded-b-2xl shrink-0">
                         <Button type="button" variant="outline" onClick={() => setShowVariantDialog(false)} className="bg-white border-slate-200 hover:bg-slate-100">
                             Cancelar
                         </Button>

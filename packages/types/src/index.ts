@@ -608,6 +608,7 @@ export interface ProductVariant {
     name: string; // e.g., "L", "XL", "Red"
     sku: string;
     price: number; // Distributor price
+    distributorPriceUpdatedAt?: string | Date;
     pvpMargin: number; // Margin over distributor price (0-0.99)
     pvpPrice: number; // Suggested public sale price
     cost: number; // Calculated Actual Cost (Avg)
