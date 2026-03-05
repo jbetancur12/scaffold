@@ -117,7 +117,7 @@ export default function PurchaseRequisitionFormPage() {
                 },
             });
             toast({ title: 'Requisición creada', description: 'Se generó automáticamente desde faltantes de la OP.' });
-            navigate(`/mrp/purchase-requisitions?highlight=${row.id}`);
+            navigate(`/mrp/purchase-requisitions/${row.id}`);
         } catch (error) {
             toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo crear la requisición desde la OP'), variant: 'destructive' });
         }
@@ -148,7 +148,7 @@ export default function PurchaseRequisitionFormPage() {
                 })),
             });
             toast({ title: 'Requisición creada', description: 'La requisición de compra fue registrada.' });
-            navigate(`/mrp/purchase-requisitions?highlight=${row.id}`);
+            navigate(`/mrp/purchase-requisitions/${row.id}`);
         } catch (error) {
             toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo crear la requisición'), variant: 'destructive' });
         }

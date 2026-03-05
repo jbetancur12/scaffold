@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, ClipboardList, Clock, CheckCircle2, ArrowRightLeft, XCircle, ShoppingCart } from 'lucide-react';
+import { Plus, ClipboardList, Clock, CheckCircle2, ArrowRightLeft, XCircle, ShoppingCart, Eye } from 'lucide-react';
 import { PurchaseRequisitionStatus } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -208,6 +208,15 @@ export default function PurchaseRequisitionListPage() {
                                             </TableCell>
                                             <TableCell className="py-4 pr-6 text-right">
                                                 <div className="flex items-center justify-end gap-2">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => navigate(`/mrp/purchase-requisitions/${row.id}`)}
+                                                        className="rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50 text-xs h-8 px-3"
+                                                    >
+                                                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                                                        Ver
+                                                    </Button>
                                                     {row.status === PurchaseRequisitionStatus.PENDIENTE && (
                                                         <Button
                                                             variant="outline"

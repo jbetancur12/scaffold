@@ -25,6 +25,7 @@ import PurchaseOrderFormPage from '@/pages/mrp/PurchaseOrderFormPage';
 import PurchaseOrderDetailPage from '@/pages/mrp/PurchaseOrderDetailPage';
 import PurchaseRequisitionListPage from '@/pages/mrp/PurchaseRequisitionListPage';
 import PurchaseRequisitionFormPage from '@/pages/mrp/PurchaseRequisitionFormPage';
+import PurchaseRequisitionDetailPage from '@/pages/mrp/PurchaseRequisitionDetailPage';
 import SalesOrderListPage from '@/pages/mrp/SalesOrderListPage';
 import SalesOrderFormPage from '@/pages/mrp/SalesOrderFormPage';
 import SalesOrderDetailPage from '@/pages/mrp/SalesOrderDetailPage';
@@ -163,6 +164,7 @@ export default function App() {
                         <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
                         <Route path="/mrp/purchase-requisitions" element={<PurchaseRequisitionListPage />} />
                         <Route path="/mrp/purchase-requisitions/new" element={<PurchaseRequisitionFormPage />} />
+                        <Route path="/mrp/purchase-requisitions/:id" element={<PurchaseRequisitionDetailPage />} />
 
                         <Route path="/mrp/sales-orders" element={<SalesOrderListPage />} />
                         <Route path="/mrp/sales-orders/new" element={<SalesOrderFormPage />} />
