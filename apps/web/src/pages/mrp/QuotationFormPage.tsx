@@ -382,6 +382,58 @@ export default function QuotationFormPage() {
 
     const addItem = () => setItems((prev) => [...prev, createItem()]);
 
+    const addVariantForItem = (index: number) => {
+        const source = items[index];
+        if (!source?.isCatalogItem || !source?.productId) {
+            toast({
+                title: 'Selecciona producto',
+                description: 'Primero selecciona un producto del catálogo para agregar otra variante.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        const product = products.find((p) => p.id === source.productId);
+        const productVariants = product?.variants || [];
+        if (productVariants.length === 0) {
+            toast({
+                title: 'Sin variantes',
+                description: 'Este producto no tiene variantes configuradas.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        const usedVariantIds = new Set(
+            items
+                .filter((item) => item.isCatalogItem && item.productId === source.productId && item.variantId)
+                .map((item) => item.variantId as string)
+        );
+        const nextVariant = productVariants.find((variant) => !usedVariantIds.has(variant.id));
+        const suggestedVariantId = nextVariant?.id;
+        const suggestedUnitPrice = nextVariant?.price ?? source.unitPrice;
+
+        const clonedLine: ItemForm = {
+            isCatalogItem: true,
+            productSearch: source.productSearch,
+            productId: source.productId,
+            variantId: suggestedVariantId,
+            customDescription: '',
+            customSku: '',
+            quantity: 1,
+            approvedQuantity: 1,
+            unitPrice: suggestedUnitPrice,
+            discountPercent: globalDiscountPercent > 0 ? 0 : Number(source.discountPercent || 0),
+            taxRate: Number(source.taxRate || 0),
+        };
+
+        setItems((prev) => [
+            ...prev.slice(0, index + 1),
+            clonedLine,
+            ...prev.slice(index + 1),
+        ]);
+    };
+
     const removeItem = (idx: number) => {
         if (items.length === 1) {
             toast({ title: 'Error', description: 'Debe haber al menos un ítem', variant: 'destructive' });
@@ -1082,7 +1134,22 @@ export default function QuotationFormPage() {
                                     <div key={idx} className={`bg-white border-b border-slate-100 last:border-0 p-5 relative ${activeCatalogComboboxIdx === idx ? 'z-50' : 'z-10'}`}>
                                         <div className="flex justify-between items-center mb-4">
                                             <p className="text-xs font-bold text-slate-500 uppercase">Ítem {idx + 1}</p>
-                                            <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-6 text-xs text-red-600 hover:text-red-700 hover:bg-red-50">Eliminar</Button>
+                                            <div className="flex items-center gap-1">
+                                                {it.isCatalogItem && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => addVariantForItem(idx)}
+                                                        title="Agregar variante del mismo producto"
+                                                        className="h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                                                    >
+                                                        <Plus className="h-3.5 w-3.5 mr-1" />
+                                                        Variante
+                                                    </Button>
+                                                )}
+                                                <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-6 text-xs text-red-600 hover:text-red-700 hover:bg-red-50">Eliminar</Button>
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
