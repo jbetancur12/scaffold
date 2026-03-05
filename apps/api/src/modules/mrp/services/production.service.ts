@@ -949,7 +949,7 @@ export class ProductionService {
             const supplierMaterials = await this.em.find(SupplierMaterial, { rawMaterial: { $in: materialIds } }, { populate: ['supplier'], orderBy: { lastPurchasePrice: 'ASC', lastPurchaseDate: 'DESC' } });
             const allocations = await this.materialAllocationRepo.find(
                 { productionOrder: orderId, rawMaterial: { $in: materialIds }, lot: { $ne: null } },
-                { populate: ['lot', 'lot.warehouse'] }
+                {}
             );
             const allocationByMaterial = new Map<string, ProductionMaterialAllocation>();
             for (const row of allocations) {
@@ -986,11 +986,12 @@ export class ProductionService {
                 }
                 const allocation = allocationByMaterial.get(req.material.id);
                 if (allocation?.lot) {
+                    const selectedLot = req.pepsLots.find((lot) => lot.lotId === allocation.lot?.id);
                     req.selectedAllocation = {
                         lotId: allocation.lot.id,
-                        lotCode: allocation.lot.supplierLotCode,
-                        warehouseId: allocation.lot.warehouse.id,
-                        warehouseName: allocation.lot.warehouse.name,
+                        lotCode: selectedLot?.lotCode || 'Lote asignado',
+                        warehouseId: selectedLot?.warehouseId || '',
+                        warehouseName: selectedLot?.warehouseName || 'No disponible',
                         quantityRequested: allocation.quantityRequested ? Number(allocation.quantityRequested) : undefined,
                     };
                 }
