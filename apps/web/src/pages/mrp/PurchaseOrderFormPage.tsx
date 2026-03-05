@@ -485,18 +485,29 @@ export default function PurchaseOrderFormPage() {
     };
 
     return (
-        <div className="p-6">
-            <div className="mb-6">
+        <div className="p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto min-h-screen bg-slate-50/50">
+            <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
                 <Button
                     variant="ghost"
                     onClick={() => navigate('/mrp/purchase-orders')}
-                    className="mb-4"
+                    className="mb-6 text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                 >
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Volver
+                    Volver a Órdenes
                 </Button>
-                <h1 className="text-3xl font-bold">Nueva Orden de Compra</h1>
-                <p className="text-slate-600">Crea una nueva orden de compra de materias primas.</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
+                            Nueva Orden de Compra
+                        </h1>
+                        <p className="text-slate-500 mt-2 text-lg max-w-2xl">
+                            Configura y emite una orden de compra de materias primas.
+                        </p>
+                    </div>
+                    <div className="hidden md:flex h-16 w-16 bg-blue-100/50 rounded-2xl items-center justify-center border border-blue-200/50 shadow-inner">
+                        <ShoppingCart className="h-8 w-8 text-blue-600" />
+                    </div>
+                </div>
             </div>
 
             {requisitionId ? (
@@ -519,10 +530,12 @@ export default function PurchaseOrderFormPage() {
 
             <form onSubmit={handleSubmit} className="flex flex-col xl:flex-row gap-6 items-start">
                 <div className="flex-1 space-y-6 w-full min-w-0">
-                    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 space-y-5">
-                        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                            <Building2 className="h-5 w-5 text-blue-600" />
-                            <h2 className="text-xl font-semibold text-slate-800">Encabezado y Proveedor</h2>
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 md:p-8 space-y-6 transition-all hover:shadow-md duration-300">
+                        <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                <Building2 className="h-5 w-5" />
+                            </div>
+                            <h2 className="text-xl font-bold text-slate-800 tracking-tight">Encabezado y Proveedor</h2>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -605,10 +618,12 @@ export default function PurchaseOrderFormPage() {
                         ) : null}
                     </div>
 
-                    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6 space-y-6">
-                        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-                            <FileText className="h-5 w-5 text-blue-600" />
-                            <h2 className="text-xl font-semibold text-slate-800">Condiciones y Requisitos</h2>
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 md:p-8 space-y-8 transition-all hover:shadow-md duration-300">
+                        <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                <FileText className="h-5 w-5" />
+                            </div>
+                            <h2 className="text-xl font-bold text-slate-800 tracking-tight">Condiciones y Requisitos</h2>
                         </div>
 
                         <div className="space-y-6">
@@ -760,11 +775,16 @@ export default function PurchaseOrderFormPage() {
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-0 overflow-hidden">
-                        <div className="p-6 pb-4 flex justify-between items-center border-b border-slate-100">
-                            <div className="flex items-center gap-2">
-                                <Package className="h-5 w-5 text-blue-600" />
-                                <h2 className="text-xl font-semibold text-slate-800">Ítems de la Orden</h2>
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-0 overflow-hidden transition-all hover:shadow-md duration-300">
+                        <div className="p-6 md:p-8 pb-5 flex justify-between items-center border-b border-slate-100 bg-slate-50/30">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                                    <Package className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-800 tracking-tight">Ítems de la Orden</h2>
+                                    <p className="text-xs text-slate-500 mt-0.5 font-medium">Gestiona los materiales y cantidades</p>
+                                </div>
                             </div>
                             <Button type="button" onClick={addItem} variant="outline" size="sm">
                                 <Plus className="mr-2 h-4 w-4" />
@@ -786,7 +806,7 @@ export default function PurchaseOrderFormPage() {
                                 const isExpanded = expandedItemIndex === index;
 
                                 return (
-                                    <div key={index} className={`relative p-4 sm:p-5 transition-all duration-200 ${isExpanded ? 'bg-white shadow-md rounded-lg border border-blue-200 z-10 my-2 xl:mx-2' : 'bg-white border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50'}`}>
+                                    <div key={index} className={`relative p-4 sm:p-5 transition-all duration-300 ${isExpanded ? 'bg-white shadow-xl shadow-blue-900/5 rounded-xl border border-blue-200/60 z-10 my-4 mx-2 sm:mx-4 ring-4 ring-blue-50/50' : 'bg-white border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80'}`}>
                                         <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isExpanded ? 'pb-4 border-b border-slate-100' : ''}`}>
                                             <div className="min-w-0 flex items-start sm:items-center gap-3">
                                                 <div className={`mt-1 sm:mt-0 shadow-sm flex shrink-0 items-center justify-center w-10 h-10 rounded-full ${item.isCatalogItem ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-slate-50 text-slate-600 border border-slate-200'}`}>
@@ -1166,57 +1186,79 @@ export default function PurchaseOrderFormPage() {
                 </div>
 
                 {/* Right Sticky Sidebar */}
-                <div className="w-full xl:w-96 shrink-0">
-                    <div className="bg-white rounded-lg shadow-md border border-slate-200 p-6 sticky top-6 space-y-6">
-                        <h2 className="text-xl font-semibold border-b border-slate-100 pb-4 text-slate-800 flex items-center gap-2">
-                            <Calculator className="h-5 w-5 text-blue-600" />
+                <div className="w-full xl:w-96 shrink-0 relative z-10">
+                    <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 p-6 sticky top-8 space-y-6 overflow-hidden transition-all duration-300">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+                        <h2 className="text-xl font-bold border-b border-slate-100 pb-4 text-slate-900 flex items-center gap-2">
+                            <Calculator className="h-5 w-5 text-indigo-600" />
                             Resumen de la Orden
                         </h2>
 
-                        <div className="space-y-3">
-                            <div className="flex justify-between text-sm text-slate-600">
-                                <span>Subtotal (Base):</span>
-                                <span>{formatCurrency(totals.subtotal)}</span>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-500 font-medium">Subtotal (Base):</span>
+                                <span className="text-slate-800 font-semibold">{formatCurrency(totals.subtotal)}</span>
                             </div>
-                            <div className="flex justify-between text-sm text-slate-600">
-                                <span>IVA Total:</span>
-                                <span>{formatCurrency(totals.tax)}</span>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-slate-500 font-medium">IVA Total:</span>
+                                <span className="text-slate-800 font-semibold">{formatCurrency(totals.tax)}</span>
                             </div>
-                            <div className="flex justify-between text-sm text-slate-600">
-                                <span>Descuento:</span>
-                                <span>- {formatCurrency(discountAmount)}</span>
+
+                            {(discountAmount > 0 || withholdingAmount > 0) && (
+                                <div className="pt-2 border-t border-slate-50/50 space-y-2">
+                                    {discountAmount > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-emerald-600 font-medium">Descuento:</span>
+                                            <span className="text-emerald-700 font-semibold">- {formatCurrency(discountAmount)}</span>
+                                        </div>
+                                    )}
+                                    {withholdingAmount > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-rose-600 font-medium tracking-tight">Retención ({withholdingRate}%):</span>
+                                            <span className="text-rose-700 font-semibold">- {formatCurrency(withholdingAmount)}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {otherChargesAmount > 0 && (
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-slate-500 font-medium">Otros cargos:</span>
+                                    <span className="text-slate-800 font-semibold">{formatCurrency(otherChargesAmount)}</span>
+                                </div>
+                            )}
+
+                            <div className="flex justify-between items-center text-sm pt-2 border-t border-slate-100">
+                                <span className="text-slate-600 font-bold">Total bruto:</span>
+                                <span className="text-slate-900 font-bold">{formatCurrency(grossTotal)}</span>
                             </div>
-                            <div className="flex justify-between text-sm text-slate-600">
-                                <span>Retención ({withholdingRate}%):</span>
-                                <span>- {formatCurrency(withholdingAmount)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm text-slate-600">
-                                <span>Otros cargos:</span>
-                                <span>{formatCurrency(otherChargesAmount)}</span>
-                            </div>
-                            <div className="flex justify-between text-sm text-slate-600">
-                                <span>Total bruto:</span>
-                                <span>{formatCurrency(grossTotal)}</span>
-                            </div>
-                            <div className="flex justify-between text-2xl font-bold pt-5 mt-2 border-t-2 border-dashed border-slate-200 text-slate-900">
-                                <span>Total Neto</span>
-                                <span className="text-blue-600">{formatCurrency(netTotal)}</span>
+
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col gap-1 mt-4">
+                                <div className="flex justify-between items-center w-full">
+                                    <span className="text-sm font-bold text-slate-600 uppercase tracking-wider">Total Neto</span>
+                                    <span className="text-3xl font-extrabold text-blue-600 tracking-tight">{formatCurrency(netTotal)}</span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 text-right">Impuestos y retenciones aplicados</span>
                             </div>
                         </div>
 
-                        <div className="flex flex-col gap-3 pt-4 border-t border-slate-100">
-                            <Button type="submit" className="w-full h-14 text-base font-semibold shadow-sm hover:shadow-md transition-all hover:scale-[1.02]" disabled={loading}>
-                                {loading ? 'Creando...' : (
+                        <div className="flex flex-col gap-3 pt-6 border-t border-slate-100">
+                            <Button
+                                type="submit"
+                                className="w-full h-14 text-base font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20 hover:shadow-xl hover:shadow-blue-600/30 transition-all hover:-translate-y-0.5"
+                                disabled={loading}
+                            >
+                                {loading ? 'Procesando...' : (
                                     <>
                                         <CheckCircle2 className="mr-2 h-5 w-5" />
-                                        Crear Orden de Compra
+                                        Emitir Orden de Compra
                                     </>
                                 )}
                             </Button>
                             <Button
                                 type="button"
-                                variant="outline"
-                                className="w-full"
+                                variant="ghost"
+                                className="w-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                                 onClick={() => navigate('/mrp/purchase-orders')}
                             >
                                 Cancelar
