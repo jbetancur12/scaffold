@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ClipboardList, Printer, ShoppingCart, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ClipboardList, FileDown, ShoppingCart, XCircle } from 'lucide-react';
 import { PurchaseRequisitionStatus } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 import { usePurchaseRequisitionQuery, useUpdatePurchaseRequisitionStatusMutation } from '@/hooks/mrp/usePurchaseRequisitions';
+import { mrpApi } from '@/services/mrpApi';
 
 const statusConfig: Record<PurchaseRequisitionStatus, { label: string; classes: string }> = {
     [PurchaseRequisitionStatus.PENDIENTE]: {
@@ -60,8 +61,24 @@ export default function PurchaseRequisitionDetailPage() {
         }
     };
 
-    const handlePrintPdf = () => {
-        window.print();
+    const handleDownloadPdf = async () => {
+        if (!id) return;
+        try {
+            const blob = await mrpApi.getPurchaseRequisitionPdf(id);
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `REQ-${id.slice(0, 8).toUpperCase()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            URL.revokeObjectURL(link.href);
+            document.body.removeChild(link);
+        } catch (err) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(err, 'No se pudo generar el PDF de la requisición'),
+                variant: 'destructive',
+            });
+        }
     };
 
     if (loading) return <div className="p-6">Cargando requisición...</div>;
@@ -107,9 +124,9 @@ export default function PurchaseRequisitionDetailPage() {
                         </div>
 
                         <div className="flex flex-wrap gap-2 print-hidden">
-                            <Button variant="outline" onClick={handlePrintPdf}>
-                                <Printer className="mr-2 h-4 w-4" />
-                                Guardar PDF
+                            <Button variant="outline" onClick={handleDownloadPdf}>
+                                <FileDown className="mr-2 h-4 w-4" />
+                                Descargar PDF
                             </Button>
                             {requisition.status === PurchaseRequisitionStatus.PENDIENTE && (
                                 <Button

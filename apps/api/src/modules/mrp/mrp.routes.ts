@@ -191,6 +191,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/purchase-requisitions', (req, res, next) => mrpController.createPurchaseRequisition(req, res, next));
     router.get('/purchase-requisitions', (req, res, next) => mrpController.listPurchaseRequisitions(req, res, next));
     router.get('/purchase-requisitions/:id', (req, res, next) => mrpController.getPurchaseRequisition(req, res, next));
+    router.get('/purchase-requisitions/:id/pdf', (req, res, next) => mrpController.downloadPurchaseRequisitionPdf(req, res, next));
     router.patch('/purchase-requisitions/:id/status', (req, res, next) => mrpController.updatePurchaseRequisitionStatus(req, res, next));
     router.post('/purchase-requisitions/:id/mark-converted', (req, res, next) => mrpController.markPurchaseRequisitionConverted(req, res, next));
     router.post('/production-orders/:id/purchase-requisition', (req, res, next) => mrpController.createPurchaseRequisitionFromProductionOrder(req, res, next));

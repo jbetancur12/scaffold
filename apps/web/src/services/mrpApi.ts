@@ -443,6 +443,10 @@ export const mrpApi = {
         const response = await api.get<PurchaseRequisition>(`/mrp/purchase-requisitions/${id}`);
         return response.data;
     },
+    getPurchaseRequisitionPdf: async (id: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/purchase-requisitions/${id}/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
+    },
     updatePurchaseRequisitionStatus: async (id: string, status: PurchaseRequisitionStatus): Promise<PurchaseRequisition> => {
         const response = await api.patch<PurchaseRequisition>(`/mrp/purchase-requisitions/${id}/status`, { status });
         return response.data;

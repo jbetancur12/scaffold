@@ -7,6 +7,7 @@ import { InventoryService } from './services/inventory.service';
 import { ProductionService } from './services/production.service';
 import { PurchaseOrderService } from './services/purchase-order.service';
 import { PurchaseOrderPdfService } from './services/purchase-order-pdf.service';
+import { PurchaseRequisitionPdfService } from './services/purchase-requisition-pdf.service';
 import { PackagingFormPdfService } from './services/packaging-form-pdf.service';
 import { FinishedInspectionFormPdfService } from './services/finished-inspection-form-pdf.service';
 import { PurchaseRequisitionService } from './services/purchase-requisition.service';
@@ -2002,6 +2003,23 @@ export class MrpController {
             const row = await this.purchaseRequisitionService.getById(id);
             if (!row) throw new AppError('Requisición no encontrada', 404);
             return ApiResponse.success(res, row);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadPurchaseRequisitionPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const em = RequestContext.getEntityManager()!;
+            const pdfService = new PurchaseRequisitionPdfService(em);
+            const { fileName, buffer } = await pdfService.generatePurchaseRequisitionPdf(id);
+            res.set({
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `attachment; filename="${fileName}"`,
+                'Content-Length': buffer.length,
+            });
+            return res.send(buffer);
         } catch (error) {
             next(error);
         }
