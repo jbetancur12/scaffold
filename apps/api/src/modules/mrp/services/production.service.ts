@@ -36,6 +36,7 @@ import { RawMaterialLot } from '../entities/raw-material-lot.entity';
 import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { ProductionMaterialAllocation } from '../entities/production-material-allocation.entity';
 import { SalesOrder } from '../entities/sales-order.entity';
+import { BOMItem } from '../entities/bom-item.entity';
 import { DocumentControlService } from './document-control.service';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema, ReturnProductionMaterialSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
 import { z } from 'zod';
@@ -138,12 +139,12 @@ export class ProductionService {
     ): number {
         const units = Number(productionUnits);
         const perUnitQty = Number(bomQuantityPerUnit);
-        if (!Number.isFinite(units) || units <= 0 || !Number.isFinite(perUnitQty) || perUnitQty <= 0) {
+        if (!Number.isFinite(units) || units <= 0) {
             return 0;
         }
 
         // Default behavior for legacy/manual BOM rows.
-        const linearRequired = perUnitQty * units;
+        const linearRequired = (Number.isFinite(perUnitQty) && perUnitQty > 0) ? perUnitQty * units : 0;
         if (!fabricationParams) {
             return linearRequired;
         }
@@ -845,7 +846,7 @@ export class ProductionService {
         pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[],
         selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
     }[]> {
-        const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] });
+        const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant'] });
 
         const requirements = new Map<string, {
             material: RawMaterial,
@@ -856,12 +857,25 @@ export class ProductionService {
             selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
         }>();
 
+        const variantIds = order.items.getItems().map((row) => row.variant.id);
+        const bomRows = variantIds.length > 0
+            ? await this.em.find(BOMItem, { variant: { $in: variantIds } }, { populate: ['variant', 'rawMaterial'] })
+            : [];
+        const bomByVariant = new Map<string, BOMItem[]>();
+        for (const bomRow of bomRows) {
+            const key = bomRow.variant.id;
+            const list = bomByVariant.get(key) || [];
+            list.push(bomRow);
+            bomByVariant.set(key, list);
+        }
+
         // 1. Calculate Required
         for (const item of order.items) {
             const variant = item.variant;
             const productionQty = item.quantity;
+            const variantBomItems = bomByVariant.get(variant.id) || [];
 
-            for (const bomItem of variant.bomItems) {
+            for (const bomItem of variantBomItems) {
                 const rawMaterialId = bomItem.rawMaterial.id;
                 const requiredQty = this.calculateRequiredMaterialFromFabrication(
                     Number(bomItem.quantity),
