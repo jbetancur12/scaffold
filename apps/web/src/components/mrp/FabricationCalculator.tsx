@@ -397,8 +397,8 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
 
                                         <FabricationLayoutPreview
                                             rollWidth={rollWidth}
-                                            pieceWidth={pieceLength}
-                                            pieceLength={pieceWidth}
+                                            pieceWidth={pieceWidth}
+                                            pieceLength={pieceLength}
                                             orientation="rotated"
                                             result={rotatedResult}
                                         />
