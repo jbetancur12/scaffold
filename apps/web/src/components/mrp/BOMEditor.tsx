@@ -50,6 +50,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
     const [newItem, setNewItem] = useState<{
         materialId: string;
         quantity: string;
+        usageNote: string;
         fabricationParams?: {
             rollWidth: number;
             pieceWidth: number;
@@ -59,6 +60,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
     }>({
         materialId: '',
         quantity: '',
+        usageNote: '',
     });
 
     const loadBOM = useCallback(async () => {
@@ -84,6 +86,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                 variantId: variant.id,
                 rawMaterialId: newItem.materialId,
                 quantity: quantity,
+                usageNote: newItem.usageNote.trim() || undefined,
                 fabricationParams: newItem.fabricationParams || undefined
             };
 
@@ -100,7 +103,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                 toast({ title: 'Material agregado' });
             }
 
-            setNewItem({ materialId: '', quantity: '' });
+            setNewItem({ materialId: '', quantity: '', usageNote: '' });
             setEditingItemId(null);
             loadBOM(); // Reload to refresh list and costs if backend updates them
         } catch (error: unknown) {
@@ -119,13 +122,14 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
         setNewItem({
             materialId: item.rawMaterialId,
             quantity: item.quantity.toString(),
+            usageNote: item.usageNote || '',
             fabricationParams: item.fabricationParams
         });
     };
 
     const handleCancelEdit = () => {
         setEditingItemId(null);
-        setNewItem({ materialId: '', quantity: '' });
+        setNewItem({ materialId: '', quantity: '', usageNote: '' });
     };
 
     const handleDeleteItem = async (id: string) => {
@@ -186,6 +190,11 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                     <TableCell>
                                         <div className="flex flex-col">
                                             <span>{material?.name || item.rawMaterialId}</span>
+                                            {item.usageNote && (
+                                                <span className="mt-1 inline-flex w-fit rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                                    Para: {item.usageNote}
+                                                </span>
+                                            )}
                                             {item.fabricationParams && (
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className="text-xs text-slate-500">
@@ -249,22 +258,31 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                         {/* New/Edit Item Row */}
                         <TableRow className="bg-slate-50 border-t-2 border-slate-100">
                             <TableCell>
-                                <Select
-                                    value={newItem.materialId}
-                                    onValueChange={(val) => setNewItem({ ...newItem, materialId: val })}
-                                    disabled={!!editingItemId} // Disable material change during edit for simplicity, or allow if desired
-                                >
-                                    <SelectTrigger className="w-full h-9">
-                                        <SelectValue placeholder="Seleccionar Material" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {materials.map(m => (
-                                            <SelectItem key={m.id} value={m.id}>
-                                                {m.name} ({m.sku}) - ${(m.averageCost && m.averageCost > 0 ? m.averageCost : m.cost).toFixed(2)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <div className="space-y-2">
+                                    <Select
+                                        value={newItem.materialId}
+                                        onValueChange={(val) => setNewItem({ ...newItem, materialId: val })}
+                                        disabled={!!editingItemId} // Disable material change during edit for simplicity, or allow if desired
+                                    >
+                                        <SelectTrigger className="w-full h-9">
+                                            <SelectValue placeholder="Seleccionar Material" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {materials.map(m => (
+                                                <SelectItem key={m.id} value={m.id}>
+                                                    {m.name} ({m.sku}) - ${(m.averageCost && m.averageCost > 0 ? m.averageCost : m.cost).toFixed(2)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Input
+                                        value={newItem.usageNote}
+                                        onChange={e => setNewItem({ ...newItem, usageNote: e.target.value })}
+                                        placeholder="Opcional: para qué es este material"
+                                        maxLength={160}
+                                        className="h-9"
+                                    />
+                                </div>
                             </TableCell>
                             <TableCell>
                                 <div className="flex gap-2 items-center">

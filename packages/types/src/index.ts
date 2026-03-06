@@ -626,6 +626,7 @@ export interface BOMItem {
     variantId: string;
     rawMaterialId: string;
     quantity: number;
+    usageNote?: string;
     fabricationParams?: {
         calculationType?: 'area' | 'linear';
         quantityPerUnit?: number;

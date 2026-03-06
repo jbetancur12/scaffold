@@ -448,6 +448,7 @@ export class MrpService {
             variant,
             rawMaterial,
             quantity: data.quantity,
+            usageNote: data.usageNote,
             fabricationParams: data.fabricationParams,
         } as unknown as BOMItem);
 
@@ -471,6 +472,7 @@ export class MrpService {
 
         // Update fields
         if (data.quantity !== undefined) item.quantity = data.quantity;
+        if (data.usageNote !== undefined) item.usageNote = data.usageNote || undefined;
         if (data.fabricationParams !== undefined) item.fabricationParams = data.fabricationParams;
         if (data.rawMaterialId !== undefined) {
             const rawMaterial = await this.rawMaterialRepo.findOneOrFail({ id: data.rawMaterialId });

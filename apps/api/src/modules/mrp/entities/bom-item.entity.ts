@@ -25,6 +25,9 @@ export class BOMItem extends BaseEntity implements IBOMItem {
     @Property({ type: 'decimal', precision: 10, scale: 4 })
     quantity!: number;
 
+    @Property({ fieldName: 'usage_note', type: 'text', nullable: true })
+    usageNote?: string;
+
     @Property({ type: 'json', nullable: true })
     fabricationParams?: {
         rollWidth: number;

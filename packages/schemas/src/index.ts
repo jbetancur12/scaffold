@@ -238,6 +238,7 @@ export const BOMItemSchema = z.object({
     variantId: z.string().uuid(),
     rawMaterialId: z.string().uuid(),
     quantity: z.number().min(0),
+    usageNote: z.string().trim().max(160).optional(),
     fabricationParams: z.object({
         calculationType: z.enum(['area', 'linear']).default('area'),
         quantityPerUnit: z.number().default(1),
