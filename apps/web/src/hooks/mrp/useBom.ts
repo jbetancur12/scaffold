@@ -22,6 +22,10 @@ export const useCopyBomFromVariantMutation = () => {
     return useMrpMutation<{ sourceVariantId: string; targetVariantId: string }, BOMItem[]>(
         async ({ sourceVariantId, targetVariantId }) => {
             const sourceBom = await mrpApi.getBOM(sourceVariantId);
+            const targetBom = await mrpApi.getBOM(targetVariantId);
+
+            await Promise.all(targetBom.map((item) => mrpApi.deleteBOMItem(item.id)));
+
             if (sourceBom.length === 0) {
                 return [];
             }
@@ -31,6 +35,7 @@ export const useCopyBomFromVariantMutation = () => {
                     variantId: targetVariantId,
                     rawMaterialId: item.rawMaterialId,
                     quantity: item.quantity,
+                    usageNote: item.usageNote,
                     fabricationParams: item.fabricationParams || undefined,
                 }))
             );

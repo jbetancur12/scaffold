@@ -13,6 +13,14 @@ import { useCopyBomFromVariantMutation } from '@/hooks/mrp/useBom';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { Badge } from '@/components/ui/badge';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function ProductBOMPage() {
     const { id } = useParams();
@@ -20,6 +28,8 @@ export default function ProductBOMPage() {
     const { toast } = useToast();
 
     const [refreshToken, setRefreshToken] = useState(0);
+    const [copyConfirmOpen, setCopyConfirmOpen] = useState(false);
+    const [pendingCopy, setPendingCopy] = useState<{ sourceVariantId: string; targetVariantId: string } | null>(null);
     const { data: productData, loading: loadingProduct, error: productError } = useProductQuery(id);
     const { materials, loading: loadingMaterials, error: materialsError } = useRawMaterialsQuery(1, 1000, '');
     const { execute: copyBomFromVariant, loading: copyingBom } = useCopyBomFromVariantMutation();
@@ -49,20 +59,31 @@ export default function ProductBOMPage() {
     }
 
     const variants = product.variants || [];
+    const sourceVariant = pendingCopy ? variants.find((variant) => variant.id === pendingCopy.sourceVariantId) : undefined;
+    const targetVariant = pendingCopy ? variants.find((variant) => variant.id === pendingCopy.targetVariantId) : undefined;
 
-    const handleCopyBOM = async (targetVariantId: string, sourceVariantId: string) => {
+    const handleRequestCopyBOM = (targetVariantId: string, sourceVariantId: string) => {
         if (!sourceVariantId) return;
-        if (!confirm('¿Estás seguro de copiar la lista de materiales? Esto agregará los materiales de la variante origen a la actual.')) return;
+        setPendingCopy({ sourceVariantId, targetVariantId });
+        setCopyConfirmOpen(true);
+    };
+
+    const handleCopyBOM = async () => {
+        if (!pendingCopy) return;
 
         try {
-            const sourceBOM = await copyBomFromVariant({ sourceVariantId, targetVariantId });
+            const sourceBOM = await copyBomFromVariant(pendingCopy);
 
             if (sourceBOM.length === 0) {
-                toast({ title: 'Aviso', description: 'La variante origen no tiene materiales en su receta.' });
+                toast({ title: 'Aviso', description: 'La variante origen no tiene materiales. La receta actual quedó vacía.' });
+                setCopyConfirmOpen(false);
+                setPendingCopy(null);
                 return;
             }
-            toast({ title: 'Éxito', description: 'Receta copiada correctamente' });
+            toast({ title: 'Éxito', description: 'Receta reemplazada correctamente' });
             setRefreshToken((prev) => prev + 1);
+            setCopyConfirmOpen(false);
+            setPendingCopy(null);
         } catch (error) {
             toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo copiar la receta'), variant: 'destructive' });
         }
@@ -70,6 +91,36 @@ export default function ProductBOMPage() {
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300">
+            <Dialog
+                open={copyConfirmOpen}
+                onOpenChange={(open) => {
+                    setCopyConfirmOpen(open);
+                    if (!open) setPendingCopy(null);
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Reemplazar receta de la variante</DialogTitle>
+                        <DialogDescription>
+                            {sourceVariant && targetVariant
+                                ? <>Se copiaran los materiales de <span className="font-semibold text-slate-800">{sourceVariant.name}</span> y se eliminara la receta actual de <span className="font-semibold text-slate-800">{targetVariant.name}</span>.</>
+                                : 'Esta accion reemplazara por completo la receta actual de la variante destino.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        La variante destino perdera los materiales que tenga en este momento.
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCopyConfirmOpen(false)} disabled={copyingBom}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleCopyBOM} disabled={copyingBom}>
+                            {copyingBom ? 'Copiando...' : 'Reemplazar receta'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Header Section */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-start gap-4">
@@ -166,7 +217,7 @@ export default function ProductBOMPage() {
                                                     className="h-9 w-full sm:w-auto min-w-[140px] rounded-md border-0 bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-fuchsia-600 cursor-pointer disabled:cursor-not-allowed"
                                                     disabled={copyingBom}
                                                     onChange={(e) => {
-                                                        if (e.target.value) handleCopyBOM(variant.id, e.target.value);
+                                                        if (e.target.value) handleRequestCopyBOM(variant.id, e.target.value);
                                                         e.target.value = ''; // Reset
                                                     }}
                                                 >
