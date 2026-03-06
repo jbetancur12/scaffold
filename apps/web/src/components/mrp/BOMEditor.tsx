@@ -18,7 +18,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Trash2, Plus, Edit2, Save } from 'lucide-react';
+import { Trash2, Plus, Edit2, Save, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { BOMItemSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
@@ -38,6 +38,18 @@ interface BOMEditorProps {
     materials: RawMaterial[];
 }
 
+interface BOMItemDraft {
+    materialId: string;
+    quantity: string;
+    usageNote: string;
+    fabricationParams?: {
+        rollWidth: number;
+        pieceWidth: number;
+        pieceLength: number;
+        orientation: 'normal' | 'rotated';
+    };
+}
+
 export default function BOMEditor({ variant, materials }: BOMEditorProps) {
     const { toast } = useToast();
     const [bomItems, setBomItems] = useState<BOMItem[]>([]);
@@ -45,19 +57,10 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
 
     // Edit state
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
+    const [editDraft, setEditDraft] = useState<BOMItemDraft | null>(null);
 
     // New item form state
-    const [newItem, setNewItem] = useState<{
-        materialId: string;
-        quantity: string;
-        usageNote: string;
-        fabricationParams?: {
-            rollWidth: number;
-            pieceWidth: number;
-            pieceLength: number;
-            orientation: 'normal' | 'rotated';
-        };
-    }>({
+    const [newItem, setNewItem] = useState<BOMItemDraft>({
         materialId: '',
         quantity: '',
         usageNote: '',
@@ -117,9 +120,42 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
         }
     };
 
+    const handleUpdateItem = async () => {
+        if (!editingItemId || !editDraft) return;
+
+        try {
+            const quantity = parseFloat(editDraft.quantity);
+            const payload = {
+                variantId: variant.id,
+                rawMaterialId: editDraft.materialId,
+                quantity,
+                usageNote: editDraft.usageNote.trim() || undefined,
+                fabricationParams: editDraft.fabricationParams || undefined,
+            };
+
+            BOMItemSchema.parse(payload);
+
+            setLoading(true);
+            await mrpApi.updateBOMItem(editingItemId, payload);
+            toast({ title: 'Material actualizado' });
+
+            setEditingItemId(null);
+            setEditDraft(null);
+            loadBOM();
+        } catch (error: unknown) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'Error al actualizar material'),
+                variant: 'destructive',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleEditItem = (item: BOMItem) => {
         setEditingItemId(item.id);
-        setNewItem({
+        setEditDraft({
             materialId: item.rawMaterialId,
             quantity: item.quantity.toString(),
             usageNote: item.usageNote || '',
@@ -129,7 +165,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
 
     const handleCancelEdit = () => {
         setEditingItemId(null);
-        setNewItem({ materialId: '', quantity: '', usageNote: '' });
+        setEditDraft(null);
     };
 
     const handleDeleteItem = async (id: string) => {
@@ -184,72 +220,144 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                             const subtotal = item.quantity * unitCost;
 
                             const isEditing = editingItemId === item.id;
+                            const draftMaterialId = editDraft?.materialId || item.rawMaterialId;
+                            const draftUnitCost = getMaterialCost(draftMaterialId);
+                            const draftSubtotal = draftUnitCost * (parseFloat(editDraft?.quantity || '0') || 0);
 
                             return (
                                 <TableRow key={item.id} className={isEditing ? 'bg-blue-50/50' : ''}>
                                     <TableCell>
-                                        <div className="flex flex-col">
-                                            <span>{material?.name || item.rawMaterialId}</span>
-                                            {item.usageNote && (
-                                                <span className="mt-1 inline-flex w-fit rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                                                    Para: {item.usageNote}
-                                                </span>
-                                            )}
-                                            {item.fabricationParams && (
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="text-xs text-slate-500">
-                                                        {item.fabricationParams.orientation === 'rotated' ? 'Rotada' : 'Normal'}
-                                                        ({item.fabricationParams.pieceWidth}x{item.fabricationParams.pieceLength}cm)
-                                                        {item.fabricationParams.quantityPerUnit && item.fabricationParams.quantityPerUnit > 1
-                                                            ? ` x ${item.fabricationParams.quantityPerUnit} pz`
-                                                            : ''}
+                                        {isEditing && editDraft ? (
+                                            <div className="space-y-2">
+                                                <Select
+                                                    value={editDraft.materialId}
+                                                    onValueChange={(val) => setEditDraft({ ...editDraft, materialId: val })}
+                                                >
+                                                    <SelectTrigger className="w-full h-9 bg-white">
+                                                        <SelectValue placeholder="Seleccionar Material" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {materials.map(m => (
+                                                            <SelectItem key={m.id} value={m.id}>
+                                                                {m.name} ({m.sku}) - ${(m.averageCost && m.averageCost > 0 ? m.averageCost : m.cost).toFixed(2)}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Input
+                                                    value={editDraft.usageNote}
+                                                    onChange={e => setEditDraft({ ...editDraft, usageNote: e.target.value })}
+                                                    placeholder="Opcional: para qué es este material"
+                                                    maxLength={160}
+                                                    className="h-9 bg-white"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col">
+                                                <span>{material?.name || item.rawMaterialId}</span>
+                                                {item.usageNote && (
+                                                    <span className="mt-1 inline-flex w-fit rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                                                        Para: {item.usageNote}
                                                     </span>
-                                                    <Dialog>
-                                                        <DialogTrigger asChild>
-                                                            <Button size="sm" variant="outline" className="h-5 text-[10px] px-2">
-                                                                Ver Trazada
-                                                            </Button>
-                                                        </DialogTrigger>
-                                                        <DialogContent>
-                                                            <DialogHeader>
-                                                                <DialogTitle>Trazada de Fabricación</DialogTitle>
-                                                                <DialogDescription>
-                                                                    Visualización de cómo se cortan las piezas en el rollo.
-                                                                </DialogDescription>
-                                                            </DialogHeader>
-                                                            <FabricationLayoutPreview
-                                                                calculationType={item.fabricationParams.calculationType}
-                                                                rollWidth={item.fabricationParams.rollWidth}
-                                                                pieceWidth={item.fabricationParams.pieceWidth}
-                                                                pieceLength={item.fabricationParams.pieceLength}
-                                                                orientation={item.fabricationParams.orientation}
-                                                            />
-                                                            <div className="text-xs text-slate-500 mt-2 text-center">
-                                                                Ancho del Rollo: {item.fabricationParams.rollWidth}cm
-                                                                {item.fabricationParams.quantityPerUnit && item.fabricationParams.quantityPerUnit > 1 && (
-                                                                    <div className="font-semibold text-emerald-600">
-                                                                        Calculado para {item.fabricationParams.quantityPerUnit} piezas por unidad.
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </DialogContent>
-                                                    </Dialog>
-                                                </div>
-                                            )}
-                                        </div>
+                                                )}
+                                                {item.fabricationParams && (
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="text-xs text-slate-500">
+                                                            {item.fabricationParams.orientation === 'rotated' ? 'Rotada' : 'Normal'}
+                                                            ({item.fabricationParams.pieceWidth}x{item.fabricationParams.pieceLength}cm)
+                                                            {item.fabricationParams.quantityPerUnit && item.fabricationParams.quantityPerUnit > 1
+                                                                ? ` x ${item.fabricationParams.quantityPerUnit} pz`
+                                                                : ''}
+                                                        </span>
+                                                        <Dialog>
+                                                            <DialogTrigger asChild>
+                                                                <Button size="sm" variant="outline" className="h-5 text-[10px] px-2">
+                                                                    Ver Trazada
+                                                                </Button>
+                                                            </DialogTrigger>
+                                                            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[720px]">
+                                                                <DialogHeader>
+                                                                    <DialogTitle>Trazada de Fabricación</DialogTitle>
+                                                                    <DialogDescription>
+                                                                        Visualización de cómo se cortan las piezas en el rollo.
+                                                                    </DialogDescription>
+                                                                </DialogHeader>
+                                                                <FabricationLayoutPreview
+                                                                    calculationType={item.fabricationParams.calculationType}
+                                                                    rollWidth={item.fabricationParams.rollWidth}
+                                                                    pieceWidth={item.fabricationParams.pieceWidth}
+                                                                    pieceLength={item.fabricationParams.pieceLength}
+                                                                    orientation={item.fabricationParams.orientation}
+                                                                />
+                                                                <div className="text-xs text-slate-500 mt-2 text-center">
+                                                                    Ancho del Rollo: {item.fabricationParams.rollWidth}cm
+                                                                    {item.fabricationParams.quantityPerUnit && item.fabricationParams.quantityPerUnit > 1 && (
+                                                                        <div className="font-semibold text-emerald-600">
+                                                                            Calculado para {item.fabricationParams.quantityPerUnit} piezas por unidad.
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </TableCell>
-                                    <TableCell>{item.quantity}</TableCell>
-                                    <TableCell>{material?.unit || '-'}</TableCell>
-                                    <TableCell className="text-right">${unitCost.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-medium">${subtotal.toFixed(2)}</TableCell>
+                                    <TableCell>
+                                        {isEditing && editDraft ? (
+                                            <div className="flex gap-2 items-center">
+                                                <Input
+                                                    type="number"
+                                                    value={editDraft.quantity}
+                                                    onChange={e => setEditDraft({ ...editDraft, quantity: e.target.value })}
+                                                    placeholder="0.00"
+                                                    min="0"
+                                                    step="0.0001"
+                                                    className="h-9 bg-white"
+                                                />
+                                                <FabricationCalculator
+                                                    onCalculate={(qty, params) => setEditDraft({ ...editDraft, quantity: qty.toString(), fabricationParams: params })}
+                                                />
+                                            </div>
+                                        ) : item.quantity}
+                                    </TableCell>
+                                    <TableCell>{isEditing && editDraft ? getMaterialUnit(editDraft.materialId) : material?.unit || '-'}</TableCell>
+                                    <TableCell className="text-right">{isEditing && editDraft ? `$${draftUnitCost.toFixed(2)}` : `$${unitCost.toFixed(2)}`}</TableCell>
+                                    <TableCell className="text-right font-medium">{isEditing && editDraft ? `$${draftSubtotal.toFixed(2)}` : `$${subtotal.toFixed(2)}`}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-1">
-                                            <Button variant="ghost" size="sm" onClick={() => handleEditItem(item)} className="text-slate-400 hover:text-primary h-8 w-8 p-0">
-                                                <Edit2 className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="sm" onClick={() => handleDeleteItem(item.id)} className="text-slate-400 hover:text-red-700 h-8 w-8 p-0">
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                            {isEditing ? (
+                                                <>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={handleCancelEdit}
+                                                        className="text-slate-400 hover:text-slate-700 h-8 w-8 p-0"
+                                                        title="Cancelar"
+                                                    >
+                                                        <X className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={handleUpdateItem}
+                                                        disabled={loading || !editDraft?.materialId || !editDraft?.quantity}
+                                                        className="h-8 w-8 p-0 bg-primary hover:bg-primary/90"
+                                                        title="Actualizar"
+                                                    >
+                                                        <Save className="h-4 w-4" />
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Button variant="ghost" size="sm" onClick={() => handleEditItem(item)} className="text-slate-400 hover:text-primary h-8 w-8 p-0">
+                                                        <Edit2 className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteItem(item.id)} className="text-slate-400 hover:text-red-700 h-8 w-8 p-0">
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </>
+                                            )}
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -321,7 +429,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                             className="h-8 w-8 p-0 text-slate-400"
                                             title="Cancelar"
                                         >
-                                            <Trash2 className="h-4 w-4 rotate-45" /> {/* Use X icon ideally, reusing Trash for now as 'cancel' visual implies stop */}
+                                            <X className="h-4 w-4" />
                                         </Button>
                                     )}
                                     <Button

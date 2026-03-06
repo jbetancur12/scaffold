@@ -31,8 +31,13 @@ export default function FabricationLayoutPreview({
         const barHeight = 20;
 
         return (
-            <div className="w-full mt-2 bg-slate-100 border border-slate-300 rounded overflow-hidden p-2">
-                <svg viewBox={`0 -10 ${materialLen} ${barHeight + 20}`} className="w-full h-auto block" preserveAspectRatio="none">
+            <div className="mt-2 overflow-hidden rounded border border-slate-300 bg-slate-100 p-2">
+                <div className="flex h-28 w-full items-center justify-center overflow-hidden rounded bg-white/60">
+                    <svg
+                        viewBox={`0 -10 ${materialLen} ${barHeight + 20}`}
+                        className="block h-full w-full"
+                        preserveAspectRatio="xMidYMid meet"
+                    >
                     {/* Background helps see the full length */}
                     <rect x="0" y="0" width={materialLen} height={barHeight} fill="#e2e8f0" stroke="#94a3b8" strokeWidth="0.5" />
 
@@ -81,7 +86,8 @@ export default function FabricationLayoutPreview({
                     <text x={materialLen / 2} y={-2} textAnchor="middle" fontSize="6" fill="#475569">
                         Largo Total: {materialLen} {waste > 0 ? `(Sobran ${waste.toFixed(2)})` : ''}
                     </text>
-                </svg>
+                    </svg>
+                </div>
             </div>
         );
     }
@@ -101,16 +107,23 @@ export default function FabricationLayoutPreview({
     // For rotated layouts, swap piece dimensions in the visual representation.
     const renderWidth = orientation === 'rotated' ? pieceLength : pieceWidth;
     const renderLength = orientation === 'rotated' ? pieceWidth : pieceLength;
+    const pieceLabel = `${Number(renderWidth.toFixed(2))} x ${Number(renderLength.toFixed(2))} cm`;
 
     // ViewBox matches the physical dimensions: 0 0 RollWidth 100cm (1 meter representative sample)
     const viewHeight = Math.max(100, renderLength * 1.1);
 
     // Text size relative to width, clamped
     const fontSize = Math.max(2, Math.min(rollWidth / 25, 5));
+    const canRenderInternalLabel = renderWidth >= 18 && renderLength >= 18;
 
     return (
-        <div className="w-full mt-2 bg-slate-100 border border-slate-300 rounded overflow-hidden">
-            <svg viewBox={`0 -${fontSize * 4} ${rollWidth} ${viewHeight + (fontSize * 4)}`} className="w-full h-auto block" preserveAspectRatio="xMidYMin meet">
+        <div className="mt-2 overflow-hidden rounded border border-slate-300 bg-slate-100 p-2">
+            <div className="flex h-56 w-full items-center justify-center overflow-hidden rounded bg-white/60">
+                <svg
+                    viewBox={`0 -${fontSize * 4} ${rollWidth} ${viewHeight + (fontSize * 4)}`}
+                    className="block h-full w-full"
+                    preserveAspectRatio="xMidYMid meet"
+                >
                 {/* Background / Fabric */}
                 <rect x="0" y="0" width={rollWidth} height={viewHeight} fill="#e2e8f0" />
 
@@ -148,17 +161,17 @@ export default function FabricationLayoutPreview({
                                     strokeWidth="0.5"
                                     fillOpacity="0.8"
                                 />
-                                {isFirst && (
+                                {isFirst && canRenderInternalLabel && (
                                     <text
                                         x={(colIndex * renderWidth) + (renderWidth / 2)}
                                         y={(rowIndex * renderLength) + (renderLength / 2)}
                                         textAnchor="middle"
                                         dominantBaseline="middle"
                                         fill="white"
-                                        fontSize={Math.min(renderWidth, renderLength) / 4}
+                                        fontSize={Math.max(4, Math.min(renderWidth, renderLength) / 4)}
                                         fontWeight="bold"
                                     >
-                                        {renderWidth}x{renderLength}
+                                        {pieceLabel}
                                     </text>
                                 )}
                             </g>
@@ -175,7 +188,26 @@ export default function FabricationLayoutPreview({
                     fill="#fecaca" // Red-200
                     fillOpacity="0.5"
                 />
-            </svg>
+                </svg>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-600">
+                <div className="rounded border border-slate-200 bg-white/80 px-2 py-1">
+                    Pieza: <span className="font-semibold">{pieceLabel}</span>
+                </div>
+                <div className="rounded border border-slate-200 bg-white/80 px-2 py-1">
+                    Orientacion: <span className="font-semibold">{orientation === 'rotated' ? 'Rotada' : 'Normal'}</span>
+                </div>
+                <div className="rounded border border-slate-200 bg-white/80 px-2 py-1">
+                    Piezas por fila: <span className="font-semibold">{res.piecesPerWidth}</span>
+                </div>
+                <div className="rounded border border-slate-200 bg-white/80 px-2 py-1">
+                    Muestra: <span className="font-semibold">1 m de avance</span>
+                </div>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                <span>Muestra escalada para ajustarse al modal</span>
+                <span>{canRenderInternalLabel ? 'Etiqueta visible en la primera pieza' : 'Etiqueta fuera del dibujo por tamano de pieza'}</span>
+            </div>
         </div>
     );
 }

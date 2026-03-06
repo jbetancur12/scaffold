@@ -205,7 +205,7 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                     <Calculator className="h-4 w-4" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
+            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[700px]">
                 <DialogHeader>
                     <DialogTitle>Calculadora de Material</DialogTitle>
                     <DialogDescription>
