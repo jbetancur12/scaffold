@@ -439,6 +439,32 @@ export const PaginationQuerySchema = z.object({
     limit: z.coerce.number().int().positive().optional(),
 });
 
+const YearMonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Formato inválido. Usa YYYY-MM');
+
+export const ProductionAnalyticsQuerySchema = z.object({
+    month: YearMonthSchema.optional(),
+    from: YearMonthSchema.optional(),
+    to: YearMonthSchema.optional(),
+    groupBy: z.enum(['product', 'variant', 'customer']).optional(),
+    limit: z.coerce.number().int().positive().max(50).optional(),
+    status: z.string().optional(),
+}).superRefine((data, ctx) => {
+    if (!data.month && !(data.from && data.to)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['month'],
+            message: 'Debes enviar month o from/to',
+        });
+    }
+    if (data.month && (data.from || data.to)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['month'],
+            message: 'Usa month o from/to, no ambos',
+        });
+    }
+});
+
 export const ListRawMaterialsQuerySchema = PaginationQuerySchema.extend({
     search: z.string().optional(),
 });
@@ -1418,6 +1444,7 @@ export type CreateSalesOrderPayload = DateInputValue<z.input<typeof CreateSalesO
 export type UpdateSalesOrderPayload = DateInputValue<z.input<typeof UpdateSalesOrderSchema>>;
 export type ListSalesOrdersFilters = DateInputValue<z.input<typeof ListSalesOrdersQuerySchema>>;
 export type UpdateSalesOrderStatusPayload = DateInputValue<z.input<typeof UpdateSalesOrderStatusSchema>>;
+export type ProductionAnalyticsFilters = DateInputValue<z.input<typeof ProductionAnalyticsQuerySchema>>;
 export type CalculateThreadConsumptionPayload = DateInputValue<z.input<typeof CalculateThreadConsumptionSchema>>;
 export type CreateProductThreadProcessPayload = DateInputValue<z.input<typeof CreateProductThreadProcessSchema>>;
 export type UpdateProductThreadProcessPayload = DateInputValue<z.input<typeof UpdateProductThreadProcessSchema>>;

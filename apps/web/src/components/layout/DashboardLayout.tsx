@@ -22,7 +22,8 @@ import {
     Megaphone,
     ChevronDown,
     ChevronRight,
-    Boxes
+    Boxes,
+    BarChart3,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
@@ -78,6 +79,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: ShoppingCart, label: 'Cotizaciones', path: '/mrp/quotations', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Package, label: 'Pedidos de Clientes', path: '/mrp/sales-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Factory, label: 'Órdenes de Producción', path: '/mrp/production-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: BarChart3, label: 'Analíticas Producción', path: '/mrp/production-analytics', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Inventario', path: '/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Almacenes', path: '/mrp/warehouses', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Scissors, label: 'Calculadora de Hilo', path: '/mrp/thread-calculator', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
@@ -95,7 +97,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         },
         {
             label: 'Operación',
-            items: ['/mrp/sales-orders', '/mrp/quotations', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/inventory', '/mrp/warehouses', '/mrp/thread-calculator'],
+            items: ['/mrp/sales-orders', '/mrp/quotations', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/production-analytics', '/mrp/inventory', '/mrp/warehouses', '/mrp/thread-calculator'],
         },
         {
             label: 'Parámetros',

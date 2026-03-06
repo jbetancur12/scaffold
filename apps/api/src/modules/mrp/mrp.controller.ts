@@ -22,6 +22,7 @@ import { ThreadConsumptionService } from './services/thread-consumption.service'
 import { ThreadProcessService } from './services/thread-process.service';
 import { QuotationService } from './services/quotation.service';
 import { QuotationPdfService } from './services/quotation-pdf.service';
+import { ProductionAnalyticsService } from './services/production-analytics.service';
 import {
     ProductSchema,
     UpdateProductSchema,
@@ -147,7 +148,9 @@ import {
     CreateProductThreadProcessSchema,
     ListProductThreadProcessesQuerySchema,
     UpdateProductThreadProcessSchema,
+    ProductionAnalyticsQuerySchema,
 } from '@scaffold/schemas';
+import { ProductionOrderStatus } from '@scaffold/types';
 import { ApiResponse, AppError } from '../../shared/utils/response';
 
 export class MrpController {
@@ -183,6 +186,17 @@ export class MrpController {
     private get quotationService() { return new QuotationService(this.em); }
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
     private get threadProcessService() { return new ThreadProcessService(this.em); }
+    private get productionAnalyticsService() { return new ProductionAnalyticsService(this.em); }
+
+    private parseProductionStatusFilter(raw?: string): ProductionOrderStatus[] | undefined {
+        if (!raw) return undefined;
+        const allowed = new Set(Object.values(ProductionOrderStatus));
+        const parsed = raw
+            .split(',')
+            .map((token) => token.trim())
+            .filter((token): token is ProductionOrderStatus => allowed.has(token as ProductionOrderStatus));
+        return parsed.length > 0 ? parsed : undefined;
+    }
 
     // --- Products ---
     async createProduct(req: Request, res: Response, next: NextFunction) {
@@ -754,6 +768,102 @@ export class MrpController {
             const { id } = req.params;
             const batches = await this.productionService.listBatches(id);
             return ApiResponse.success(res, batches);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionAnalyticsSummary(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = ProductionAnalyticsQuerySchema.parse(req.query);
+            const data = await this.productionAnalyticsService.getSummary({
+                month: query.month,
+                from: query.from,
+                to: query.to,
+                statuses: this.parseProductionStatusFilter(query.status),
+            });
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionAnalyticsTrend(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = ProductionAnalyticsQuerySchema.parse(req.query);
+            const data = await this.productionAnalyticsService.getTrend({
+                month: query.month,
+                from: query.from,
+                to: query.to,
+                statuses: this.parseProductionStatusFilter(query.status),
+            });
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionAnalyticsTopProducts(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = ProductionAnalyticsQuerySchema.parse(req.query);
+            const data = await this.productionAnalyticsService.getTopProducts({
+                month: query.month,
+                from: query.from,
+                to: query.to,
+                limit: query.limit,
+                statuses: this.parseProductionStatusFilter(query.status),
+            });
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionAnalyticsTopCustomers(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = ProductionAnalyticsQuerySchema.parse(req.query);
+            const data = await this.productionAnalyticsService.getTopCustomers({
+                month: query.month,
+                from: query.from,
+                to: query.to,
+                limit: query.limit,
+                statuses: this.parseProductionStatusFilter(query.status),
+            });
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionAnalyticsDetail(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = ProductionAnalyticsQuerySchema.parse(req.query);
+            const data = await this.productionAnalyticsService.getDetail({
+                month: query.month,
+                from: query.from,
+                to: query.to,
+                groupBy: query.groupBy,
+                statuses: this.parseProductionStatusFilter(query.status),
+            });
+            return ApiResponse.success(res, data);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async exportProductionAnalyticsCsv(req: Request, res: Response, next: NextFunction) {
+        try {
+            const query = ProductionAnalyticsQuerySchema.parse(req.query);
+            const file = await this.productionAnalyticsService.exportDetailCsv({
+                month: query.month,
+                from: query.from,
+                to: query.to,
+                groupBy: query.groupBy,
+                statuses: this.parseProductionStatusFilter(query.status),
+            });
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
         } catch (error) {
             next(error);
         }

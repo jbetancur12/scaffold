@@ -37,6 +37,7 @@ import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
 import ThreadCalculatorPage from '@/pages/mrp/ThreadCalculatorPage';
 import WarehouseListPage from '@/pages/mrp/WarehouseListPage';
 import WarehouseFormPage from '@/pages/mrp/WarehouseFormPage';
+import ProductionAnalyticsPage from '@/pages/mrp/ProductionAnalyticsPage';
 import { qualitySections } from '@/constants/mrpNavigation';
 import {
     PostmarketRecallPage,
@@ -158,6 +159,7 @@ export default function App() {
                         <Route path="/mrp/production-orders/new" element={<ProductionOrderFormPage />} />
                         <Route path="/mrp/production-orders/:id" element={<ProductionOrderDetailPage />} />
                         <Route path="/mrp/production-orders/:id/edit" element={<ProductionOrderFormPage />} />
+                        <Route path="/mrp/production-analytics" element={<ProductionAnalyticsPage />} />
 
                         <Route path="/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
                         <Route path="/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />

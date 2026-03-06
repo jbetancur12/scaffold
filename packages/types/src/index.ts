@@ -1380,6 +1380,73 @@ export interface BatchDhrExportFile {
     content: string;
 }
 
+export type ProductionAnalyticsDetailGroupBy = 'product' | 'variant' | 'customer';
+
+export interface ProductionAnalyticsSummary {
+    period: {
+        from: string | Date;
+        to: string | Date;
+        month?: string;
+    };
+    kpis: {
+        producedQty: number;
+        plannedQty: number;
+        inProgressQty: number;
+        completionRatePercent: number;
+        activeOrders: number;
+        completedOrders: number;
+    };
+}
+
+export interface ProductionAnalyticsTrendPoint {
+    month: string;
+    producedQty: number;
+    plannedQty: number;
+    inProgressQty: number;
+}
+
+export interface ProductionAnalyticsTopProduct {
+    productId: string;
+    productName: string;
+    variantId: string;
+    variantName: string;
+    variantSku: string;
+    producedQty: number;
+    plannedQty: number;
+    orderCount: number;
+}
+
+export interface ProductionAnalyticsTopCustomer {
+    customerId?: string;
+    customerName: string;
+    producedQty: number;
+    orderCount: number;
+}
+
+export interface ProductionAnalyticsDetailRow {
+    key: string;
+    label: string;
+    producedQty: number;
+    plannedQty: number;
+    inProgressQty: number;
+    completionRatePercent: number;
+    orderCount: number;
+    productName?: string;
+    variantName?: string;
+    variantSku?: string;
+    customerName?: string;
+}
+
+export interface ProductionAnalyticsDetailResult {
+    period: {
+        from: string | Date;
+        to: string | Date;
+        month?: string;
+    };
+    groupBy: ProductionAnalyticsDetailGroupBy;
+    rows: ProductionAnalyticsDetailRow[];
+}
+
 // MRP API payloads (shared contracts)
 export interface CreateProductionBatchPayload {
     variantId: string;

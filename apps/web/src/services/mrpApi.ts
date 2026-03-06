@@ -80,6 +80,12 @@ import {
     Quotation,
     QuotationStatus,
     QuotationListResponse,
+    ProductionAnalyticsSummary,
+    ProductionAnalyticsTrendPoint,
+    ProductionAnalyticsTopProduct,
+    ProductionAnalyticsTopCustomer,
+    ProductionAnalyticsDetailResult,
+    ProductionAnalyticsDetailGroupBy,
     UpsertProductionBatchPackagingFormPayload,
     UpsertProductionBatchFinishedInspectionFormPayload,
 } from '@scaffold/types';
@@ -156,6 +162,7 @@ import type {
     CalculateThreadConsumptionPayload,
     CreateProductThreadProcessPayload,
     UpdateProductThreadProcessPayload,
+    ProductionAnalyticsFilters,
 } from '@scaffold/schemas';
 
 export interface MaterialRequirement {
@@ -827,6 +834,30 @@ export const mrpApi = {
     },
     getProductionBatchFinishedInspectionFormPdf: async (batchId: string): Promise<Blob> => {
         const response = await api.get(`/mrp/production-batches/${batchId}/finished-inspection-form/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    getProductionAnalyticsSummary: async (filters: ProductionAnalyticsFilters): Promise<ProductionAnalyticsSummary> => {
+        const response = await api.get('/mrp/analytics/production/summary', { params: filters });
+        return response.data;
+    },
+    getProductionAnalyticsTrend: async (filters: ProductionAnalyticsFilters): Promise<ProductionAnalyticsTrendPoint[]> => {
+        const response = await api.get('/mrp/analytics/production/trend', { params: filters });
+        return response.data;
+    },
+    getProductionAnalyticsTopProducts: async (filters: ProductionAnalyticsFilters): Promise<ProductionAnalyticsTopProduct[]> => {
+        const response = await api.get('/mrp/analytics/production/top-products', { params: filters });
+        return response.data;
+    },
+    getProductionAnalyticsTopCustomers: async (filters: ProductionAnalyticsFilters): Promise<ProductionAnalyticsTopCustomer[]> => {
+        const response = await api.get('/mrp/analytics/production/top-customers', { params: filters });
+        return response.data;
+    },
+    getProductionAnalyticsDetail: async (filters: ProductionAnalyticsFilters & { groupBy?: ProductionAnalyticsDetailGroupBy }): Promise<ProductionAnalyticsDetailResult> => {
+        const response = await api.get('/mrp/analytics/production/detail', { params: filters });
+        return response.data;
+    },
+    exportProductionAnalyticsCsv: async (filters: ProductionAnalyticsFilters & { groupBy?: ProductionAnalyticsDetailGroupBy }): Promise<Blob> => {
+        const response = await api.get('/mrp/analytics/production/export.csv', { params: filters, responseType: 'blob' });
         return response.data as Blob;
     },
 

@@ -33,6 +33,17 @@ export const mrpQueryKeys = {
     productionOrder: (id: string) => `mrp.production-order.${id}`,
     productionBatches: (id: string) => `mrp.production-batches.${id}`,
     productionRequirements: (id: string) => `mrp.production-requirements.${id}`,
+    productionAnalytics: 'mrp.production-analytics',
+    productionAnalyticsSummary: (month?: string, from?: string, to?: string, status?: string) =>
+        `mrp.production-analytics.summary.${month || ''}.${from || ''}.${to || ''}.${status || ''}`,
+    productionAnalyticsTrend: (month?: string, from?: string, to?: string, status?: string) =>
+        `mrp.production-analytics.trend.${month || ''}.${from || ''}.${to || ''}.${status || ''}`,
+    productionAnalyticsTopProducts: (month?: string, from?: string, to?: string, status?: string, limit?: number) =>
+        `mrp.production-analytics.top-products.${month || ''}.${from || ''}.${to || ''}.${status || ''}.${limit || ''}`,
+    productionAnalyticsTopCustomers: (month?: string, from?: string, to?: string, status?: string, limit?: number) =>
+        `mrp.production-analytics.top-customers.${month || ''}.${from || ''}.${to || ''}.${status || ''}.${limit || ''}`,
+    productionAnalyticsDetail: (month?: string, from?: string, to?: string, status?: string, groupBy?: string) =>
+        `mrp.production-analytics.detail.${month || ''}.${from || ''}.${to || ''}.${status || ''}.${groupBy || ''}`,
     operationalConfig: 'mrp.operational-config',
     qualityNonConformities: 'mrp.quality.non-conformities',
     qualityCapas: 'mrp.quality.capa-actions',

@@ -91,6 +91,12 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/production-batches/:batchId/finished-inspection-form/pdf', (req, res, next) => mrpController.downloadProductionBatchFinishedInspectionFormPdf(req, res, next));
     router.patch('/production-batch-units/:unitId/qc', (req, res, next) => mrpController.updateProductionBatchUnitQc(req, res, next));
     router.patch('/production-batch-units/:unitId/packaging', (req, res, next) => mrpController.updateProductionBatchUnitPackaging(req, res, next));
+    router.get('/analytics/production/summary', (req, res, next) => mrpController.getProductionAnalyticsSummary(req, res, next));
+    router.get('/analytics/production/trend', (req, res, next) => mrpController.getProductionAnalyticsTrend(req, res, next));
+    router.get('/analytics/production/top-products', (req, res, next) => mrpController.getProductionAnalyticsTopProducts(req, res, next));
+    router.get('/analytics/production/top-customers', (req, res, next) => mrpController.getProductionAnalyticsTopCustomers(req, res, next));
+    router.get('/analytics/production/detail', (req, res, next) => mrpController.getProductionAnalyticsDetail(req, res, next));
+    router.get('/analytics/production/export.csv', (req, res, next) => mrpController.exportProductionAnalyticsCsv(req, res, next));
 
     // Quality / INVIMA
     router.post('/quality/non-conformities', requireRole(qualityEditors), (req, res, next) => mrpController.createNonConformity(req, res, next));
