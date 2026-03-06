@@ -47,7 +47,7 @@ export class IncomingInspection extends BaseEntity implements IIncomingInspectio
     @Enum(() => IncomingInspectionStatus)
     status: IncomingInspectionStatus = IncomingInspectionStatus.PENDIENTE;
 
-    @Enum(() => IncomingInspectionResult)
+    @Enum({ items: () => IncomingInspectionResult, nullable: true })
     inspectionResult?: IncomingInspectionResult;
 
     @Property({ nullable: true })
