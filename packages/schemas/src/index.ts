@@ -1049,13 +1049,6 @@ export const ResolveIncomingInspectionSchema = z.object({
             message: 'Resultado condicional no libera cantidades: registra 0 aceptado y 0 rechazado',
         });
     }
-    if (data.quantityAccepted > 0 && !data.supplierLotCode?.trim()) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ['supplierLotCode'],
-            message: 'Debes registrar el lote del proveedor cuando existe cantidad aceptada',
-        });
-    }
     if (
         (data.inspectionResult === IncomingInspectionResult.CONDICIONAL ||
             data.inspectionResult === IncomingInspectionResult.RECHAZADO) &&
