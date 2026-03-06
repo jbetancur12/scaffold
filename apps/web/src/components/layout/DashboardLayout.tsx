@@ -43,13 +43,23 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, isChild }: SidebarIte
     <button
         onClick={onClick}
         className={cn(
-            "sidebar-link w-full",
-            active && "sidebar-link-active",
-            isChild && "pl-11 py-1.5 h-auto text-xs opacity-80 hover:opacity-100"
+            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative",
+            active
+                ? "bg-primary/10 text-primary font-medium shadow-sm ring-1 ring-primary/10"
+                : "text-slate-600 hover:bg-slate-100/80 hover:text-slate-900",
+            isChild ? "pl-[2.75rem] py-2 text-[13px]" : "text-sm",
+            "active:scale-[0.98]"
         )}
     >
-        <Icon className={cn("h-5 w-5", isChild && "h-4 w-4")} />
-        <span>{label}</span>
+        {active && !isChild && (
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 bg-primary rounded-r-full shadow-[0_0_8px_rgba(var(--primary),0.5)]" />
+        )}
+        <Icon className={cn(
+            "transition-colors flex-shrink-0",
+            isChild ? "h-[1.125rem] w-[1.125rem]" : "h-5 w-5",
+            active ? "text-primary" : "text-slate-400 group-hover:text-slate-500"
+        )} />
+        <span className="truncate text-left">{label}</span>
     </button>
 );
 
@@ -143,29 +153,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             />
 
             {/* MRP Group */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
                 <button
                     onClick={() => setIsMrpOpen(!isMrpOpen)}
                     className={cn(
-                        "sidebar-link w-full justify-between pr-4",
-                        isMrpActive && "text-primary font-medium bg-primary/5"
+                        "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group select-none",
+                        isMrpActive ? "bg-slate-100/80" : "hover:bg-slate-50"
                     )}
                 >
                     <div className="flex items-center gap-3">
-                        <Boxes className="h-5 w-5" />
-                        <span>Módulo MRP</span>
+                        <div className={cn(
+                            "flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm border",
+                            isMrpActive ? "bg-primary text-white border-primary/20" : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300 group-hover:text-slate-700"
+                        )}>
+                            <Boxes className="h-4 w-4" />
+                        </div>
+                        <span className={cn(
+                            "text-sm font-semibold tracking-tight",
+                            isMrpActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
+                        )}>Módulo MRP</span>
                     </div>
-                    {isMrpOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    {isMrpOpen ? <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200" />}
                 </button>
 
                 {isMrpOpen && (
-                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300 ease-out fill-mode-both pb-2">
                         {mrpCategories.map((category) => {
                             const categoryItems = filteredMrpItems.filter((item) => category.items.includes(item.path));
                             if (categoryItems.length === 0) return null;
                             return (
                                 <div key={category.label} className="space-y-1 pt-1">
-                                    <div className="pl-11 pr-2 text-[10px] uppercase tracking-wide text-slate-400">{category.label}</div>
+                                    <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">{category.label}</div>
                                     {categoryItems.map((item) => (
                                         <SidebarItem
                                             key={item.path}
@@ -187,29 +205,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* Quality Group */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
                 <button
                     onClick={() => setIsQualityOpen(!isQualityOpen)}
                     className={cn(
-                        "sidebar-link w-full justify-between pr-4",
-                        isQualityActive && "text-primary font-medium bg-primary/5"
+                        "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group select-none",
+                        isQualityActive ? "bg-slate-100/80" : "hover:bg-slate-50"
                     )}
                 >
                     <div className="flex items-center gap-3">
-                        <ShieldCheck className="h-5 w-5" />
-                        <span>Calidad e INVIMA</span>
+                        <div className={cn(
+                            "flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm border",
+                            isQualityActive ? "bg-emerald-600 text-white border-emerald-600/20" : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300 group-hover:text-slate-700"
+                        )}>
+                            <ShieldCheck className="h-4 w-4" />
+                        </div>
+                        <span className={cn(
+                            "text-sm font-semibold tracking-tight",
+                            isQualityActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
+                        )}>Calidad e INVIMA</span>
                     </div>
-                    {isQualityOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    {isQualityOpen ? <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200" />}
                 </button>
 
                 {isQualityOpen && (
-                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300 ease-out fill-mode-both pb-2">
                         {qualitySectionCategoryOrder.map((categoryKey) => {
                             const categoryItems = qualitySections.filter((item) => item.domain === 'quality' && item.category === categoryKey);
                             if (categoryItems.length === 0) return null;
                             return (
                                 <div key={categoryKey} className="space-y-1 pt-1">
-                                    <div className="pl-11 pr-2 text-[10px] uppercase tracking-wide text-slate-400">
+                                    <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">
                                         {qualitySectionCategoryLabels[categoryKey]}
                                     </div>
                                     {categoryItems.map((item) => (
@@ -233,29 +259,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* Postmarket Group */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
                 <button
                     onClick={() => setIsPostmarketOpen(!isPostmarketOpen)}
                     className={cn(
-                        "sidebar-link w-full justify-between pr-4",
-                        isPostmarketActive && "text-primary font-medium bg-primary/5"
+                        "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group select-none",
+                        isPostmarketActive ? "bg-slate-100/80" : "hover:bg-slate-50"
                     )}
                 >
                     <div className="flex items-center gap-3">
-                        <Megaphone className="h-5 w-5" />
-                        <span>Postmercado</span>
+                        <div className={cn(
+                            "flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm border",
+                            isPostmarketActive ? "bg-blue-600 text-white border-blue-600/20" : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300 group-hover:text-slate-700"
+                        )}>
+                            <Megaphone className="h-4 w-4" />
+                        </div>
+                        <span className={cn(
+                            "text-sm font-semibold tracking-tight",
+                            isPostmarketActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
+                        )}>Postmercado</span>
                     </div>
-                    {isPostmarketOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    {isPostmarketOpen ? <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200" />}
                 </button>
 
                 {isPostmarketOpen && (
-                    <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
+                    <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300 ease-out fill-mode-both pb-2">
                         {qualitySectionCategoryOrder.map((categoryKey) => {
                             const categoryItems = qualitySections.filter((item) => item.domain === 'postmarket' && item.category === categoryKey);
                             if (categoryItems.length === 0) return null;
                             return (
                                 <div key={`post-${categoryKey}`} className="space-y-1 pt-1">
-                                    <div className="pl-11 pr-2 text-[10px] uppercase tracking-wide text-slate-400">
+                                    <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">
                                         {qualitySectionCategoryLabels[categoryKey]}
                                     </div>
                                     {categoryItems.map((item) => (
@@ -293,14 +327,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
 
     return (
-        <div className="min-h-screen bg-[#f8fafc] flex">
+        <div className="min-h-screen bg-slate-50 flex">
             {/* Desktop Sidebar */}
-            <aside className="hidden lg:flex flex-col w-72 bg-white border-r border-slate-200 p-6 sticky top-0 h-screen">
-                <div className="flex items-center gap-3 mb-10 px-2">
+            <aside className="hidden lg:flex flex-col w-[280px] bg-white border-r border-slate-200/60 p-4 sticky top-0 h-screen shadow-sm z-40">
+                <div className="flex items-center gap-3 mb-6 px-3 py-2">
                     <img
                         src={logo}
                         alt="Colortópedicas"
-                        className="h-12 w-auto object-contain"
+                        className="h-[52px] w-auto object-contain"
                     />
                 </div>
 
@@ -308,22 +342,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {renderNavItems()}
                 </nav>
 
-                <div className="mt-auto pt-6 border-t border-slate-100">
-                    <div className="flex items-center gap-3 px-2 mb-6">
-                        <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200">
-                            <UserCircle className="h-6 w-6 text-slate-500" />
+                <div className="mt-auto pt-4 pb-2 border-t border-slate-200/60">
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 mb-2">
+                        <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center border border-slate-200 shadow-sm flex-shrink-0">
+                            <UserCircle className="h-6 w-6 text-slate-400" />
                         </div>
-                        <div className="flex flex-col overflow-hidden">
-                            <span className="text-sm font-semibold truncate text-slate-900">{user?.email}</span>
-                            <span className="text-xs text-slate-500">{user ? roleLabels[user.role] : ''}</span>
+                        <div className="flex flex-col min-w-0 flex-1">
+                            <span className="text-sm font-semibold truncate text-slate-900" title={user?.email}>{user?.email}</span>
+                            <span className="text-xs font-medium text-slate-500 truncate">{user ? roleLabels[user.role] : ''}</span>
                         </div>
                     </div>
                     <Button
                         variant="ghost"
-                        className="w-full justify-start text-slate-500 hover:text-destructive hover:bg-destructive/5"
+                        className="w-full justify-start text-slate-600 hover:text-destructive hover:bg-destructive/10 transition-colors rounded-lg h-10 px-3"
                         onClick={handleLogout}
                     >
-                        <LogOut className="mr-3 h-5 w-5" />
+                        <LogOut className="mr-3 h-4 w-4" />
                         Cerrar sesión
                     </Button>
                 </div>
@@ -339,19 +373,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Mobile Sidebar */}
             <aside className={cn(
-                "fixed inset-y-0 left-0 w-72 bg-white z-50 transform transition-transform duration-300 lg:hidden p-6",
+                "fixed inset-y-0 left-0 w-[280px] bg-white z-50 transform transition-transform duration-300 ease-in-out lg:hidden p-4 shadow-2xl",
                 isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
             )}>
-                <div className="flex items-center justify-between mb-10 px-2">
+                <div className="flex items-center justify-between mb-6 px-3 py-2">
                     <div className="flex items-center gap-3">
                         <img
                             src={logo}
                             alt="Colortópedicas"
-                            className="h-12 w-auto object-contain"
+                            className="h-[52px] w-auto object-contain"
                         />
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)}>
-                        <X className="h-6 w-6" />
+                    <Button variant="ghost" size="icon" className="hover:bg-slate-100 rounded-full h-8 w-8" onClick={() => setIsMobileMenuOpen(false)}>
+                        <X className="h-5 w-5 text-slate-500" />
                     </Button>
                 </div>
 
