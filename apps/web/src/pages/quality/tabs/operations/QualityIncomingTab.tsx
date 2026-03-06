@@ -771,7 +771,7 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                       <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Trazabilidad documental</p>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         {[
-                          { key: 'supplierLotCode' as const, label: 'Lote proveedor', placeholder: 'Requerido si hay aceptado', mono: true },
+                          { key: 'supplierLotCode' as const, label: 'Lote proveedor', placeholder: 'Opcional (si vacío, se genera lote interno)', mono: true },
                           { key: 'certificateRef' as const, label: 'Certificado / COA', placeholder: 'Requerido para aprobado/condicional' },
                           { key: 'invoiceNumber' as const, label: 'Factura / remisión N°', placeholder: 'Requerido si hay cantidad aceptada', mono: true },
                         ].map(({ key, label, placeholder, mono }) => (
