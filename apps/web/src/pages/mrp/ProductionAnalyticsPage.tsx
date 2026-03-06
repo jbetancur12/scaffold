@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { BarChart3, Download, Factory, Loader2, Package, Users } from 'lucide-react';
+import { ArrowDown, ArrowUp, BarChart3, Download, Factory, Loader2, Package, Users } from 'lucide-react';
 import {
     useProductionAnalyticsDetailQuery,
     useProductionAnalyticsSummaryQuery,
@@ -36,12 +36,17 @@ const groupOptions: Array<{ value: ProductionAnalyticsDetailGroupBy; label: stri
     { value: 'customer', label: 'Por cliente' },
 ];
 
+type DetailSortColumn = 'label' | 'producedQty' | 'plannedQty' | 'inProgressQty' | 'completionRatePercent' | 'orderCount';
+type SortDirection = 'asc' | 'desc';
+
 export default function ProductionAnalyticsPage() {
     const { toast } = useToast();
     const [month, setMonth] = useState(nowMonth);
     const [status, setStatus] = useState<string>('all');
     const [groupBy, setGroupBy] = useState<ProductionAnalyticsDetailGroupBy>('variant');
     const [exporting, setExporting] = useState(false);
+    const [sortColumn, setSortColumn] = useState<DetailSortColumn>('producedQty');
+    const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
     const filters = useMemo(() => ({
         month,
@@ -69,6 +74,41 @@ export default function ProductionAnalyticsPage() {
         const rows = trend || [];
         return rows.reduce((max, row) => Math.max(max, row.producedQty, row.plannedQty), 0) || 1;
     }, [trend]);
+
+    const sortedDetailRows = useMemo(() => {
+        const rows = [...(detail?.rows || [])];
+        rows.sort((a, b) => {
+            const aValue = a[sortColumn];
+            const bValue = b[sortColumn];
+
+            if (typeof aValue === 'string' && typeof bValue === 'string') {
+                const compare = aValue.localeCompare(bValue, 'es', { sensitivity: 'base' });
+                return sortDirection === 'asc' ? compare : -compare;
+            }
+
+            const aNumber = Number(aValue || 0);
+            const bNumber = Number(bValue || 0);
+            if (aNumber === bNumber) return 0;
+            return sortDirection === 'asc' ? aNumber - bNumber : bNumber - aNumber;
+        });
+        return rows;
+    }, [detail?.rows, sortColumn, sortDirection]);
+
+    const toggleSort = (column: DetailSortColumn) => {
+        if (sortColumn === column) {
+            setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+            return;
+        }
+        setSortColumn(column);
+        setSortDirection(column === 'label' ? 'asc' : 'desc');
+    };
+
+    const sortIcon = (column: DetailSortColumn) => {
+        if (sortColumn !== column) return null;
+        return sortDirection === 'asc'
+            ? <ArrowUp className="h-3.5 w-3.5 ml-1" />
+            : <ArrowDown className="h-3.5 w-3.5 ml-1" />;
+    };
 
     const handleExport = async () => {
         try {
@@ -267,16 +307,40 @@ export default function ProductionAnalyticsPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Grupo</TableHead>
-                                <TableHead className="text-right">Producido</TableHead>
-                                <TableHead className="text-right">Planificado</TableHead>
-                                <TableHead className="text-right">En proceso</TableHead>
-                                <TableHead className="text-right">% Cumplimiento</TableHead>
-                                <TableHead className="text-right">Órdenes</TableHead>
+                                <TableHead>
+                                    <button type="button" className="inline-flex items-center" onClick={() => toggleSort('label')}>
+                                        Grupo {sortIcon('label')}
+                                    </button>
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    <button type="button" className="inline-flex items-center justify-end w-full" onClick={() => toggleSort('producedQty')}>
+                                        Producido {sortIcon('producedQty')}
+                                    </button>
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    <button type="button" className="inline-flex items-center justify-end w-full" onClick={() => toggleSort('plannedQty')}>
+                                        Planificado {sortIcon('plannedQty')}
+                                    </button>
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    <button type="button" className="inline-flex items-center justify-end w-full" onClick={() => toggleSort('inProgressQty')}>
+                                        En proceso {sortIcon('inProgressQty')}
+                                    </button>
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    <button type="button" className="inline-flex items-center justify-end w-full" onClick={() => toggleSort('completionRatePercent')}>
+                                        % Cumplimiento {sortIcon('completionRatePercent')}
+                                    </button>
+                                </TableHead>
+                                <TableHead className="text-right">
+                                    <button type="button" className="inline-flex items-center justify-end w-full" onClick={() => toggleSort('orderCount')}>
+                                        Órdenes {sortIcon('orderCount')}
+                                    </button>
+                                </TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {(detail?.rows || []).map((row) => (
+                            {sortedDetailRows.map((row) => (
                                 <TableRow key={row.key}>
                                     <TableCell>{row.label}</TableCell>
                                     <TableCell className="text-right">{formatNumber(row.producedQty)}</TableCell>
