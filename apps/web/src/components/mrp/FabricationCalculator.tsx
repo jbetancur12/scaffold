@@ -25,9 +25,12 @@ interface FabricationParams {
 
 interface FabricationCalculatorProps {
     onCalculate: (quantity: number, params: FabricationParams) => void;
+    initialParams?: Partial<FabricationParams>;
+    specificationWidthCm?: number;
+    specificationLengthCm?: number;
 }
 
-export default function FabricationCalculator({ onCalculate }: FabricationCalculatorProps) {
+export default function FabricationCalculator({ onCalculate, initialParams, specificationWidthCm, specificationLengthCm }: FabricationCalculatorProps) {
     const [open, setOpen] = useState(false);
     const [calcType, setCalcType] = useState<'area' | 'linear'>('area');
 
@@ -72,6 +75,20 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
         waste: number;
         consumption: number;
     } | null>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const nextCalcType = initialParams?.calculationType ?? 'area';
+        setCalcType(nextCalcType);
+        setQuantityPerUnit(Math.max(1, Number(initialParams?.quantityPerUnit ?? 1)));
+        setRollWidth(Number(
+            nextCalcType === 'area'
+                ? (specificationWidthCm || initialParams?.rollWidth || 150)
+                : (specificationLengthCm || initialParams?.rollWidth || 150)
+        ));
+        setPieceWidth(Number(initialParams?.pieceWidth || 0));
+        setPieceLength(Number(initialParams?.pieceLength || 0));
+    }, [open, initialParams, specificationWidthCm, specificationLengthCm]);
 
     const calculateArea = (rWidth: number, pWidth: number, pLength: number, qty: number) => {
         if (rWidth <= 0 || pWidth <= 0 || pLength <= 0) return null;
@@ -255,8 +272,22 @@ export default function FabricationCalculator({ onCalculate }: FabricationCalcul
                             value={rollWidth}
                             onChange={(e) => setRollWidth(Number(e.target.value))}
                             className="col-span-2"
+                            disabled={
+                                (calcType === 'area' && Boolean(specificationWidthCm && specificationWidthCm > 0))
+                                || (calcType === 'linear' && Boolean(specificationLengthCm && specificationLengthCm > 0))
+                            }
                         />
                     </div>
+                    {calcType === 'area' && specificationWidthCm && specificationWidthCm > 0 && (
+                        <div className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+                            El ancho se toma automáticamente desde la especificación seleccionada: {specificationWidthCm} cm.
+                        </div>
+                    )}
+                    {calcType === 'linear' && specificationLengthCm && specificationLengthCm > 0 && (
+                        <div className="rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-700">
+                            El largo del material se toma automáticamente desde la especificación seleccionada: {specificationLengthCm} cm.
+                        </div>
+                    )}
 
                     {calcType === 'area' && (
                         <div className="grid grid-cols-4 items-center gap-4">

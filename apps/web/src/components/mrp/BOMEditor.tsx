@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { mrpApi } from '@/services/mrpApi';
-import { BOMItem, RawMaterial, ProductVariant } from '@scaffold/types';
+import { BOMItem, RawMaterial, ProductVariant, RawMaterialSpecification, UnitType } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -44,6 +44,8 @@ interface BOMItemDraft {
     quantity: string;
     usageNote: string;
     fabricationParams?: {
+        calculationType?: 'area' | 'linear';
+        quantityPerUnit?: number;
         rollWidth: number;
         pieceWidth: number;
         pieceLength: number;
@@ -191,9 +193,74 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
     // Helper to find material name by ID for display if relation not populated deep enough or just for safety
     const getMaterialUnit = (id: string) => materials.find(m => m.id === id)?.unit || '-';
     const getMaterialSpecifications = (id: string) => materials.find(m => m.id === id)?.specifications || [];
+    const getSelectedSpecification = (materialId: string, rawMaterialSpecificationId?: string) =>
+        getMaterialSpecifications(materialId).find((spec) => spec.id === rawMaterialSpecificationId);
+    const getSpecificationLengthCm = (specification?: RawMaterialSpecification) => {
+        if (!specification?.lengthValue || !specification.lengthUnit) return undefined;
+        const lengthValue = Number(specification.lengthValue);
+        if (!Number.isFinite(lengthValue) || lengthValue <= 0) return undefined;
+        switch (specification.lengthUnit) {
+            case UnitType.METER:
+                return Number((lengthValue * 100).toFixed(4));
+            case UnitType.YARD:
+                return Number((lengthValue * 91.44).toFixed(4));
+            default:
+                return undefined;
+        }
+    };
     const getMaterialCost = (id: string) => {
         const m = materials.find(m => m.id === id);
         return (m?.averageCost && m.averageCost > 0) ? m.averageCost : (m?.cost || 0);
+    };
+    const applySpecificationWidth = (
+        draft: BOMItemDraft,
+        materialId: string,
+        rawMaterialSpecificationId?: string,
+    ): BOMItemDraft => {
+        const specification = getSelectedSpecification(materialId, rawMaterialSpecificationId);
+        const specificationWidthCm = specification?.widthCm != null ? Number(specification.widthCm) : undefined;
+        const specificationLengthCm = getSpecificationLengthCm(specification);
+        if (!draft.fabricationParams) {
+            return {
+                ...draft,
+                materialId,
+                rawMaterialSpecificationId,
+            };
+        }
+        if ((draft.fabricationParams.calculationType ?? 'area') === 'area') {
+            if (!specificationWidthCm) {
+                return {
+                    ...draft,
+                    materialId,
+                    rawMaterialSpecificationId,
+                };
+            }
+            return {
+                ...draft,
+                materialId,
+                rawMaterialSpecificationId,
+                fabricationParams: {
+                    ...draft.fabricationParams,
+                    rollWidth: specificationWidthCm,
+                },
+            };
+        }
+        if (!specificationLengthCm) {
+            return {
+                ...draft,
+                materialId,
+                rawMaterialSpecificationId,
+            };
+        }
+        return {
+            ...draft,
+            materialId,
+            rawMaterialSpecificationId,
+            fabricationParams: {
+                ...draft.fabricationParams,
+                rollWidth: specificationLengthCm,
+            },
+        };
     };
 
     type BomItemWithMaterial = BOMItem & { rawMaterial?: RawMaterial };
@@ -237,7 +304,10 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                             <div className="space-y-2">
                                                 <Select
                                                     value={editDraft.materialId}
-                                                    onValueChange={(val) => setEditDraft({ ...editDraft, materialId: val })}
+                                                    onValueChange={(val) => setEditDraft(applySpecificationWidth({
+                                                        ...editDraft,
+                                                        rawMaterialSpecificationId: '',
+                                                    }, val, undefined))}
                                                 >
                                                     <SelectTrigger className="w-full h-9 bg-white">
                                                         <SelectValue placeholder="Seleccionar Material" />
@@ -253,7 +323,11 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                                 {getMaterialSpecifications(editDraft.materialId).length > 0 ? (
                                                     <Select
                                                         value={editDraft.rawMaterialSpecificationId || '__none__'}
-                                                        onValueChange={(val) => setEditDraft({ ...editDraft, rawMaterialSpecificationId: val === '__none__' ? '' : val })}
+                                                        onValueChange={(val) => setEditDraft(applySpecificationWidth(
+                                                            editDraft,
+                                                            editDraft.materialId,
+                                                            val === '__none__' ? '' : val,
+                                                        ))}
                                                     >
                                                         <SelectTrigger className="w-full h-9 bg-white">
                                                             <SelectValue placeholder="Especificación" />
@@ -344,6 +418,9 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                                     className="h-9 bg-white"
                                                 />
                                                 <FabricationCalculator
+                                                    initialParams={editDraft.fabricationParams}
+                                                    specificationWidthCm={getSelectedSpecification(editDraft.materialId, editDraft.rawMaterialSpecificationId)?.widthCm}
+                                                    specificationLengthCm={getSpecificationLengthCm(getSelectedSpecification(editDraft.materialId, editDraft.rawMaterialSpecificationId))}
                                                     onCalculate={(qty, params) => setEditDraft({ ...editDraft, quantity: qty.toString(), fabricationParams: params })}
                                                 />
                                             </div>
@@ -396,7 +473,10 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                 <div className="space-y-2">
                                     <Select
                                         value={newItem.materialId}
-                                        onValueChange={(val) => setNewItem({ ...newItem, materialId: val })}
+                                        onValueChange={(val) => setNewItem(applySpecificationWidth({
+                                            ...newItem,
+                                            rawMaterialSpecificationId: '',
+                                        }, val, undefined))}
                                         disabled={!!editingItemId} // Disable material change during edit for simplicity, or allow if desired
                                     >
                                         <SelectTrigger className="w-full h-9">
@@ -413,7 +493,11 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                     {getMaterialSpecifications(newItem.materialId).length > 0 ? (
                                         <Select
                                             value={newItem.rawMaterialSpecificationId || '__none__'}
-                                            onValueChange={(val) => setNewItem({ ...newItem, rawMaterialSpecificationId: val === '__none__' ? '' : val })}
+                                            onValueChange={(val) => setNewItem(applySpecificationWidth(
+                                                newItem,
+                                                newItem.materialId,
+                                                val === '__none__' ? '' : val,
+                                            ))}
                                         >
                                             <SelectTrigger className="w-full h-9">
                                                 <SelectValue placeholder="Especificación" />
@@ -449,6 +533,9 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                         className="h-9"
                                     />
                                     <FabricationCalculator
+                                        initialParams={newItem.fabricationParams}
+                                        specificationWidthCm={getSelectedSpecification(newItem.materialId, newItem.rawMaterialSpecificationId)?.widthCm}
+                                        specificationLengthCm={getSpecificationLengthCm(getSelectedSpecification(newItem.materialId, newItem.rawMaterialSpecificationId))}
                                         onCalculate={(qty, params) => setNewItem({ ...newItem, quantity: qty.toString(), fabricationParams: params })}
                                     />
                                 </div>

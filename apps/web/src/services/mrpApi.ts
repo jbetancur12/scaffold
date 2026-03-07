@@ -172,6 +172,14 @@ export interface MaterialRequirement {
         sku: string;
         unit: string;
     };
+    rawMaterialSpecification?: {
+        id: string;
+        name: string;
+        sku: string;
+        widthCm?: number;
+    };
+    effectiveRollWidth?: number;
+    bomRollWidth?: number;
     required: number;
     available: number;
     potentialSuppliers: {

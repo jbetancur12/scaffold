@@ -31,6 +31,14 @@ interface Requirement {
         unit: string;
         sku: string;
     };
+    rawMaterialSpecification?: {
+        id: string;
+        name: string;
+        sku: string;
+        widthCm?: number;
+    };
+    effectiveRollWidth?: number;
+    bomRollWidth?: number;
     required: number;
     available: number;
     potentialSuppliers: SupplierInfo[];
@@ -152,6 +160,19 @@ export function ProductionRequirementsTable({ requirements, onAssignLot, savingA
                                     <TableCell>
                                         <div className="font-medium">{req.material.name}</div>
                                         <div className="text-xs text-muted-foreground">{req.material.sku}</div>
+                                        {req.rawMaterialSpecification ? (
+                                            <div className="mt-1 space-y-1">
+                                                <div className="text-xs text-sky-700">
+                                                    Esp.: {req.rawMaterialSpecification.name}
+                                                    {req.rawMaterialSpecification.widthCm ? ` · ${formatQuantity(req.rawMaterialSpecification.widthCm)} cm` : ''}
+                                                </div>
+                                                {req.effectiveRollWidth && req.bomRollWidth && Number(req.effectiveRollWidth) !== Number(req.bomRollWidth) ? (
+                                                    <div className="text-xs text-amber-700">
+                                                        Trazada ajustada: BOM {formatQuantity(req.bomRollWidth)} cm {'->'} esp. {formatQuantity(req.effectiveRollWidth)} cm
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                        ) : null}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         {formatQuantity(req.required)} {req.material.unit}

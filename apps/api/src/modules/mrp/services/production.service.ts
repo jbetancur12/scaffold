@@ -37,6 +37,7 @@ import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { ProductionMaterialAllocation } from '../entities/production-material-allocation.entity';
 import { SalesOrder } from '../entities/sales-order.entity';
 import { BOMItem } from '../entities/bom-item.entity';
+import { RawMaterialSpecification } from '../entities/raw-material-specification.entity';
 import { DocumentControlService } from './document-control.service';
 import { ProductionOrderSchema, ProductionOrderItemCreateSchema, ReturnProductionMaterialSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
 import { z } from 'zod';
@@ -107,6 +108,30 @@ export class ProductionService {
         return `${dateToken}-${variantMarker}-${String(next).padStart(2, '0')}`;
     }
 
+    private resolveEffectiveFabricationParams(
+        fabricationParams?: {
+            calculationType?: 'area' | 'linear';
+            quantityPerUnit?: number;
+            rollWidth: number;
+            pieceWidth: number;
+            pieceLength: number;
+            orientation: 'normal' | 'rotated';
+        },
+        rawMaterialSpecification?: RawMaterialSpecification | null,
+    ) {
+        if (!fabricationParams) {
+            return undefined;
+        }
+        const specWidthCm = Number(rawMaterialSpecification?.widthCm || 0);
+        if ((fabricationParams.calculationType ?? 'area') !== 'area' || !Number.isFinite(specWidthCm) || specWidthCm <= 0) {
+            return fabricationParams;
+        }
+        return {
+            ...fabricationParams,
+            rollWidth: specWidthCm,
+        };
+    }
+
     async generateNextOrderCode(tx?: EntityManager): Promise<string> {
         const manager = tx ?? this.em;
         const repo = manager.getRepository(ProductionOrder);
@@ -170,8 +195,7 @@ export class ProductionService {
             if (piecesPerBar <= 0) {
                 return linearRequired;
             }
-            const barsNeeded = Math.ceil(totalPieces / piecesPerBar);
-            return Number(((barsNeeded * materialLengthCm) / 100).toFixed(4));
+            return Number((((materialLengthCm / piecesPerBar) * totalPieces) / 100).toFixed(4));
         }
 
         const rollWidthCm = Number(fabricationParams.rollWidth);
@@ -228,11 +252,9 @@ export class ProductionService {
             if (!Number.isFinite(materialLengthCm) || !Number.isFinite(cutLengthCm) || materialLengthCm <= 0 || cutLengthCm <= 0 || totalPieces <= 0) {
                 return { requiredGross: Number(requiredGross.toFixed(4)), remnantRecoverable: 0 };
             }
-            const netUsed = Number(((totalPieces * cutLengthCm) / 100).toFixed(4));
-            const remnant = Math.max(0, Number((requiredGross - netUsed).toFixed(4)));
             return {
                 requiredGross: Number(requiredGross.toFixed(4)),
-                remnantRecoverable: remnant,
+                remnantRecoverable: 0,
             };
         }
 
@@ -842,6 +864,9 @@ export class ProductionService {
         material: RawMaterial,
         required: number,
         available: number,
+        rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku' | 'widthCm'>,
+        effectiveRollWidth?: number,
+        bomRollWidth?: number,
         potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[],
         pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[],
         selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
@@ -852,6 +877,9 @@ export class ProductionService {
             material: RawMaterial,
             required: number,
             available: number,
+            rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku' | 'widthCm'>,
+            effectiveRollWidth?: number,
+            bomRollWidth?: number,
             potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[],
             pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[],
             selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
@@ -859,7 +887,7 @@ export class ProductionService {
 
         const variantIds = order.items.getItems().map((row) => row.variant.id);
         const bomRows = variantIds.length > 0
-            ? await this.em.find(BOMItem, { variant: { $in: variantIds } }, { populate: ['variant', 'rawMaterial'] })
+            ? await this.em.find(BOMItem, { variant: { $in: variantIds } }, { populate: ['variant', 'rawMaterial', 'rawMaterialSpecification'] })
             : [];
         const bomByVariant = new Map<string, BOMItem[]>();
         for (const bomRow of bomRows) {
@@ -877,9 +905,7 @@ export class ProductionService {
 
             for (const bomItem of variantBomItems) {
                 const rawMaterialId = bomItem.rawMaterial.id;
-                const requiredQty = this.calculateRequiredMaterialFromFabrication(
-                    Number(bomItem.quantity),
-                    Number(productionQty),
+                const effectiveFabricationParams = this.resolveEffectiveFabricationParams(
                     bomItem.fabricationParams as {
                         calculationType?: 'area' | 'linear';
                         quantityPerUnit?: number;
@@ -887,7 +913,13 @@ export class ProductionService {
                         pieceWidth: number;
                         pieceLength: number;
                         orientation: 'normal' | 'rotated';
-                    } | undefined
+                    } | undefined,
+                    bomItem.rawMaterialSpecification,
+                );
+                const requiredQty = this.calculateRequiredMaterialFromFabrication(
+                    Number(bomItem.quantity),
+                    Number(productionQty),
+                    effectiveFabricationParams,
                 );
 
                 if (requirements.has(rawMaterialId)) {
@@ -897,6 +929,14 @@ export class ProductionService {
                         material: bomItem.rawMaterial,
                         required: requiredQty,
                         available: 0, // Will populate next
+                        rawMaterialSpecification: bomItem.rawMaterialSpecification ? {
+                            id: bomItem.rawMaterialSpecification.id,
+                            name: bomItem.rawMaterialSpecification.name,
+                            sku: bomItem.rawMaterialSpecification.sku,
+                            widthCm: Number(bomItem.rawMaterialSpecification.widthCm || 0) || undefined,
+                        } : undefined,
+                        effectiveRollWidth: effectiveFabricationParams?.rollWidth,
+                        bomRollWidth: bomItem.fabricationParams?.rollWidth,
                         potentialSuppliers: [], // Will populate next
                         pepsLots: [], // Will populate next
                     });
@@ -911,11 +951,17 @@ export class ProductionService {
             const inventoryItems = await this.inventoryRepo.find({
                 rawMaterial: { $in: materialIds },
                 warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
+            }, {
+                populate: ['rawMaterial', 'rawMaterialSpecification'],
             });
 
             for (const invItem of inventoryItems) {
                 if (invItem.rawMaterial && requirements.has(invItem.rawMaterial.id)) {
-                    requirements.get(invItem.rawMaterial.id)!.available += Number(invItem.quantity);
+                    const req = requirements.get(invItem.rawMaterial.id)!;
+                    const requiredSpecId = req.rawMaterialSpecification?.id;
+                    const inventorySpecId = invItem.rawMaterialSpecification?.id;
+                    if (requiredSpecId && inventorySpecId !== requiredSpecId) continue;
+                    req.available += Number(invItem.quantity);
                 }
             }
 
@@ -926,7 +972,7 @@ export class ProductionService {
                     warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
                 },
                 {
-                    populate: ['warehouse', 'rawMaterial'],
+                    populate: ['warehouse', 'rawMaterial', 'rawMaterialSpecification'],
                     orderBy: [{ receivedAt: 'ASC' }, { createdAt: 'ASC' }],
                 }
             );
@@ -934,7 +980,11 @@ export class ProductionService {
             for (const lot of lots) {
                 const materialId = lot.rawMaterial?.id;
                 if (!materialId || !requirements.has(materialId)) continue;
-                requirements.get(materialId)!.pepsLots.push({
+                const req = requirements.get(materialId)!;
+                const requiredSpecId = req.rawMaterialSpecification?.id;
+                const lotSpecId = lot.rawMaterialSpecification?.id;
+                if (requiredSpecId && lotSpecId !== requiredSpecId) continue;
+                req.pepsLots.push({
                     lotId: lot.id,
                     lotCode: lot.supplierLotCode,
                     warehouseId: lot.warehouse.id,
@@ -1019,7 +1069,7 @@ export class ProductionService {
     }
 
     async upsertMaterialAllocation(orderId: string, payload: z.infer<typeof UpsertProductionMaterialAllocationSchema>) {
-        const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial'] });
+        const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial', 'items.variant.bomItems.rawMaterialSpecification'] });
         if ([ProductionOrderStatus.COMPLETED, ProductionOrderStatus.CANCELLED].includes(order.status)) {
             throw new AppError('No puedes cambiar asignación de lotes en una OP cerrada/cancelada', 400);
         }
@@ -1036,10 +1086,13 @@ export class ProductionService {
             return { productionOrderId: orderId, rawMaterialId: payload.rawMaterialId, lotId: null };
         }
 
-        const lot = await this.rawMaterialLotRepo.findOne({ id: payload.lotId }, { populate: ['rawMaterial', 'warehouse'] });
+        const lot = await this.rawMaterialLotRepo.findOne({ id: payload.lotId }, { populate: ['rawMaterial', 'rawMaterialSpecification', 'warehouse'] });
         if (!lot) throw new AppError('Lote de materia prima no encontrado', 404);
         if (lot.rawMaterial.id !== payload.rawMaterialId) {
             throw new AppError('El lote seleccionado no corresponde a la materia prima', 400);
+        }
+        if (req.rawMaterialSpecification?.id && lot.rawMaterialSpecification?.id !== req.rawMaterialSpecification.id) {
+            throw new AppError(`El lote seleccionado no corresponde a la especificación requerida (${req.rawMaterialSpecification.name})`, 400);
         }
         if (lot.warehouse.type === WarehouseType.QUARANTINE) {
             throw new AppError('No puedes asignar un lote en cuarentena', 400);
@@ -1118,11 +1171,13 @@ export class ProductionService {
 
             let inventoryRow = await inventoryRepo.findOne({
                 rawMaterial: lot.rawMaterial.id,
+                rawMaterialSpecification: lot.rawMaterialSpecification?.id || null,
                 warehouse: lot.warehouse.id,
             });
             if (!inventoryRow) {
                 inventoryRow = inventoryRepo.create({
                     rawMaterial: lot.rawMaterial,
+                    rawMaterialSpecification: lot.rawMaterialSpecification,
                     warehouse: lot.warehouse,
                     quantity: 0,
                 } as unknown as InventoryItem);
@@ -1131,6 +1186,7 @@ export class ProductionService {
 
             const kardex = kardexRepo.create({
                 rawMaterial: lot.rawMaterial,
+                rawMaterialSpecification: lot.rawMaterialSpecification,
                 warehouse: lot.warehouse,
                 lot,
                 movementType: 'ENTRADA_DEVOLUCION_PRODUCCION',
@@ -1171,7 +1227,7 @@ export class ProductionService {
             const warehouseRepo = tx.getRepository(Warehouse);
             const order = await productionOrderRepo.findOneOrFail(
                 { id },
-                { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial', 'batches', 'batches.units', 'salesOrder'] }
+                { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial', 'items.variant.bomItems.rawMaterialSpecification', 'batches', 'batches.units', 'salesOrder'] }
             );
 
             // Basic transition validation
@@ -1237,6 +1293,7 @@ export class ProductionService {
                     required: number;
                     remnantRecoverable: number;
                     materialName: string;
+                    specificationId?: string;
                 }>();
 
                 for (const item of order.items) {
@@ -1249,9 +1306,7 @@ export class ProductionService {
                             continue;
                         }
                         const rawMaterialId = bomItem.rawMaterial.id;
-                        const breakdown = this.calculateFabricationConsumptionBreakdown(
-                            Number(bomItem.quantity),
-                            Number(producedQty),
+                        const effectiveFabricationParams = this.resolveEffectiveFabricationParams(
                             bomItem.fabricationParams as {
                                 calculationType?: 'area' | 'linear';
                                 quantityPerUnit?: number;
@@ -1259,7 +1314,13 @@ export class ProductionService {
                                 pieceWidth: number;
                                 pieceLength: number;
                                 orientation: 'normal' | 'rotated';
-                            } | undefined
+                            } | undefined,
+                            bomItem.rawMaterialSpecification,
+                        );
+                        const breakdown = this.calculateFabricationConsumptionBreakdown(
+                            Number(bomItem.quantity),
+                            Number(producedQty),
+                            effectiveFabricationParams
                         );
                         if (breakdown.requiredGross <= 0) {
                             continue;
@@ -1273,6 +1334,7 @@ export class ProductionService {
                                 required: breakdown.requiredGross,
                                 remnantRecoverable: breakdown.remnantRecoverable,
                                 materialName: bomItem.rawMaterial.name,
+                                specificationId: bomItem.rawMaterialSpecification?.id,
                             });
                         }
                     }
@@ -1290,7 +1352,7 @@ export class ProductionService {
                             quantityAvailable: { $gt: 0 },
                             warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
                         },
-                        { populate: ['rawMaterial', 'warehouse'], orderBy: [{ receivedAt: 'ASC' }, { createdAt: 'ASC' }] }
+                        { populate: ['rawMaterial', 'rawMaterialSpecification', 'warehouse'], orderBy: [{ receivedAt: 'ASC' }, { createdAt: 'ASC' }] }
                     );
 
                     const lotsByMaterial = new Map<string, RawMaterialLot[]>();
@@ -1320,7 +1382,10 @@ export class ProductionService {
                     }>();
                     for (const [materialId, requirement] of materialRequirements.entries()) {
                         let pending = Number(requirement.required);
-                        const rows = lotsByMaterial.get(materialId) || [];
+                        const rows = (lotsByMaterial.get(materialId) || []).filter((row) => {
+                            if (!requirement.specificationId) return true;
+                            return row.rawMaterialSpecification?.id === requirement.specificationId;
+                        });
                         const available = rows.reduce((sum, row) => sum + Number(row.quantityAvailable), 0);
                         if (available < pending) {
                             throw new AppError(
@@ -1336,7 +1401,7 @@ export class ProductionService {
                             const consume = Math.min(currentQty, maxQty);
                             lot.quantityAvailable = currentQty - consume;
                             pending -= consume;
-                            const key = `${materialId}::${lot.warehouse.id}`;
+                            const key = `${materialId}::${lot.warehouse.id}::${lot.rawMaterialSpecification?.id || ''}`;
                             consumedByMaterialWarehouse.set(key, Number(consumedByMaterialWarehouse.get(key) || 0) + consume);
                             const lotKey = `${materialId}::${lot.id}`;
                             const consumedLot = consumedByLot.get(lotKey);
@@ -1462,10 +1527,11 @@ export class ProductionService {
                     }
 
                     for (const [key, consumedQty] of consumedByMaterialWarehouse.entries()) {
-                        const [materialId, warehouseRowId] = key.split('::');
+                        const [materialId, warehouseRowId, specificationId] = key.split('::');
                         const inventoryRow = await inventoryRepo.findOne({
                             rawMaterial: materialId,
                             warehouse: warehouseRowId,
+                            rawMaterialSpecification: specificationId || null,
                         });
                         if (!inventoryRow) {
                             throw new AppError(`No existe inventario agregado para material ${materialId} en bodega ${warehouseRowId}`, 400);
