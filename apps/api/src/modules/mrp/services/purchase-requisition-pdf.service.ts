@@ -64,7 +64,7 @@ html(lang="es")
           .meta-k Necesario para
           .meta-v= neededBy
         .meta-card
-          .meta-k OP Asociada
+          .meta-k OP Asociadas
           .meta-v= productionOrderCode
       if notes
         .notes= notes
@@ -76,7 +76,8 @@ html(lang="es")
             th(style='width: 10%') Unidad
             th(style='width: 10%') Cantidad
             th(style='width: 20%') Proveedor Sugerido
-            th(style='width: 14%') Notas
+            th(style='width: 18%') Origen OP
+            th(style='width: 12%') Notas
         tbody
           each item in items
             tr
@@ -85,6 +86,7 @@ html(lang="es")
               td.center= item.unit
               td.right= item.quantity
               td= item.suggestedSupplier
+              td= item.sourceProductionOrders
               td= item.notes
       table.summary
         tr
@@ -280,13 +282,18 @@ export class PurchaseRequisitionPdfService {
 
     const totalQuantity = (row.items?.getItems() ?? []).reduce((sum, item) => sum + Number(item.quantity || 0), 0);
     const code = `REQ-${row.id.slice(0, 8).toUpperCase()}`;
+    const productionOrderIds = row.productionOrderIds?.length
+      ? row.productionOrderIds
+      : (row.productionOrderId ? [row.productionOrderId] : []);
     const html = compile({
       code,
       createdAt: this.formatDate(row.createdAt),
       requestedBy: row.requestedBy || 'N/A',
       status: this.getStatusLabel(String(row.status || '')),
       neededBy: this.formatDate(row.neededBy),
-      productionOrderCode: row.productionOrderId ? `OP-${row.productionOrderId.slice(0, 8).toUpperCase()}` : 'Manual',
+      productionOrderCode: productionOrderIds.length > 0
+        ? productionOrderIds.map((productionOrderId) => `OP-${productionOrderId.slice(0, 8).toUpperCase()}`).join(', ')
+        : 'Manual',
       notes: row.notes || '',
       totalItems: String(row.items?.count() || 0),
       totalQuantity: Number(totalQuantity).toLocaleString('es-CO'),
@@ -296,6 +303,11 @@ export class PurchaseRequisitionPdfService {
         unit: item.rawMaterial?.unit || '-',
         quantity: Number(item.quantity || 0).toLocaleString('es-CO'),
         suggestedSupplier: item.suggestedSupplier?.name || 'Sin sugerencia',
+        sourceProductionOrders: item.sourceProductionOrders?.length
+          ? item.sourceProductionOrders
+            .map((source) => `${source.productionOrderCode || `OP-${source.productionOrderId.slice(0, 8).toUpperCase()}`}: ${Number(source.quantity).toLocaleString('es-CO')}`)
+            .join(', ')
+          : '-',
         notes: item.notes || '',
       })),
     });

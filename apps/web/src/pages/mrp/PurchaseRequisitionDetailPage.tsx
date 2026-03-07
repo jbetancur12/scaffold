@@ -45,6 +45,9 @@ export default function PurchaseRequisitionDetailPage() {
         () => (requisition?.items ?? []).reduce((sum, item) => sum + Number(item.quantity || 0), 0),
         [requisition?.items]
     );
+    const associatedProductionOrders = requisition?.productionOrderIds?.length
+        ? requisition.productionOrderIds
+        : (requisition?.productionOrderId ? [requisition.productionOrderId] : []);
 
     const handleUpdateStatus = async (status: PurchaseRequisitionStatus) => {
         if (!id) return;
@@ -182,10 +185,19 @@ export default function PurchaseRequisitionDetailPage() {
                             </div>
                         </div>
                         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
-                            <div className="text-xs text-slate-500 uppercase tracking-wide">OP Asociada</div>
+                            <div className="text-xs text-slate-500 uppercase tracking-wide">OP Asociadas</div>
                             <div className="text-sm font-semibold text-slate-900 mt-1">
-                                {requisition.productionOrderId ? `OP-${requisition.productionOrderId.slice(0, 8).toUpperCase()}` : 'Manual'}
+                                {associatedProductionOrders.length > 0 ? `${associatedProductionOrders.length} seleccionada(s)` : 'Manual'}
                             </div>
+                            {associatedProductionOrders.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {associatedProductionOrders.map((productionOrderId) => (
+                                        <Badge key={productionOrderId} variant="outline" className="bg-white text-slate-700 border-slate-200 font-mono text-[10px]">
+                                            OP-{productionOrderId.slice(0, 8).toUpperCase()}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -212,6 +224,7 @@ export default function PurchaseRequisitionDetailPage() {
                                 <TableHead>Unidad</TableHead>
                                 <TableHead className="text-right">Cantidad</TableHead>
                                 <TableHead>Proveedor sugerido</TableHead>
+                                <TableHead>Origen OP</TableHead>
                                 <TableHead>Notas</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -225,12 +238,23 @@ export default function PurchaseRequisitionDetailPage() {
                                         {Number(item.quantity || 0).toLocaleString('es-CO')}
                                     </TableCell>
                                     <TableCell className="text-slate-700">{item.suggestedSupplier?.name || 'Sin sugerencia'}</TableCell>
+                                    <TableCell className="text-slate-600">
+                                        {item.sourceProductionOrders?.length ? (
+                                            <div className="flex flex-wrap gap-1">
+                                                {item.sourceProductionOrders.map((source) => (
+                                                    <Badge key={`${source.productionOrderId}-${source.quantity}`} variant="outline" className="bg-orange-50 text-orange-700 border-orange-200 text-[10px]">
+                                                        {(source.productionOrderCode || `OP-${source.productionOrderId.slice(0, 8).toUpperCase()}`)} · {Number(source.quantity).toLocaleString('es-CO')}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        ) : '—'}
+                                    </TableCell>
                                     <TableCell className="text-slate-600">{item.notes || '—'}</TableCell>
                                 </TableRow>
                             ))}
                             {(requisition.items?.length ?? 0) === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="text-center text-slate-500 py-10">
+                                    <TableCell colSpan={7} className="text-center text-slate-500 py-10">
                                         Esta requisición no tiene ítems.
                                     </TableCell>
                                 </TableRow>

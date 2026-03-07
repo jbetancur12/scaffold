@@ -362,6 +362,7 @@ export const CreatePurchaseOrderSchema = z.object({
 export const CreatePurchaseRequisitionSchema = z.object({
     requestedBy: z.string().min(2),
     productionOrderId: z.string().uuid().optional(),
+    productionOrderIds: z.array(z.string().uuid()).optional(),
     neededBy: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
     notes: z.string().optional(),
     items: z.array(z.object({
@@ -369,7 +370,23 @@ export const CreatePurchaseRequisitionSchema = z.object({
         quantity: z.number().min(0.01),
         suggestedSupplierId: z.string().uuid().optional(),
         notes: z.string().optional(),
+        sourceProductionOrders: z.array(z.object({
+            productionOrderId: z.string().uuid(),
+            productionOrderCode: z.string().optional(),
+            quantity: z.number().min(0.0001),
+        })).optional(),
     })).min(1),
+}).superRefine((payload, ctx) => {
+    if (payload.productionOrderId && payload.productionOrderIds?.length) {
+        const included = payload.productionOrderIds.includes(payload.productionOrderId);
+        if (!included) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'productionOrderId debe estar incluido en productionOrderIds',
+                path: ['productionOrderId'],
+            });
+        }
+    }
 });
 
 export const CreatePurchaseRequisitionFromProductionOrderSchema = z.object({

@@ -11,6 +11,9 @@ export class PurchaseRequisition extends BaseEntity {
     @Property({ nullable: true })
     productionOrderId?: string;
 
+    @Property({ type: 'json', nullable: true })
+    productionOrderIds?: string[];
+
     @Property({ nullable: true })
     neededBy?: Date;
 

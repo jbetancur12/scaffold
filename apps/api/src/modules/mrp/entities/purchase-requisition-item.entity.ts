@@ -6,6 +6,13 @@ import { Supplier } from './supplier.entity';
 
 @Entity()
 export class PurchaseRequisitionItem extends BaseEntity {
+    @Property({ type: 'json', nullable: true })
+    sourceProductionOrders?: Array<{
+        productionOrderId: string;
+        productionOrderCode?: string;
+        quantity: number;
+    }>;
+
     @ManyToOne(() => PurchaseRequisition)
     requisition!: PurchaseRequisition;
 

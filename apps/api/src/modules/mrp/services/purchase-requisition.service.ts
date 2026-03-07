@@ -12,6 +12,7 @@ export class PurchaseRequisitionService {
     async create(data: {
         requestedBy: string;
         productionOrderId?: string;
+        productionOrderIds?: string[];
         neededBy?: Date;
         notes?: string;
         items: Array<{
@@ -19,11 +20,21 @@ export class PurchaseRequisitionService {
             quantity: number;
             suggestedSupplierId?: string;
             notes?: string;
+            sourceProductionOrders?: Array<{
+                productionOrderId: string;
+                productionOrderCode?: string;
+                quantity: number;
+            }>;
         }>;
     }) {
+        const normalizedProductionOrderIds = Array.from(
+            new Set((data.productionOrderIds ?? []).filter((row) => row?.trim()).map((row) => row.trim()))
+        );
+        const primaryProductionOrderId = data.productionOrderId?.trim() || normalizedProductionOrderIds[0];
         const requisition = this.em.create(PurchaseRequisition, {
             requestedBy: data.requestedBy.trim(),
-            productionOrderId: data.productionOrderId,
+            productionOrderId: primaryProductionOrderId,
+            productionOrderIds: normalizedProductionOrderIds.length > 0 ? normalizedProductionOrderIds : (primaryProductionOrderId ? [primaryProductionOrderId] : undefined),
             neededBy: data.neededBy,
             notes: data.notes,
             status: PurchaseRequisitionStatus.PENDIENTE,
@@ -42,6 +53,7 @@ export class PurchaseRequisitionService {
                 quantity: itemData.quantity,
                 suggestedSupplier: suggestedSupplier || undefined,
                 notes: itemData.notes,
+                sourceProductionOrders: itemData.sourceProductionOrders?.length ? itemData.sourceProductionOrders : undefined,
             } as unknown as PurchaseRequisitionItem);
             requisition.items.add(item);
         }

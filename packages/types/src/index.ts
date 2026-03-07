@@ -598,12 +598,18 @@ export interface PurchaseRequisitionItem {
     quantity: number;
     suggestedSupplier?: Pick<Supplier, 'id' | 'name'>;
     notes?: string;
+    sourceProductionOrders?: Array<{
+        productionOrderId: string;
+        productionOrderCode?: string;
+        quantity: number;
+    }>;
 }
 
 export interface PurchaseRequisition {
     id: string;
     requestedBy: string;
     productionOrderId?: string;
+    productionOrderIds?: string[];
     neededBy?: string | Date;
     notes?: string;
     status: PurchaseRequisitionStatus;
@@ -1659,6 +1665,7 @@ export interface CreateEquipmentPayload {
 export interface CreatePurchaseRequisitionPayload {
     requestedBy: string;
     productionOrderId?: string;
+    productionOrderIds?: string[];
     neededBy?: string | Date;
     notes?: string;
     items: Array<{
@@ -1666,6 +1673,11 @@ export interface CreatePurchaseRequisitionPayload {
         quantity: number;
         suggestedSupplierId?: string;
         notes?: string;
+        sourceProductionOrders?: Array<{
+            productionOrderId: string;
+            productionOrderCode?: string;
+            quantity: number;
+        }>;
     }>;
 }
 

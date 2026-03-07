@@ -187,10 +187,16 @@ export default function PurchaseRequisitionListPage() {
                                                 <span className="font-semibold text-slate-800 text-sm">{row.requestedBy}</span>
                                             </TableCell>
                                             <TableCell className="py-4">
-                                                {row.productionOrderId ? (
-                                                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-mono font-semibold">
-                                                        OP-{row.productionOrderId.slice(0, 8).toUpperCase()}
-                                                    </span>
+                                                {(row.productionOrderIds?.length || row.productionOrderId) ? (
+                                                    row.productionOrderIds && row.productionOrderIds.length > 1 ? (
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 text-xs font-semibold border border-orange-200">
+                                                            {row.productionOrderIds.length} OP
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-mono font-semibold">
+                                                            OP-{(row.productionOrderIds?.[0] || row.productionOrderId || '').slice(0, 8).toUpperCase()}
+                                                        </span>
+                                                    )
                                                 ) : (
                                                     <span className="text-slate-400 text-sm italic">Manual</span>
                                                 )}

@@ -2088,6 +2088,10 @@ export class MrpController {
                         quantity: deficit,
                         suggestedSupplierId: reqRow.potentialSuppliers[0]?.supplier?.id,
                         notes: `Autogenerado desde OP ${productionOrderId}`,
+                        sourceProductionOrders: [{
+                            productionOrderId,
+                            quantity: deficit,
+                        }],
                     };
                 });
 
@@ -2098,6 +2102,7 @@ export class MrpController {
             const row = await this.purchaseRequisitionService.create({
                 requestedBy: payload.requestedBy,
                 productionOrderId,
+                productionOrderIds: [productionOrderId],
                 neededBy: payload.neededBy,
                 notes: payload.notes,
                 items: shortageItems,
