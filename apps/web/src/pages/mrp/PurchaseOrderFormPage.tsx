@@ -775,8 +775,8 @@ export default function PurchaseOrderFormPage() {
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-0 overflow-hidden transition-all hover:shadow-md duration-300">
-                        <div className="p-6 md:p-8 pb-5 flex justify-between items-center border-b border-slate-100 bg-slate-50/30">
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-0 transition-all hover:shadow-md duration-300">
+                        <div className="p-6 md:p-8 pb-5 flex justify-between items-center border-b border-slate-100 bg-slate-50/30 rounded-t-2xl">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
                                     <Package className="h-5 w-5" />
@@ -806,7 +806,7 @@ export default function PurchaseOrderFormPage() {
                                 const isExpanded = expandedItemIndex === index;
 
                                 return (
-                                    <div key={index} className={`relative p-4 sm:p-5 transition-all duration-300 ${isExpanded ? 'bg-white shadow-xl shadow-blue-900/5 rounded-xl border border-blue-200/60 z-10 my-4 mx-2 sm:mx-4 ring-4 ring-blue-50/50' : 'bg-white border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80'}`}>
+                                    <div key={index} className={`relative p-4 sm:p-5 transition-all duration-300 ${isExpanded ? 'bg-white shadow-xl shadow-blue-900/5 rounded-xl border border-blue-200/60 z-30 my-4 mx-2 sm:mx-4 ring-4 ring-blue-50/50' : 'bg-white border-b border-slate-100 last:border-b-0 hover:bg-slate-50/80 z-0'}`}>
                                         <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${isExpanded ? 'pb-4 border-b border-slate-100' : ''}`}>
                                             <div className="min-w-0 flex items-start sm:items-center gap-3">
                                                 <div className={`mt-1 sm:mt-0 shadow-sm flex shrink-0 items-center justify-center w-10 h-10 rounded-full ${item.isCatalogItem ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-slate-50 text-slate-600 border border-slate-200'}`}>
@@ -897,7 +897,7 @@ export default function PurchaseOrderFormPage() {
                                                         <option value="free">Ítem libre (ocasional)</option>
                                                     </select>
                                                 </div>
-                                                <div className="xl:col-span-3">
+                                                <div className="xl:col-span-4">
                                                     <Label className="xl:hidden">{item.isCatalogItem ? 'Materia Prima *' : 'Descripción *'}</Label>
                                                     {item.isCatalogItem ? (
                                                         <>
@@ -1054,7 +1054,7 @@ export default function PurchaseOrderFormPage() {
                                                     </div>
 
                                                     {activeCalcIdx === index && (
-                                                        <div className="absolute z-10 top-full right-0 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-xl p-3 space-y-3 animate-in fade-in zoom-in duration-200">
+                                                        <div className="absolute z-50 top-full right-0 mt-1 w-64 bg-white border border-slate-200 rounded-md shadow-xl p-3 space-y-3 animate-in fade-in zoom-in duration-200">
                                                             <div className="flex justify-between items-center border-b pb-1 mb-2">
                                                                 <span className="text-xs font-bold text-slate-700">Calculadora de Precio</span>
                                                                 <button
@@ -1162,7 +1162,7 @@ export default function PurchaseOrderFormPage() {
                                                     </div>
                                                 </div>
 
-                                                <div className="xl:col-span-1"></div>
+                                                {/* Se quitó el xl:col-span-1 para ajustar los anchos (4+2+2+2+2 = 12) */}
                                                 {!item.isCatalogItem ? (
                                                     <div className="xl:col-span-12">
                                                         <label className="text-sm flex items-center gap-2">
