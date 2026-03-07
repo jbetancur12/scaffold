@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { generateVariantSku } from '@/utils/skuGenerator';
-import { ProductVariant } from '@scaffold/types';
+import { ProductTaxStatus, ProductVariant } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,8 @@ interface VariantFormData {
     targetMargin: number;
     productionMinutes?: number;
     cost?: number;
+    taxStatus: ProductTaxStatus;
+    taxRate: number;
 }
 
 export default function ProductDetailPage() {
@@ -58,6 +60,8 @@ export default function ProductDetailPage() {
         price: 0,
         pvpMargin: 0.25,
         targetMargin: 0.4,
+        taxStatus: ProductTaxStatus.EXCLUIDO,
+        taxRate: 0,
     });
 
     const { data: operationalConfig } = useOperationalConfigQuery();
@@ -79,7 +83,16 @@ export default function ProductDetailPage() {
 
     const handleAddVariant = () => {
         setEditingVariant(null);
-        setVariantFormData({ name: '', sku: '', price: 0, pvpMargin: 0.25, targetMargin: 0.4, productionMinutes: 0 });
+        setVariantFormData({
+            name: '',
+            sku: '',
+            price: 0,
+            pvpMargin: 0.25,
+            targetMargin: 0.4,
+            productionMinutes: 0,
+            taxStatus: ProductTaxStatus.EXCLUIDO,
+            taxRate: 0,
+        });
         setShowVariantDialog(true);
     };
 
@@ -93,9 +106,23 @@ export default function ProductDetailPage() {
             pvpMargin: variant.pvpMargin ?? 0.25,
             pvpPrice: variant.pvpPrice ?? 0,
             targetMargin: variant.targetMargin ?? 0.4,
-            productionMinutes: variant.productionMinutes ?? 0
+            productionMinutes: variant.productionMinutes ?? 0,
+            taxStatus: variant.taxStatus ?? ProductTaxStatus.EXCLUIDO,
+            taxRate: Number(variant.taxRate || 0),
         });
         setShowVariantDialog(true);
+    };
+
+    const getTaxStatusLabel = (status?: ProductTaxStatus) => {
+        switch (status) {
+            case ProductTaxStatus.GRAVADO:
+                return 'Gravado';
+            case ProductTaxStatus.EXENTO:
+                return 'Exento';
+            case ProductTaxStatus.EXCLUIDO:
+            default:
+                return 'Excluido';
+        }
     };
 
     const calculatePvpPrice = (distributorPrice: number, margin: number) => {
@@ -452,6 +479,11 @@ export default function ProductDetailPage() {
                                                                 <Hash className="h-3 w-3 text-slate-400" />
                                                                 <span className="text-xs text-slate-500 font-mono tracking-wide">{variant.sku}</span>
                                                             </div>
+                                                            <div className="mt-2">
+                                                                <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
+                                                                    {getTaxStatusLabel(variant.taxStatus)}{variant.taxStatus === ProductTaxStatus.GRAVADO ? ` ${Number(variant.taxRate || 0)}%` : ''}
+                                                                </Badge>
+                                                            </div>
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="font-semibold text-slate-900">
@@ -673,6 +705,48 @@ export default function ProductDetailPage() {
                                     />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm">%</span>
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="variant-tax-status" className="text-slate-700">Tratamiento IVA</Label>
+                                <select
+                                    id="variant-tax-status"
+                                    value={variantFormData.taxStatus}
+                                    onChange={(e) => {
+                                        const nextStatus = e.target.value as ProductTaxStatus;
+                                        setVariantFormData((prev) => ({
+                                            ...prev,
+                                            taxStatus: nextStatus,
+                                            taxRate: nextStatus === ProductTaxStatus.GRAVADO
+                                                ? (prev.taxRate > 0 ? prev.taxRate : 19)
+                                                : 0,
+                                        }));
+                                    }}
+                                    className="w-full h-10 border border-slate-200 rounded-md px-3 text-sm focus:ring-1 focus:ring-fuchsia-500 focus:border-fuchsia-500"
+                                >
+                                    <option value={ProductTaxStatus.EXCLUIDO}>Excluido</option>
+                                    <option value={ProductTaxStatus.EXENTO}>Exento</option>
+                                    <option value={ProductTaxStatus.GRAVADO}>Gravado</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="variant-tax-rate" className="text-slate-700">IVA %</Label>
+                                <Input
+                                    id="variant-tax-rate"
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.01"
+                                    value={variantFormData.taxRate || ''}
+                                    disabled={variantFormData.taxStatus !== ProductTaxStatus.GRAVADO}
+                                    onChange={(e) => setVariantFormData({
+                                        ...variantFormData,
+                                        taxRate: Math.max(0, Math.min(100, Number(e.target.value) || 0)),
+                                    })}
+                                    placeholder="0"
+                                    className="h-10 border-slate-200 disabled:bg-slate-50 disabled:text-slate-400"
+                                />
                             </div>
 
                             <div className="md:col-span-2 space-y-2 mt-2">

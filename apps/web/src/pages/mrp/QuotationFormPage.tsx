@@ -14,7 +14,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
-import { QuotationTermsTemplate } from '@scaffold/types';
+import { ProductTaxStatus, QuotationTermsTemplate } from '@scaffold/types';
 
 type ItemForm = {
     isCatalogItem: boolean;
@@ -28,6 +28,22 @@ type ItemForm = {
     unitPrice: number;
     discountPercent: number;
     taxRate: number;
+};
+
+type ProductOption = {
+    id: string;
+    name: string;
+    sku: string;
+    reference?: string;
+    variants?: Array<{
+        id: string;
+        name: string;
+        price: number;
+        cost: number;
+        targetMargin: number;
+        taxStatus: ProductTaxStatus;
+        taxRate: number;
+    }>;
 };
 
 const createItem = (): ItemForm => ({
@@ -247,7 +263,7 @@ export default function QuotationFormPage() {
         documentNumber?: string;
         quotationTermsTemplate?: QuotationTermsTemplate | null;
     }>>([]);
-    const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string; reference?: string; variants?: Array<{ id: string; name: string; price: number; cost: number; targetMargin: number }> }>>([]);
+    const [products, setProducts] = useState<ProductOption[]>([]);
 
     // Data Form
     const [customerId, setCustomerId] = useState('');
@@ -333,6 +349,8 @@ export default function QuotationFormPage() {
                             price: Number(v.price || 0),
                             cost: Number(v.cost || 0),
                             targetMargin: Number(v.targetMargin ?? 0.4),
+                            taxStatus: v.taxStatus ?? ProductTaxStatus.EXCLUIDO,
+                            taxRate: Number(v.taxRate || 0),
                         })) || [],
                     };
                 }));
@@ -412,6 +430,7 @@ export default function QuotationFormPage() {
         const nextVariant = productVariants.find((variant) => !usedVariantIds.has(variant.id));
         const suggestedVariantId = nextVariant?.id;
         const suggestedUnitPrice = nextVariant?.price ?? source.unitPrice;
+        const suggestedTax = resolveCatalogTax(source.productId, suggestedVariantId);
 
         const clonedLine: ItemForm = {
             isCatalogItem: true,
@@ -424,7 +443,7 @@ export default function QuotationFormPage() {
             approvedQuantity: 1,
             unitPrice: suggestedUnitPrice,
             discountPercent: globalDiscountPercent > 0 ? 0 : Number(source.discountPercent || 0),
-            taxRate: Number(source.taxRate || 0),
+            taxRate: suggestedTax.taxRate,
         };
 
         setItems((prev) => [
@@ -464,6 +483,32 @@ export default function QuotationFormPage() {
         }
         const firstVariantPrice = Number(product.variants?.[0]?.price || 0);
         return firstVariantPrice;
+    };
+
+    const resolveCatalogTax = (productId?: string, variantId?: string) => {
+        if (!productId) return { taxStatus: ProductTaxStatus.EXCLUIDO, taxRate: 0 };
+        const product = products.find((p) => p.id === productId);
+        if (!product) return { taxStatus: ProductTaxStatus.EXCLUIDO, taxRate: 0 };
+        const variant = variantId
+            ? product.variants?.find((v) => v.id === variantId)
+            : product.variants?.[0];
+        if (!variant) return { taxStatus: ProductTaxStatus.EXCLUIDO, taxRate: 0 };
+        if (variant.taxStatus !== ProductTaxStatus.GRAVADO) {
+            return { taxStatus: variant.taxStatus, taxRate: 0 };
+        }
+        return { taxStatus: variant.taxStatus, taxRate: Number(variant.taxRate || 0) };
+    };
+
+    const getTaxStatusLabel = (status: ProductTaxStatus) => {
+        switch (status) {
+            case ProductTaxStatus.GRAVADO:
+                return 'Gravado';
+            case ProductTaxStatus.EXENTO:
+                return 'Exento';
+            case ProductTaxStatus.EXCLUIDO:
+            default:
+                return 'Excluido';
+        }
     };
 
     const resolveDiscountLimit = (item: ItemForm) => {
@@ -553,11 +598,13 @@ export default function QuotationFormPage() {
 
     const handleProductChange = (index: number, productId: string) => {
         const selectedProduct = products.find(p => p.id === productId);
+        const tax = resolveCatalogTax(productId, undefined);
         patchItem(index, {
             productId,
             variantId: undefined,
             productSearch: selectedProduct ? `${selectedProduct.sku} ${selectedProduct.name}` : '',
-            unitPrice: resolveCatalogUnitPrice(productId, undefined)
+            unitPrice: resolveCatalogUnitPrice(productId, undefined),
+            taxRate: tax.taxRate,
         });
     };
 
@@ -1237,9 +1284,11 @@ export default function QuotationFormPage() {
                                                             value={it.variantId || ''}
                                                             onChange={(e) => {
                                                                 const variantId = e.target.value || undefined;
+                                                                const tax = resolveCatalogTax(it.productId, variantId);
                                                                 patchItem(idx, {
                                                                     variantId,
                                                                     unitPrice: resolveCatalogUnitPrice(it.productId, variantId),
+                                                                    taxRate: tax.taxRate,
                                                                 });
                                                             }}
                                                         >
@@ -1318,23 +1367,36 @@ export default function QuotationFormPage() {
                                                 <div className="flex items-center gap-2">
                                                     <Label className="text-[11px] font-semibold text-slate-500 w-12 mb-0 block">IVA %</Label>
                                                     <div className="flex-1 flex gap-2">
-                                                        <Input
-                                                            type="number"
-                                                            min={0}
-                                                            value={it.taxRate || ''}
-                                                            onChange={(e) => patchItem(idx, { taxRate: Number(e.target.value) })}
-                                                            className="h-8 border-slate-300 text-sm py-1"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => patchItem(idx, { taxRate: Number(it.taxRate) === 19 ? 0 : 19 })}
-                                                            className={`h-8 px-2 rounded-md border text-xs font-medium shrink-0 transition-colors ${Number(it.taxRate) === 19
-                                                                    ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                                                                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
-                                                                }`}
-                                                        >
-                                                            19%
-                                                        </button>
+                                                        {it.isCatalogItem ? (
+                                                            <div className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 flex items-center justify-between">
+                                                                <span>
+                                                                    {getTaxStatusLabel(resolveCatalogTax(it.productId, it.variantId).taxStatus)}
+                                                                </span>
+                                                                <span className="font-semibold">
+                                                                    {Number(it.taxRate || 0).toFixed(2)}%
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <Input
+                                                                    type="number"
+                                                                    min={0}
+                                                                    value={it.taxRate || ''}
+                                                                    onChange={(e) => patchItem(idx, { taxRate: Number(e.target.value) })}
+                                                                    className="h-8 border-slate-300 text-sm py-1"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => patchItem(idx, { taxRate: Number(it.taxRate) === 19 ? 0 : 19 })}
+                                                                    className={`h-8 px-2 rounded-md border text-xs font-medium shrink-0 transition-colors ${Number(it.taxRate) === 19
+                                                                            ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                                                                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                                                        }`}
+                                                                >
+                                                                    19%
+                                                                </button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

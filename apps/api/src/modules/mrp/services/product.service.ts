@@ -3,7 +3,7 @@ import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { ProductSchema, UpdateProductSchema } from '@scaffold/schemas';
 import { OperationalConfig } from '../entities/operational-config.entity';
-import { InvimaRegistrationStatus } from '@scaffold/types';
+import { InvimaRegistrationStatus, ProductTaxStatus } from '@scaffold/types';
 import { AppError } from '../../../shared/utils/response';
 import { InvimaRegistration } from '../entities/invima-registration.entity';
 import { z } from 'zod';
@@ -117,6 +117,17 @@ export class ProductService {
         return Number((price / divisor).toFixed(2));
     }
 
+    private normalizeVariantTax(data: Partial<ProductVariant>, current?: ProductVariant): Partial<ProductVariant> {
+        const taxStatus = data.taxStatus ?? current?.taxStatus ?? ProductTaxStatus.EXCLUIDO;
+        const rawTaxRate = Number(data.taxRate ?? current?.taxRate ?? 0);
+        return {
+            taxStatus,
+            taxRate: taxStatus === ProductTaxStatus.GRAVADO
+                ? Math.max(0, Math.min(100, rawTaxRate || 19))
+                : 0,
+        };
+    }
+
     private enrichVariantPricing(data: Partial<ProductVariant>, current?: ProductVariant): Partial<ProductVariant> {
         const price = data.price ?? current?.price ?? 0;
         const pvpMargin = this.normalizePvpMargin(data.pvpMargin ?? current?.pvpMargin);
@@ -129,6 +140,7 @@ export class ProductService {
             : current?.distributorPriceUpdatedAt;
         return {
             ...data,
+            ...this.normalizeVariantTax(data, current),
             pvpMargin,
             pvpPrice: this.calculatePvpPrice(price, pvpMargin),
             distributorPriceUpdatedAt,

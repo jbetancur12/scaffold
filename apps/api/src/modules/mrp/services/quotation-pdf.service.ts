@@ -3,7 +3,7 @@ import { AppError } from '../../../shared/utils/response';
 import { QuotationService } from './quotation.service';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DocumentCategory, DocumentStatus } from '@scaffold/types';
+import { DocumentCategory, DocumentStatus, ProductTaxStatus } from '@scaffold/types';
 import { ControlledDocument } from '../entities/controlled-document.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
 
@@ -47,6 +47,7 @@ html(lang="es")
       .totals { margin-top: 12px; width: 260px; margin-left: auto; border: none; }
       .totals td { padding: 4px 6px; font-size: 11px; border-bottom: 1px solid #f1f5f9; color: #334155; }
       .totals tr:last-child td { border-bottom: none; font-weight: 700; font-size: 13px; color: #0f172a; border-top: 2px solid #e2e8f0; padding-top: 6px; }
+      .tax-legend { margin-top: 8px; font-size: 9px; color: #64748b; text-align: right; }
       
       .notes-card { margin-top: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 16px 20px; break-inside: avoid; page-break-inside: avoid; }
       .notes-title { margin: 0 0 12px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #334155; }
@@ -76,7 +77,7 @@ html(lang="es")
           th Ítem
           th.right Cantidad
           th.right Vr Unit
-          th.right IVA %
+          th.right IVA
           th.right Total
       tbody
         each item in items
@@ -89,6 +90,8 @@ html(lang="es")
             td.right= item.netUnitPrice
             td.right= item.taxRate
             td.right= item.netSubtotal
+    if taxLegend
+      .tax-legend= taxLegend
     table.totals
       tr
         td Subtotal base
@@ -168,6 +171,23 @@ export class QuotationPdfService {
     private formatDate(value?: Date) {
         if (!value) return 'N/A';
         return new Date(value).toLocaleDateString('es-CO');
+    }
+
+    private formatCompactTaxLabel(params: {
+        isCatalogItem: boolean;
+        taxRate: number;
+        variantTaxStatus?: ProductTaxStatus;
+    }) {
+        if (params.isCatalogItem) {
+            if (params.variantTaxStatus === ProductTaxStatus.EXCLUIDO) return 'EXC';
+            if (params.variantTaxStatus === ProductTaxStatus.EXENTO) return 'EXE';
+            if (params.variantTaxStatus === ProductTaxStatus.GRAVADO) {
+                const rate = Number(params.taxRate || 0);
+                return `G${Number.isInteger(rate) ? rate.toFixed(0) : rate.toFixed(2)}`;
+            }
+        }
+        const rate = Number(params.taxRate || 0);
+        return `${rate.toFixed(2)}%`;
     }
 
     private formatHeaderDate(value?: Date | string | null) {
@@ -445,7 +465,11 @@ export class QuotationPdfService {
             })(),
             quantity: Number(item.quantity || 0),
             netUnitPrice: this.formatCurrency(Number(item.unitPrice || 0)),
-            taxRate: `${Number(item.taxRate || 0).toFixed(2)}%`,
+            taxRate: this.formatCompactTaxLabel({
+                isCatalogItem: item.isCatalogItem,
+                taxRate: Number(item.taxRate || 0),
+                variantTaxStatus: item.variant?.taxStatus,
+            }),
             netSubtotal: this.formatCurrency(Number(item.netSubtotal || 0)),
         }));
 
@@ -466,6 +490,7 @@ export class QuotationPdfService {
             quotationDate: this.formatDate(quotation.quotationDate),
             validUntil: this.formatDate(quotation.validUntil),
             items,
+            taxLegend: 'G: Gravado | EXE: Exento | EXC: Excluido',
             quotationNotes: this.parseQuotationNotes(quotation.notes),
             totals: {
                 listSubtotal: this.formatCurrency(listSubtotal),

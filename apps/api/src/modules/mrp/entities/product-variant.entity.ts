@@ -1,6 +1,6 @@
 import { Entity, Property, ManyToOne, OneToMany, Collection, Cascade } from '@mikro-orm/core';
 import { BaseEntity } from '../../../shared/entities/base.entity';
-import { ProductVariant as IProductVariant } from '@scaffold/types';
+import { ProductTaxStatus, ProductVariant as IProductVariant } from '@scaffold/types';
 import { Product } from './product.entity';
 import { BOMItem } from './bom-item.entity';
 
@@ -50,6 +50,11 @@ export class ProductVariant extends BaseEntity implements IProductVariant {
     @Property({ nullable: true, type: 'decimal', precision: 10, scale: 2 })
     productionMinutes?: number;
 
+    @Property({ fieldName: 'tax_status', length: 20 })
+    taxStatus: ProductTaxStatus = ProductTaxStatus.EXCLUIDO;
+
+    @Property({ fieldName: 'tax_rate', type: 'decimal', precision: 5, scale: 2, default: 0 })
+    taxRate: number = 0;
 
     @OneToMany(() => BOMItem, bomItem => bomItem.variant, { cascade: [Cascade.ALL], orphanRemoval: true })
     bomItems = new Collection<BOMItem>(this);

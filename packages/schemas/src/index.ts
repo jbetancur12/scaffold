@@ -46,6 +46,7 @@ import {
     OperationalAlertRole,
     SalesOrderStatus,
     QuotationStatus,
+    ProductTaxStatus,
 } from '@scaffold/types';
 
 export const LoginSchema = z.object({
@@ -251,6 +252,8 @@ export const ProductVariantSchema = z.object({
     indirectCost: z.number().min(0),
     targetMargin: z.number().min(0).max(1).default(0.4),
     productionMinutes: z.number().min(0).optional(),
+    taxStatus: z.nativeEnum(ProductTaxStatus).default(ProductTaxStatus.EXCLUIDO),
+    taxRate: z.number().min(0).max(100).default(0),
 });
 
 export const CreateProductVariantSchema = z.object({
@@ -260,6 +263,8 @@ export const CreateProductVariantSchema = z.object({
     pvpMargin: z.number().min(0).max(0.99).default(0.25),
     targetMargin: z.number().min(0).max(1).default(0.4),
     productionMinutes: z.number().min(0).optional(),
+    taxStatus: z.nativeEnum(ProductTaxStatus).default(ProductTaxStatus.EXCLUIDO),
+    taxRate: z.number().min(0).max(100).default(0),
 });
 
 export const UpdateProductVariantSchema = CreateProductVariantSchema.partial();

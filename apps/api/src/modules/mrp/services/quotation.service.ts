@@ -5,7 +5,7 @@ import { QuotationItem } from '../entities/quotation-item.entity';
 import { Customer } from '../entities/customer.entity';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
-import { QuotationStatus, SalesOrderStatus } from '@scaffold/types';
+import { ProductTaxStatus, QuotationStatus, SalesOrderStatus } from '@scaffold/types';
 import { SalesOrderService } from './sales-order.service';
 
 type QuotationInputItem = {
@@ -61,6 +61,16 @@ export class QuotationService {
 
     private minMargin(targetMargin: number) {
         return Math.max(0, targetMargin - 0.1);
+    }
+
+    private resolveCatalogTax(variant?: ProductVariant, fallbackRate?: number) {
+        if (!variant) {
+            return Number(fallbackRate || 0);
+        }
+        if (variant.taxStatus === ProductTaxStatus.GRAVADO) {
+            return Number(variant.taxRate || fallbackRate || 0);
+        }
+        return 0;
     }
 
     private validateMarginAndDiscount(params: {
@@ -136,7 +146,9 @@ export class QuotationService {
         const discountPercent = globalDiscountPercent > 0
             ? globalDiscountPercent
             : Number(row.discountPercent || 0);
-        const taxRate = Number(row.taxRate || 0);
+        const taxRate = isCatalogItem
+            ? this.resolveCatalogTax(variant, row.taxRate)
+            : Number(row.taxRate || 0);
         const listedUnitPrice = Number(row.unitPrice || 0);
         const finalUnitPrice = this.round(listedUnitPrice * (1 - (discountPercent / 100)), 4);
 

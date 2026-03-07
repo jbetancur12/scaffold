@@ -60,6 +60,12 @@ export enum QuotationStatus {
     CONVERTED = 'converted',
 }
 
+export enum ProductTaxStatus {
+    EXCLUIDO = 'excluido',
+    EXENTO = 'exento',
+    GRAVADO = 'gravado',
+}
+
 export enum PurchaseRequisitionStatus {
     PENDIENTE = 'pendiente',
     APROBADA = 'aprobada',
@@ -662,6 +668,8 @@ export interface ProductVariant {
     indirectCost: number;
     targetMargin: number;
     productionMinutes?: number;
+    taxStatus: ProductTaxStatus;
+    taxRate: number;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
