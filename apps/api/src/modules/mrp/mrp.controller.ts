@@ -1943,6 +1943,17 @@ export class MrpController {
         }
     }
 
+    async updatePurchaseOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const data = CreatePurchaseOrderSchema.parse(req.body);
+            const purchaseOrder = await this.purchaseOrderService.updatePurchaseOrder(id, data);
+            return ApiResponse.success(res, purchaseOrder, 'Orden de compra actualizada');
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async downloadPurchaseOrderPdf(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;

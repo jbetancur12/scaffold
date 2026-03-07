@@ -4,11 +4,14 @@ import {
     IncomingInspection as IIncomingInspection,
     IncomingInspectionResult,
     IncomingInspectionStatus,
+    UnitType,
 } from '@scaffold/types';
 import { PurchaseOrder } from './purchase-order.entity';
 import { PurchaseOrderItem } from './purchase-order-item.entity';
 import { RawMaterial } from './raw-material.entity';
 import { Warehouse } from './warehouse.entity';
+import { RawMaterialSpecification } from './raw-material-specification.entity';
+import { PurchasePresentation } from './purchase-presentation.entity';
 
 @Entity()
 export class IncomingInspection extends BaseEntity implements IIncomingInspection {
@@ -95,6 +98,22 @@ export class IncomingInspection extends BaseEntity implements IIncomingInspectio
     @Property({ nullable: true, type: 'text' })
     notes?: string;
 
+    @ManyToOne(() => RawMaterialSpecification, { nullable: true })
+    rawMaterialSpecification?: RawMaterialSpecification;
+
+    @Property({ persist: false })
+    get rawMaterialSpecificationId() {
+        return this.rawMaterialSpecification?.id;
+    }
+
+    @ManyToOne(() => PurchasePresentation, { nullable: true })
+    purchasePresentation?: PurchasePresentation;
+
+    @Property({ persist: false })
+    get purchasePresentationId() {
+        return this.purchasePresentation?.id;
+    }
+
     @Property({ type: 'decimal', precision: 10, scale: 4 })
     quantityReceived!: number;
 
@@ -106,6 +125,12 @@ export class IncomingInspection extends BaseEntity implements IIncomingInspectio
 
     @Property({ type: 'decimal', precision: 12, scale: 4, nullable: true })
     acceptedUnitCost?: number;
+
+    @Property({ nullable: true })
+    purchaseUnitLabel?: string;
+
+    @Enum({ items: () => UnitType, nullable: true })
+    inventoryUnit?: UnitType;
 
     @Property({ nullable: true })
     inspectedBy?: string;

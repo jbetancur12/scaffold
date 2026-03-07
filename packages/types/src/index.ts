@@ -18,6 +18,7 @@ export enum UnitType {
     KG = 'kg',
     LITER = 'litro',
     METER = 'metro',
+    YARD = 'yarda',
 }
 
 export enum WarehouseType {
@@ -380,6 +381,43 @@ export interface RawMaterial {
     minStockLevel?: number;
     supplierId?: string; // Preferred supplier
     supplierName?: string;
+    specifications?: RawMaterialSpecification[];
+    purchasePresentations?: PurchasePresentation[];
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface RawMaterialSpecification {
+    id: string;
+    rawMaterialId: string;
+    name: string;
+    sku: string;
+    description?: string;
+    color?: string;
+    widthCm?: number;
+    lengthValue?: number;
+    lengthUnit?: UnitType;
+    thicknessMm?: number;
+    grammageGsm?: number;
+    isDefault?: boolean;
+    notes?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface PurchasePresentation {
+    id: string;
+    rawMaterialId: string;
+    supplierId?: string;
+    specificationId?: string;
+    specification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku'>;
+    name: string;
+    purchaseUnitLabel: string;
+    quantityPerPurchaseUnit: number;
+    contentUnit: UnitType;
+    allowsFractionalQuantity?: boolean;
+    isDefault?: boolean;
+    notes?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -408,6 +446,10 @@ export interface PurchaseOrderItem {
     id: string;
     isCatalogItem?: boolean;
     rawMaterial?: Pick<RawMaterial, 'id' | 'name' | 'sku' | 'unit'>;
+    rawMaterialSpecificationId?: string;
+    rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku'>;
+    purchasePresentationId?: string;
+    purchasePresentation?: Pick<PurchasePresentation, 'id' | 'name' | 'purchaseUnitLabel' | 'quantityPerPurchaseUnit' | 'contentUnit'>;
     customDescription?: string;
     customUnit?: string;
     isInventoriable?: boolean;
@@ -415,6 +457,9 @@ export interface PurchaseOrderItem {
     unitPrice: number;
     taxAmount: number;
     subtotal: number;
+    purchaseUnitLabel?: string;
+    inventoryQuantity?: number;
+    inventoryUnit?: UnitType;
 }
 
 export interface PurchaseOrder {
@@ -625,6 +670,8 @@ export interface BOMItem {
     id: string;
     variantId: string;
     rawMaterialId: string;
+    rawMaterialSpecificationId?: string;
+    rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku'>;
     quantity: number;
     usageNote?: string;
     fabricationParams?: {
@@ -654,6 +701,8 @@ export interface InventoryItem {
     warehouse?: Warehouse;
     rawMaterialId?: string;
     rawMaterial?: RawMaterial;
+    rawMaterialSpecificationId?: string;
+    rawMaterialSpecification?: RawMaterialSpecification;
     variantId?: string;
     variant?: ProductVariant;
     quantity: number;
@@ -1157,9 +1206,14 @@ export interface IncomingInspection {
         id: string;
         quantity?: number;
         rawMaterial?: Pick<RawMaterial, 'id' | 'name' | 'sku' | 'unit'>;
+        rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku'>;
     };
     rawMaterialId: string;
     rawMaterial?: Pick<RawMaterial, 'id' | 'name' | 'sku' | 'unit'>;
+    rawMaterialSpecificationId?: string;
+    rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku'>;
+    purchasePresentationId?: string;
+    purchasePresentation?: Pick<PurchasePresentation, 'id' | 'name' | 'purchaseUnitLabel'>;
     warehouseId: string;
     status: IncomingInspectionStatus;
     inspectionResult?: IncomingInspectionResult;
@@ -1180,6 +1234,8 @@ export interface IncomingInspection {
     quantityAccepted: number;
     quantityRejected: number;
     acceptedUnitCost?: number;
+    purchaseUnitLabel?: string;
+    inventoryUnit?: UnitType;
     inspectedBy?: string;
     inspectedAt?: string | Date;
     releasedBy?: string;

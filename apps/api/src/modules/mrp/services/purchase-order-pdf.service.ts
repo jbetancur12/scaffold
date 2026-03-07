@@ -3,6 +3,7 @@ import { AppError } from '../../../shared/utils/response';
 import { PurchaseOrderService } from './purchase-order.service';
 import fs from 'node:fs';
 import path from 'node:path';
+import { PurchaseOrderItem } from '@scaffold/types';
 
 type PugModule = {
   compile: (template: string, options?: { pretty?: boolean }) => (locals: Record<string, unknown>) => string;
@@ -73,19 +74,20 @@ html(lang="es")
       table.items
         thead
           tr
-            th(style='width: 34%') Descripción
-            th(style='width: 14%') Referencia
-            th(style='width: 10%') Unidad
-            th(style='width: 10%') Cantidad
+            th(style='width: 42%') Descripción
+            th(style='width: 14%') Unidad
+            th(style='width: 12%') Cantidad
             th(style='width: 14%') Vr. Unitario
             th(style='width: 18%') Total
         tbody
           each row in items
             tr
-              td= row.description
-              td= row.reference
-              td= row.unit
-              td.right= row.quantity
+              td
+                div= row.description
+              td
+                div= row.unit
+              td.right
+                div= row.quantity
               td.right= row.unitPrice
               td.right
                 div= row.lineTotal
@@ -147,6 +149,19 @@ export class PurchaseOrderPdfService {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  private formatPlainQuantity(value?: number | null) {
+    return new Intl.NumberFormat('es-CO', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(Number(value || 0));
+  }
+
+  private buildPurchaseLabel(item: PurchaseOrderItem) {
+    if (item.purchasePresentation?.name) return item.purchasePresentation.name;
+    if (item.purchaseUnitLabel) return item.purchaseUnitLabel;
+    return item.rawMaterial?.unit || item.customUnit || '';
   }
 
   private resolveProcessLabelByDocCode(code?: string | null) {
@@ -311,11 +326,10 @@ export class PurchaseOrderPdfService {
       notes: order.notes || '',
       items: (order.items ?? []).map((item) => ({
         description: item.rawMaterial?.name || item.customDescription || 'Ítem libre',
-        reference: item.rawMaterial?.sku || '-',
-        unit: item.rawMaterial?.unit || item.customUnit || '',
-        quantity: Number(item.quantity || 0).toLocaleString('es-CO'),
+        unit: this.buildPurchaseLabel(item),
+        quantity: this.formatPlainQuantity(Number(item.quantity || 0)),
         unitPrice: this.formatCurrency(Number(item.unitPrice || 0)),
-        lineTotal: this.formatCurrency(Number(item.subtotal || 0)),
+        lineTotal: this.formatCurrency(Math.max(0, Number(item.subtotal || 0) - Number(item.taxAmount || 0))),
         taxAmount: this.formatCurrency(Number(item.taxAmount || 0)),
       })),
       subtotalBase: this.formatCurrency(Number(order.subtotalBase || 0)),

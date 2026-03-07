@@ -40,6 +40,7 @@ interface BOMEditorProps {
 
 interface BOMItemDraft {
     materialId: string;
+    rawMaterialSpecificationId?: string;
     quantity: string;
     usageNote: string;
     fabricationParams?: {
@@ -62,6 +63,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
     // New item form state
     const [newItem, setNewItem] = useState<BOMItemDraft>({
         materialId: '',
+        rawMaterialSpecificationId: '',
         quantity: '',
         usageNote: '',
     });
@@ -88,6 +90,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
             const payload = {
                 variantId: variant.id,
                 rawMaterialId: newItem.materialId,
+                rawMaterialSpecificationId: newItem.rawMaterialSpecificationId || undefined,
                 quantity: quantity,
                 usageNote: newItem.usageNote.trim() || undefined,
                 fabricationParams: newItem.fabricationParams || undefined
@@ -106,7 +109,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                 toast({ title: 'Material agregado' });
             }
 
-            setNewItem({ materialId: '', quantity: '', usageNote: '' });
+            setNewItem({ materialId: '', rawMaterialSpecificationId: '', quantity: '', usageNote: '' });
             setEditingItemId(null);
             loadBOM(); // Reload to refresh list and costs if backend updates them
         } catch (error: unknown) {
@@ -128,6 +131,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
             const payload = {
                 variantId: variant.id,
                 rawMaterialId: editDraft.materialId,
+                rawMaterialSpecificationId: editDraft.rawMaterialSpecificationId || undefined,
                 quantity,
                 usageNote: editDraft.usageNote.trim() || undefined,
                 fabricationParams: editDraft.fabricationParams || undefined,
@@ -157,6 +161,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
         setEditingItemId(item.id);
         setEditDraft({
             materialId: item.rawMaterialId,
+            rawMaterialSpecificationId: item.rawMaterialSpecificationId,
             quantity: item.quantity.toString(),
             usageNote: item.usageNote || '',
             fabricationParams: item.fabricationParams
@@ -185,6 +190,7 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
 
     // Helper to find material name by ID for display if relation not populated deep enough or just for safety
     const getMaterialUnit = (id: string) => materials.find(m => m.id === id)?.unit || '-';
+    const getMaterialSpecifications = (id: string) => materials.find(m => m.id === id)?.specifications || [];
     const getMaterialCost = (id: string) => {
         const m = materials.find(m => m.id === id);
         return (m?.averageCost && m.averageCost > 0) ? m.averageCost : (m?.cost || 0);
@@ -244,6 +250,24 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
+                                                {getMaterialSpecifications(editDraft.materialId).length > 0 ? (
+                                                    <Select
+                                                        value={editDraft.rawMaterialSpecificationId || '__none__'}
+                                                        onValueChange={(val) => setEditDraft({ ...editDraft, rawMaterialSpecificationId: val === '__none__' ? '' : val })}
+                                                    >
+                                                        <SelectTrigger className="w-full h-9 bg-white">
+                                                            <SelectValue placeholder="Especificación" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="__none__">Sin especificación</SelectItem>
+                                                            {getMaterialSpecifications(editDraft.materialId).map((spec) => (
+                                                                <SelectItem key={spec.id} value={spec.id}>
+                                                                    {spec.name} ({spec.sku})
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : null}
                                                 <Input
                                                     value={editDraft.usageNote}
                                                     onChange={e => setEditDraft({ ...editDraft, usageNote: e.target.value })}
@@ -255,6 +279,9 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                         ) : (
                                             <div className="flex flex-col">
                                                 <span>{material?.name || item.rawMaterialId}</span>
+                                                {item.rawMaterialSpecification?.name ? (
+                                                    <span className="text-xs text-sky-700">{item.rawMaterialSpecification.name}</span>
+                                                ) : null}
                                                 {item.usageNote && (
                                                     <span className="mt-1 inline-flex w-fit rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
                                                         Para: {item.usageNote}
@@ -383,6 +410,24 @@ export default function BOMEditor({ variant, materials }: BOMEditorProps) {
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {getMaterialSpecifications(newItem.materialId).length > 0 ? (
+                                        <Select
+                                            value={newItem.rawMaterialSpecificationId || '__none__'}
+                                            onValueChange={(val) => setNewItem({ ...newItem, rawMaterialSpecificationId: val === '__none__' ? '' : val })}
+                                        >
+                                            <SelectTrigger className="w-full h-9">
+                                                <SelectValue placeholder="Especificación" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">Sin especificación</SelectItem>
+                                                {getMaterialSpecifications(newItem.materialId).map((spec) => (
+                                                    <SelectItem key={spec.id} value={spec.id}>
+                                                        {spec.name} ({spec.sku})
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    ) : null}
                                     <Input
                                         value={newItem.usageNote}
                                         onChange={e => setNewItem({ ...newItem, usageNote: e.target.value })}

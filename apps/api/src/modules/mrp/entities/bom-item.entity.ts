@@ -3,6 +3,7 @@ import { BaseEntity } from '../../../shared/entities/base.entity';
 import { BOMItem as IBOMItem } from '@scaffold/types';
 import { ProductVariant } from './product-variant.entity';
 import { RawMaterial } from './raw-material.entity';
+import { RawMaterialSpecification } from './raw-material-specification.entity';
 
 @Entity()
 export class BOMItem extends BaseEntity implements IBOMItem {
@@ -20,6 +21,14 @@ export class BOMItem extends BaseEntity implements IBOMItem {
     @Property({ persist: false })
     get rawMaterialId() {
         return this.rawMaterial.id;
+    }
+
+    @ManyToOne(() => RawMaterialSpecification, { nullable: true })
+    rawMaterialSpecification?: RawMaterialSpecification;
+
+    @Property({ persist: false })
+    get rawMaterialSpecificationId() {
+        return this.rawMaterialSpecification?.id;
     }
 
     @Property({ type: 'decimal', precision: 10, scale: 4 })

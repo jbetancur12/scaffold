@@ -54,6 +54,7 @@ export class InventoryService {
         // Build query based on whether it's raw material or variant
         const query: FilterQuery<InventoryItem> = { warehouse: data.warehouseId };
         if (data.rawMaterialId) query.rawMaterial = data.rawMaterialId;
+        if (data.rawMaterialSpecificationId) query.rawMaterialSpecification = data.rawMaterialSpecificationId;
         if (data.variantId) query.variant = data.variantId;
 
         let inventoryItem = await this.inventoryRepo.findOne(query);
@@ -95,6 +96,7 @@ export class InventoryService {
         // 3. Get or Create Inventory Item
         let inventory = await this.inventoryRepo.findOne({
             rawMaterial: { id: data.rawMaterialId },
+            rawMaterialSpecification: null,
             warehouse: { id: warehouse.id },
         });
 
@@ -102,6 +104,7 @@ export class InventoryService {
             inventory = this.inventoryRepo.create({
                 warehouse,
                 rawMaterial,
+                rawMaterialSpecification: undefined,
                 quantity: 0,
             } as InventoryItem);
         }
@@ -126,6 +129,7 @@ export class InventoryService {
         const supplierLotCode = `MANUAL-${Date.now().toString(36).toUpperCase()}`;
         const lot = this.rawMaterialLotRepo.create({
             rawMaterial,
+            rawMaterialSpecification: undefined,
             warehouse,
             supplierLotCode,
             quantityInitial: addedQty,
@@ -137,6 +141,7 @@ export class InventoryService {
 
         const kardex = this.rawMaterialKardexRepo.create({
             rawMaterial,
+            rawMaterialSpecification: undefined,
             warehouse,
             lot,
             movementType: 'ENTRADA_AJUSTE_MANUAL',

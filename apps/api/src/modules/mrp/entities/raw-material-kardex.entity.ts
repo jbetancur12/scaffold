@@ -3,12 +3,16 @@ import { BaseEntity } from '../../../shared/entities/base.entity';
 import { RawMaterial } from './raw-material.entity';
 import { Warehouse } from './warehouse.entity';
 import { RawMaterialLot } from './raw-material-lot.entity';
+import { RawMaterialSpecification } from './raw-material-specification.entity';
 
-@Index({ properties: ['rawMaterial', 'occurredAt'] })
+@Index({ properties: ['rawMaterial', 'rawMaterialSpecification', 'occurredAt'] })
 @Entity()
 export class RawMaterialKardex extends BaseEntity {
     @ManyToOne(() => RawMaterial)
     rawMaterial!: RawMaterial;
+
+    @ManyToOne(() => RawMaterialSpecification, { nullable: true })
+    rawMaterialSpecification?: RawMaterialSpecification;
 
     @ManyToOne(() => Warehouse)
     warehouse!: Warehouse;
@@ -37,4 +41,3 @@ export class RawMaterialKardex extends BaseEntity {
     @Property()
     occurredAt: Date = new Date();
 }
-

@@ -3,13 +3,17 @@ import { BaseEntity } from '../../../shared/entities/base.entity';
 import { RawMaterial } from './raw-material.entity';
 import { Warehouse } from './warehouse.entity';
 import { IncomingInspection } from './incoming-inspection.entity';
+import { RawMaterialSpecification } from './raw-material-specification.entity';
 
-@Unique({ properties: ['rawMaterial', 'warehouse', 'supplierLotCode'] })
-@Index({ properties: ['rawMaterial', 'warehouse', 'receivedAt'] })
+@Unique({ properties: ['rawMaterial', 'rawMaterialSpecification', 'warehouse', 'supplierLotCode'] })
+@Index({ properties: ['rawMaterial', 'rawMaterialSpecification', 'warehouse', 'receivedAt'] })
 @Entity()
 export class RawMaterialLot extends BaseEntity {
     @ManyToOne(() => RawMaterial)
     rawMaterial!: RawMaterial;
+
+    @ManyToOne(() => RawMaterialSpecification, { nullable: true })
+    rawMaterialSpecification?: RawMaterialSpecification;
 
     @ManyToOne(() => Warehouse)
     warehouse!: Warehouse;
@@ -38,4 +42,3 @@ export class RawMaterialLot extends BaseEntity {
     @Property({ nullable: true, type: 'text' })
     notes?: string;
 }
-

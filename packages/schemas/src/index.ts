@@ -155,6 +155,34 @@ export const RawMaterialCsvImportSchema = z.object({
     actor: z.string().optional(),
 });
 
+export const RawMaterialSpecificationSchema = z.object({
+    id: z.string().uuid().optional(),
+    name: z.string().min(1, 'El nombre de la especificación es obligatorio'),
+    sku: z.string().min(1, 'El SKU de la especificación es obligatorio'),
+    description: z.string().optional(),
+    color: z.string().optional(),
+    widthCm: z.number().min(0).optional(),
+    lengthValue: z.number().min(0).optional(),
+    lengthUnit: z.nativeEnum(UnitType).optional(),
+    thicknessMm: z.number().min(0).optional(),
+    grammageGsm: z.number().min(0).optional(),
+    isDefault: z.boolean().optional(),
+    notes: z.string().optional(),
+});
+
+export const PurchasePresentationSchema = z.object({
+    id: z.string().uuid().optional(),
+    supplierId: z.string().uuid().optional(),
+    specificationId: z.string().uuid().optional(),
+    name: z.string().min(1, 'El nombre de la presentación es obligatorio'),
+    purchaseUnitLabel: z.string().min(1, 'La unidad de compra es obligatoria'),
+    quantityPerPurchaseUnit: z.number().positive('La cantidad por unidad de compra debe ser mayor a 0'),
+    contentUnit: z.nativeEnum(UnitType),
+    allowsFractionalQuantity: z.boolean().optional(),
+    isDefault: z.boolean().optional(),
+    notes: z.string().optional(),
+});
+
 export const RawMaterialSchema = z.object({
     name: z.string().min(1, 'El nombre es obligatorio'),
     sku: z.string().min(1, 'SKU es obligatorio'),
@@ -162,6 +190,8 @@ export const RawMaterialSchema = z.object({
     cost: z.number().min(0),
     minStockLevel: z.number().min(0).optional(),
     supplierId: z.string().uuid().optional(),
+    specifications: z.array(RawMaterialSpecificationSchema).optional(),
+    purchasePresentations: z.array(PurchasePresentationSchema).optional(),
 });
 
 export const PurchaseRecordSchema = z.object({
@@ -237,6 +267,7 @@ export const UpdateProductVariantSchema = CreateProductVariantSchema.partial();
 export const BOMItemSchema = z.object({
     variantId: z.string().uuid(),
     rawMaterialId: z.string().uuid(),
+    rawMaterialSpecificationId: z.string().uuid().optional(),
     quantity: z.number().min(0),
     usageNote: z.string().trim().max(160).optional(),
     fabricationParams: z.object({
@@ -258,6 +289,7 @@ export const WarehouseSchema = z.object({
 export const InventoryItemSchema = z.object({
     warehouseId: z.string().uuid(),
     rawMaterialId: z.string().uuid().optional(),
+    rawMaterialSpecificationId: z.string().uuid().optional(),
     variantId: z.string().uuid().optional(),
     quantity: z.number(),
 }).refine(data => data.rawMaterialId || data.variantId, {
@@ -303,6 +335,8 @@ export const CreatePurchaseOrderSchema = z.object({
         z.object({
             isCatalogItem: z.literal(true).optional(),
             rawMaterialId: z.string().uuid(),
+            rawMaterialSpecificationId: z.string().uuid().optional(),
+            purchasePresentationId: z.string().uuid().optional(),
             quantity: z.number().min(0.01),
             unitPrice: z.number().min(0),
             taxAmount: z.number().min(0).optional(),

@@ -64,7 +64,7 @@ export const useRawMaterialSuppliersQuery = (id?: string) => {
 
 export interface SaveRawMaterialInput {
     id?: string;
-    payload: Partial<RawMaterial>;
+    payload: unknown;
 }
 
 export const useSaveRawMaterialMutation = () => {

@@ -391,6 +391,10 @@ export const mrpApi = {
         const response = await api.post<PurchaseOrder>('/mrp/purchase-orders', data);
         return response.data;
     },
+    updatePurchaseOrder: async (id: string, data: CreatePurchaseOrderDto): Promise<PurchaseOrder> => {
+        const response = await api.put<PurchaseOrder>(`/mrp/purchase-orders/${id}`, data);
+        return response.data;
+    },
 
     listPurchaseOrders: async (
         page: number = 1,
@@ -669,11 +673,11 @@ export const mrpApi = {
         const response = await api.get<RawMaterial>(`/mrp/raw-materials/${id}`);
         return response.data;
     },
-    createRawMaterial: async (data: Partial<RawMaterial>): Promise<RawMaterial> => {
+    createRawMaterial: async (data: unknown): Promise<RawMaterial> => {
         const response = await api.post('/mrp/raw-materials', data);
         return response.data;
     },
-    updateRawMaterial: async (id: string, data: Partial<RawMaterial>): Promise<RawMaterial> => {
+    updateRawMaterial: async (id: string, data: unknown): Promise<RawMaterial> => {
         const response = await api.patch(`/mrp/raw-materials/${id}`, data);
         return response.data;
     },

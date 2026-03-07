@@ -5,6 +5,8 @@ import { ProductVariant } from '../entities/product-variant.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
 import { Supplier } from '../entities/supplier.entity';
+import { RawMaterialSpecification } from '../entities/raw-material-specification.entity';
+import { PurchasePresentation } from '../entities/purchase-presentation.entity';
 import { RawMaterialSchema, BOMItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { UnitType } from '@scaffold/types';
@@ -15,12 +17,117 @@ export class MrpService {
     private readonly rawMaterialRepo: EntityRepository<RawMaterial>;
     private readonly bomItemRepo: EntityRepository<BOMItem>;
     private readonly variantRepo: EntityRepository<ProductVariant>;
+    private readonly rawMaterialSpecificationRepo: EntityRepository<RawMaterialSpecification>;
+    private readonly purchasePresentationRepo: EntityRepository<PurchasePresentation>;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.rawMaterialRepo = em.getRepository(RawMaterial);
         this.bomItemRepo = em.getRepository(BOMItem);
         this.variantRepo = em.getRepository(ProductVariant);
+        this.rawMaterialSpecificationRepo = em.getRepository(RawMaterialSpecification);
+        this.purchasePresentationRepo = em.getRepository(PurchasePresentation);
+    }
+
+    private async syncRawMaterialSpecifications(
+        material: RawMaterial,
+        items: z.infer<typeof RawMaterialSchema>['specifications'] | undefined
+    ) {
+        if (items === undefined) return;
+
+        const existing = material.specifications.getItems();
+        const byId = new Map(existing.map((row) => [row.id, row]));
+        const nextEntities: RawMaterialSpecification[] = [];
+
+        for (const [index, item] of items.entries()) {
+            const entity = item.id ? byId.get(item.id) : undefined;
+            const specification = entity || this.rawMaterialSpecificationRepo.create({
+                rawMaterial: material,
+            } as RawMaterialSpecification);
+
+            specification.name = item.name;
+            specification.sku = item.sku;
+            specification.description = item.description?.trim() || undefined;
+            specification.color = item.color?.trim() || undefined;
+            specification.widthCm = item.widthCm;
+            specification.lengthValue = item.lengthValue;
+            specification.lengthUnit = item.lengthUnit;
+            specification.thicknessMm = item.thicknessMm;
+            specification.grammageGsm = item.grammageGsm;
+            specification.isDefault = item.isDefault ?? index === 0;
+            specification.notes = item.notes?.trim() || undefined;
+            specification.rawMaterial = material;
+            nextEntities.push(specification);
+        }
+
+        if (nextEntities.filter((row) => row.isDefault).length > 1) {
+            let first = true;
+            for (const row of nextEntities) {
+                row.isDefault = first && row.isDefault;
+                if (row.isDefault) first = false;
+            }
+        }
+        if (nextEntities.length > 0 && !nextEntities.some((row) => row.isDefault)) {
+            nextEntities[0].isDefault = true;
+        }
+
+        const removed = existing.filter((row) => !nextEntities.includes(row));
+        material.specifications.set(nextEntities);
+        if (removed.length > 0) {
+            await this.em.removeAndFlush(removed);
+        }
+    }
+
+    private async syncPurchasePresentations(
+        material: RawMaterial,
+        items: z.infer<typeof RawMaterialSchema>['purchasePresentations'] | undefined
+    ) {
+        if (items === undefined) return;
+
+        const existing = material.purchasePresentations.getItems();
+        const byId = new Map(existing.map((row) => [row.id, row]));
+        const specificationMap = new Map(material.specifications.getItems().map((row) => [row.id, row]));
+        const nextEntities: PurchasePresentation[] = [];
+
+        for (const [index, item] of items.entries()) {
+            const entity = item.id ? byId.get(item.id) : undefined;
+            const presentation = entity || this.purchasePresentationRepo.create({
+                rawMaterial: material,
+            } as PurchasePresentation);
+
+            presentation.name = item.name;
+            presentation.purchaseUnitLabel = item.purchaseUnitLabel.trim();
+            presentation.quantityPerPurchaseUnit = item.quantityPerPurchaseUnit;
+            presentation.contentUnit = item.contentUnit;
+            presentation.allowsFractionalQuantity = item.allowsFractionalQuantity ?? false;
+            presentation.isDefault = item.isDefault ?? index === 0;
+            presentation.notes = item.notes?.trim() || undefined;
+            presentation.rawMaterial = material;
+            presentation.supplier = item.supplierId
+                ? await this.em.findOneOrFail(Supplier, { id: item.supplierId })
+                : undefined;
+            presentation.specification = item.specificationId
+                ? (specificationMap.get(item.specificationId) || await this.em.findOneOrFail(RawMaterialSpecification, { id: item.specificationId, rawMaterial: material.id }))
+                : undefined;
+            nextEntities.push(presentation);
+        }
+
+        if (nextEntities.filter((row) => row.isDefault).length > 1) {
+            let first = true;
+            for (const row of nextEntities) {
+                row.isDefault = first && row.isDefault;
+                if (row.isDefault) first = false;
+            }
+        }
+        if (nextEntities.length > 0 && !nextEntities.some((row) => row.isDefault)) {
+            nextEntities[0].isDefault = true;
+        }
+
+        const removed = existing.filter((row) => !nextEntities.includes(row));
+        material.purchasePresentations.set(nextEntities);
+        if (removed.length > 0) {
+            await this.em.removeAndFlush(removed);
+        }
     }
 
     private readonly rawMaterialImportHeaders = [
@@ -152,11 +259,13 @@ export class MrpService {
     }
 
     async createRawMaterial(data: z.infer<typeof RawMaterialSchema>): Promise<RawMaterial> {
-        const { supplierId, ...rest } = data;
+        const { supplierId, specifications, purchasePresentations, ...rest } = data;
         const material = this.rawMaterialRepo.create(rest as unknown as RawMaterial);
         if (supplierId) {
             material.supplier = await this.em.findOneOrFail(Supplier, { id: supplierId });
         }
+        await this.syncRawMaterialSpecifications(material, specifications);
+        await this.syncPurchasePresentations(material, purchasePresentations);
         await this.em.persistAndFlush(material);
 
         if (material.supplier) {
@@ -175,13 +284,16 @@ export class MrpService {
     }
 
     async getRawMaterial(id: string): Promise<RawMaterial> {
-        return this.rawMaterialRepo.findOneOrFail({ id }, { populate: ['supplier'] });
+        return this.rawMaterialRepo.findOneOrFail(
+            { id },
+            { populate: ['supplier', 'specifications', 'purchasePresentations', 'purchasePresentations.supplier', 'purchasePresentations.specification'] }
+        );
     }
 
     async updateRawMaterial(id: string, data: Partial<z.infer<typeof RawMaterialSchema>>): Promise<RawMaterial> {
         const material = await this.getRawMaterial(id);
         const oldCost = material.cost;
-        const { supplierId, ...rest } = data;
+        const { supplierId, specifications, purchasePresentations, ...rest } = data;
         Object.assign(material, rest);
 
         if (supplierId !== undefined) {
@@ -189,6 +301,9 @@ export class MrpService {
                 ? await this.em.findOneOrFail(Supplier, { id: supplierId })
                 : undefined;
         }
+
+        await this.syncRawMaterialSpecifications(material, specifications);
+        await this.syncPurchasePresentations(material, purchasePresentations);
 
         await this.em.persistAndFlush(material);
 
@@ -235,6 +350,7 @@ export class MrpService {
                 populate: ['supplier']
             }
         );
+        await this.em.populate(materials, ['specifications', 'purchasePresentations', 'purchasePresentations.supplier', 'purchasePresentations.specification']);
         return { materials, total };
     }
 
@@ -442,11 +558,15 @@ export class MrpService {
         // Fetch the variant and raw material entities
         const variant = await this.variantRepo.findOneOrFail({ id: data.variantId });
         const rawMaterial = await this.rawMaterialRepo.findOneOrFail({ id: data.rawMaterialId });
+        const specification = data.rawMaterialSpecificationId
+            ? await this.rawMaterialSpecificationRepo.findOneOrFail({ id: data.rawMaterialSpecificationId, rawMaterial: data.rawMaterialId })
+            : undefined;
 
         // Create BOM item with proper relations
         const bomItem = this.bomItemRepo.create({
             variant,
             rawMaterial,
+            rawMaterialSpecification: specification,
             quantity: data.quantity,
             usageNote: data.usageNote,
             fabricationParams: data.fabricationParams,
@@ -463,7 +583,7 @@ export class MrpService {
     async getBOM(variantId: string): Promise<BOMItem[]> {
         return this.bomItemRepo.find(
             { variantId },
-            { populate: ['rawMaterial'] }
+            { populate: ['rawMaterial', 'rawMaterialSpecification'] }
         );
     }
 
@@ -477,6 +597,14 @@ export class MrpService {
         if (data.rawMaterialId !== undefined) {
             const rawMaterial = await this.rawMaterialRepo.findOneOrFail({ id: data.rawMaterialId });
             item.rawMaterial = rawMaterial;
+        }
+        if (data.rawMaterialSpecificationId !== undefined || data.rawMaterialId !== undefined) {
+            item.rawMaterialSpecification = data.rawMaterialSpecificationId
+                ? await this.rawMaterialSpecificationRepo.findOneOrFail({
+                    id: data.rawMaterialSpecificationId,
+                    rawMaterial: data.rawMaterialId || item.rawMaterial.id,
+                })
+                : undefined;
         }
 
         await this.em.persistAndFlush(item);

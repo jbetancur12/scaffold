@@ -1,10 +1,12 @@
-import { Entity, Property, Enum, ManyToOne } from '@mikro-orm/core';
+import { Collection, Entity, Property, Enum, ManyToOne, OneToMany } from '@mikro-orm/core';
 import { BaseEntity } from '../../../shared/entities/base.entity';
-import { RawMaterial as IRawMaterial, UnitType } from '@scaffold/types';
+import { UnitType } from '@scaffold/types';
 import { Supplier } from './supplier.entity';
+import { RawMaterialSpecification } from './raw-material-specification.entity';
+import { PurchasePresentation } from './purchase-presentation.entity';
 
 @Entity()
-export class RawMaterial extends BaseEntity implements IRawMaterial {
+export class RawMaterial extends BaseEntity {
     @Property()
     name!: string;
 
@@ -31,6 +33,12 @@ export class RawMaterial extends BaseEntity implements IRawMaterial {
 
     @ManyToOne(() => Supplier, { nullable: true })
     supplier?: Supplier;
+
+    @OneToMany(() => RawMaterialSpecification, specification => specification.rawMaterial, { orphanRemoval: true })
+    specifications = new Collection<RawMaterialSpecification>(this);
+
+    @OneToMany(() => PurchasePresentation, presentation => presentation.rawMaterial, { orphanRemoval: true })
+    purchasePresentations = new Collection<PurchasePresentation>(this);
 
     @Property({ persist: false })
     get supplierId() {

@@ -3,8 +3,9 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save, RefreshCw, Calculator, Package, DollarSign, Fingerprint, Building2, Anchor } from 'lucide-react';
+import { ArrowLeft, Save, RefreshCw, Calculator, Package, DollarSign, Fingerprint, Building2, Anchor, Plus, Trash2, Ruler, Layers3 } from 'lucide-react';
 import { generateRawMaterialSku } from '@/utils/skuGenerator';
 import {
     Select,
@@ -13,7 +14,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { RawMaterial, UnitType } from '@scaffold/types';
+import { PurchasePresentation, RawMaterial, RawMaterialSpecification, UnitType } from '@scaffold/types';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatCurrency } from '@/lib/utils';
 import { RawMaterialSchema } from '@scaffold/schemas';
@@ -37,6 +38,8 @@ export default function RawMaterialFormPage() {
         cost: 0,
         minStockLevel: 0,
         supplierId: '',
+        specifications: [] as RawMaterialSpecification[],
+        purchasePresentations: [] as PurchasePresentation[],
     });
 
     // IVA Calculator State
@@ -80,6 +83,8 @@ export default function RawMaterialFormPage() {
                     cost: materialData.cost,
                     minStockLevel: materialData.minStockLevel || 0,
                     supplierId: materialData.supplierId || '',
+                    specifications: materialData.specifications || [],
+                    purchasePresentations: materialData.purchasePresentations || [],
                 });
             }
         } else {
@@ -92,6 +97,8 @@ export default function RawMaterialFormPage() {
                     cost: state.initialData.cost || 0,
                     minStockLevel: state.initialData.minStockLevel || 0,
                     supplierId: state.initialData.supplierId || '',
+                    specifications: state.initialData.specifications || [],
+                    purchasePresentations: state.initialData.purchasePresentations || [],
                 });
                 if (state.initialData.sku) {
                     setSkuManuallyEdited(true);
@@ -101,6 +108,82 @@ export default function RawMaterialFormPage() {
     }, [isEditing, materialData, location]);
 
     useMrpQueryErrorRedirect(materialError, 'No se pudo cargar el material', '/mrp/raw-materials');
+
+    const setSpecification = (index: number, patch: Partial<RawMaterialSpecification>) => {
+        setFormData((prev) => ({
+            ...prev,
+            specifications: prev.specifications.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row),
+        }));
+    };
+
+    const addSpecification = () => {
+        setFormData((prev) => ({
+            ...prev,
+            specifications: [
+                ...prev.specifications,
+                {
+                    id: crypto.randomUUID(),
+                    rawMaterialId: id || '',
+                    name: '',
+                    sku: `${prev.sku || 'ESP'}-${prev.specifications.length + 1}`,
+                    isDefault: prev.specifications.length === 0,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                },
+            ],
+        }));
+    };
+
+    const removeSpecification = (index: number) => {
+        setFormData((prev) => ({
+            ...prev,
+            specifications: prev.specifications
+                .filter((_, rowIndex) => rowIndex !== index)
+                .map((row, rowIndex) => ({ ...row, isDefault: rowIndex === 0 ? true : row.isDefault && prev.specifications.length > 2 })),
+            purchasePresentations: prev.purchasePresentations.map((row) => (
+                row.specificationId === prev.specifications[index]?.id
+                    ? { ...row, specificationId: undefined, specification: undefined }
+                    : row
+            )),
+        }));
+    };
+
+    const setPresentation = (index: number, patch: Partial<PurchasePresentation>) => {
+        setFormData((prev) => ({
+            ...prev,
+            purchasePresentations: prev.purchasePresentations.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row),
+        }));
+    };
+
+    const addPresentation = () => {
+        setFormData((prev) => ({
+            ...prev,
+            purchasePresentations: [
+                ...prev.purchasePresentations,
+                {
+                    id: crypto.randomUUID(),
+                    rawMaterialId: id || '',
+                    name: '',
+                    purchaseUnitLabel: 'unidad',
+                    quantityPerPurchaseUnit: 1,
+                    contentUnit: prev.unit,
+                    allowsFractionalQuantity: false,
+                    isDefault: prev.purchasePresentations.length === 0,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                },
+            ],
+        }));
+    };
+
+    const removePresentation = (index: number) => {
+        setFormData((prev) => ({
+            ...prev,
+            purchasePresentations: prev.purchasePresentations
+                .filter((_, rowIndex) => rowIndex !== index)
+                .map((row, rowIndex) => ({ ...row, isDefault: rowIndex === 0 ? true : row.isDefault && prev.purchasePresentations.length > 2 })),
+        }));
+    };
 
     // Recalculate cost when calculator inputs change
     useEffect(() => {
@@ -132,6 +215,36 @@ export default function RawMaterialFormPage() {
                 cost: Number(formData.cost),
                 minStockLevel: Number(formData.minStockLevel || 0),
                 supplierId: formData.supplierId || undefined,
+                specifications: formData.specifications
+                    .filter((row) => row.name.trim() && row.sku.trim())
+                    .map((row) => ({
+                        id: row.id,
+                        name: row.name.trim(),
+                        sku: row.sku.trim(),
+                        description: row.description?.trim() || undefined,
+                        color: row.color?.trim() || undefined,
+                        widthCm: row.widthCm ? Number(row.widthCm) : undefined,
+                        lengthValue: row.lengthValue ? Number(row.lengthValue) : undefined,
+                        lengthUnit: row.lengthUnit || undefined,
+                        thicknessMm: row.thicknessMm ? Number(row.thicknessMm) : undefined,
+                        grammageGsm: row.grammageGsm ? Number(row.grammageGsm) : undefined,
+                        isDefault: row.isDefault,
+                        notes: row.notes?.trim() || undefined,
+                    })),
+                purchasePresentations: formData.purchasePresentations
+                    .filter((row) => row.name.trim() && row.purchaseUnitLabel.trim())
+                    .map((row) => ({
+                        id: row.id,
+                        supplierId: row.supplierId || undefined,
+                        specificationId: row.specificationId || undefined,
+                        name: row.name.trim(),
+                        purchaseUnitLabel: row.purchaseUnitLabel.trim(),
+                        quantityPerPurchaseUnit: Number(row.quantityPerPurchaseUnit || 0),
+                        contentUnit: row.contentUnit,
+                        allowsFractionalQuantity: Boolean(row.allowsFractionalQuantity),
+                        isDefault: row.isDefault,
+                        notes: row.notes?.trim() || undefined,
+                    })),
             };
             RawMaterialSchema.parse(payload);
 
@@ -310,6 +423,175 @@ export default function RawMaterialFormPage() {
                                         Se usará como valor por defecto al generar órdenes de compra para este material.
                                     </p>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-sky-100 text-sky-700 rounded-lg">
+                                        <Ruler className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-slate-800">Especificaciones</h2>
+                                        <p className="text-sm text-slate-500">Úsalas cuando cambie ancho, calibre, espesor o una variante técnica.</p>
+                                    </div>
+                                </div>
+                                <Button type="button" variant="outline" size="sm" onClick={addSpecification}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Agregar
+                                </Button>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                                {formData.specifications.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                                        Si este material cambia por ancho, color, espesor o largo fijo, regístralo aquí.
+                                    </div>
+                                ) : formData.specifications.map((spec, index) => (
+                                    <div key={spec.id || index} className="rounded-2xl border border-slate-200 p-4 space-y-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <div className="font-medium text-slate-900">Especificación {index + 1}</div>
+                                                <div className="text-xs text-slate-500">La producción y el inventario pueden distinguir esta variante.</div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <label className="flex items-center gap-2 text-xs text-slate-600">
+                                                    <input
+                                                        type="radio"
+                                                        checked={Boolean(spec.isDefault)}
+                                                        onChange={() => setFormData((prev) => ({
+                                                            ...prev,
+                                                            specifications: prev.specifications.map((row, rowIndex) => ({ ...row, isDefault: rowIndex === index })),
+                                                        }))}
+                                                    />
+                                                    Predeterminada
+                                                </label>
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => removeSpecification(index)}>
+                                                    <Trash2 className="h-4 w-4 text-slate-500" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <Input placeholder="Nombre técnico" value={spec.name || ''} onChange={(e) => setSpecification(index, { name: e.target.value })} />
+                                            <Input placeholder="SKU especificación" value={spec.sku || ''} onChange={(e) => setSpecification(index, { sku: e.target.value })} />
+                                            <Input placeholder="Color" value={spec.color || ''} onChange={(e) => setSpecification(index, { color: e.target.value })} />
+                                            <Input placeholder="Ancho (cm)" type="number" min="0" value={spec.widthCm ?? ''} onChange={(e) => setSpecification(index, { widthCm: Number(e.target.value) || undefined })} />
+                                            <Input placeholder="Espesor (mm)" type="number" min="0" step="0.01" value={spec.thicknessMm ?? ''} onChange={(e) => setSpecification(index, { thicknessMm: Number(e.target.value) || undefined })} />
+                                            <Input placeholder="Gramaje (gsm)" type="number" min="0" value={spec.grammageGsm ?? ''} onChange={(e) => setSpecification(index, { grammageGsm: Number(e.target.value) || undefined })} />
+                                            <Input placeholder="Largo fijo" type="number" min="0" step="0.01" value={spec.lengthValue ?? ''} onChange={(e) => setSpecification(index, { lengthValue: Number(e.target.value) || undefined })} />
+                                            <Select value={spec.lengthUnit || '__none__'} onValueChange={(value) => setSpecification(index, { lengthUnit: value === '__none__' ? undefined : value as UnitType })}>
+                                                <SelectTrigger><SelectValue placeholder="Unidad largo fijo" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="__none__">Sin largo fijo</SelectItem>
+                                                    {Object.values(UnitType).map((unit) => (
+                                                        <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <div className="md:col-span-2">
+                                                <Textarea placeholder="Notas o detalle técnico" value={spec.notes || ''} onChange={(e) => setSpecification(index, { notes: e.target.value })} rows={2} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-amber-100 text-amber-700 rounded-lg">
+                                        <Layers3 className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-semibold text-slate-800">Presentaciones de Compra</h2>
+                                        <p className="text-sm text-slate-500">Define cómo compra el proveedor y cómo se convierte a inventario.</p>
+                                    </div>
+                                </div>
+                                <Button type="button" variant="outline" size="sm" onClick={addPresentation}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Agregar
+                                </Button>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                                {formData.purchasePresentations.length === 0 ? (
+                                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                                        Ejemplos: cono x 5000 yardas, rollo x 50 metros, lámina x 6 metros, compra por metro.
+                                    </div>
+                                ) : formData.purchasePresentations.map((presentation, index) => (
+                                    <div key={presentation.id || index} className="rounded-2xl border border-slate-200 p-4 space-y-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="font-medium text-slate-900">Presentación {index + 1}</div>
+                                            <div className="flex items-center gap-3">
+                                                <label className="flex items-center gap-2 text-xs text-slate-600">
+                                                    <input
+                                                        type="radio"
+                                                        checked={Boolean(presentation.isDefault)}
+                                                        onChange={() => setFormData((prev) => ({
+                                                            ...prev,
+                                                            purchasePresentations: prev.purchasePresentations.map((row, rowIndex) => ({ ...row, isDefault: rowIndex === index })),
+                                                        }))}
+                                                    />
+                                                    Predeterminada
+                                                </label>
+                                                <Button type="button" variant="ghost" size="icon" onClick={() => removePresentation(index)}>
+                                                    <Trash2 className="h-4 w-4 text-slate-500" />
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <Input placeholder="Nombre de presentación" value={presentation.name || ''} onChange={(e) => setPresentation(index, { name: e.target.value })} />
+                                            <Input placeholder="Unidad de compra" value={presentation.purchaseUnitLabel || ''} onChange={(e) => setPresentation(index, { purchaseUnitLabel: e.target.value })} />
+                                            <Input placeholder="Contenido por unidad comprada" type="number" min="0" step="0.01" value={presentation.quantityPerPurchaseUnit ?? ''} onChange={(e) => setPresentation(index, { quantityPerPurchaseUnit: Number(e.target.value) || 0 })} />
+                                            <Select value={presentation.contentUnit || formData.unit} onValueChange={(value) => setPresentation(index, { contentUnit: value as UnitType })}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {Object.values(UnitType).map((unit) => (
+                                                        <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Select value={presentation.specificationId || '__all__'} onValueChange={(value) => setPresentation(index, { specificationId: value === '__all__' ? undefined : value })}>
+                                                <SelectTrigger><SelectValue placeholder="Aplica a todas las especificaciones" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="__all__">Aplica a cualquier especificación</SelectItem>
+                                                    {formData.specifications.map((spec) => (
+                                                        <SelectItem key={spec.id} value={spec.id}>{spec.name || spec.sku}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Select value={presentation.supplierId || '__none__'} onValueChange={(value) => setPresentation(index, { supplierId: value === '__none__' ? undefined : value })}>
+                                                <SelectTrigger><SelectValue placeholder="Proveedor opcional" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="__none__">Cualquier proveedor</SelectItem>
+                                                    {suppliers.map((supplier) => (
+                                                        <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <div className="md:col-span-2 flex flex-wrap items-center gap-4">
+                                                <label className="flex items-center gap-2 text-sm text-slate-600">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={Boolean(presentation.allowsFractionalQuantity)}
+                                                        onChange={(e) => setPresentation(index, { allowsFractionalQuantity: e.target.checked })}
+                                                    />
+                                                    Permite fracciones al comprar
+                                                </label>
+                                                <span className="text-xs text-slate-500">
+                                                    1 {presentation.purchaseUnitLabel || 'unidad'} = {presentation.quantityPerPurchaseUnit || 0} {presentation.contentUnit || formData.unit}
+                                                </span>
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <Textarea placeholder="Notas de compra o empaque" value={presentation.notes || ''} onChange={(e) => setPresentation(index, { notes: e.target.value })} rows={2} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>

@@ -1,9 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Textarea } from '../../components/ui/textarea';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Plus, Trash2, ArrowLeft, Calculator, Check, X, ChevronDown, ChevronUp, Building2, FileText, ShoppingCart, Percent, Package, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '../../components/ui/currency-input';
@@ -13,7 +20,7 @@ import { PurchaseRequisitionStatus } from '@scaffold/types';
 import { getErrorMessage } from '@/lib/api-error';
 import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
-import { useCreatePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
+import { useCreatePurchaseOrderMutation, usePurchaseOrderQuery, useUpdatePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useMarkPurchaseRequisitionConvertedMutation, usePurchaseRequisitionQuery } from '@/hooks/mrp/usePurchaseRequisitions';
 import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
@@ -22,6 +29,8 @@ import { mrpApi, RawMaterialSupplier } from '@/services/mrpApi';
 interface OrderItem {
     isCatalogItem: boolean;
     rawMaterialId: string;
+    rawMaterialSpecificationId: string;
+    purchasePresentationId: string;
     catalogSearch: string;
     customDescription: string;
     customUnit: string;
@@ -35,6 +44,8 @@ interface OrderItem {
 
 
 export default function PurchaseOrderFormPage() {
+    const { id } = useParams<{ id: string }>();
+    const isEditing = Boolean(id);
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const { toast } = useToast();
@@ -70,6 +81,8 @@ export default function PurchaseOrderFormPage() {
         {
             isCatalogItem: true,
             rawMaterialId: '',
+            rawMaterialSpecificationId: '',
+            purchasePresentationId: '',
             catalogSearch: '',
             customDescription: '',
             customUnit: '',
@@ -84,6 +97,8 @@ export default function PurchaseOrderFormPage() {
     const { data: suppliersResponse, error: suppliersError } = useSuppliersQuery(1, 100);
     const { materials: rawMaterials, error: rawMaterialsError } = useRawMaterialsQuery(1, 1000, '');
     const { execute: createPurchaseOrder } = useCreatePurchaseOrderMutation();
+    const { execute: updatePurchaseOrder } = useUpdatePurchaseOrderMutation();
+    const { data: existingOrder, error: purchaseOrderError } = usePurchaseOrderQuery(id);
     const { execute: markPurchaseRequisitionConverted } = useMarkPurchaseRequisitionConvertedMutation();
     const { data: requisition, error: requisitionError } = usePurchaseRequisitionQuery(requisitionId);
     const { data: operationalConfig, error: operationalConfigError } = useOperationalConfigQuery();
@@ -93,9 +108,17 @@ export default function PurchaseOrderFormPage() {
     useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar la información inicial');
     useMrpQueryErrorToast(requisitionError, 'No se pudo cargar la requisición para precargar la orden');
     useMrpQueryErrorToast(operationalConfigError, 'No se pudo cargar la configuración operativa');
+    useMrpQueryErrorToast(purchaseOrderError, 'No se pudo cargar la orden de compra');
+
+    const extractUserNotes = (notes?: string) => {
+        const raw = (notes || '').trim();
+        if (!raw) return '';
+        const markerIndex = raw.indexOf('[DETALLE OC]');
+        return markerIndex >= 0 ? raw.slice(0, markerIndex).trim() : raw;
+    };
 
     useEffect(() => {
-        if (!requisition || didHydrateRequisitionRef.current) return;
+        if (isEditing || !requisition || didHydrateRequisitionRef.current) return;
 
         const requisitionItems = requisition.items ?? [];
         if (requisitionItems.length > 0) {
@@ -103,6 +126,8 @@ export default function PurchaseOrderFormPage() {
                 requisitionItems.map((item) => ({
                     isCatalogItem: true,
                     rawMaterialId: item.rawMaterial.id,
+                    rawMaterialSpecificationId: '',
+                    purchasePresentationId: '',
                     catalogSearch: `${item.rawMaterial.sku} ${item.rawMaterial.name}`,
                     customDescription: '',
                     customUnit: '',
@@ -128,7 +153,47 @@ export default function PurchaseOrderFormPage() {
         }));
 
         didHydrateRequisitionRef.current = true;
-    }, [requisition]);
+    }, [isEditing, requisition]);
+
+    useEffect(() => {
+        if (!isEditing || !existingOrder || didHydrateRequisitionRef.current) return;
+
+        setFormData({
+            supplierId: existingOrder.supplier?.id || '',
+            expectedDeliveryDate: existingOrder.expectedDeliveryDate
+                ? new Date(existingOrder.expectedDeliveryDate).toISOString().slice(0, 10)
+                : '',
+            notes: extractUserNotes(existingOrder.notes),
+        });
+
+        setPurchaseConditions((prev) => ({
+            ...prev,
+            purchaseType: existingOrder.purchaseType || prev.purchaseType,
+            paymentMethod: existingOrder.paymentMethod || prev.paymentMethod,
+            currency: existingOrder.currency || prev.currency,
+            discountAmount: Number(existingOrder.discountAmount || 0),
+            otherChargesAmount: Number(existingOrder.otherChargesAmount || 0),
+        }));
+
+        if ((existingOrder.items ?? []).length > 0) {
+            setItems((existingOrder.items ?? []).map((item) => ({
+                isCatalogItem: item.isCatalogItem !== false,
+                rawMaterialId: item.rawMaterial?.id || '',
+                rawMaterialSpecificationId: item.rawMaterialSpecification?.id || '',
+                purchasePresentationId: item.purchasePresentation?.id || '',
+                catalogSearch: item.rawMaterial ? `${item.rawMaterial.sku} ${item.rawMaterial.name}` : '',
+                customDescription: item.customDescription || '',
+                customUnit: item.customUnit || '',
+                isInventoriable: item.isInventoriable ?? Boolean(item.rawMaterial),
+                quantity: Number(item.quantity || 0),
+                unitPrice: Number(item.unitPrice || 0),
+                hasIva: Number(item.taxAmount || 0) > 0,
+                ivaIncluded: false,
+            })));
+        }
+
+        didHydrateRequisitionRef.current = true;
+    }, [existingOrder, isEditing]);
 
     useEffect(() => {
         if (!operationalConfig) return;
@@ -146,6 +211,8 @@ export default function PurchaseOrderFormPage() {
             const next = [...prev, {
                 isCatalogItem: true,
                 rawMaterialId: '',
+                rawMaterialSpecificationId: '',
+                purchasePresentationId: '',
                 catalogSearch: '',
                 customDescription: '',
                 customUnit: '',
@@ -191,6 +258,61 @@ export default function PurchaseOrderFormPage() {
         return suppliers.find((supplier) => supplier.id === supplierId);
     };
 
+    const getMaterialById = (id: string) => {
+        return rawMaterials.find(m => m.id === id);
+    };
+
+    const convertQuantity = (quantity: number, fromUnit: string, toUnit: string) => {
+        if (fromUnit === toUnit) return quantity;
+        if (fromUnit === 'yarda' && toUnit === 'metro') return quantity * 0.9144;
+        if (fromUnit === 'metro' && toUnit === 'yarda') return quantity / 0.9144;
+        return quantity;
+    };
+
+    const getSelectedSpecification = (item: OrderItem) => {
+        const material = getMaterialById(item.rawMaterialId);
+        return material?.specifications?.find((spec) => spec.id === item.rawMaterialSpecificationId);
+    };
+
+    const getAvailablePresentations = (item: OrderItem) => {
+        const material = getMaterialById(item.rawMaterialId);
+        return (material?.purchasePresentations || []).filter((presentation) => {
+            if (!item.rawMaterialSpecificationId) return true;
+            return !presentation.specificationId || presentation.specificationId === item.rawMaterialSpecificationId;
+        });
+    };
+
+    const getSelectedPresentation = (item: OrderItem) => {
+        return getAvailablePresentations(item).find((presentation) => presentation.id === item.purchasePresentationId);
+    };
+
+    const getPurchaseDisplayLabel = (item: OrderItem) => {
+        const presentation = getSelectedPresentation(item);
+        const material = getMaterialById(item.rawMaterialId);
+        if (!presentation) return material?.unit || item.customUnit || '';
+        const label = presentation.name?.trim() || presentation.purchaseUnitLabel?.trim() || material?.unit || '';
+        return label;
+    };
+
+    const getPurchaseDisplayDetail = (item: OrderItem) => {
+        const presentation = getSelectedPresentation(item);
+        if (!presentation) return '';
+        const unitLabel = presentation.purchaseUnitLabel?.trim();
+        const presentationName = presentation.name?.trim();
+        if (presentationName && unitLabel && presentationName.toLowerCase() !== unitLabel.toLowerCase()) {
+            return `${presentationName} x ${presentation.quantityPerPurchaseUnit} ${presentation.contentUnit}`;
+        }
+        return `${unitLabel || presentationName} x ${presentation.quantityPerPurchaseUnit} ${presentation.contentUnit}`;
+    };
+
+    const getInventoryPreviewQuantity = (item: OrderItem) => {
+        const material = getMaterialById(item.rawMaterialId);
+        const presentation = getSelectedPresentation(item);
+        if (!material) return 0;
+        if (!presentation) return item.quantity;
+        return convertQuantity(item.quantity * Number(presentation.quantityPerPurchaseUnit || 0), presentation.contentUnit, material.unit);
+    };
+
     const fetchMaterialSuppliers = async (materialId: string) => {
         if (!materialId) return [];
         if (materialSuppliersByMaterialId[materialId]) {
@@ -216,6 +338,18 @@ export default function PurchaseOrderFormPage() {
     const handleMaterialChange = async (index: number, materialId: string) => {
         const selectedMaterial = rawMaterials.find((material) => material.id === materialId);
         updateItem(index, 'rawMaterialId', materialId);
+        const defaultSpecificationId = selectedMaterial?.specifications?.find((spec) => spec.isDefault)?.id
+            || selectedMaterial?.specifications?.[0]?.id
+            || '';
+        updateItem(index, 'rawMaterialSpecificationId', defaultSpecificationId);
+        const eligiblePresentations = (selectedMaterial?.purchasePresentations || []).filter((presentation) => {
+            if (!defaultSpecificationId) return true;
+            return !presentation.specificationId || presentation.specificationId === defaultSpecificationId;
+        });
+        const defaultPresentationId = eligiblePresentations.find((presentation) => presentation.isDefault)?.id
+            || eligiblePresentations[0]?.id
+            || '';
+        updateItem(index, 'purchasePresentationId', defaultPresentationId);
         if (selectedMaterial) {
             updateItem(index, 'catalogSearch', `${selectedMaterial.sku} ${selectedMaterial.name}`);
         }
@@ -329,6 +463,8 @@ export default function PurchaseOrderFormPage() {
                             ? {
                                 isCatalogItem: true,
                                 rawMaterialId: item.rawMaterialId,
+                                rawMaterialSpecificationId: item.rawMaterialSpecificationId || undefined,
+                                purchasePresentationId: item.purchasePresentationId || undefined,
                                 quantity: item.quantity,
                                 unitPrice: item.quantity > 0 ? ((item.quantity * item.unitPrice) / 1.19) / item.quantity : 0,
                                 taxAmount: (item.quantity * item.unitPrice) - ((item.quantity * item.unitPrice) / 1.19),
@@ -336,6 +472,8 @@ export default function PurchaseOrderFormPage() {
                             : {
                                 isCatalogItem: true,
                                 rawMaterialId: item.rawMaterialId,
+                                rawMaterialSpecificationId: item.rawMaterialSpecificationId || undefined,
+                                purchasePresentationId: item.purchasePresentationId || undefined,
                                 quantity: item.quantity,
                                 unitPrice: item.unitPrice,
                                 taxAmount: item.hasIva ? (item.quantity * item.unitPrice) * 0.19 : 0,
@@ -364,11 +502,13 @@ export default function PurchaseOrderFormPage() {
                 })),
             };
             const validatedData = CreatePurchaseOrderSchema.parse(submitData);
-            const createdOrder = await createPurchaseOrder(validatedData);
+            const savedOrder = isEditing && id
+                ? await updatePurchaseOrder({ id, payload: validatedData })
+                : await createPurchaseOrder(validatedData);
 
-            if (requisitionId) {
+            if (!isEditing && requisitionId) {
                 try {
-                    await markPurchaseRequisitionConverted({ id: requisitionId, purchaseOrderId: createdOrder.id });
+                    await markPurchaseRequisitionConverted({ id: requisitionId, purchaseOrderId: savedOrder.id });
                 } catch (markError) {
                     toast({
                         title: 'OC creada con advertencia',
@@ -380,10 +520,10 @@ export default function PurchaseOrderFormPage() {
 
             toast({
                 title: 'Éxito',
-                description: 'Orden de compra creada exitosamente',
+                description: isEditing ? 'Orden de compra actualizada exitosamente' : 'Orden de compra creada exitosamente',
                 variant: 'default',
             });
-            navigate(`/mrp/purchase-orders/${createdOrder.id}`);
+            navigate(`/mrp/purchase-orders/${savedOrder.id}`);
         } catch (error: unknown) {
             toast({
                 title: 'Error',
@@ -395,9 +535,6 @@ export default function PurchaseOrderFormPage() {
         }
     };
 
-    const getMaterialById = (id: string) => {
-        return rawMaterials.find(m => m.id === id);
-    };
     const getFilteredMaterials = (search: string) => {
         const normalized = search.trim().toLowerCase();
         if (!normalized) return rawMaterials.slice(0, 50);
@@ -498,10 +635,10 @@ export default function PurchaseOrderFormPage() {
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
-                            Nueva Orden de Compra
+                            {isEditing ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
                         </h1>
                         <p className="text-slate-500 mt-2 text-lg max-w-2xl">
-                            Configura y emite una orden de compra de materias primas.
+                            {isEditing ? 'Ajusta ítems, cantidades, precios y condiciones antes de recibir la orden.' : 'Configura y emite una orden de compra de materias primas.'}
                         </p>
                     </div>
                     <div className="hidden md:flex h-16 w-16 bg-blue-100/50 rounded-2xl items-center justify-center border border-blue-200/50 shadow-inner">
@@ -510,7 +647,7 @@ export default function PurchaseOrderFormPage() {
                 </div>
             </div>
 
-            {requisitionId ? (
+            {requisitionId && !isEditing ? (
                 <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                     {requisition ? (
                         <>
@@ -795,10 +932,14 @@ export default function PurchaseOrderFormPage() {
                         <div className="flex flex-col">
                             {items.map((item, index) => {
                                 const material = getMaterialById(item.rawMaterialId);
+                                const selectedSpecification = getSelectedSpecification(item);
+                                const selectedPresentation = getSelectedPresentation(item);
                                 const itemLabel = item.isCatalogItem
                                     ? (material ? `${material.name} (${material.sku})` : `Ítem ${index + 1}`)
                                     : (item.customDescription?.trim() || `Ítem libre ${index + 1}`);
-                                const itemUnit = item.isCatalogItem ? (material?.unit || '') : (item.customUnit || '');
+                                const itemUnit = item.isCatalogItem ? getPurchaseDisplayLabel(item) : (item.customUnit || '');
+                                const itemUnitDetail = item.isCatalogItem ? getPurchaseDisplayDetail(item) : '';
+                                const inventoryPreviewQuantity = item.isCatalogItem ? getInventoryPreviewQuantity(item) : 0;
                                 const enteredLineTotal = item.quantity * item.unitPrice;
                                 const subtotal = item.hasIva && item.ivaIncluded ? enteredLineTotal / 1.19 : enteredLineTotal;
                                 const taxAmount = item.hasIva ? (item.ivaIncluded ? enteredLineTotal - subtotal : subtotal * 0.19) : 0;
@@ -821,8 +962,21 @@ export default function PurchaseOrderFormPage() {
                                                         <span className={`px-2 py-0.5 rounded text-[11px] font-medium border ${item.isCatalogItem ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                                                             {item.isCatalogItem ? 'Catálogo' : 'Libre'}
                                                         </span>
+                                                        {selectedSpecification ? <span className="text-[11px] text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded">{selectedSpecification.name}</span> : null}
                                                         <span className="hidden sm:inline text-slate-300">•</span>
                                                         <span>Cant: <strong className="text-slate-700">{item.quantity || 0} {itemUnit}</strong></span>
+                                                        {itemUnitDetail ? (
+                                                            <>
+                                                                <span className="hidden sm:inline text-slate-300">•</span>
+                                                                <span>{itemUnitDetail}</span>
+                                                            </>
+                                                        ) : null}
+                                                        {item.isCatalogItem && selectedPresentation ? (
+                                                            <>
+                                                                <span className="hidden sm:inline text-slate-300">•</span>
+                                                                <span>Ingresa: <strong className="text-slate-700">{inventoryPreviewQuantity.toFixed(2)} {material?.unit}</strong></span>
+                                                            </>
+                                                        ) : null}
                                                         <span className="hidden sm:inline text-slate-300">•</span>
                                                         <span>V. Unit: {formatCurrency(item.unitPrice || 0)}</span>
                                                     </div>
@@ -884,6 +1038,8 @@ export default function PurchaseOrderFormPage() {
                                                                     ...next[index],
                                                                     isCatalogItem: isCatalog,
                                                                     rawMaterialId: isCatalog ? next[index].rawMaterialId : '',
+                                                                    rawMaterialSpecificationId: isCatalog ? next[index].rawMaterialSpecificationId : '',
+                                                                    purchasePresentationId: isCatalog ? next[index].purchasePresentationId : '',
                                                                     catalogSearch: isCatalog ? next[index].catalogSearch : '',
                                                                     customDescription: isCatalog ? '' : next[index].customDescription,
                                                                     customUnit: isCatalog ? '' : next[index].customUnit,
@@ -960,6 +1116,50 @@ export default function PurchaseOrderFormPage() {
                                                     )}
                                                     {item.isCatalogItem && item.rawMaterialId ? (
                                                         <div className="mt-1 space-y-1">
+                                                            {material?.specifications?.length ? (
+                                                                <div className="grid gap-2 md:grid-cols-2">
+                                                                    <select
+                                                                        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+                                                                        value={item.rawMaterialSpecificationId || '__none__'}
+                                                                        onChange={(e) => {
+                                                                            const nextSpecId = e.target.value === '__none__' ? '' : e.target.value;
+                                                                            updateItem(index, 'rawMaterialSpecificationId', nextSpecId);
+                                                                            const nextPresentations = (material.purchasePresentations || []).filter((presentation) => !nextSpecId || !presentation.specificationId || presentation.specificationId === nextSpecId);
+                                                                            updateItem(index, 'purchasePresentationId', nextPresentations.find((presentation) => presentation.isDefault)?.id || nextPresentations[0]?.id || '');
+                                                                        }}
+                                                                    >
+                                                                        <option value="__none__">Sin especificación</option>
+                                                                        {material.specifications.map((spec) => (
+                                                                            <option key={spec.id} value={spec.id}>{spec.name} ({spec.sku})</option>
+                                                                        ))}
+                                                                    </select>
+                                                                    <select
+                                                                        className="h-9 rounded-md border border-slate-300 bg-white px-2 text-sm"
+                                                                        value={item.purchasePresentationId || '__none__'}
+                                                                        onChange={(e) => updateItem(index, 'purchasePresentationId', e.target.value === '__none__' ? '' : e.target.value)}
+                                                                    >
+                                                                        <option value="__none__">Comprar en unidad base</option>
+                                                                        {getAvailablePresentations(item).map((presentation) => (
+                                                                            <option key={presentation.id} value={presentation.id}>
+                                                                                {presentation.name} ({presentation.purchaseUnitLabel} x {presentation.quantityPerPurchaseUnit} {presentation.contentUnit})
+                                                                            </option>
+                                                                        ))}
+                                                                    </select>
+                                                                </div>
+                                                            ) : material?.purchasePresentations?.length ? (
+                                                                <select
+                                                                    className="h-9 w-full rounded-md border border-slate-300 bg-white px-2 text-sm"
+                                                                    value={item.purchasePresentationId || '__none__'}
+                                                                    onChange={(e) => updateItem(index, 'purchasePresentationId', e.target.value === '__none__' ? '' : e.target.value)}
+                                                                >
+                                                                    <option value="__none__">Comprar en unidad base</option>
+                                                                    {getAvailablePresentations(item).map((presentation) => (
+                                                                        <option key={presentation.id} value={presentation.id}>
+                                                                            {presentation.name} ({presentation.purchaseUnitLabel} x {presentation.quantityPerPurchaseUnit} {presentation.contentUnit})
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            ) : null}
                                                             {loadingMaterialSuppliersByMaterialId[item.rawMaterialId] ? (
                                                                 <div className="text-[11px] text-slate-500">Cargando proveedores sugeridos...</div>
                                                             ) : null}
@@ -1010,7 +1210,11 @@ export default function PurchaseOrderFormPage() {
                                                             required
                                                         />
                                                         {material && (
-                                                            <span className="text-[11px] text-slate-500">{material.unit}</span>
+                                                            <span className="text-[11px] text-slate-500">
+                                                                {selectedPresentation
+                                                                    ? `${getPurchaseDisplayDetail(item)} -> ${inventoryPreviewQuantity.toFixed(2)} ${material.unit}`
+                                                                    : material.unit}
+                                                            </span>
                                                         )}
                                                         {!item.isCatalogItem ? (
                                                             <Input
@@ -1136,14 +1340,18 @@ export default function PurchaseOrderFormPage() {
                                                             Aplica IVA
                                                         </label>
                                                         {item.hasIva ? (
-                                                            <select
-                                                                className="h-9 min-w-[110px] px-2 py-1 border border-slate-300 rounded-md text-sm"
+                                                            <Select
                                                                 value={item.ivaIncluded ? 'included' : 'add'}
-                                                                onChange={(e) => updateItem(index, 'ivaIncluded', e.target.value === 'included')}
+                                                                onValueChange={(value) => updateItem(index, 'ivaIncluded', value === 'included')}
                                                             >
-                                                                <option value="add">+ IVA</option>
-                                                                <option value="included">Incluido</option>
-                                                            </select>
+                                                                <SelectTrigger className="h-9 min-w-[110px] text-sm bg-white">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="add">+ IVA</SelectItem>
+                                                                    <SelectItem value="included">Incluido</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
                                                         ) : null}
                                                     </div>
                                                 </div>

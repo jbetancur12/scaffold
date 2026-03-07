@@ -244,6 +244,7 @@ export class QualityIncomingService {
         if (!isConditional) {
             quarantineInventory = await this.inventoryRepo.findOne({
                 rawMaterial: row.rawMaterial.id,
+                rawMaterialSpecification: row.rawMaterialSpecification ? row.rawMaterialSpecification.id : null,
                 warehouse: row.warehouse.id,
             });
             if (!quarantineInventory || Number(quarantineInventory.quantity) < totalResolved) {
@@ -293,11 +294,13 @@ export class QualityIncomingService {
 
             let releasedInventory = await this.inventoryRepo.findOne({
                 rawMaterial: row.rawMaterial.id,
+                rawMaterialSpecification: row.rawMaterialSpecification ? row.rawMaterialSpecification.id : null,
                 warehouse: releasedWarehouse.id,
             });
             if (!releasedInventory) {
                 releasedInventory = this.inventoryRepo.create({
                     rawMaterial: row.rawMaterial,
+                    rawMaterialSpecification: row.rawMaterialSpecification,
                     warehouse: releasedWarehouse,
                     quantity: 0,
                 } as InventoryItem);
@@ -315,12 +318,14 @@ export class QualityIncomingService {
             row.supplierLotCode = supplierLotCode;
             let lot = await this.rawMaterialLotRepo.findOne({
                 rawMaterial: row.rawMaterial.id,
+                rawMaterialSpecification: row.rawMaterialSpecification ? row.rawMaterialSpecification.id : null,
                 warehouse: releasedWarehouse.id,
                 supplierLotCode,
             });
             if (!lot) {
                 lot = this.rawMaterialLotRepo.create({
                     rawMaterial: row.rawMaterial,
+                    rawMaterialSpecification: row.rawMaterialSpecification,
                     warehouse: releasedWarehouse,
                     incomingInspection: row,
                     supplierLotCode,
@@ -349,6 +354,7 @@ export class QualityIncomingService {
 
             const kardex = this.rawMaterialKardexRepo.create({
                 rawMaterial: row.rawMaterial,
+                rawMaterialSpecification: row.rawMaterialSpecification,
                 warehouse: releasedWarehouse,
                 lot,
                 movementType: 'ENTRADA_RECEPCION_APROBADA',

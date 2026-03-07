@@ -163,6 +163,7 @@ export default function App() {
 
                         <Route path="/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
                         <Route path="/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />
+                        <Route path="/mrp/purchase-orders/:id/edit" element={<PurchaseOrderFormPage />} />
                         <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
                         <Route path="/mrp/purchase-requisitions" element={<PurchaseRequisitionListPage />} />
                         <Route path="/mrp/purchase-requisitions/new" element={<PurchaseRequisitionFormPage />} />

@@ -7,11 +7,13 @@ import { InventoryItem } from '../entities/inventory-item.entity';
 import { IncomingInspection } from '../entities/incoming-inspection.entity';
 import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Warehouse } from '../entities/warehouse.entity';
-import { DocumentCategory, DocumentProcess, DocumentStatus, PurchaseOrderStatus, WarehouseType } from '@scaffold/types';
+import { DocumentCategory, DocumentProcess, DocumentStatus, PurchaseOrderStatus, UnitType, WarehouseType } from '@scaffold/types';
 import type { CreatePurchaseOrderDto } from '@scaffold/schemas';
 import { AppError } from '../../../shared/utils/response';
 import { ControlledDocument } from '../entities/controlled-document.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
+import { RawMaterialSpecification } from '../entities/raw-material-specification.entity';
+import { PurchasePresentation } from '../entities/purchase-presentation.entity';
 
 export class PurchaseOrderService {
     private purchaseOrderRepo: EntityRepository<PurchaseOrder>;
@@ -22,6 +24,114 @@ export class PurchaseOrderService {
     ) {
         this.purchaseOrderRepo = em.getRepository(PurchaseOrder);
         this.incomingInspectionRepo = em.getRepository(IncomingInspection);
+    }
+
+    private convertQuantity(quantity: number, fromUnit: UnitType, toUnit: UnitType): number {
+        if (fromUnit === toUnit) return quantity;
+        if (fromUnit === UnitType.YARD && toUnit === UnitType.METER) return quantity * 0.9144;
+        if (fromUnit === UnitType.METER && toUnit === UnitType.YARD) return quantity / 0.9144;
+        throw new AppError(`No existe conversión automática entre ${fromUnit} y ${toUnit}`, 400);
+    }
+
+    private async buildPurchaseOrderItems(
+        tx: EntityManager,
+        purchaseOrder: PurchaseOrder,
+        data: CreatePurchaseOrderDto
+    ) {
+        let totalAmount = 0;
+        let taxTotal = 0;
+        let subtotalBase = 0;
+
+        for (const itemData of data.items) {
+            const isCatalogItem = itemData.isCatalogItem !== false;
+            const rawMaterial = isCatalogItem ? await tx.getRepository(RawMaterial).findOneOrFail({ id: itemData.rawMaterialId }) : undefined;
+            const rawMaterialSpecification = isCatalogItem && itemData.rawMaterialSpecificationId
+                ? await tx.getRepository(RawMaterialSpecification).findOneOrFail({
+                    id: itemData.rawMaterialSpecificationId,
+                    rawMaterial: itemData.rawMaterialId,
+                })
+                : undefined;
+            const purchasePresentation = isCatalogItem && itemData.purchasePresentationId
+                ? await tx.getRepository(PurchasePresentation).findOneOrFail({
+                    id: itemData.purchasePresentationId,
+                    rawMaterial: itemData.rawMaterialId,
+                }, { populate: ['specification'] })
+                : undefined;
+
+            if (purchasePresentation?.specification && rawMaterialSpecification && purchasePresentation.specification.id !== rawMaterialSpecification.id) {
+                throw new AppError('La presentación seleccionada no corresponde a la especificación elegida', 400);
+            }
+
+            const inventoryQuantity = isCatalogItem
+                ? purchasePresentation
+                    ? this.convertQuantity(
+                        Number(itemData.quantity) * Number(purchasePresentation.quantityPerPurchaseUnit),
+                        purchasePresentation.contentUnit,
+                        rawMaterial!.unit
+                    )
+                    : Number(itemData.quantity)
+                : undefined;
+            const purchaseUnitLabel = isCatalogItem
+                ? purchasePresentation?.purchaseUnitLabel || rawMaterial?.unit
+                : itemData.customUnit?.trim();
+
+            const subtotal = itemData.quantity * itemData.unitPrice;
+            const taxAmount = itemData.taxAmount || 0;
+            const itemTotal = subtotal + taxAmount;
+
+            subtotalBase += subtotal;
+            taxTotal += taxAmount;
+            totalAmount += itemTotal;
+
+            const item = tx.getRepository(PurchaseOrderItem).create({
+                purchaseOrder,
+                isCatalogItem,
+                rawMaterial,
+                rawMaterialSpecification,
+                purchasePresentation,
+                customDescription: !isCatalogItem ? itemData.customDescription?.trim() : undefined,
+                customUnit: !isCatalogItem ? itemData.customUnit?.trim() : undefined,
+                isInventoriable: itemData.isInventoriable ?? isCatalogItem,
+                quantity: itemData.quantity,
+                unitPrice: itemData.unitPrice,
+                purchaseUnitLabel,
+                inventoryUnit: rawMaterial?.unit,
+                inventoryQuantity,
+                taxAmount,
+                subtotal: itemTotal,
+            } as PurchaseOrderItem);
+
+            purchaseOrder.items.add(item);
+        }
+
+        return { totalAmount, taxTotal, subtotalBase };
+    }
+
+    private applyPurchaseOrderTotals(purchaseOrder: PurchaseOrder, data: CreatePurchaseOrderDto, totals: { totalAmount: number; taxTotal: number; subtotalBase: number }) {
+        const discountAmount = Number(data.discountAmount || 0);
+        const otherChargesAmount = Number(data.otherChargesAmount || 0);
+        const withholdingRate = Number(data.withholdingRate || 0);
+        const taxableBase = Math.max(0, totals.subtotalBase - discountAmount);
+        const withholdingAmount = Number(
+            data.withholdingAmount !== undefined
+                ? data.withholdingAmount
+                : taxableBase * (withholdingRate / 100)
+        );
+        const grossTotal = Math.max(0, totals.totalAmount - discountAmount + otherChargesAmount);
+        const netTotalAmount = Number(
+            data.netTotalAmount !== undefined
+                ? data.netTotalAmount
+                : Math.max(0, grossTotal - withholdingAmount)
+        );
+
+        purchaseOrder.subtotalBase = totals.subtotalBase;
+        purchaseOrder.taxTotal = totals.taxTotal;
+        purchaseOrder.totalAmount = grossTotal;
+        purchaseOrder.discountAmount = discountAmount;
+        purchaseOrder.otherChargesAmount = otherChargesAmount;
+        purchaseOrder.withholdingRate = withholdingRate;
+        purchaseOrder.withholdingAmount = withholdingAmount;
+        purchaseOrder.netTotalAmount = netTotalAmount;
     }
 
     async createPurchaseOrder(data: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
@@ -77,63 +187,45 @@ export class PurchaseOrderService {
             config.purchaseOrderSequence = nextNumber;
             purchaseOrder.code = `${prefix}-${String(nextNumber).padStart(4, '0')}`;
 
-            let totalAmount = 0;
-            let taxTotal = 0;
-            let subtotalBase = 0;
+            const totals = await this.buildPurchaseOrderItems(tx, purchaseOrder, data);
+            this.applyPurchaseOrderTotals(purchaseOrder, data, totals);
 
-            // Create purchase order items
-            for (const itemData of data.items) {
-                const isCatalogItem = itemData.isCatalogItem !== false;
-                const rawMaterial = isCatalogItem ? await tx.getRepository(RawMaterial).findOneOrFail({ id: itemData.rawMaterialId }) : undefined;
+            await tx.persistAndFlush(purchaseOrder);
+            return purchaseOrder;
+        });
+    }
 
-                const subtotal = itemData.quantity * itemData.unitPrice;
-                const taxAmount = itemData.taxAmount || 0;
-                const itemTotal = subtotal + taxAmount;
+    async updatePurchaseOrder(id: string, data: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
+        const controlDocument = await this.resolvePurchaseOrderControlDocument(data.controlledDocumentId);
 
-                subtotalBase += subtotal;
-                taxTotal += taxAmount;
-                totalAmount += itemTotal;
+        return this.em.transactional(async (tx) => {
+            const purchaseOrder = await tx.getRepository(PurchaseOrder).findOneOrFail(
+                { id },
+                { populate: ['items', 'supplier'] }
+            );
 
-                const item = tx.getRepository(PurchaseOrderItem).create({
-                    purchaseOrder,
-                    isCatalogItem,
-                    rawMaterial,
-                    customDescription: !isCatalogItem ? itemData.customDescription?.trim() : undefined,
-                    customUnit: !isCatalogItem ? itemData.customUnit?.trim() : undefined,
-                    isInventoriable: itemData.isInventoriable ?? isCatalogItem,
-                    quantity: itemData.quantity,
-                    unitPrice: itemData.unitPrice,
-                    taxAmount,
-                    subtotal: itemTotal,
-                } as PurchaseOrderItem);
-
-                purchaseOrder.items.add(item);
+            if (purchaseOrder.status === PurchaseOrderStatus.RECEIVED) {
+                throw new AppError('No se puede editar una orden de compra ya recibida', 400);
+            }
+            if (purchaseOrder.status === PurchaseOrderStatus.CANCELLED) {
+                throw new AppError('No se puede editar una orden de compra cancelada', 400);
             }
 
-            const discountAmount = Number(data.discountAmount || 0);
-            const otherChargesAmount = Number(data.otherChargesAmount || 0);
-            const withholdingRate = Number(data.withholdingRate || 0);
-            const taxableBase = Math.max(0, subtotalBase - discountAmount);
-            const withholdingAmount = Number(
-                data.withholdingAmount !== undefined
-                    ? data.withholdingAmount
-                    : taxableBase * (withholdingRate / 100)
-            );
-            const grossTotal = Math.max(0, totalAmount - discountAmount + otherChargesAmount);
-            const netTotalAmount = Number(
-                data.netTotalAmount !== undefined
-                    ? data.netTotalAmount
-                    : Math.max(0, grossTotal - withholdingAmount)
-            );
+            purchaseOrder.supplier = await tx.getRepository(Supplier).findOneOrFail({ id: data.supplierId });
+            purchaseOrder.controlledDocumentId = controlDocument.id;
+            purchaseOrder.expectedDeliveryDate = data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : undefined;
+            purchaseOrder.notes = data.notes;
+            purchaseOrder.purchaseType = data.purchaseType;
+            purchaseOrder.paymentMethod = data.paymentMethod;
+            purchaseOrder.currency = data.currency || 'COP';
+            purchaseOrder.documentControlCode = controlDocument.code;
+            purchaseOrder.documentControlTitle = controlDocument.title;
+            purchaseOrder.documentControlVersion = controlDocument.version;
+            purchaseOrder.documentControlDate = controlDocument.effectiveDate || controlDocument.approvedAt || controlDocument.updatedAt || new Date();
 
-            purchaseOrder.subtotalBase = subtotalBase;
-            purchaseOrder.taxTotal = taxTotal;
-            purchaseOrder.totalAmount = grossTotal;
-            purchaseOrder.discountAmount = discountAmount;
-            purchaseOrder.otherChargesAmount = otherChargesAmount;
-            purchaseOrder.withholdingRate = withholdingRate;
-            purchaseOrder.withholdingAmount = withholdingAmount;
-            purchaseOrder.netTotalAmount = netTotalAmount;
+            purchaseOrder.items.removeAll();
+            const totals = await this.buildPurchaseOrderItems(tx, purchaseOrder, data);
+            this.applyPurchaseOrderTotals(purchaseOrder, data, totals);
 
             await tx.persistAndFlush(purchaseOrder);
             return purchaseOrder;
@@ -203,7 +295,7 @@ export class PurchaseOrderService {
     async getPurchaseOrder(id: string): Promise<PurchaseOrder | null> {
         return this.purchaseOrderRepo.findOne(
             { id },
-            { populate: ['supplier', 'items', 'items.rawMaterial'] }
+            { populate: ['supplier', 'items', 'items.rawMaterial', 'items.rawMaterialSpecification', 'items.purchasePresentation'] }
         );
     }
 
@@ -222,7 +314,7 @@ export class PurchaseOrderService {
         }
 
         const [data, total] = await this.purchaseOrderRepo.findAndCount(where, {
-            populate: ['supplier', 'items'],
+            populate: ['supplier', 'items', 'items.rawMaterialSpecification', 'items.purchasePresentation'],
             limit,
             offset: (page - 1) * limit,
             orderBy: { orderDate: 'DESC' },
@@ -248,7 +340,7 @@ export class PurchaseOrderService {
             const purchaseOrderRepo = tx.getRepository(PurchaseOrder);
             const purchaseOrder = await purchaseOrderRepo.findOneOrFail(
                 { id },
-                { populate: ['supplier', 'items', 'items.rawMaterial'] }
+                { populate: ['supplier', 'items', 'items.rawMaterial', 'items.rawMaterialSpecification', 'items.purchasePresentation'] }
             );
 
             if (purchaseOrder.status === PurchaseOrderStatus.RECEIVED) {
@@ -280,7 +372,8 @@ export class PurchaseOrderService {
         if (!item.rawMaterial) return;
         // Price with tax = (Base Price * Qty + Tax) / Qty
         // Note: item.subtotal already includes taxAmount (see createPurchaseOrder)
-        const purchasePriceWithTax = item.quantity > 0 ? Number(item.subtotal) / Number(item.quantity) : Number(item.unitPrice);
+        const effectiveInventoryQty = Number(item.inventoryQuantity || item.quantity || 0);
+        const purchasePriceWithTax = effectiveInventoryQty > 0 ? Number(item.subtotal) / effectiveInventoryQty : Number(item.unitPrice);
 
         // Update global last purchase on raw material
         item.rawMaterial.lastPurchasePrice = purchasePriceWithTax;
@@ -336,17 +429,21 @@ export class PurchaseOrderService {
         // Find or create inventory record for this raw material
         let inventory = await inventoryRepo.findOne({
             rawMaterial: { id: item.rawMaterial.id },
+            rawMaterialSpecification: item.rawMaterialSpecification ? { id: item.rawMaterialSpecification.id } : null,
             warehouse: { id: warehouse.id },
         });
+
+        const quantityToAdd = Number(item.inventoryQuantity || item.quantity);
 
         if (!inventory) {
             inventory = inventoryRepo.create({
                 warehouse,
                 rawMaterial: item.rawMaterial,
-                quantity: item.quantity,
+                rawMaterialSpecification: item.rawMaterialSpecification,
+                quantity: quantityToAdd,
             } as InventoryItem);
         } else {
-            inventory.quantity += item.quantity;
+            inventory.quantity += quantityToAdd;
         }
 
         await em.persistAndFlush(inventory);
@@ -380,10 +477,14 @@ export class PurchaseOrderService {
             purchaseOrder,
             purchaseOrderItem: item,
             rawMaterial: item.rawMaterial,
+            rawMaterialSpecification: item.rawMaterialSpecification,
+            purchasePresentation: item.purchasePresentation,
             warehouse,
-            quantityReceived: item.quantity,
+            quantityReceived: Number(item.inventoryQuantity || item.quantity),
             quantityAccepted: 0,
             quantityRejected: 0,
+            purchaseUnitLabel: item.purchaseUnitLabel,
+            inventoryUnit: item.inventoryUnit,
             documentControlCode: controlDoc?.code || 'GC-FOR-28',
             documentControlTitle: controlDoc?.title || 'Recepción de Materias Primas',
             documentControlVersion: controlDoc?.version || 1,

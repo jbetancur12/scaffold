@@ -63,3 +63,15 @@ export const useCreatePurchaseOrderMutation = () => {
         }
     );
 };
+
+export const useUpdatePurchaseOrderMutation = () => {
+    return useMrpMutation<{ id: string; payload: CreatePurchaseOrderDto }, PurchaseOrder>(
+        async ({ id, payload }) => mrpApi.updatePurchaseOrder(id, payload),
+        {
+            onSuccess: async (order) => {
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.purchaseOrders);
+                invalidateMrpQuery(mrpQueryKeys.purchaseOrder(order.id));
+            },
+        }
+    );
+};

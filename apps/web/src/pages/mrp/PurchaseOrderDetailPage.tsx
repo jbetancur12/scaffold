@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
 import {
-    ArrowLeft, Check, X, Loader2, FileText, Download,
+    ArrowLeft, Check, X, Loader2, FileText, Download, Edit2,
     Calendar, Building2, CreditCard, Tag, FileSignature, ExternalLink, MessageSquare
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -166,6 +166,22 @@ export default function PurchaseOrderDetailPage() {
         );
     }
 
+    const getItemPurchaseLabel = (item: NonNullable<typeof order.items>[number]) => {
+        if (item.purchasePresentation?.name) return item.purchasePresentation.name;
+        if (item.purchaseUnitLabel) return item.purchaseUnitLabel;
+        return item.rawMaterial?.unit || item.customUnit || '';
+    };
+
+    const getItemPurchaseDetail = (item: NonNullable<typeof order.items>[number]) => {
+        if (!item.purchasePresentation) return '';
+        const unitLabel = item.purchasePresentation.purchaseUnitLabel?.trim();
+        const presentationName = item.purchasePresentation.name?.trim();
+        if (presentationName && unitLabel && presentationName.toLowerCase() !== unitLabel.toLowerCase()) {
+            return `${presentationName} x ${item.purchasePresentation.quantityPerPurchaseUnit} ${item.purchasePresentation.contentUnit}`;
+        }
+        return `${unitLabel || presentationName} x ${item.purchasePresentation.quantityPerPurchaseUnit} ${item.purchasePresentation.contentUnit}`;
+    };
+
     return (
         <div>
             <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -216,6 +232,14 @@ export default function PurchaseOrderDetailPage() {
                             </Button>
                             {(order.status === 'PENDING' || order.status === 'CONFIRMED') && (
                                 <>
+                                    <Button
+                                        onClick={() => navigate(`/mrp/purchase-orders/${order.id}/edit`)}
+                                        variant="outline"
+                                        className="bg-white hover:bg-slate-50 shadow-sm transition-all"
+                                    >
+                                        <Edit2 className="mr-2 h-4 w-4 text-slate-500" />
+                                        Editar
+                                    </Button>
                                     <Button
                                         onClick={() => setIsReceiveDialogOpen(true)}
                                         className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm border-transparent transition-all"
@@ -419,13 +443,33 @@ export default function PurchaseOrderDetailPage() {
                                                 <span className="text-xs text-slate-500 font-mono mt-0.5">
                                                     {item.rawMaterial?.sku || 'N/A'}
                                                 </span>
+                                                {item.rawMaterialSpecification?.name ? (
+                                                    <span className="text-xs text-sky-700 mt-1">
+                                                        Especificación: {item.rawMaterialSpecification.name}
+                                                    </span>
+                                                ) : null}
+                                                {item.purchasePresentation?.name ? (
+                                                    <span className="text-xs text-amber-700 mt-1">
+                                                        Presentación: {item.purchasePresentation.name}
+                                                    </span>
+                                                ) : null}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <div className="text-sm font-medium text-slate-900">
                                                 {item.quantity}
-                                                <span className="text-slate-500 ml-1 text-xs">{item.rawMaterial?.unit || item.customUnit || ''}</span>
+                                                <span className="text-slate-500 ml-1 text-xs">{getItemPurchaseLabel(item)}</span>
                                             </div>
+                                            {getItemPurchaseDetail(item) ? (
+                                                <div className="text-[10px] font-medium text-slate-400 mt-0.5">
+                                                    {getItemPurchaseDetail(item)}
+                                                </div>
+                                            ) : null}
+                                            {item.inventoryQuantity && item.inventoryUnit ? (
+                                                <div className="text-[10px] font-medium text-slate-400 mt-0.5">
+                                                    Ingresa {item.inventoryQuantity} {item.inventoryUnit}
+                                                </div>
+                                            ) : null}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <div className="text-sm font-medium text-slate-900">

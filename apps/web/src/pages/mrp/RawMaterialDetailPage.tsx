@@ -94,10 +94,55 @@ export default function RawMaterialDetailPage() {
                             </div>
                         </div>
 
-                        {/* Quick Stats or Additional Info could go here */}
-                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 border-dashed flex items-center justify-center text-slate-400 text-sm">
-                            Información adicional de inventario próximamente...
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                            <h3 className="font-semibold text-lg border-b pb-2 mb-4">Especificaciones</h3>
+                            {material.specifications?.length ? (
+                                <div className="space-y-3">
+                                    {material.specifications.map((spec) => (
+                                        <div key={spec.id} className="rounded-lg border border-slate-200 p-3">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="font-medium text-slate-900">{spec.name}</div>
+                                                    <div className="text-xs text-slate-500">{spec.sku}</div>
+                                                </div>
+                                                {spec.isDefault ? <span className="text-xs rounded-full bg-sky-50 border border-sky-200 px-2 py-1 text-sky-700">Predeterminada</span> : null}
+                                            </div>
+                                            <div className="mt-2 text-sm text-slate-600">
+                                                {[spec.color, spec.widthCm ? `${spec.widthCm} cm ancho` : '', spec.thicknessMm ? `${spec.thicknessMm} mm` : '', spec.lengthValue && spec.lengthUnit ? `${spec.lengthValue} ${spec.lengthUnit}` : ''].filter(Boolean).join(' · ') || 'Sin atributos adicionales'}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-sm text-slate-500">Este material no tiene especificaciones técnicas separadas.</div>
+                            )}
                         </div>
+                    </div>
+
+                    <div className="mt-6 bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <h3 className="font-semibold text-lg border-b pb-2 mb-4">Presentaciones de Compra</h3>
+                        {material.purchasePresentations?.length ? (
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {material.purchasePresentations.map((presentation) => (
+                                    <div key={presentation.id} className="rounded-lg border border-slate-200 p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <div className="font-medium text-slate-900">{presentation.name}</div>
+                                                <div className="text-xs text-slate-500">
+                                                    1 {presentation.purchaseUnitLabel} = {presentation.quantityPerPurchaseUnit} {presentation.contentUnit}
+                                                </div>
+                                            </div>
+                                            {presentation.isDefault ? <span className="text-xs rounded-full bg-amber-50 border border-amber-200 px-2 py-1 text-amber-700">Predeterminada</span> : null}
+                                        </div>
+                                        <div className="mt-2 text-sm text-slate-600">
+                                            {[presentation.specification?.name ? `Especificación: ${presentation.specification.name}` : 'Todas', presentation.supplierId ? 'Proveedor específico' : 'Cualquier proveedor', presentation.allowsFractionalQuantity ? 'Permite fracción' : 'Solo enteros'].join(' · ')}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-slate-500">Aún no hay presentaciones configuradas.</div>
+                        )}
                     </div>
                 </TabsContent>
 
