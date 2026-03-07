@@ -26,7 +26,7 @@ const envSchema = z.object({
     MINIO_ACCESS_KEY: z.string().optional(),
     MINIO_SECRET_KEY: z.string().optional(),
     MINIO_BUCKET: z.string().default('mrp-quality-documents'),
-
+    DB_SYNC_SCHEMA_ON_BOOT: z.enum(['true', 'false']).optional().default('false'),
 });
 
 const validateEnv = () => {

@@ -42,12 +42,15 @@ const main = async () => {
     try {
         const orm = await MikroORM.init(mikroConfig);
 
-        // Sync schema in development
-        if (process.env.NODE_ENV !== 'production') {
+        // Only run schema sync when explicitly requested.
+        // Restored production databases should use migrations, not updateSchema().
+        if (process.env.NODE_ENV !== 'production' && env.DB_SYNC_SCHEMA_ON_BOOT === 'true') {
             const generator = orm.getSchemaGenerator();
             await generator.ensureDatabase();
             await generator.updateSchema();
             winstonLogger.info('Database schema synchronized');
+        } else if (process.env.NODE_ENV !== 'production') {
+            winstonLogger.info('Database schema sync skipped on boot; use migrations for local restored databases');
         }
 
         winstonLogger.info('Database connected successfully');
