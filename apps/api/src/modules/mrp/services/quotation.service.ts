@@ -7,6 +7,7 @@ import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { ProductTaxStatus, QuotationStatus, SalesOrderStatus } from '@scaffold/types';
 import { SalesOrderService } from './sales-order.service';
+import { OperationalConfig } from '../entities/operational-config.entity';
 
 type QuotationInputItem = {
     isCatalogItem?: boolean;
@@ -228,6 +229,39 @@ export class QuotationService {
         return QuotationStatus.APPROVED_PARTIAL;
     }
 
+    private resolveVariantCostComposition(
+        variant: ProductVariant | undefined,
+        baseUnitCost: number,
+        config?: OperationalConfig | null,
+    ) {
+        if (!variant) {
+            return {
+                materialCost: 0,
+                laborCost: 0,
+                indirectCost: 0,
+                totalCost: 0,
+            };
+        }
+
+        let laborCost = Number(variant.laborCost || 0);
+        let indirectCost = Number(variant.indirectCost || 0);
+
+        if (variant.productionMinutes && variant.productionMinutes > 0 && config) {
+            laborCost = Number(variant.productionMinutes || 0) * Number(config.modCostPerMinute || 0);
+            indirectCost = Number(variant.productionMinutes || 0) * Number(config.cifCostPerMinute || 0);
+        }
+
+        const totalCost = Number(baseUnitCost || 0);
+        const materialCost = Math.max(0, totalCost - laborCost - indirectCost);
+
+        return {
+            materialCost: this.round(materialCost),
+            laborCost: this.round(laborCost),
+            indirectCost: this.round(indirectCost),
+            totalCost: this.round(totalCost),
+        };
+    }
+
     private resolveAnalyticsWindow(month?: string) {
         if (!month) return null;
         const [yearRaw, monthRaw] = month.split('-');
@@ -259,6 +293,10 @@ export class QuotationService {
 
     async getAnalyticsSummary(filters?: { month?: string; status?: QuotationStatus }) {
         const rows = await this.getAnalyticsRows(filters);
+        const [operationalConfig] = await this.em.getRepository(OperationalConfig).find({}, {
+            orderBy: { createdAt: 'DESC' },
+            limit: 1,
+        });
         const now = new Date();
         const breakdownMap = new Map<QuotationStatus, { count: number; amount: number }>();
 
@@ -267,6 +305,9 @@ export class QuotationService {
         let convertedAmount = 0;
         let expiredPendingCount = 0;
         let convertedCount = 0;
+        let materialCostAmount = 0;
+        let laborCostAmount = 0;
+        let indirectCostAmount = 0;
 
         for (const row of rows) {
             const amount = Number(row.netTotalAmount || 0);
@@ -293,13 +334,28 @@ export class QuotationService {
 
             const current = breakdownMap.get(row.status) || { count: 0, amount: 0 };
             current.count += 1;
-            current.amount += amount;
+                current.amount += amount;
             breakdownMap.set(row.status, current);
+
+            for (const item of row.items.getItems()) {
+                const quantity = Number(item.quantity || 0);
+                const composition = this.resolveVariantCostComposition(
+                    item.variant,
+                    Number(item.baseUnitCost || 0),
+                    operationalConfig,
+                );
+                materialCostAmount += composition.materialCost * quantity;
+                laborCostAmount += composition.laborCost * quantity;
+                indirectCostAmount += composition.indirectCost * quantity;
+            }
         }
 
         const quotationCount = rows.length;
         const averageTicket = quotationCount > 0 ? totalQuotedAmount / quotationCount : 0;
         const conversionRatePercent = quotationCount > 0 ? (convertedCount / quotationCount) * 100 : 0;
+        const totalCostAmount = materialCostAmount + laborCostAmount + indirectCostAmount;
+        const estimatedGrossMarginAmount = totalQuotedAmount - totalCostAmount;
+        const estimatedGrossMarginPercent = totalQuotedAmount > 0 ? (estimatedGrossMarginAmount / totalQuotedAmount) * 100 : 0;
 
         return {
             kpis: {
@@ -310,6 +366,12 @@ export class QuotationService {
                 averageTicket: this.round(averageTicket),
                 conversionRatePercent: this.round(conversionRatePercent),
                 expiredPendingCount,
+                materialCostAmount: this.round(materialCostAmount),
+                laborCostAmount: this.round(laborCostAmount),
+                indirectCostAmount: this.round(indirectCostAmount),
+                totalCostAmount: this.round(totalCostAmount),
+                estimatedGrossMarginAmount: this.round(estimatedGrossMarginAmount),
+                estimatedGrossMarginPercent: this.round(estimatedGrossMarginPercent),
             },
             breakdown: Array.from(breakdownMap.entries()).map(([status, data]) => ({
                 status,

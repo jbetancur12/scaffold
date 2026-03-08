@@ -43,6 +43,7 @@ export default function QuotationListPage() {
     const [statusFilter, setStatusFilter] = useState<string>('ALL');
     const [analyticsMonth, setAnalyticsMonth] = useState(new Date().toISOString().slice(0, 7));
     const [analyticsExpanded, setAnalyticsExpanded] = useState(false);
+    const [topProductsView, setTopProductsView] = useState<'amount' | 'quantity'>('amount');
     const [page] = useState(1);
     const limit = 50;
 
@@ -94,6 +95,17 @@ export default function QuotationListPage() {
         1,
         ...(analyticsTrend ?? []).map((point) => Math.max(point.totalQuotedAmount, point.convertedAmount))
     );
+
+    const sortedTopProducts = useMemo(() => {
+        const rows = [...(analyticsTopProducts ?? [])];
+        rows.sort((a, b) => {
+            if (topProductsView === 'quantity') {
+                return b.quantity - a.quantity;
+            }
+            return b.totalQuotedAmount - a.totalQuotedAmount;
+        });
+        return rows;
+    }, [analyticsTopProducts, topProductsView]);
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
@@ -242,6 +254,67 @@ export default function QuotationListPage() {
                         </div>
 
                         <div className="mt-4 grid grid-cols-1 xl:grid-cols-2 gap-4">
+                            <div className="xl:col-span-2 rounded-2xl border border-white/10 bg-slate-950/30 p-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h3 className="font-semibold text-white mb-1">Estructura de costo cotizado</h3>
+                                        <p className="text-xs text-slate-400">Composición estimada de MP, MOD y CIF sobre las cotizaciones del período.</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs uppercase tracking-wider text-slate-400">Margen estimado</p>
+                                        <p className="text-lg font-bold text-emerald-300">
+                                            {formatCurrency(analyticsSummary?.kpis.estimatedGrossMarginAmount || 0)}
+                                        </p>
+                                        <p className="text-xs text-slate-400">
+                                            {(analyticsSummary?.kpis.estimatedGrossMarginPercent || 0).toFixed(1)}%
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                                        <p className="text-xs uppercase tracking-wider text-slate-400">Materia prima</p>
+                                        <p className="mt-2 text-xl font-bold text-white">{formatCurrency(analyticsSummary?.kpis.materialCostAmount || 0)}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                                        <p className="text-xs uppercase tracking-wider text-slate-400">MOD</p>
+                                        <p className="mt-2 text-xl font-bold text-white">{formatCurrency(analyticsSummary?.kpis.laborCostAmount || 0)}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                                        <p className="text-xs uppercase tracking-wider text-slate-400">CIF</p>
+                                        <p className="mt-2 text-xl font-bold text-white">{formatCurrency(analyticsSummary?.kpis.indirectCostAmount || 0)}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                                        <p className="text-xs uppercase tracking-wider text-slate-400">Costo total</p>
+                                        <p className="mt-2 text-xl font-bold text-white">{formatCurrency(analyticsSummary?.kpis.totalCostAmount || 0)}</p>
+                                    </div>
+                                </div>
+
+                                <div className="mt-4 space-y-2">
+                                    {(() => {
+                                        const totalCost = analyticsSummary?.kpis.totalCostAmount || 0;
+                                        const materialShare = totalCost > 0 ? ((analyticsSummary?.kpis.materialCostAmount || 0) / totalCost) * 100 : 0;
+                                        const laborShare = totalCost > 0 ? ((analyticsSummary?.kpis.laborCostAmount || 0) / totalCost) * 100 : 0;
+                                        const indirectShare = totalCost > 0 ? ((analyticsSummary?.kpis.indirectCostAmount || 0) / totalCost) * 100 : 0;
+
+                                        return (
+                                            <>
+                                                <div className="h-3 rounded-full overflow-hidden bg-white/10 flex">
+                                                    <div className="h-full bg-emerald-400" style={{ width: `${materialShare}%` }} />
+                                                    <div className="h-full bg-sky-400" style={{ width: `${laborShare}%` }} />
+                                                    <div className="h-full bg-amber-400" style={{ width: `${indirectShare}%` }} />
+                                                </div>
+                                                <div className="flex flex-wrap gap-4 text-xs text-slate-300">
+                                                    <span>MP {(materialShare).toFixed(1)}%</span>
+                                                    <span>MOD {(laborShare).toFixed(1)}%</span>
+                                                    <span>CIF {(indirectShare).toFixed(1)}%</span>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+
                             <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
                                 <h3 className="font-semibold text-white mb-1">Top clientes</h3>
                                 <p className="text-xs text-slate-400 mb-4">Clientes con mayor valor cotizado.</p>
@@ -266,24 +339,62 @@ export default function QuotationListPage() {
                             </div>
 
                             <div className="rounded-2xl border border-white/10 bg-slate-950/30 p-4">
-                                <h3 className="font-semibold text-white mb-1">Top productos</h3>
-                                <p className="text-xs text-slate-400 mb-4">Productos padre más cotizados por valor.</p>
+                                <div className="flex items-start justify-between gap-3 mb-4">
+                                    <div>
+                                        <h3 className="font-semibold text-white mb-1">Top productos</h3>
+                                        <p className="text-xs text-slate-400">
+                                            Productos padre más cotizados por {topProductsView === 'amount' ? 'valor' : 'unidades'}.
+                                        </p>
+                                    </div>
+                                    <div className="inline-flex rounded-full border border-white/10 bg-white/5 p-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => setTopProductsView('amount')}
+                                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                                                topProductsView === 'amount'
+                                                    ? 'bg-white text-slate-900'
+                                                    : 'text-slate-300 hover:text-white'
+                                            }`}
+                                        >
+                                            Valor
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setTopProductsView('quantity')}
+                                            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                                                topProductsView === 'quantity'
+                                                    ? 'bg-white text-slate-900'
+                                                    : 'text-slate-300 hover:text-white'
+                                            }`}
+                                        >
+                                            Unidades
+                                        </button>
+                                    </div>
+                                </div>
                                 <div className="space-y-3">
-                                    {(analyticsTopProducts ?? []).length === 0 ? (
+                                    {sortedTopProducts.length === 0 ? (
                                         <p className="text-sm text-slate-400">Sin datos.</p>
                                     ) : (
-                                        analyticsTopProducts?.map((row, index) => (
+                                        sortedTopProducts.map((row, index) => (
                                             <div key={`${row.label}-${index}`} className="flex items-center justify-between gap-3">
                                                 <div>
                                                     <p className="font-medium text-white">{row.label}</p>
-                                                    <p className="text-xs text-slate-400">{row.quotationCount} cotizaciones · {row.quantity.toLocaleString('es-CO')} uds</p>
+                                                    <p className="text-xs text-slate-400">
+                                                        {row.quotationCount} cotizaciones · {topProductsView === 'quantity'
+                                                            ? formatCurrency(row.totalQuotedAmount)
+                                                            : `${row.quantity.toLocaleString('es-CO')} uds`}
+                                                    </p>
                                                     {row.variantHighlights && row.variantHighlights.length > 0 && (
                                                         <p className="text-[11px] text-indigo-200 mt-1">
                                                             Variantes: {row.variantHighlights.join(', ')}
                                                         </p>
                                                     )}
                                                 </div>
-                                                <p className="font-semibold text-white">{formatCurrency(row.totalQuotedAmount)}</p>
+                                                <p className="font-semibold text-white">
+                                                    {topProductsView === 'quantity'
+                                                        ? `${row.quantity.toLocaleString('es-CO')} uds`
+                                                        : formatCurrency(row.totalQuotedAmount)}
+                                                </p>
                                             </div>
                                         ))
                                     )}

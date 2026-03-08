@@ -181,6 +181,39 @@ export default function QuotationDetailPage() {
         return <div className="p-6 text-sm text-slate-500">Cargando...</div>;
     }
 
+    const itemCostRows = (row.items || []).map((item: any) => {
+        const quantity = Number(item.quantity || 0);
+        const variant = item.variant;
+        let laborUnitCost = Number(variant?.laborCost || 0);
+        let indirectUnitCost = Number(variant?.indirectCost || 0);
+
+        if (variant?.productionMinutes && operationalConfig) {
+            laborUnitCost = Number(variant.productionMinutes || 0) * Number(operationalConfig.modCostPerMinute || 0);
+            indirectUnitCost = Number(variant.productionMinutes || 0) * Number(operationalConfig.cifCostPerMinute || 0);
+        }
+
+        const totalUnitCost = Number(item.baseUnitCost || 0);
+        const materialUnitCost = Math.max(0, totalUnitCost - laborUnitCost - indirectUnitCost);
+
+        return {
+            item,
+            quantity,
+            materialCost: materialUnitCost * quantity,
+            laborCost: laborUnitCost * quantity,
+            indirectCost: indirectUnitCost * quantity,
+            totalCost: totalUnitCost * quantity,
+        };
+    });
+
+    const totalMaterialCost = itemCostRows.reduce((sum, row) => sum + row.materialCost, 0);
+    const totalLaborCost = itemCostRows.reduce((sum, row) => sum + row.laborCost, 0);
+    const totalIndirectCost = itemCostRows.reduce((sum, row) => sum + row.indirectCost, 0);
+    const totalQuotedCost = itemCostRows.reduce((sum, row) => sum + row.totalCost, 0);
+    const estimatedMarginAmount = Number(row.netTotalAmount || 0) - totalQuotedCost;
+    const estimatedMarginPercent = Number(row.netTotalAmount || 0) > 0
+        ? (estimatedMarginAmount / Number(row.netTotalAmount || 0)) * 100
+        : 0;
+
     const canManageApproval = row.status !== QuotationStatus.CONVERTED && row.status !== QuotationStatus.REJECTED;
 
     return (
@@ -258,6 +291,7 @@ export default function QuotationDetailPage() {
                                         <th className="px-6 py-4 font-semibold text-slate-600 text-right">Cant. Aprobada</th>
                                         <th className="px-6 py-4 font-semibold text-slate-600 text-right">Vr Unit.</th>
                                         <th className="px-6 py-4 font-semibold text-slate-600 text-right">Desc. %</th>
+                                        <th className="px-6 py-4 font-semibold text-slate-600 text-right">Costo Est.</th>
                                         <th className="px-6 py-4 font-semibold text-slate-600 text-right">Total Neto</th>
                                     </tr>
                                 </thead>
@@ -302,6 +336,9 @@ export default function QuotationDetailPage() {
                                                 <td className="px-6 py-4 text-right text-slate-600">
                                                     {Number(it.discountPercent || 0).toFixed(2)}%
                                                 </td>
+                                                <td className="px-6 py-4 text-right text-slate-600">
+                                                    {formatCurrency(Number(it.baseUnitCost || 0) * Number(it.quantity || 0))}
+                                                </td>
                                                 <td className="px-6 py-4 text-right font-bold text-slate-900">
                                                     {formatCurrency(netItem)}
                                                 </td>
@@ -334,6 +371,47 @@ export default function QuotationDetailPage() {
                             <div>
                                 <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Email</label>
                                 <div className="text-sm text-slate-700">{(row as any).customer?.email || 'No registrado'}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-5 border-b border-slate-100">
+                            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <Calculator className="h-5 w-5 text-emerald-600" />
+                                Estructura de Costo
+                            </h2>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Materia prima</p>
+                                    <p className="mt-1 text-base font-bold text-slate-900">{formatCurrency(totalMaterialCost)}</p>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-[11px] uppercase tracking-wide text-slate-500">MOD</p>
+                                    <p className="mt-1 text-base font-bold text-slate-900">{formatCurrency(totalLaborCost)}</p>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-[11px] uppercase tracking-wide text-slate-500">CIF</p>
+                                    <p className="mt-1 text-base font-bold text-slate-900">{formatCurrency(totalIndirectCost)}</p>
+                                </div>
+                                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Costo total</p>
+                                    <p className="mt-1 text-base font-bold text-slate-900">{formatCurrency(totalQuotedCost)}</p>
+                                </div>
+                            </div>
+                            <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div>
+                                        <p className="text-xs uppercase tracking-wider text-emerald-700">Margen estimado</p>
+                                        <p className="mt-1 text-lg font-bold text-emerald-900">{formatCurrency(estimatedMarginAmount)}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-2xl font-black text-emerald-700">{estimatedMarginPercent.toFixed(1)}%</p>
+                                        <p className="text-xs text-emerald-700">sobre valor neto cotizado</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

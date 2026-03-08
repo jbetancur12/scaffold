@@ -594,6 +594,12 @@ export interface QuotationAnalyticsSummary {
         averageTicket: number;
         conversionRatePercent: number;
         expiredPendingCount: number;
+        materialCostAmount: number;
+        laborCostAmount: number;
+        indirectCostAmount: number;
+        totalCostAmount: number;
+        estimatedGrossMarginAmount: number;
+        estimatedGrossMarginPercent: number;
     };
     breakdown: Array<{
         status: QuotationStatus;
