@@ -81,6 +81,10 @@ import {
     Quotation,
     QuotationStatus,
     QuotationListResponse,
+    QuotationAnalyticsSummary,
+    QuotationAnalyticsTrendPoint,
+    QuotationAnalyticsTopCustomer,
+    QuotationAnalyticsTopProduct,
     ProductionAnalyticsSummary,
     ProductionAnalyticsTrendPoint,
     ProductionAnalyticsTopProduct,
@@ -151,6 +155,7 @@ import type {
     CreateQuotationPayload,
     UpdateQuotationPayload,
     ListQuotationsFilters,
+    QuotationAnalyticsFilters,
     UpdateQuotationStatusPayload,
     ApproveQuotationPayload,
     ConvertQuotationPayload,
@@ -583,6 +588,22 @@ export const mrpApi = {
             params: { ...docOptions },
         });
         return response.data as Blob;
+    },
+    getQuotationAnalyticsSummary: async (filters?: Partial<QuotationAnalyticsFilters>): Promise<QuotationAnalyticsSummary> => {
+        const response = await api.get('/mrp/analytics/quotations/summary', { params: filters });
+        return response.data;
+    },
+    getQuotationAnalyticsTrend: async (filters?: Partial<QuotationAnalyticsFilters>): Promise<QuotationAnalyticsTrendPoint[]> => {
+        const response = await api.get('/mrp/analytics/quotations/trend', { params: filters });
+        return response.data;
+    },
+    getQuotationAnalyticsTopCustomers: async (filters?: Partial<QuotationAnalyticsFilters>): Promise<QuotationAnalyticsTopCustomer[]> => {
+        const response = await api.get('/mrp/analytics/quotations/top-customers', { params: filters });
+        return response.data;
+    },
+    getQuotationAnalyticsTopProducts: async (filters?: Partial<QuotationAnalyticsFilters>): Promise<QuotationAnalyticsTopProduct[]> => {
+        const response = await api.get('/mrp/analytics/quotations/top-products', { params: filters });
+        return response.data;
     },
 
     // Warehouses

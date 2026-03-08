@@ -585,6 +585,47 @@ export interface QuotationListResponse {
     limit: number;
 }
 
+export interface QuotationAnalyticsSummary {
+    kpis: {
+        quotationCount: number;
+        totalQuotedAmount: number;
+        approvedAmount: number;
+        convertedAmount: number;
+        averageTicket: number;
+        conversionRatePercent: number;
+        expiredPendingCount: number;
+    };
+    breakdown: Array<{
+        status: QuotationStatus;
+        count: number;
+        amount: number;
+    }>;
+}
+
+export interface QuotationAnalyticsTrendPoint {
+    month: string;
+    quotationCount: number;
+    totalQuotedAmount: number;
+    convertedAmount: number;
+}
+
+export interface QuotationAnalyticsTopCustomer {
+    customerId: string;
+    customerName: string;
+    quotationCount: number;
+    totalQuotedAmount: number;
+    convertedAmount: number;
+}
+
+export interface QuotationAnalyticsTopProduct {
+    productId?: string;
+    label: string;
+    variantHighlights?: string[];
+    quotationCount: number;
+    quantity: number;
+    totalQuotedAmount: number;
+}
+
 export interface SalesOrderListResponse {
     data: SalesOrder[];
     total: number;

@@ -228,6 +228,205 @@ export class QuotationService {
         return QuotationStatus.APPROVED_PARTIAL;
     }
 
+    private resolveAnalyticsWindow(month?: string) {
+        if (!month) return null;
+        const [yearRaw, monthRaw] = month.split('-');
+        const year = Number(yearRaw);
+        const monthIndex = Number(monthRaw) - 1;
+        if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+            throw new AppError('Mes inválido para analíticas de cotización', 400);
+        }
+        const from = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
+        const to = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0, 0));
+        return { from, to };
+    }
+
+    private async getAnalyticsRows(filters?: { month?: string; status?: QuotationStatus }) {
+        const where: Record<string, unknown> = { deletedAt: null };
+        if (filters?.status) {
+            where.status = filters.status;
+        }
+        const window = this.resolveAnalyticsWindow(filters?.month);
+        if (window) {
+            where.quotationDate = { $gte: window.from, $lt: window.to };
+        }
+
+        return this.quotationRepo.find(where, {
+            populate: ['customer', 'items', 'items.product', 'items.variant'],
+            orderBy: { quotationDate: 'ASC' },
+        });
+    }
+
+    async getAnalyticsSummary(filters?: { month?: string; status?: QuotationStatus }) {
+        const rows = await this.getAnalyticsRows(filters);
+        const now = new Date();
+        const breakdownMap = new Map<QuotationStatus, { count: number; amount: number }>();
+
+        let totalQuotedAmount = 0;
+        let approvedAmount = 0;
+        let convertedAmount = 0;
+        let expiredPendingCount = 0;
+        let convertedCount = 0;
+
+        for (const row of rows) {
+            const amount = Number(row.netTotalAmount || 0);
+            totalQuotedAmount += amount;
+            if (
+                row.status === QuotationStatus.APPROVED_FULL ||
+                row.status === QuotationStatus.APPROVED_PARTIAL ||
+                row.status === QuotationStatus.CONVERTED
+            ) {
+                approvedAmount += amount;
+            }
+            if (row.status === QuotationStatus.CONVERTED) {
+                convertedAmount += amount;
+                convertedCount += 1;
+            }
+            if (
+                row.validUntil &&
+                new Date(row.validUntil) < now &&
+                row.status !== QuotationStatus.CONVERTED &&
+                row.status !== QuotationStatus.REJECTED
+            ) {
+                expiredPendingCount += 1;
+            }
+
+            const current = breakdownMap.get(row.status) || { count: 0, amount: 0 };
+            current.count += 1;
+            current.amount += amount;
+            breakdownMap.set(row.status, current);
+        }
+
+        const quotationCount = rows.length;
+        const averageTicket = quotationCount > 0 ? totalQuotedAmount / quotationCount : 0;
+        const conversionRatePercent = quotationCount > 0 ? (convertedCount / quotationCount) * 100 : 0;
+
+        return {
+            kpis: {
+                quotationCount,
+                totalQuotedAmount: this.round(totalQuotedAmount),
+                approvedAmount: this.round(approvedAmount),
+                convertedAmount: this.round(convertedAmount),
+                averageTicket: this.round(averageTicket),
+                conversionRatePercent: this.round(conversionRatePercent),
+                expiredPendingCount,
+            },
+            breakdown: Array.from(breakdownMap.entries()).map(([status, data]) => ({
+                status,
+                count: data.count,
+                amount: this.round(data.amount),
+            })),
+        };
+    }
+
+    async getAnalyticsTrend(filters?: { month?: string; status?: QuotationStatus }) {
+        const rows = await this.getAnalyticsRows(filters);
+        const points = new Map<string, { quotationCount: number; totalQuotedAmount: number; convertedAmount: number }>();
+
+        for (const row of rows) {
+            const date = new Date(row.quotationDate);
+            const monthKey = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+            const current = points.get(monthKey) || { quotationCount: 0, totalQuotedAmount: 0, convertedAmount: 0 };
+            current.quotationCount += 1;
+            current.totalQuotedAmount += Number(row.netTotalAmount || 0);
+            if (row.status === QuotationStatus.CONVERTED) {
+                current.convertedAmount += Number(row.netTotalAmount || 0);
+            }
+            points.set(monthKey, current);
+        }
+
+        return Array.from(points.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([month, data]) => ({
+                month,
+                quotationCount: data.quotationCount,
+                totalQuotedAmount: this.round(data.totalQuotedAmount),
+                convertedAmount: this.round(data.convertedAmount),
+            }));
+    }
+
+    async getAnalyticsTopCustomers(filters?: { month?: string; status?: QuotationStatus; limit?: number }) {
+        const rows = await this.getAnalyticsRows(filters);
+        const grouped = new Map<string, { customerName: string; quotationCount: number; totalQuotedAmount: number; convertedAmount: number }>();
+
+        for (const row of rows) {
+            const customerId = row.customer.id;
+            const current = grouped.get(customerId) || {
+                customerName: row.customer.name,
+                quotationCount: 0,
+                totalQuotedAmount: 0,
+                convertedAmount: 0,
+            };
+            current.quotationCount += 1;
+            current.totalQuotedAmount += Number(row.netTotalAmount || 0);
+            if (row.status === QuotationStatus.CONVERTED) {
+                current.convertedAmount += Number(row.netTotalAmount || 0);
+            }
+            grouped.set(customerId, current);
+        }
+
+        return Array.from(grouped.entries())
+            .map(([customerId, data]) => ({
+                customerId,
+                customerName: data.customerName,
+                quotationCount: data.quotationCount,
+                totalQuotedAmount: this.round(data.totalQuotedAmount),
+                convertedAmount: this.round(data.convertedAmount),
+            }))
+            .sort((a, b) => b.totalQuotedAmount - a.totalQuotedAmount)
+            .slice(0, filters?.limit || 5);
+    }
+
+    async getAnalyticsTopProducts(filters?: { month?: string; status?: QuotationStatus; limit?: number }) {
+        const rows = await this.getAnalyticsRows(filters);
+        const grouped = new Map<string, {
+            productId?: string;
+            label: string;
+            variantHighlights: Set<string>;
+            quotationCount: number;
+            quantity: number;
+            totalQuotedAmount: number;
+        }>();
+
+        for (const row of rows) {
+            const seenKeys = new Set<string>();
+            for (const item of row.items.getItems()) {
+                const key = item.product?.id || item.customSku || item.customDescription || item.id;
+                const label = item.product?.name || item.customDescription || item.customSku || 'Ítem libre';
+                const current = grouped.get(key) || {
+                    productId: item.product?.id,
+                    label,
+                    variantHighlights: new Set<string>(),
+                    quotationCount: 0,
+                    quantity: 0,
+                    totalQuotedAmount: 0,
+                };
+                if (!seenKeys.has(key)) {
+                    current.quotationCount += 1;
+                    seenKeys.add(key);
+                }
+                current.quantity += Number(item.quantity || 0);
+                current.totalQuotedAmount += Number(item.netSubtotal || 0);
+                if (item.variant?.name && item.product?.name) {
+                    current.variantHighlights.add(item.variant.name);
+                }
+                grouped.set(key, current);
+            }
+        }
+
+        return Array.from(grouped.values())
+            .map((row) => ({
+                productId: row.productId,
+                label: row.label,
+                variantHighlights: Array.from(row.variantHighlights).slice(0, 3),
+                quotationCount: row.quotationCount,
+                quantity: this.round(row.quantity, 3),
+                totalQuotedAmount: this.round(row.totalQuotedAmount),
+            }))
+            .sort((a, b) => b.totalQuotedAmount - a.totalQuotedAmount)
+            .slice(0, filters?.limit || 5);
+    }
+
     async list(page = 1, limit = 20, search?: string, status?: QuotationStatus) {
         const query: Record<string, unknown> = { deletedAt: null };
         if (status) query.status = status;

@@ -1369,6 +1369,12 @@ export const ListQuotationsQuerySchema = z.object({
     status: z.nativeEnum(QuotationStatus).optional(),
 });
 
+export const QuotationAnalyticsQuerySchema = z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+    status: z.nativeEnum(QuotationStatus).optional(),
+    limit: z.coerce.number().int().positive().max(20).optional(),
+});
+
 export const UpdateQuotationStatusSchema = z.object({
     status: z.nativeEnum(QuotationStatus),
 });
@@ -1525,6 +1531,7 @@ export type UpdateProductThreadProcessPayload = DateInputValue<z.input<typeof Up
 export type CreateQuotationPayload = DateInputValue<z.input<typeof CreateQuotationSchema>>;
 export type UpdateQuotationPayload = DateInputValue<z.input<typeof UpdateQuotationSchema>>;
 export type ListQuotationsFilters = DateInputValue<z.input<typeof ListQuotationsQuerySchema>>;
+export type QuotationAnalyticsFilters = z.infer<typeof QuotationAnalyticsQuerySchema>;
 export type UpdateQuotationStatusPayload = DateInputValue<z.input<typeof UpdateQuotationStatusSchema>>;
 export type ApproveQuotationPayload = DateInputValue<z.input<typeof ApproveQuotationSchema>>;
 export type ConvertQuotationPayload = DateInputValue<z.input<typeof ConvertQuotationSchema>>;

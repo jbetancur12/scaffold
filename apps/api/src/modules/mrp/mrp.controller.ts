@@ -140,6 +140,7 @@ import {
     CreateQuotationSchema,
     UpdateQuotationSchema,
     ListQuotationsQuerySchema,
+    QuotationAnalyticsQuerySchema,
     UpdateQuotationStatusSchema,
     ApproveQuotationSchema,
     ConvertQuotationSchema,
@@ -2324,6 +2325,46 @@ export class MrpController {
             const { page, limit, search, status } = ListQuotationsQuerySchema.parse(req.query);
             const rows = await this.quotationService.list(page || 1, limit || 20, search, status);
             return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getQuotationAnalyticsSummary(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = QuotationAnalyticsQuerySchema.parse(req.query);
+            const result = await this.quotationService.getAnalyticsSummary(filters);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getQuotationAnalyticsTrend(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = QuotationAnalyticsQuerySchema.parse(req.query);
+            const result = await this.quotationService.getAnalyticsTrend(filters);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getQuotationAnalyticsTopCustomers(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = QuotationAnalyticsQuerySchema.parse(req.query);
+            const result = await this.quotationService.getAnalyticsTopCustomers(filters);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getQuotationAnalyticsTopProducts(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = QuotationAnalyticsQuerySchema.parse(req.query);
+            const result = await this.quotationService.getAnalyticsTopProducts(filters);
+            return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
         }

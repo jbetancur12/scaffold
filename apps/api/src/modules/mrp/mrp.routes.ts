@@ -218,6 +218,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     // Quotations
     router.post('/quotations', (req, res, next) => mrpController.createQuotation(req, res, next));
     router.get('/quotations', (req, res, next) => mrpController.listQuotations(req, res, next));
+    router.get('/analytics/quotations/summary', (req, res, next) => mrpController.getQuotationAnalyticsSummary(req, res, next));
+    router.get('/analytics/quotations/trend', (req, res, next) => mrpController.getQuotationAnalyticsTrend(req, res, next));
+    router.get('/analytics/quotations/top-customers', (req, res, next) => mrpController.getQuotationAnalyticsTopCustomers(req, res, next));
+    router.get('/analytics/quotations/top-products', (req, res, next) => mrpController.getQuotationAnalyticsTopProducts(req, res, next));
     router.get('/quotations/:id', (req, res, next) => mrpController.getQuotation(req, res, next));
     router.put('/quotations/:id', (req, res, next) => mrpController.updateQuotation(req, res, next));
     router.patch('/quotations/:id/status', (req, res, next) => mrpController.updateQuotationStatus(req, res, next));

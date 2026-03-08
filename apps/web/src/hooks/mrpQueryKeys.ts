@@ -25,6 +25,12 @@ export const mrpQueryKeys = {
     salesOrders: 'mrp.sales-orders',
     salesOrdersList: (page: number, limit: number, status?: string, search?: string) => `mrp.sales-orders.${page}.${limit}.${status || ''}.${search || ''}`,
     salesOrder: (id: string) => `mrp.sales-orders.${id}`,
+    quotationAnalyticsSummary: (month?: string, status?: string) => `mrp.quotation-analytics.summary.${month || ''}.${status || ''}`,
+    quotationAnalyticsTrend: (month?: string, status?: string) => `mrp.quotation-analytics.trend.${month || ''}.${status || ''}`,
+    quotationAnalyticsTopCustomers: (month?: string, status?: string, limit?: number) =>
+        `mrp.quotation-analytics.top-customers.${month || ''}.${status || ''}.${limit || ''}`,
+    quotationAnalyticsTopProducts: (month?: string, status?: string, limit?: number) =>
+        `mrp.quotation-analytics.top-products.${month || ''}.${status || ''}.${limit || ''}`,
 
     customers: 'mrp.customers',
     customersList: (search?: string) => `mrp.customers.list.${search || ''}`,
