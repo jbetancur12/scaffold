@@ -57,6 +57,69 @@ export const generateVariantSku = (productSku: string, variantName: string): str
     return `${productSku}-${suffix}`;
 };
 
+const normalizeAttributeText = (value: string): string =>
+    value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9\s]/g, " ")
+        .toUpperCase()
+        .trim();
+
+export const generateVariantCode = (value: string, fallback = ''): string => {
+    const normalized = normalizeAttributeText(value);
+    if (!normalized) return fallback;
+
+    const compact = normalized.replace(/\s+/g, ' ').trim();
+
+    const aliases: Record<string, string> = {
+        'UNICA': 'U',
+        'UNICO': 'U',
+        'TALLA UNICA': 'U',
+        'NEGRO': 'N',
+        'BLANCO': 'B',
+        'AZUL': 'AZ',
+        'ROJO': 'R',
+        'VERDE': 'V',
+        'AMARILLO': 'AM',
+        'ROSADO': 'RS',
+        'GRIS': 'GR',
+    };
+
+    if (aliases[compact]) return aliases[compact];
+
+    const words = compact.split(/\s+/).filter(Boolean);
+    if (words.length === 1) {
+        const word = words[0];
+        if (word.length <= 3) return word;
+        return word.substring(0, 2);
+    }
+
+    return words.map((word) => word[0]).join('').slice(0, 3);
+};
+
+export const generateVariantDisplayName = (size?: string, color?: string, fallbackName?: string): string => {
+    const parts = [size?.trim(), color?.trim()].filter((part): part is string => Boolean(part && part.trim()));
+    if (parts.length > 0) {
+        return parts.join(' ');
+    }
+    return fallbackName?.trim() || '';
+};
+
+export const generateVariantSkuFromAttributes = (
+    productSku: string,
+    size?: string,
+    color?: string,
+    sizeCode?: string,
+    colorCode?: string,
+): string => {
+    if (!productSku) return '';
+
+    const normalizedSizeCode = (sizeCode?.trim() || generateVariantCode(size || '', '')).toUpperCase();
+    const normalizedColorCode = (colorCode?.trim() || generateVariantCode(color || '', '')).toUpperCase();
+
+    return `${productSku}${normalizedSizeCode}${normalizedColorCode}`;
+};
+
 export const generateRawMaterialSku = (materialName: string): string => {
     if (!materialName) return '';
     const baseSku = generateProductSku(materialName);

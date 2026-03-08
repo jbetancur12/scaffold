@@ -1,6 +1,7 @@
 import api from './api';
 import {
     Product,
+    ProductGroup,
     Supplier,
     SupplierMaterial,
     RawMaterial,
@@ -309,9 +310,26 @@ export interface ListResponse<T> {
 
 export const mrpApi = {
     // Products
-    getProducts: async (page = 1, limit = 10, search = '') => {
+    getProductGroups: async (activeOnly = false): Promise<ProductGroup[]> => {
+        const response = await api.get<ProductGroup[]>(`/mrp/product-groups`, {
+            params: { activeOnly },
+        });
+        return response.data;
+    },
+    createProductGroup: async (data: Partial<ProductGroup>): Promise<ProductGroup> => {
+        const response = await api.post('/mrp/product-groups', data);
+        return response.data;
+    },
+    updateProductGroup: async (id: string, data: Partial<ProductGroup>): Promise<ProductGroup> => {
+        const response = await api.put(`/mrp/product-groups/${id}`, data);
+        return response.data;
+    },
+    deleteProductGroup: async (id: string): Promise<void> => {
+        await api.delete(`/mrp/product-groups/${id}`);
+    },
+    getProducts: async (page = 1, limit = 10, search = '', categoryId = '') => {
         const response = await api.get<{ products: Product[], total: number }>(`/mrp/products`, {
-            params: { page, limit, search },
+            params: { page, limit, search, categoryId: categoryId || undefined },
         });
         return response.data;
     },

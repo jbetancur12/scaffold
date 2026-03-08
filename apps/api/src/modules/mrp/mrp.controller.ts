@@ -25,7 +25,9 @@ import { QuotationPdfService } from './services/quotation-pdf.service';
 import { ProductionAnalyticsService } from './services/production-analytics.service';
 import {
     ProductSchema,
+    ProductGroupSchema,
     UpdateProductSchema,
+    UpdateProductGroupSchema,
     ProductionOrderSchema,
     RawMaterialSchema,
     BOMItemSchema,
@@ -41,6 +43,7 @@ import {
     ListInvimaRegistrationsQuerySchema,
     PaginationQuerySchema,
     ListProductsQuerySchema,
+    ListProductGroupsQuerySchema,
     ListRawMaterialsQuerySchema,
     AddSupplierMaterialSchema,
     UpdateProductionOrderStatusSchema,
@@ -211,9 +214,50 @@ export class MrpController {
 
     async listProducts(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit, search } = ListProductsQuerySchema.parse(req.query);
-            const result = await this.productService.listProducts(page || 1, limit || 10, search);
+            const { page, limit, search, categoryId } = ListProductsQuerySchema.parse(req.query);
+            const result = await this.productService.listProducts(page || 1, limit || 10, search, categoryId);
             return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createProductGroup(req: Request, res: Response, next: NextFunction) {
+        try {
+            const data = ProductGroupSchema.parse(req.body);
+            const row = await this.productService.createProductGroup(data);
+            return ApiResponse.success(res, row, 'Grupo de producto creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listProductGroups(req: Request, res: Response, next: NextFunction) {
+        try {
+            const filters = ListProductGroupsQuerySchema.parse(req.query);
+            const rows = await this.productService.listProductGroups(filters);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateProductGroup(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const data = UpdateProductGroupSchema.parse(req.body);
+            const row = await this.productService.updateProductGroup(id, data);
+            return ApiResponse.success(res, row, 'Grupo de producto actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteProductGroup(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            await this.productService.deleteProductGroup(id);
+            return ApiResponse.success(res, null, 'Grupo de producto eliminado');
         } catch (error) {
             next(error);
         }

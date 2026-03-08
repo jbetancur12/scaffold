@@ -1,24 +1,67 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
-import { ProductSchema, UpdateProductSchema } from '@scaffold/schemas';
+import { ListProductGroupsQuerySchema, ProductGroupSchema, ProductSchema, UpdateProductGroupSchema, UpdateProductSchema } from '@scaffold/schemas';
 import { OperationalConfig } from '../entities/operational-config.entity';
 import { InvimaRegistrationStatus, ProductTaxStatus } from '@scaffold/types';
 import { AppError } from '../../../shared/utils/response';
 import { InvimaRegistration } from '../entities/invima-registration.entity';
 import { z } from 'zod';
+import { ProductGroup } from '../entities/product-group.entity';
 
 export class ProductService {
     private readonly em: EntityManager;
     private readonly productRepo: EntityRepository<Product>;
     private readonly variantRepo: EntityRepository<ProductVariant>;
     private readonly invimaRepo: EntityRepository<InvimaRegistration>;
+    private readonly productGroupRepo: EntityRepository<ProductGroup>;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.productRepo = em.getRepository(Product);
         this.variantRepo = em.getRepository(ProductVariant);
         this.invimaRepo = em.getRepository(InvimaRegistration);
+        this.productGroupRepo = em.getRepository(ProductGroup);
+    }
+
+    private slugifyGroup(value: string) {
+        return value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 120);
+    }
+
+    private async resolveUniqueGroupSlug(baseInput: string, excludeId?: string) {
+        const normalizedBase = this.slugifyGroup(baseInput) || 'grupo';
+        let candidate = normalizedBase;
+        let suffix = 1;
+        while (true) {
+            const existing = await this.productGroupRepo.findOne({ slug: candidate });
+            if (!existing || existing.id === excludeId) {
+                return candidate;
+            }
+            suffix += 1;
+            candidate = `${normalizedBase}-${suffix}`;
+        }
+    }
+
+    private async assertValidGroupParent(groupId: string, parentId: string) {
+        if (groupId === parentId) {
+            throw new AppError('Un grupo no puede ser padre de sí mismo', 400);
+        }
+
+        let current = await this.productGroupRepo.findOne({ id: parentId }, { populate: ['parent'] });
+        while (current) {
+            if (current.id === groupId) {
+                throw new AppError('No puedes crear una jerarquía circular de grupos', 400);
+            }
+            current = current.parent
+                ? await this.productGroupRepo.findOne({ id: current.parent.id }, { populate: ['parent'] })
+                : null;
+        }
     }
 
     private readonly productImportHeaders = [
@@ -346,13 +389,17 @@ export class ProductService {
     }
 
     async createProduct(data: z.infer<typeof ProductSchema>): Promise<Product> {
-        const { invimaRegistrationId, ...productData } = data;
+        const { invimaRegistrationId, categoryId, ...productData } = data;
         let invimaRegistration: InvimaRegistration | undefined;
+        let category: ProductGroup | undefined;
         if (invimaRegistrationId) {
             invimaRegistration = await this.invimaRepo.findOneOrFail({ id: invimaRegistrationId });
             if (invimaRegistration.status !== InvimaRegistrationStatus.ACTIVO) {
                 throw new AppError('El registro INVIMA seleccionado no está activo', 400);
             }
+        }
+        if (categoryId) {
+            category = await this.productGroupRepo.findOneOrFail({ id: categoryId });
         }
 
         if (productData.requiresInvima && !invimaRegistration) {
@@ -361,16 +408,80 @@ export class ProductService {
 
         const product = this.productRepo.create({
             ...productData,
+            category,
             invimaRegistration,
         } as unknown as Product);
         await this.em.persistAndFlush(product);
-        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants'] });
+        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category'] });
+    }
+
+    async createProductGroup(data: z.infer<typeof ProductGroupSchema>): Promise<ProductGroup> {
+        const parent = data.parentId
+            ? await this.productGroupRepo.findOneOrFail({ id: data.parentId })
+            : undefined;
+        const slug = await this.resolveUniqueGroupSlug(data.slug || data.name);
+        const row = this.productGroupRepo.create({
+            name: data.name.trim(),
+            slug,
+            description: data.description?.trim() || undefined,
+            parent,
+            sortOrder: Number(data.sortOrder || 0),
+            active: data.active ?? true,
+        } as ProductGroup);
+        await this.em.persistAndFlush(row);
+        return this.productGroupRepo.findOneOrFail({ id: row.id }, { populate: ['parent'] });
+    }
+
+    async listProductGroups(filters?: z.infer<typeof ListProductGroupsQuerySchema>): Promise<ProductGroup[]> {
+        const where: FilterQuery<ProductGroup> = {};
+        if (filters?.activeOnly) {
+            where.active = true;
+        }
+        return this.productGroupRepo.find(where, {
+            populate: ['parent'],
+            orderBy: [{ sortOrder: 'ASC' }, { name: 'ASC' }],
+        });
+    }
+
+    async updateProductGroup(id: string, data: z.infer<typeof UpdateProductGroupSchema>): Promise<ProductGroup> {
+        const row = await this.productGroupRepo.findOneOrFail({ id }, { populate: ['parent'] });
+        let parent = row.parent;
+        if ('parentId' in data) {
+            if (data.parentId) {
+                await this.assertValidGroupParent(id, data.parentId);
+                parent = await this.productGroupRepo.findOneOrFail({ id: data.parentId });
+            } else {
+                parent = undefined;
+            }
+        }
+        if (data.slug !== undefined || data.name !== undefined) {
+            row.slug = await this.resolveUniqueGroupSlug(data.slug || data.name || row.name, row.id);
+        }
+        if (data.name !== undefined) row.name = data.name.trim();
+        if (data.description !== undefined) row.description = data.description?.trim() || undefined;
+        row.parent = parent;
+        if (data.sortOrder !== undefined) row.sortOrder = Number(data.sortOrder);
+        if (data.active !== undefined) row.active = data.active;
+        await this.em.persistAndFlush(row);
+        return this.productGroupRepo.findOneOrFail({ id: row.id }, { populate: ['parent'] });
+    }
+
+    async deleteProductGroup(id: string): Promise<void> {
+        const row = await this.productGroupRepo.findOneOrFail({ id }, { populate: ['children', 'products'] });
+        if (row.children.length > 0) {
+            throw new AppError('No puedes eliminar un grupo que tiene subgrupos', 409);
+        }
+        if (row.products.length > 0) {
+            throw new AppError('No puedes eliminar un grupo asignado a productos', 409);
+        }
+        await this.em.removeAndFlush(row);
     }
 
     async updateProduct(id: string, data: z.infer<typeof UpdateProductSchema>): Promise<Product> {
-        const product = await this.productRepo.findOneOrFail({ id }, { populate: ['invimaRegistration'] });
+        const product = await this.productRepo.findOneOrFail({ id }, { populate: ['invimaRegistration', 'category'] });
         let invimaRegistration = product.invimaRegistration;
-        const { invimaRegistrationId, ...productData } = data;
+        let category = product.category;
+        const { invimaRegistrationId, categoryId, ...productData } = data;
 
         if ('invimaRegistrationId' in data) {
             if (invimaRegistrationId) {
@@ -380,6 +491,13 @@ export class ProductService {
                 }
             } else {
                 invimaRegistration = undefined;
+            }
+        }
+        if ('categoryId' in data) {
+            if (categoryId) {
+                category = await this.productGroupRepo.findOneOrFail({ id: categoryId });
+            } else {
+                category = undefined;
             }
         }
 
@@ -394,10 +512,11 @@ export class ProductService {
 
         this.productRepo.assign(product, {
             ...productData,
+            category,
             invimaRegistration,
         });
         await this.em.persistAndFlush(product);
-        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants'] });
+        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category'] });
     }
 
     async deleteProduct(id: string): Promise<void> {
@@ -427,10 +546,10 @@ export class ProductService {
     }
 
     async getProduct(id: string): Promise<Product | null> {
-        return this.productRepo.findOne({ id }, { populate: ['variants', 'invimaRegistration'] });
+        return this.productRepo.findOne({ id }, { populate: ['variants', 'invimaRegistration', 'category'] });
     }
 
-    async listProducts(page = 1, limit = 10, search?: string): Promise<{ products: Product[]; total: number }> {
+    async listProducts(page = 1, limit = 10, search?: string, categoryId?: string): Promise<{ products: Product[]; total: number }> {
         const filters: FilterQuery<Product> = {};
         if (search && search.trim().length > 0) {
             filters.$or = [
@@ -439,6 +558,9 @@ export class ProductService {
                 { productReference: { $ilike: `%${search.trim()}%` } },
             ];
         }
+        if (categoryId) {
+            filters.category = categoryId;
+        }
 
         const [products, total] = await this.productRepo.findAndCount(
             filters,
@@ -446,7 +568,7 @@ export class ProductService {
                 limit,
                 offset: (page - 1) * limit,
                 orderBy: { name: 'ASC' },
-                populate: ['variants', 'invimaRegistration'],
+                populate: ['variants', 'invimaRegistration', 'category'],
             }
         );
         return { products, total };

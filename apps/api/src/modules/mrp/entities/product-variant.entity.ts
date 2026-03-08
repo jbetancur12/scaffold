@@ -17,6 +17,18 @@ export class ProductVariant extends BaseEntity implements IProductVariant {
     @Property()
     name!: string;
 
+    @Property({ nullable: true })
+    size?: string;
+
+    @Property({ nullable: true, fieldName: 'size_code' })
+    sizeCode?: string;
+
+    @Property({ nullable: true })
+    color?: string;
+
+    @Property({ nullable: true, fieldName: 'color_code' })
+    colorCode?: string;
+
     @Property({ unique: true })
     sku!: string;
 

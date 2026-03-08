@@ -639,6 +639,19 @@ export interface InvimaRegistration {
     updatedAt: string | Date;
 }
 
+export interface ProductGroup {
+    id: string;
+    name: string;
+    slug: string;
+    description?: string;
+    parentId?: string;
+    parent?: Pick<ProductGroup, 'id' | 'name' | 'slug'>;
+    sortOrder: number;
+    active: boolean;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
 export interface Product {
     id: string;
     name: string;
@@ -650,6 +663,7 @@ export interface Product {
     weightKg?: number;
     sku: string;
     categoryId?: string;
+    category?: Pick<ProductGroup, 'id' | 'name' | 'slug' | 'parentId'>;
     requiresInvima: boolean;
     productReference?: string;
     invimaRegistrationId?: string;
@@ -663,6 +677,10 @@ export interface ProductVariant {
     id: string;
     productId: string;
     name: string; // e.g., "L", "XL", "Red"
+    size?: string;
+    sizeCode?: string;
+    color?: string;
+    colorCode?: string;
     sku: string;
     price: number; // Distributor price
     distributorPriceUpdatedAt?: string | Date;
@@ -1679,6 +1697,15 @@ export interface CreatePurchaseRequisitionPayload {
             quantity: number;
         }>;
     }>;
+}
+
+export interface CreateProductGroupPayload {
+    name: string;
+    slug?: string;
+    description?: string;
+    parentId?: string;
+    sortOrder?: number;
+    active?: boolean;
 }
 
 export interface CreatePurchaseRequisitionFromProductionOrderPayload {

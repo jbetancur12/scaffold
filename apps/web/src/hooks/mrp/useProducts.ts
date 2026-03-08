@@ -1,16 +1,16 @@
 import { useCallback } from 'react';
-import { InvimaRegistration, InvimaRegistrationStatus, Product } from '@scaffold/types';
+import { InvimaRegistration, InvimaRegistrationStatus, Product, ProductGroup } from '@scaffold/types';
 import { CreateProductVariantDto, UpdateProductVariantDto } from '@scaffold/schemas';
 import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 import { invalidateMrpQueriesByPrefix, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
-export const useProductsQuery = (page = 1, limit = 10, search = '') => {
+export const useProductsQuery = (page = 1, limit = 10, search = '', categoryId = '') => {
     const fetchProducts = useCallback(async (): Promise<{ products: Product[]; total: number }> => {
-        return mrpApi.getProducts(page, limit, search);
-    }, [page, limit, search]);
+        return mrpApi.getProducts(page, limit, search, categoryId);
+    }, [page, limit, search, categoryId]);
 
-    return useMrpQuery(fetchProducts, true, mrpQueryKeys.productsList(page, limit, search));
+    return useMrpQuery(fetchProducts, true, mrpQueryKeys.productsList(page, limit, search, categoryId));
 };
 
 export const useProductQuery = (id?: string) => {
@@ -86,6 +86,41 @@ export const useInvimaRegistrationsQuery = (filters?: { status?: InvimaRegistrat
     }, [filters]);
 
     return useMrpQuery(fetcher, true, mrpQueryKeys.invimaRegistrations);
+};
+
+export const useProductGroupsQuery = (activeOnly = false) => {
+    const fetcher = useCallback(async (): Promise<ProductGroup[]> => {
+        return mrpApi.getProductGroups(activeOnly);
+    }, [activeOnly]);
+
+    return useMrpQuery(fetcher, true, `${mrpQueryKeys.productGroups}.${activeOnly ? 'active' : 'all'}`);
+};
+
+export const useSaveProductGroupMutation = () => {
+    return useMrpMutation<{ id?: string; payload: Partial<ProductGroup> }, ProductGroup>(
+        async ({ id, payload }) => {
+            if (id) return mrpApi.updateProductGroup(id, payload);
+            return mrpApi.createProductGroup(payload);
+        },
+        {
+            onSuccess: async () => {
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.productGroups);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.products);
+            },
+        }
+    );
+};
+
+export const useDeleteProductGroupMutation = () => {
+    return useMrpMutation<string, void>(
+        async (id) => mrpApi.deleteProductGroup(id),
+        {
+            onSuccess: async () => {
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.productGroups);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.products);
+            },
+        }
+    );
 };
 
 export const useCreateInvimaRegistrationMutation = () => {

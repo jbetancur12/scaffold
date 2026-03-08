@@ -217,6 +217,17 @@ const ProductBaseSchema = z.object({
     invimaRegistrationId: z.string().uuid().optional(),
 });
 
+export const ProductGroupSchema = z.object({
+    name: z.string().min(1, 'El nombre es obligatorio'),
+    slug: z.string().trim().min(1).optional(),
+    description: z.string().optional(),
+    parentId: z.string().uuid().optional(),
+    sortOrder: z.number().int().min(0).default(0),
+    active: z.boolean().default(true),
+});
+
+export const UpdateProductGroupSchema = ProductGroupSchema.partial();
+
 const validateProductInvima = (
     data: { requiresInvima?: boolean; invimaRegistrationId?: string; productReference?: string },
     ctx: z.RefinementCtx
@@ -243,6 +254,10 @@ export const UpdateProductSchema = ProductBaseSchema.partial().superRefine(valid
 export const ProductVariantSchema = z.object({
     productId: z.string().uuid(),
     name: z.string().min(1, 'El nombre es obligatorio'),
+    size: z.string().optional(),
+    sizeCode: z.string().optional(),
+    color: z.string().optional(),
+    colorCode: z.string().optional(),
     sku: z.string().min(1, 'SKU es obligatorio'),
     price: z.number().min(0),
     pvpMargin: z.number().min(0).max(0.99).default(0.25),
@@ -258,6 +273,10 @@ export const ProductVariantSchema = z.object({
 
 export const CreateProductVariantSchema = z.object({
     name: z.string().min(1, 'El nombre es obligatorio'),
+    size: z.string().optional(),
+    sizeCode: z.string().optional(),
+    color: z.string().optional(),
+    colorCode: z.string().optional(),
     sku: z.string().min(1, 'SKU es obligatorio'),
     price: z.number().min(0),
     pvpMargin: z.number().min(0).max(0.99).default(0.25),
@@ -528,6 +547,11 @@ export const ListRawMaterialsQuerySchema = PaginationQuerySchema.extend({
 
 export const ListProductsQuerySchema = PaginationQuerySchema.extend({
     search: z.string().optional(),
+    categoryId: z.string().uuid().optional(),
+});
+
+export const ListProductGroupsQuerySchema = z.object({
+    activeOnly: z.coerce.boolean().optional(),
 });
 
 export const AddSupplierMaterialSchema = z.object({

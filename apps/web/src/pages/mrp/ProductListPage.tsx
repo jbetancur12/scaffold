@@ -14,7 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/components/ui/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
-import { useDeleteProductMutation, useProductsQuery } from '@/hooks/mrp/useProducts';
+import { useDeleteProductMutation, useProductGroupsQuery, useProductsQuery } from '@/hooks/mrp/useProducts';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { Badge } from '@/components/ui/badge';
 import { mrpApi } from '@/services/mrpApi';
@@ -25,6 +25,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ProductListPage() {
     const navigate = useNavigate();
@@ -33,8 +34,10 @@ export default function ProductListPage() {
     const [limit, setLimit] = useState(10);
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [categoryId, setCategoryId] = useState('');
 
-    const { data: productsResponse, loading, error, execute: reloadProducts } = useProductsQuery(page, limit, debouncedSearch);
+    const { data: productsResponse, loading, error, execute: reloadProducts } = useProductsQuery(page, limit, debouncedSearch, categoryId);
+    const { data: productGroups } = useProductGroupsQuery(true);
     const products = productsResponse?.products ?? [];
     const total = productsResponse?.total ?? 0;
     const { execute: deleteProduct } = useDeleteProductMutation();
@@ -241,6 +244,14 @@ export default function ProductListPage() {
                         <Plus className="mr-2 h-4 w-4" />
                         Nuevo Producto
                     </Button>
+                    <Button
+                        onClick={() => navigate('/mrp/product-groups')}
+                        variant="outline"
+                        className="h-11 px-6 border-slate-200 text-slate-700 hover:bg-slate-100 w-full sm:w-auto"
+                    >
+                        <Layers className="mr-2 h-4 w-4" />
+                        Grupos
+                    </Button>
                 </div>
             </div>
 
@@ -289,17 +300,38 @@ export default function ProductListPage() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                 <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="relative w-full sm:max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input
-                                placeholder="Buscar por nombre, SKU o referencia..."
-                                value={search}
-                                onChange={(e) => {
-                                    setSearch(e.target.value);
+                        <div className="flex w-full flex-col lg:flex-row gap-3">
+                            <div className="relative w-full sm:max-w-md">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                <Input
+                                    placeholder="Buscar por nombre, SKU o referencia..."
+                                    value={search}
+                                    onChange={(e) => {
+                                        setSearch(e.target.value);
+                                        setPage(1);
+                                    }}
+                                    className="pl-9 h-10 bg-white border-slate-200 shadow-sm"
+                                />
+                            </div>
+                            <Select
+                                value={categoryId || '__all__'}
+                                onValueChange={(value) => {
+                                    setCategoryId(value === '__all__' ? '' : value);
                                     setPage(1);
                                 }}
-                                className="pl-9 h-10 bg-white border-slate-200 shadow-sm"
-                            />
+                            >
+                                <SelectTrigger className="w-full lg:w-[280px] h-10 bg-white border-slate-200 shadow-sm">
+                                    <SelectValue placeholder="Filtrar por grupo" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__all__">Todos los grupos</SelectItem>
+                                    {(productGroups ?? []).map((group) => (
+                                        <SelectItem key={group.id} value={group.id}>
+                                            {group.parent ? `${group.parent.name} / ${group.name}` : group.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="text-sm text-slate-500 font-medium">
                             {totalProducts > 0 ? `Mostrando ${firstRow}-${lastRow} de ${totalProducts} productos` : ''}
@@ -314,6 +346,7 @@ export default function ProductListPage() {
                             <TableRow className="bg-slate-50 border-b border-slate-200 hover:bg-slate-50">
                                 <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">Producto</TableHead>
                                 <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">SKU</TableHead>
+                                <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">Grupo</TableHead>
                                 <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap text-center">Variantes</TableHead>
                                 <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">Precio Lista (Max)</TableHead>
                                 <TableHead className="py-4 font-semibold text-slate-700 whitespace-nowrap">Margen Peor Escenario</TableHead>
@@ -323,7 +356,7 @@ export default function ProductListPage() {
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-48 text-center">
+                                    <TableCell colSpan={7} className="h-48 text-center">
                                         <div className="flex flex-col items-center justify-center text-slate-500 space-y-3">
                                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-fuchsia-600"></div>
                                             <span className="text-sm font-medium">Generando catálogo...</span>
@@ -332,7 +365,7 @@ export default function ProductListPage() {
                                 </TableRow>
                             ) : products.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-64 text-center">
+                                    <TableCell colSpan={7} className="h-64 text-center">
                                         <div className="flex flex-col items-center justify-center text-slate-500 space-y-3">
                                             <div className="p-4 bg-slate-100 rounded-full">
                                                 <Package className="h-8 w-8 text-slate-400" />
@@ -397,6 +430,15 @@ export default function ProductListPage() {
                                                 <Badge variant="outline" className="bg-slate-100 text-slate-700 font-mono border-slate-200">
                                                     {product.sku}
                                                 </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                {product.category ? (
+                                                    <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+                                                        {product.category.name}
+                                                    </Badge>
+                                                ) : (
+                                                    <span className="text-slate-400 text-xs italic">Sin grupo</span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-center">
                                                 <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-slate-100 text-xs font-semibold text-slate-700">

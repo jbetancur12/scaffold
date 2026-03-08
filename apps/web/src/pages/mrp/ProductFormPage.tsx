@@ -9,9 +9,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, RefreshCw, Package, ShieldCheck, FileText, Hash, Layers } from 'lucide-react';
 import { ProductSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
-import { useInvimaRegistrationsQuery, useProductQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
+import { useInvimaRegistrationsQuery, useProductGroupsQuery, useProductQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ProductFormPage() {
     const { id } = useParams();
@@ -30,6 +31,7 @@ export default function ProductFormPage() {
         weightGrams: '',
         requiresInvima: false,
         productReference: '',
+        categoryId: '',
         invimaRegistrationId: '',
     });
 
@@ -46,6 +48,7 @@ export default function ProductFormPage() {
 
     const { data: product, loading: loadingProduct, error: productError } = useProductQuery(isEditing ? id : undefined);
     const { data: invimaRegistrations, loading: loadingInvimaRegistrations } = useInvimaRegistrationsQuery();
+    const { data: productGroups, loading: loadingProductGroups } = useProductGroupsQuery(true);
     const { execute: saveProduct } = useSaveProductMutation();
 
     useEffect(() => {
@@ -60,6 +63,7 @@ export default function ProductFormPage() {
                 weightGrams: product.weightKg != null ? String(Number(product.weightKg) * 1000) : '',
                 requiresInvima: product.requiresInvima || false,
                 productReference: product.productReference || '',
+                categoryId: product.categoryId || product.category?.id || '',
                 invimaRegistrationId: product.invimaRegistrationId || '',
             });
             setSkuManuallyEdited(true);
@@ -79,6 +83,7 @@ export default function ProductFormPage() {
                 heightCm: formData.heightCm !== '' ? Number(formData.heightCm) : undefined,
                 weightKg: formData.weightGrams !== '' ? Number(formData.weightGrams) / 1000 : undefined,
                 productReference: formData.productReference || undefined,
+                categoryId: formData.categoryId || undefined,
                 invimaRegistrationId: formData.invimaRegistrationId || undefined,
             };
             ProductSchema.parse(payload);
@@ -225,6 +230,36 @@ export default function ProductFormPage() {
                                         className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors uppercase"
                                         placeholder="Ej. 7701234567890"
                                     />
+                                </div>
+
+                                <div className="space-y-2 md:col-span-2">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <Label htmlFor="categoryId" className="text-slate-700 font-medium">Grupo Comercial</Label>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            onClick={() => navigate('/mrp/product-groups')}
+                                            className="h-auto px-0 text-xs text-fuchsia-700 hover:text-fuchsia-800 hover:bg-transparent"
+                                        >
+                                            Gestionar grupos
+                                        </Button>
+                                    </div>
+                                    <Select
+                                        value={formData.categoryId || '__none__'}
+                                        onValueChange={(value) => setFormData({ ...formData, categoryId: value === '__none__' ? '' : value })}
+                                    >
+                                        <SelectTrigger id="categoryId" className="h-11 bg-slate-50 border-slate-200 focus:bg-white transition-colors">
+                                            <SelectValue placeholder={loadingProductGroups ? 'Cargando grupos...' : 'Selecciona un grupo opcional'} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">Sin grupo</SelectItem>
+                                            {(productGroups ?? []).map((group) => (
+                                                <SelectItem key={group.id} value={group.id}>
+                                                    {group.parent ? `${group.parent.name} / ${group.name}` : group.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </div>

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { generateVariantSku } from '@/utils/skuGenerator';
+import { generateVariantDisplayName, generateVariantSku, generateVariantSkuFromAttributes } from '@/utils/skuGenerator';
 import { ProductTaxStatus, ProductVariant } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw, Package, Layers, Clock, ShieldCheck, BoxSelect, AreaChart, DollarSign, Activity, Hash } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw, Package, Layers, Clock, ShieldCheck, BoxSelect, AreaChart, DollarSign, Activity, Hash, ChevronDown, ChevronRight } from 'lucide-react';
 import { CreateProductVariantSchema, UpdateProductVariantSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
 import {
@@ -34,6 +34,10 @@ import { Badge } from '@/components/ui/badge';
 interface VariantFormData {
     id?: string;
     name: string;
+    size: string;
+    sizeCode: string;
+    color: string;
+    colorCode: string;
     sku: string;
     price: number;
     distributorPriceUpdatedAt?: string | Date;
@@ -53,9 +57,13 @@ export default function ProductDetailPage() {
 
     // Variant management state
     const [showVariantDialog, setShowVariantDialog] = useState(false);
-    const [editingVariant, setEditingVariant] = useState<VariantFormData | null>(null);
+    const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null);
     const [variantFormData, setVariantFormData] = useState<VariantFormData>({
         name: '',
+        size: '',
+        sizeCode: '',
+        color: '',
+        colorCode: '',
         sku: '',
         price: 0,
         pvpMargin: 0.25,
@@ -63,6 +71,9 @@ export default function ProductDetailPage() {
         taxStatus: ProductTaxStatus.EXCLUIDO,
         taxRate: 0,
     });
+    const [variantNameManuallyEdited, setVariantNameManuallyEdited] = useState(false);
+    const [variantSkuManuallyEdited, setVariantSkuManuallyEdited] = useState(false);
+    const [variantIdentityOpen, setVariantIdentityOpen] = useState(true);
 
     const { data: operationalConfig } = useOperationalConfigQuery();
     const { data: product, loading, error, execute: reloadProduct } = useProductQuery(id);
@@ -74,17 +85,42 @@ export default function ProductDetailPage() {
 
     // Variant SKU generation listener
     useEffect(() => {
-        if (showVariantDialog && product?.sku && variantFormData.name && !editingVariant) {
-            // Only auto-generate for new variants if we haven't manually edited
-            const autoVariantSku = generateVariantSku(product.sku, variantFormData.name);
-            setVariantFormData(prev => ({ ...prev, sku: autoVariantSku }));
-        }
-    }, [variantFormData.name, product?.sku, showVariantDialog, editingVariant]);
+        if (!showVariantDialog || editingVariant) return;
+
+        const autoName = generateVariantDisplayName(variantFormData.size, variantFormData.color, variantFormData.name);
+        const autoSku = generateVariantSkuFromAttributes(
+            product?.sku || '',
+            variantFormData.size,
+            variantFormData.color,
+            variantFormData.sizeCode,
+            variantFormData.colorCode,
+        ) || (variantFormData.name ? generateVariantSku(product?.sku || '', variantFormData.name) : product?.sku || '');
+
+        setVariantFormData((prev) => ({
+            ...prev,
+            name: variantNameManuallyEdited ? prev.name : autoName,
+            sku: variantSkuManuallyEdited ? prev.sku : autoSku,
+        }));
+    }, [
+        showVariantDialog,
+        editingVariant,
+        product?.sku,
+        variantFormData.size,
+        variantFormData.color,
+        variantFormData.sizeCode,
+        variantFormData.colorCode,
+        variantNameManuallyEdited,
+        variantSkuManuallyEdited,
+    ]);
 
     const handleAddVariant = () => {
         setEditingVariant(null);
         setVariantFormData({
             name: '',
+            size: '',
+            sizeCode: '',
+            color: '',
+            colorCode: '',
             sku: '',
             price: 0,
             pvpMargin: 0.25,
@@ -93,6 +129,9 @@ export default function ProductDetailPage() {
             taxStatus: ProductTaxStatus.EXCLUIDO,
             taxRate: 0,
         });
+        setVariantNameManuallyEdited(false);
+        setVariantSkuManuallyEdited(false);
+        setVariantIdentityOpen(true);
         setShowVariantDialog(true);
     };
 
@@ -100,6 +139,10 @@ export default function ProductDetailPage() {
         setEditingVariant(variant);
         setVariantFormData({
             name: variant.name,
+            size: variant.size || '',
+            sizeCode: variant.sizeCode || '',
+            color: variant.color || '',
+            colorCode: variant.colorCode || '',
             sku: variant.sku,
             price: variant.price,
             distributorPriceUpdatedAt: variant.distributorPriceUpdatedAt,
@@ -110,6 +153,9 @@ export default function ProductDetailPage() {
             taxStatus: variant.taxStatus ?? ProductTaxStatus.EXCLUIDO,
             taxRate: Number(variant.taxRate || 0),
         });
+        setVariantNameManuallyEdited(true);
+        setVariantSkuManuallyEdited(true);
+        setVariantIdentityOpen(true);
         setShowVariantDialog(true);
     };
 
@@ -213,6 +259,11 @@ export default function ProductDetailPage() {
                             <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 uppercase tracking-widest text-[10px] font-bold">
                                 {product.sku}
                             </Badge>
+                            {product.category && (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 uppercase tracking-widest text-[10px] font-bold">
+                                    {product.category.name}
+                                </Badge>
+                            )}
                             {product.requiresInvima && (
                                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center gap-1 uppercase tracking-widest text-[10px] font-bold">
                                     <ShieldCheck className="h-3 w-3" /> INVIMA
@@ -475,6 +526,20 @@ export default function ProductDetailPage() {
                                                     <TableCell className="py-3">
                                                         <div className="flex flex-col">
                                                             <span className="font-bold text-slate-900">{variant.name}</span>
+                                                            {(variant.size || variant.color) && (
+                                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                                    {variant.size && (
+                                                                        <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">
+                                                                            Talla {variant.size}
+                                                                        </Badge>
+                                                                    )}
+                                                                    {variant.color && (
+                                                                        <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200">
+                                                                            {variant.color}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                             <div className="flex items-center gap-1 mt-0.5">
                                                                 <Hash className="h-3 w-3 text-slate-400" />
                                                                 <span className="text-xs text-slate-500 font-mono tracking-wide">{variant.sku}</span>
@@ -559,50 +624,136 @@ export default function ProductDetailPage() {
                     </DialogHeader>
 
                     <div className="p-6 space-y-5 bg-white overflow-y-auto flex-1 min-h-0">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div className="md:col-span-2 space-y-2">
-                                <Label htmlFor="variant-name" className="text-slate-700">Denominación / Tamaño</Label>
-                                <Input
-                                    id="variant-name"
-                                    value={variantFormData.name}
-                                    onChange={(e) => setVariantFormData({ ...variantFormData, name: e.target.value })}
-                                    placeholder="Ej. Presentación 500ml, Talla L..."
-                                    className="h-10 border-slate-200 focus:bg-slate-50/50"
-                                />
-                            </div>
+                        <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setVariantIdentityOpen((prev) => !prev)}
+                                className="w-full px-4 py-3 bg-slate-50/70 flex items-center justify-between text-left hover:bg-slate-100/70 transition-colors"
+                            >
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">Identidad de la variante</p>
+                                    <p className="text-xs text-slate-500">Talla, color, nombre visible y SKU comercial.</p>
+                                </div>
+                                {variantIdentityOpen ? (
+                                    <ChevronDown className="h-4 w-4 text-slate-500" />
+                                ) : (
+                                    <ChevronRight className="h-4 w-4 text-slate-500" />
+                                )}
+                            </button>
 
-                            <div className="md:col-span-2 space-y-2">
-                                <Label htmlFor="variant-sku" className="text-slate-700">SKU Específico</Label>
-                                <div className="flex gap-2">
-                                    <div className="relative flex-1">
-                                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            {variantIdentityOpen && (
+                                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-5 bg-white border-t border-slate-100">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="variant-size" className="text-slate-700">Talla</Label>
                                         <Input
-                                            id="variant-sku"
-                                            value={variantFormData.sku}
-                                            onChange={(e) => setVariantFormData({ ...variantFormData, sku: e.target.value })}
-                                            placeholder="Ej. PROD-BAS-500"
-                                            className="h-10 pl-9 font-mono text-sm uppercase"
+                                            id="variant-size"
+                                            value={variantFormData.size}
+                                            onChange={(e) => setVariantFormData({ ...variantFormData, size: e.target.value })}
+                                            placeholder="Ej. L, M, Única"
+                                            className="h-10 border-slate-200 focus:bg-slate-50/50"
                                         />
                                     </div>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="h-10 w-10 shrink-0 text-slate-500"
-                                        title="Sugerir SKU basado en el nombre"
-                                        onClick={() => {
-                                            if (product?.sku && variantFormData.name) {
-                                                const autoSku = generateVariantSku(product.sku, variantFormData.name);
-                                                setVariantFormData({ ...variantFormData, sku: autoSku });
-                                            } else {
-                                                toast({ title: 'Aviso', description: 'Ingresa un nombre primero.' });
-                                            }
-                                        }}
-                                    >
-                                        <RefreshCw className="h-4 w-4" />
-                                    </Button>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="variant-color" className="text-slate-700">Color</Label>
+                                        <Input
+                                            id="variant-color"
+                                            value={variantFormData.color}
+                                            onChange={(e) => setVariantFormData({ ...variantFormData, color: e.target.value })}
+                                            placeholder="Ej. Negro, Azul"
+                                            className="h-10 border-slate-200 focus:bg-slate-50/50"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="variant-size-code" className="text-slate-700">Código talla</Label>
+                                        <Input
+                                            id="variant-size-code"
+                                            value={variantFormData.sizeCode}
+                                            onChange={(e) => setVariantFormData({ ...variantFormData, sizeCode: e.target.value.toUpperCase() })}
+                                            placeholder="Ej. L, U"
+                                            className="h-10 border-slate-200 focus:bg-slate-50/50 font-mono uppercase"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="variant-color-code" className="text-slate-700">Código color</Label>
+                                        <Input
+                                            id="variant-color-code"
+                                            value={variantFormData.colorCode}
+                                            onChange={(e) => setVariantFormData({ ...variantFormData, colorCode: e.target.value.toUpperCase() })}
+                                            placeholder="Ej. N, AZ"
+                                            className="h-10 border-slate-200 focus:bg-slate-50/50 font-mono uppercase"
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-2 space-y-2">
+                                        <Label htmlFor="variant-name" className="text-slate-700">Nombre visible de la variante</Label>
+                                        <Input
+                                            id="variant-name"
+                                            value={variantFormData.name}
+                                            onChange={(e) => {
+                                                setVariantFormData({ ...variantFormData, name: e.target.value });
+                                                setVariantNameManuallyEdited(true);
+                                            }}
+                                            placeholder="Ej. L Negro"
+                                            className="h-10 border-slate-200 focus:bg-slate-50/50"
+                                        />
+                                        <p className="text-[11px] text-slate-500">
+                                            Si no lo editas manualmente, se arma con talla + color.
+                                        </p>
+                                    </div>
+
+                                    <div className="md:col-span-2 space-y-2">
+                                        <Label htmlFor="variant-sku" className="text-slate-700">SKU Específico</Label>
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                                <Input
+                                                    id="variant-sku"
+                                                    value={variantFormData.sku}
+                                                    onChange={(e) => {
+                                                        setVariantFormData({ ...variantFormData, sku: e.target.value.toUpperCase() });
+                                                        setVariantSkuManuallyEdited(true);
+                                                    }}
+                                                    placeholder="Ej. CLM051LN"
+                                                    className="h-10 pl-9 font-mono text-sm uppercase"
+                                                />
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-10 w-10 shrink-0 text-slate-500"
+                                                title="Sugerir SKU basado en talla y color"
+                                                onClick={() => {
+                                                    if (product?.sku) {
+                                                        const autoSku = generateVariantSkuFromAttributes(
+                                                            product.sku,
+                                                            variantFormData.size,
+                                                            variantFormData.color,
+                                                            variantFormData.sizeCode,
+                                                            variantFormData.colorCode,
+                                                        ) || generateVariantSku(product.sku, variantFormData.name);
+                                                        setVariantFormData({ ...variantFormData, sku: autoSku });
+                                                        setVariantSkuManuallyEdited(false);
+                                                    } else {
+                                                        toast({ title: 'Aviso', description: 'El producto base no tiene SKU.' });
+                                                    }
+                                                }}
+                                            >
+                                                <RefreshCw className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500">
+                                            Formato sugerido: SKU padre + código talla + código color. Ej: <span className="font-mono">CLM051LN</span>.
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
                             <div className="space-y-2">
                                 <Label htmlFor="variant-price" className="text-slate-700">Precio Distribuidor</Label>

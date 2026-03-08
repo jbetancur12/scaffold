@@ -23,6 +23,7 @@ import {
     ChevronDown,
     ChevronRight,
     Boxes,
+    Layers,
     BarChart3,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -81,6 +82,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     const mrpItems = [
         { icon: Package, label: 'Productos', path: '/mrp/products', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Layers, label: 'Grupos de Producto', path: '/mrp/product-groups', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Package, label: 'Materias Primas', path: '/mrp/raw-materials', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Users, label: 'Clientes', path: '/mrp/customers', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: ShoppingCart, label: 'Proveedores', path: '/mrp/suppliers', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
@@ -99,7 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const mrpCategories = [
         {
             label: 'Maestros',
-            items: ['/mrp/products', '/mrp/raw-materials'],
+            items: ['/mrp/products', '/mrp/product-groups', '/mrp/raw-materials'],
         },
         {
             label: 'Terceros',

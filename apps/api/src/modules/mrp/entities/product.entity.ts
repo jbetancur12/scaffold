@@ -2,6 +2,7 @@ import { Entity, Property, OneToMany, Collection, Cascade, ManyToOne } from '@mi
 import { BaseEntity } from '../../../shared/entities/base.entity';
 import { ProductVariant } from './product-variant.entity';
 import { InvimaRegistration } from './invima-registration.entity';
+import { ProductGroup } from './product-group.entity';
 
 @Entity()
 export class Product extends BaseEntity {
@@ -29,8 +30,13 @@ export class Product extends BaseEntity {
     @Property({ unique: true })
     sku!: string;
 
-    @Property({ nullable: true })
-    categoryId?: string;
+    @ManyToOne(() => ProductGroup, { nullable: true, fieldName: 'category_id' })
+    category?: ProductGroup;
+
+    @Property({ persist: false })
+    get categoryId() {
+        return this.category?.id;
+    }
 
     @Property({ default: false })
     requiresInvima: boolean = false;
