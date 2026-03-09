@@ -114,6 +114,105 @@ const { hasRole } = useHasRole();
 const canEdit = hasRole([UserRole.SUPERADMIN]);
 ```
 
+### Casos comunes: ocultar menú, botones, contenedores, info o acciones
+
+#### 1. Ocultar un botón o bloque completo
+Usa `RoleGuard` cuando quieras mostrar u ocultar algo entero en JSX.
+
+```tsx
+import { RoleGuard } from '@/components/auth/RoleGuard';
+import { UserRole } from '@scaffold/types';
+
+<RoleGuard allowedRoles={[UserRole.ADMIN, UserRole.SUPERADMIN]}>
+    <Button>Eliminar registro</Button>
+</RoleGuard>
+```
+
+También funciona para cards, tabs, tablas, secciones o contenedores completos:
+
+```tsx
+<RoleGuard allowedRoles={[UserRole.SUPERADMIN]}>
+    <section>
+        <h3>Costos internos</h3>
+        <InternalCostsPanel />
+    </section>
+</RoleGuard>
+```
+
+#### 2. Ocultar o deshabilitar con lógica dentro del componente
+Usa `useHasRole()` si necesitas condiciones más finas.
+
+```tsx
+import { useHasRole } from '@/components/auth/RoleGuard';
+import { UserRole } from '@scaffold/types';
+
+const { hasRole } = useHasRole();
+
+const canSeeCosts = Boolean(hasRole([UserRole.ADMIN, UserRole.SUPERADMIN]));
+const canDelete = Boolean(hasRole([UserRole.SUPERADMIN]));
+```
+
+Luego:
+
+```tsx
+{canSeeCosts && <CostBreakdown />}
+
+<Button disabled={!canDelete}>
+    Eliminar
+</Button>
+```
+
+#### 3. Ocultar información sensible
+Si una parte del contenido solo la debe ver cierto rol:
+
+```tsx
+{hasRole([UserRole.ADMIN, UserRole.SUPERADMIN]) ? (
+    <p>Costo unitario: {formatCurrency(row.cost)}</p>
+) : null}
+```
+
+#### 4. Ocultar items del menú lateral
+En este proyecto el menú ya está modelado por item con una propiedad `roles`.
+El ejemplo real está en `apps/web/src/components/layout/DashboardLayout.tsx`.
+
+```tsx
+{
+    icon: Settings,
+    label: 'Configuración Operativa',
+    path: '/mrp/operational-settings',
+    roles: [UserRole.ADMIN, UserRole.SUPERADMIN],
+}
+```
+
+Después el layout filtra los items según `user.role`.
+
+#### 5. Proteger acciones sensibles en backend
+Ocultar en frontend no es seguridad. Si una acción no la debe ejecutar un rol, protégela también en backend.
+
+```typescript
+router.delete(
+    '/users/:id',
+    authenticateToken,
+    requireRole([UserRole.SUPERADMIN]),
+    controller.deleteUser
+);
+```
+
+#### 6. Regla práctica
+- Si solo quieres esconder UI: `RoleGuard`.
+- Si necesitas una condición dentro del componente: `useHasRole()`.
+- Si el usuario no debe poder ejecutar la acción aunque intente llamar la API manualmente: `requireRole(...)` en backend.
+
+#### 7. Patrón recomendado
+Para una funcionalidad sensible, aplica ambas capas:
+
+1. Oculta o deshabilita la acción en frontend.
+2. Protege el endpoint en backend.
+
+Ejemplo típico:
+- Botón "Eliminar" visible solo para `SUPERADMIN`.
+- Endpoint `DELETE` protegido también para `SUPERADMIN`.
+
 ---
 
 ## 🔗 Validación Compartida (`@scaffold/schemas`)
