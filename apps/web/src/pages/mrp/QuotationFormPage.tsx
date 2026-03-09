@@ -171,11 +171,48 @@ const validUntilFromDays = (days: number) => {
     return formatInputDate(date);
 };
 
+const splitNonEmptyLines = (raw?: string) =>
+    (raw || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+const looksLikeCommercialTerms = (raw?: string) => {
+    const lines = splitNonEmptyLines(raw);
+    if (lines.length === 0) return false;
+    const normalizedLines = lines.map((line) => line.toUpperCase());
+    if (normalizedLines[0].startsWith(COMMERCIAL_TERMS_HEADING_PREFIX)) {
+        return true;
+    }
+
+    const numberedSections = normalizedLines.filter((line) => /^\d+\.\s+/.test(line)).length;
+    const commercialMarkers = normalizedLines.filter((line) =>
+        line.includes('VIGENCIA') ||
+        line.includes('PAGO') ||
+        line.includes('PRODUCCION') ||
+        line.includes('GARANT') ||
+        line.includes('CANCELACION') ||
+        line.includes('CLIENTES HABITUALES') ||
+        line.includes('RETENCION DIAN')
+    ).length;
+
+    return numberedSections >= 2 || commercialMarkers >= 2;
+};
+
+const ensureCommercialTermsHeading = (raw: string, companyName: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return '';
+    if (trimmed.toUpperCase().startsWith(COMMERCIAL_TERMS_HEADING_PREFIX)) {
+        return trimmed;
+    }
+    return `${COMMERCIAL_TERMS_HEADING_PREFIX}${companyName}\n\n${trimmed}`;
+};
+
 const splitCustomNotes = (raw?: string) => {
     const content = (raw || '').trim();
     if (!content) return '';
     const sectionStart = content.indexOf(COMMERCIAL_TERMS_HEADING_PREFIX);
-    if (sectionStart < 0) return content;
+    if (sectionStart < 0) return looksLikeCommercialTerms(content) ? '' : content;
     return content.slice(0, sectionStart).trim();
 };
 
@@ -183,7 +220,9 @@ const extractCommercialTermsBlock = (raw?: string) => {
     const content = (raw || '').trim();
     if (!content) return '';
     const sectionStart = content.indexOf(COMMERCIAL_TERMS_HEADING_PREFIX);
-    if (sectionStart < 0) return '';
+    if (sectionStart < 0) {
+        return looksLikeCommercialTerms(content) ? ensureCommercialTermsHeading(content, defaultCommercialTerms.companyName) : '';
+    }
     return content.slice(sectionStart).trim();
 };
 
@@ -262,7 +301,7 @@ const composeQuotationNotes = (
     const notesText = freeNotes.trim();
     const manualTermsText = (options?.manualTermsText || '').trim();
     const termsText = options?.manualTermsEnabled && manualTermsText
-        ? manualTermsText
+        ? ensureCommercialTermsHeading(manualTermsText, terms.companyName)
         : buildCommercialTermsText(terms);
     if (notesText && termsText) return `${notesText}\n\n${termsText}`;
     return notesText || termsText || '';
@@ -324,7 +363,7 @@ export default function QuotationFormPage() {
         setCommercialTerms(selectedTemplate);
         if (selectedTemplate.manualText?.trim()) {
             setManualTermsEnabled(true);
-            setManualTermsText(selectedTemplate.manualText.trim());
+            setManualTermsText(ensureCommercialTermsHeading(selectedTemplate.manualText.trim(), selectedTemplate.companyName));
         } else {
             setManualTermsEnabled(false);
             setManualTermsText('');
@@ -383,6 +422,8 @@ export default function QuotationFormPage() {
                     setValidUntil(q.validUntil ? new Date(q.validUntil as string).toISOString().slice(0, 10) : '');
                     setNotes(splitCustomNotes(currentNotes));
                     const termsBlock = extractCommercialTermsBlock(currentNotes);
+                    setManualTermsEnabled(false);
+                    setManualTermsText('');
                     if (termsBlock) {
                         setManualTermsEnabled(true);
                         setManualTermsText(termsBlock);
