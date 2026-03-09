@@ -3,11 +3,15 @@ import { BaseEntity } from '../../../shared/entities/base.entity';
 import { Quotation } from './quotation.entity';
 import { Product } from './product.entity';
 import { ProductVariant } from './product-variant.entity';
+import { QuotationItemLineType } from '@scaffold/types';
 
 @Entity()
 export class QuotationItem extends BaseEntity {
     @ManyToOne(() => Quotation)
     quotation!: Quotation;
+
+    @Property({ default: QuotationItemLineType.ITEM })
+    lineType: QuotationItemLineType = QuotationItemLineType.ITEM;
 
     @Property({ default: true })
     isCatalogItem: boolean = true;
@@ -23,6 +27,12 @@ export class QuotationItem extends BaseEntity {
 
     @Property({ nullable: true })
     customSku?: string;
+
+    @Property({ nullable: true, type: 'text' })
+    noteText?: string;
+
+    @Property({ default: 0 })
+    sortOrder: number = 0;
 
     @Property({ type: 'decimal', precision: 12, scale: 3 })
     quantity!: number;

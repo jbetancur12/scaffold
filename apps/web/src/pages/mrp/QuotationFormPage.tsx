@@ -9,20 +9,22 @@ import { mrpApi } from '@/services/mrpApi';
 import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { calculateShippingSplit } from '@/utils/shipping';
-import { ArrowLeft, Plus, Users, Package, ChevronsUpDown, Check, Loader2, FileText, ShieldCheck, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Plus, Users, Package, ChevronsUpDown, Check, Loader2, FileText, ShieldCheck, ChevronDown, ChevronRight, StickyNote } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
-import { ProductTaxStatus, QuotationTermsTemplate } from '@scaffold/types';
+import { ProductTaxStatus, QuotationItemLineType, QuotationTermsTemplate } from '@scaffold/types';
 
 type ItemForm = {
+    lineType: QuotationItemLineType;
     isCatalogItem: boolean;
     productSearch: string;
     productId?: string;
     variantId?: string;
     customDescription?: string;
     customSku?: string;
+    noteText?: string;
     quantity: number;
     approvedQuantity: number;
     unitPrice: number;
@@ -47,14 +49,32 @@ type ProductOption = {
 };
 
 const createItem = (): ItemForm => ({
+    lineType: QuotationItemLineType.ITEM,
     isCatalogItem: true,
     productSearch: '',
     productId: undefined,
     variantId: undefined,
     customDescription: '',
     customSku: '',
+    noteText: '',
     quantity: 1,
     approvedQuantity: 1,
+    unitPrice: 0,
+    discountPercent: 0,
+    taxRate: 0,
+});
+
+const createNoteItem = (): ItemForm => ({
+    lineType: QuotationItemLineType.NOTE,
+    isCatalogItem: false,
+    productSearch: '',
+    productId: undefined,
+    variantId: undefined,
+    customDescription: '',
+    customSku: '',
+    noteText: '',
+    quantity: 0,
+    approvedQuantity: 0,
     unitPrice: 0,
     discountPercent: 0,
     taxRate: 0,
@@ -369,18 +389,26 @@ export default function QuotationFormPage() {
                     }
                     setGlobalDiscountPercent(Number((q as any).globalDiscountPercent || 0));
                     setItems((q.items || []).map((it: any) => {
+                        if (it.lineType === QuotationItemLineType.NOTE) {
+                            return {
+                                ...createNoteItem(),
+                                noteText: it.noteText || it.customDescription || '',
+                            };
+                        }
                         const netUnitPrice = Number(it.unitPrice || 0);
                         const discountPercent = Number(it.discountPercent || 0);
                         const listUnitPrice = discountPercent > 0 && discountPercent < 100
                             ? netUnitPrice / (1 - (discountPercent / 100))
                             : netUnitPrice;
                         return {
+                            lineType: QuotationItemLineType.ITEM,
                             isCatalogItem: it.isCatalogItem !== false,
                             productSearch: it.isCatalogItem ? (it.product?.sku ? `${it.product.sku} ${it.product?.name}` : '') : '',
                             productId: it.productId || it.product?.id,
                             variantId: it.variantId || it.variant?.id,
                             customDescription: it.customDescription || '',
                             customSku: it.customSku || '',
+                            noteText: '',
                             quantity: Number(it.quantity || 0),
                             approvedQuantity: Number(it.approvedQuantity ?? it.quantity ?? 0),
                             unitPrice: Number.isFinite(listUnitPrice) ? Number(listUnitPrice.toFixed(4)) : 0,
@@ -399,10 +427,11 @@ export default function QuotationFormPage() {
     }, [id, isEditMode, toast]);
 
     const addItem = () => setItems((prev) => [...prev, createItem()]);
+    const addNoteLine = () => setItems((prev) => [...prev, createNoteItem()]);
 
     const addVariantForItem = (index: number) => {
         const source = items[index];
-        if (!source?.isCatalogItem || !source?.productId) {
+        if (!source || source.lineType === QuotationItemLineType.NOTE || !source.isCatalogItem || !source.productId) {
             toast({
                 title: 'Selecciona producto',
                 description: 'Primero selecciona un producto del catálogo para agregar otra variante.',
@@ -433,12 +462,14 @@ export default function QuotationFormPage() {
         const suggestedTax = resolveCatalogTax(source.productId, suggestedVariantId);
 
         const clonedLine: ItemForm = {
+            lineType: QuotationItemLineType.ITEM,
             isCatalogItem: true,
             productSearch: source.productSearch,
             productId: source.productId,
             variantId: suggestedVariantId,
             customDescription: '',
             customSku: '',
+            noteText: '',
             quantity: 1,
             approvedQuantity: 1,
             unitPrice: suggestedUnitPrice,
@@ -462,7 +493,10 @@ export default function QuotationFormPage() {
     };
 
     const patchItem = (idx: number, patch: Partial<ItemForm>) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, ...patch } : it));
-    const hasPerItemDiscount = useMemo(() => items.some((it) => Number(it.discountPercent || 0) > 0), [items]);
+    const hasPerItemDiscount = useMemo(
+        () => items.some((it) => it.lineType === QuotationItemLineType.ITEM && Number(it.discountPercent || 0) > 0),
+        [items]
+    );
 
     const updateGlobalDiscount = (value: number) => {
         const safe = Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -539,6 +573,7 @@ export default function QuotationFormPage() {
 
     const globalDiscountLimit = useMemo(() => {
         const limits = items
+            .filter((it) => it.lineType === QuotationItemLineType.ITEM)
             .map((it) => resolveDiscountLimit(it)?.maxDiscountPercent)
             .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
         if (limits.length === 0) return null;
@@ -547,6 +582,7 @@ export default function QuotationFormPage() {
 
     const totalsPreview = useMemo(() => {
         const summary = items.reduce((acc, it) => {
+            if (it.lineType === QuotationItemLineType.NOTE) return acc;
             const qty = Number(it.quantity || 0);
             const listUnit = Number(it.unitPrice || 0);
             const listSubtotal = listUnit * qty;
@@ -659,8 +695,28 @@ export default function QuotationFormPage() {
             return;
         }
 
+        if (!items.some((row) => row.lineType === QuotationItemLineType.ITEM)) {
+            toast({
+                title: 'Dato requerido',
+                description: 'Agrega al menos un ítem cobrable además de las notas.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
         for (let i = 0; i < items.length; i += 1) {
             const row = items[i];
+            if (row.lineType === QuotationItemLineType.NOTE) {
+                if (!(row.noteText || '').trim()) {
+                    toast({
+                        title: 'Dato requerido',
+                        description: `Línea ${i + 1}: escribe el texto de la nota.`,
+                        variant: 'destructive',
+                    });
+                    return;
+                }
+                continue;
+            }
             if (row.isCatalogItem && !row.productId) {
                 toast({
                     title: 'Dato requerido',
@@ -697,25 +753,43 @@ export default function QuotationFormPage() {
                     manualTermsText,
                 }),
                 globalDiscountPercent: Number(globalDiscountPercent || 0),
-                items: items.map((it) => it.isCatalogItem ? ({
-                    isCatalogItem: true as const,
-                    productId: it.productId!,
-                    variantId: it.variantId || undefined,
-                    quantity: Number(it.quantity),
-                    approvedQuantity: Number(it.approvedQuantity),
-                    unitPrice: Number(it.unitPrice),
-                    discountPercent: Number(it.discountPercent),
-                    taxRate: Number(it.taxRate),
-                }) : ({
-                    isCatalogItem: false as const,
-                    customDescription: it.customDescription || 'Ítem libre',
-                    customSku: it.customSku || undefined,
-                    quantity: Number(it.quantity),
-                    approvedQuantity: Number(it.approvedQuantity),
-                    unitPrice: Number(it.unitPrice),
-                    discountPercent: Number(it.discountPercent),
-                    taxRate: Number(it.taxRate),
-                })),
+                items: items.map((it) => {
+                    if (it.lineType === QuotationItemLineType.NOTE) {
+                        return {
+                            lineType: 'note' as const,
+                            noteText: it.noteText?.trim() || '',
+                            quantity: 0,
+                            approvedQuantity: 0,
+                            unitPrice: 0,
+                            discountPercent: 0,
+                            taxRate: 0,
+                        };
+                    }
+                    if (it.isCatalogItem) {
+                        return {
+                            lineType: 'item' as const,
+                            isCatalogItem: true as const,
+                            productId: it.productId!,
+                            variantId: it.variantId || undefined,
+                            quantity: Number(it.quantity),
+                            approvedQuantity: Number(it.approvedQuantity),
+                            unitPrice: Number(it.unitPrice),
+                            discountPercent: Number(it.discountPercent),
+                            taxRate: Number(it.taxRate),
+                        };
+                    }
+                    return {
+                        lineType: 'item' as const,
+                        isCatalogItem: false as const,
+                        customDescription: it.customDescription || 'Ítem libre',
+                        customSku: it.customSku || undefined,
+                        quantity: Number(it.quantity),
+                        approvedQuantity: Number(it.approvedQuantity),
+                        unitPrice: Number(it.unitPrice),
+                        discountPercent: Number(it.discountPercent),
+                        taxRate: Number(it.taxRate),
+                    };
+                }),
             };
 
             const row = isEditMode && id
@@ -1164,14 +1238,48 @@ export default function QuotationFormPage() {
                                 <Package className="h-5 w-5 text-indigo-600" />
                                 <h2 className="text-lg font-semibold text-slate-800">Ítems Cotizados</h2>
                             </div>
-                            <Button type="button" onClick={addItem} variant="outline" size="sm" className="h-8">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Agregar Ítem
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button type="button" onClick={addNoteLine} variant="outline" size="sm" className="h-8">
+                                    <StickyNote className="mr-2 h-4 w-4" />
+                                    Agregar Nota
+                                </Button>
+                                <Button type="button" onClick={addItem} variant="outline" size="sm" className="h-8">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Agregar Ítem
+                                </Button>
+                            </div>
                         </div>
 
                         <div className="flex flex-col">
                             {items.map((it, idx) => {
+                                if (it.lineType === QuotationItemLineType.NOTE) {
+                                    return (
+                                        <div key={idx} className="bg-amber-50/40 border-b border-slate-100 last:border-0 p-5 relative">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <div className="flex items-center gap-2">
+                                                    <StickyNote className="h-4 w-4 text-amber-600" />
+                                                    <p className="text-xs font-bold text-amber-700 uppercase">Nota {idx + 1}</p>
+                                                </div>
+                                                <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="h-6 text-xs text-red-600 hover:text-red-700 hover:bg-red-50">Eliminar</Button>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Texto libre *</Label>
+                                                <Textarea
+                                                    value={it.noteText || ''}
+                                                    onChange={(e) => patchItem(idx, { noteText: e.target.value })}
+                                                    placeholder="Ej: Incluye instalación, capacitación inicial y empaque personalizado."
+                                                    rows={3}
+                                                    className={`border-slate-300 resize-y bg-white ${showValidation && !(it.noteText || '').trim() ? 'border-red-500' : ''}`}
+                                                />
+                                                <p className="text-[11px] text-slate-500">
+                                                    Esta línea se verá en el PDF como nota de detalle y no afecta cantidades, precios ni impuestos.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    );
+                                }
+
                                 const variants = products.find((p) => p.id === it.productId)?.variants || [];
                                 const effectiveDiscount = globalDiscountPercent > 0 ? Number(globalDiscountPercent || 0) : Number(it.discountPercent || 0);
                                 const unitListPrice = Number(it.unitPrice || 0);
@@ -1205,7 +1313,14 @@ export default function QuotationFormPage() {
                                                 <select
                                                     className="w-full h-10 border border-slate-300 rounded-md px-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                                     value={it.isCatalogItem ? 'catalog' : 'custom'}
-                                                    onChange={(e) => patchItem(idx, { isCatalogItem: e.target.value === 'catalog', productId: undefined, customDescription: '' })}
+                                                    onChange={(e) => patchItem(idx, {
+                                                        isCatalogItem: e.target.value === 'catalog',
+                                                        productId: undefined,
+                                                        variantId: undefined,
+                                                        productSearch: '',
+                                                        customDescription: '',
+                                                        customSku: '',
+                                                    })}
                                                 >
                                                     <option value="catalog">Catálogo</option>
                                                     <option value="custom">Libre</option>

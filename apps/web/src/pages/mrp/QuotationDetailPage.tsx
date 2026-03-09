@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { mrpApi } from '@/services/mrpApi';
-import { ControlledDocument, DocumentCategory, DocumentStatus, Quotation, QuotationStatus } from '@scaffold/types';
-import { FileDown, Pencil, RefreshCcw, Settings, ArrowLeft, Package, User, Calculator, CheckCircle2 } from 'lucide-react';
+import { ControlledDocument, DocumentCategory, DocumentStatus, Quotation, QuotationItemLineType, QuotationStatus } from '@scaffold/types';
+import { FileDown, Pencil, RefreshCcw, Settings, ArrowLeft, Package, User, Calculator, CheckCircle2, StickyNote } from 'lucide-react';
 import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
 import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/hooks/mrp/useOperationalConfig';
 import { formatCurrency } from '@/lib/utils';
@@ -68,6 +68,7 @@ export default function QuotationDetailPage() {
             setRow(data);
             const nextApprovals: Record<string, number> = {};
             (data.items || []).forEach((item: any) => {
+                if (item.lineType === QuotationItemLineType.NOTE) return;
                 nextApprovals[item.id] = Number(item.approvedQuantity ?? 0);
             });
             setApprovals(nextApprovals);
@@ -111,7 +112,9 @@ export default function QuotationDetailPage() {
     const savePartialApproval = async () => {
         if (!id || !row) return;
         try {
-            const payloadItems = (row.items || []).map((item: any) => {
+            const payloadItems = (row.items || [])
+                .filter((item: any) => item.lineType !== QuotationItemLineType.NOTE)
+                .map((item: any) => {
                 const maxQty = Number(item.quantity || 0);
                 const requested = Number(approvals[item.id] ?? item.approvedQuantity ?? 0);
                 const approvedQuantity = Math.max(0, Math.min(maxQty, requested));
@@ -181,7 +184,9 @@ export default function QuotationDetailPage() {
         return <div className="p-6 text-sm text-slate-500">Cargando...</div>;
     }
 
-    const itemCostRows = (row.items || []).map((item: any) => {
+    const itemCostRows = (row.items || [])
+        .filter((item: any) => item.lineType !== QuotationItemLineType.NOTE)
+        .map((item: any) => {
         const quantity = Number(item.quantity || 0);
         const variant = item.variant;
         let laborUnitCost = Number(variant?.laborCost || 0);
@@ -297,6 +302,21 @@ export default function QuotationDetailPage() {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
                                     {(row.items || []).map((it: any) => {
+                                        if (it.lineType === QuotationItemLineType.NOTE) {
+                                            return (
+                                                <tr key={it.id} className="bg-amber-50/50">
+                                                    <td className="px-6 py-4" colSpan={7}>
+                                                        <div className="flex items-start gap-3 text-slate-700">
+                                                            <StickyNote className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                                            <div>
+                                                                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Nota de cotización</p>
+                                                                <p className="mt-1 whitespace-pre-line text-sm">{it.noteText || it.customDescription || 'Sin texto'}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
                                         const subtotal = Number(it.quantity || 0) * Number(it.unitPrice || 0);
                                         const discountVal = subtotal * (Number(it.discountPercent || 0) / 100);
                                         const netItem = subtotal - discountVal;

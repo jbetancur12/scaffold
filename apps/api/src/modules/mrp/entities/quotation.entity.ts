@@ -46,6 +46,9 @@ export class Quotation extends BaseEntity {
     @ManyToOne(() => SalesOrder, { nullable: true })
     convertedSalesOrder?: SalesOrder;
 
-    @OneToMany(() => QuotationItem, item => item.quotation, { cascade: [Cascade.ALL] })
+    @OneToMany(() => QuotationItem, item => item.quotation, {
+        cascade: [Cascade.ALL],
+        orderBy: { sortOrder: 'ASC', createdAt: 'ASC' },
+    })
     items = new Collection<QuotationItem>(this);
 }

@@ -5,16 +5,18 @@ import { QuotationItem } from '../entities/quotation-item.entity';
 import { Customer } from '../entities/customer.entity';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
-import { ProductTaxStatus, QuotationStatus, SalesOrderStatus } from '@scaffold/types';
+import { ProductTaxStatus, QuotationItemLineType, QuotationStatus, SalesOrderStatus } from '@scaffold/types';
 import { SalesOrderService } from './sales-order.service';
 import { OperationalConfig } from '../entities/operational-config.entity';
 
 type QuotationInputItem = {
+    lineType?: QuotationItemLineType | 'item' | 'note';
     isCatalogItem?: boolean;
     productId?: string;
     variantId?: string;
     customDescription?: string;
     customSku?: string;
+    noteText?: string;
     quantity: number;
     approvedQuantity?: number;
     unitPrice: number;
@@ -62,6 +64,14 @@ export class QuotationService {
 
     private minMargin(targetMargin: number) {
         return Math.max(0, targetMargin - 0.1);
+    }
+
+    private isNoteLine(item: Pick<QuotationItem, 'lineType'> | Pick<QuotationInputItem, 'lineType'>) {
+        return String(item.lineType || '') === 'note';
+    }
+
+    private getPricedItems(items: QuotationItem[]) {
+        return items.filter((item) => !this.isNoteLine(item));
     }
 
     private resolveCatalogTax(variant?: ProductVariant, fallbackRate?: number) {
@@ -115,6 +125,35 @@ export class QuotationService {
         index: number,
         globalDiscountPercent: number
     ) {
+        if (row.lineType === QuotationItemLineType.NOTE) {
+            const noteText = (row.noteText || '').trim();
+            if (!noteText) {
+                throw new AppError(`Línea ${index + 1}: texto de nota requerido`, 400);
+            }
+            const item = new QuotationItem();
+            item.quotation = quotation;
+            item.lineType = QuotationItemLineType.NOTE;
+            item.isCatalogItem = false;
+            item.noteText = noteText;
+            item.customDescription = 'Nota';
+            item.customSku = undefined;
+            item.sortOrder = index;
+            item.quantity = 0;
+            item.approvedQuantity = 0;
+            item.convertedQuantity = 0;
+            item.unitPrice = 0;
+            item.baseUnitCost = 0;
+            item.targetMargin = 0;
+            item.minAllowedMargin = 0;
+            item.discountPercent = 0;
+            item.taxRate = 0;
+            item.taxAmount = 0;
+            item.subtotal = 0;
+            item.netSubtotal = 0;
+            item.approved = false;
+            return item;
+        }
+
         const isCatalogItem = row.isCatalogItem !== false;
         let product: Product | undefined;
         let variant: ProductVariant | undefined;
@@ -173,11 +212,14 @@ export class QuotationService {
 
         const item = new QuotationItem();
         item.quotation = quotation;
+        item.lineType = QuotationItemLineType.ITEM;
         item.isCatalogItem = isCatalogItem;
         item.product = product;
         item.variant = variant;
         item.customDescription = row.customDescription;
         item.customSku = row.customSku;
+        item.noteText = undefined;
+        item.sortOrder = index;
         item.quantity = quantity;
         item.approvedQuantity = approvedQuantity;
         item.convertedQuantity = 0;
@@ -199,7 +241,7 @@ export class QuotationService {
         let taxTotal = 0;
         let grossTotal = 0;
         let discountTotal = 0;
-        for (const item of quotation.items.getItems()) {
+        for (const item of this.getPricedItems(quotation.items.getItems())) {
             subtotalBase += Number(item.subtotal || 0);
             taxTotal += Number(item.taxAmount || 0);
             grossTotal += Number(item.netSubtotal || 0);
@@ -220,7 +262,8 @@ export class QuotationService {
     }
 
     private quoteStatusFromItems(quotation: Quotation) {
-        const items = quotation.items.getItems();
+        const items = this.getPricedItems(quotation.items.getItems());
+        if (items.length === 0) return QuotationStatus.DRAFT;
         const approvedCount = items.filter((i) => i.approved && Number(i.approvedQuantity) > 0).length;
         if (approvedCount === 0) return QuotationStatus.REJECTED;
         if (approvedCount === items.length && items.every((i) => Number(i.approvedQuantity) >= Number(i.quantity))) {
@@ -337,7 +380,7 @@ export class QuotationService {
                 current.amount += amount;
             breakdownMap.set(row.status, current);
 
-            for (const item of row.items.getItems()) {
+            for (const item of this.getPricedItems(row.items.getItems())) {
                 const quantity = Number(item.quantity || 0);
                 const composition = this.resolveVariantCostComposition(
                     item.variant,
@@ -452,7 +495,7 @@ export class QuotationService {
 
         for (const row of rows) {
             const seenKeys = new Set<string>();
-            for (const item of row.items.getItems()) {
+            for (const item of this.getPricedItems(row.items.getItems())) {
                 const key = item.product?.id || item.customSku || item.customDescription || item.id;
                 const label = item.product?.name || item.customDescription || item.customSku || 'Ítem libre';
                 const current = grouped.get(key) || {
@@ -525,8 +568,13 @@ export class QuotationService {
             quotation.globalDiscountPercent = Number(payload.globalDiscountPercent || 0);
             quotation.status = QuotationStatus.DRAFT;
 
+            const pricedItems = payload.items.filter((item) => item.lineType !== QuotationItemLineType.NOTE);
+            if (pricedItems.length === 0) {
+                throw new AppError('La cotización debe tener al menos un ítem cobrable', 400);
+            }
+
             if (quotation.globalDiscountPercent > 0) {
-                const hasPerItemDiscount = payload.items.some((it) => Number(it.discountPercent || 0) > 0);
+                const hasPerItemDiscount = pricedItems.some((it) => Number(it.discountPercent || 0) > 0);
                 if (hasPerItemDiscount) {
                     throw new AppError('No puedes aplicar descuento global y descuento por ítem al mismo tiempo', 400);
                 }
@@ -558,8 +606,13 @@ export class QuotationService {
             quotation.notes = payload.notes;
             quotation.globalDiscountPercent = Number(payload.globalDiscountPercent || 0);
 
+            const pricedItems = payload.items.filter((item) => item.lineType !== QuotationItemLineType.NOTE);
+            if (pricedItems.length === 0) {
+                throw new AppError('La cotización debe tener al menos un ítem cobrable', 400);
+            }
+
             if (quotation.globalDiscountPercent > 0) {
-                const hasPerItemDiscount = payload.items.some((it) => Number(it.discountPercent || 0) > 0);
+                const hasPerItemDiscount = pricedItems.some((it) => Number(it.discountPercent || 0) > 0);
                 if (hasPerItemDiscount) {
                     throw new AppError('No puedes aplicar descuento global y descuento por ítem al mismo tiempo', 400);
                 }
@@ -595,6 +648,7 @@ export class QuotationService {
             if (payload.items?.length) {
                 const map = new Map(payload.items.map((r) => [r.quotationItemId, r]));
                 for (const item of quotation.items.getItems()) {
+                    if (this.isNoteLine(item)) continue;
                     const patch = map.get(item.id);
                     if (!patch) continue;
                     if (patch.approved !== undefined) item.approved = patch.approved;
@@ -610,6 +664,7 @@ export class QuotationService {
                 }
             } else {
                 for (const item of quotation.items.getItems()) {
+                    if (this.isNoteLine(item)) continue;
                     item.approved = true;
                     item.approvedQuantity = Number(item.quantity);
                 }
@@ -630,6 +685,7 @@ export class QuotationService {
 
             const selectedIds = new Set(payload?.quotationItemIds || []);
             const selected = quotation.items.getItems().filter((item) => {
+                if (this.isNoteLine(item)) return false;
                 const idSelected = selectedIds.size === 0 || selectedIds.has(item.id);
                 const pendingQty = Number(item.approvedQuantity || 0) - Number(item.convertedQuantity || 0);
                 return idSelected && item.approved && pendingQty > 0;
@@ -666,6 +722,7 @@ export class QuotationService {
             }
 
             const pendingAfter = quotation.items.getItems().some((item) => {
+                if (this.isNoteLine(item)) return false;
                 const pendingQty = Number(item.approvedQuantity || 0) - Number(item.convertedQuantity || 0);
                 return item.approved && pendingQty > 0;
             });

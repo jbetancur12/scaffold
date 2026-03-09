@@ -60,6 +60,11 @@ export enum QuotationStatus {
     CONVERTED = 'converted',
 }
 
+export enum QuotationItemLineType {
+    ITEM = 'item',
+    NOTE = 'note',
+}
+
 export enum ProductTaxStatus {
     EXCLUIDO = 'excluido',
     EXENTO = 'exento',
@@ -541,11 +546,14 @@ export interface SalesOrder {
 export interface QuotationItem {
     id: string;
     quotationId: string;
+    lineType: QuotationItemLineType;
     isCatalogItem: boolean;
     productId?: string;
     variantId?: string;
     customDescription?: string;
     customSku?: string;
+    noteText?: string;
+    sortOrder?: number;
     quantity: number;
     approvedQuantity: number;
     unitPrice: number;
@@ -2198,11 +2206,13 @@ export interface CreateSalesOrderPayload {
 }
 
 export interface CreateQuotationItemPayload {
+    lineType?: QuotationItemLineType;
     isCatalogItem?: boolean;
     productId?: string;
     variantId?: string;
     customDescription?: string;
     customSku?: string;
+    noteText?: string;
     quantity: number;
     approvedQuantity?: number;
     unitPrice: number;

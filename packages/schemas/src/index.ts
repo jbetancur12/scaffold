@@ -1329,6 +1329,7 @@ export const UpdateSalesOrderStatusSchema = z.object({
 });
 
 const QuotationCatalogItemSchema = z.object({
+    lineType: z.literal('item').optional(),
     isCatalogItem: z.literal(true).optional(),
     productId: z.string().uuid(),
     variantId: z.string().uuid().optional(),
@@ -1341,6 +1342,7 @@ const QuotationCatalogItemSchema = z.object({
 });
 
 const QuotationCustomItemSchema = z.object({
+    lineType: z.literal('item').optional(),
     isCatalogItem: z.literal(false),
     customDescription: z.string().min(2),
     customSku: z.string().optional(),
@@ -1352,12 +1354,23 @@ const QuotationCustomItemSchema = z.object({
     approved: z.boolean().optional(),
 });
 
+const QuotationNoteItemSchema = z.object({
+    lineType: z.literal('note'),
+    noteText: z.string().min(1),
+    quantity: z.number().min(0).default(0),
+    approvedQuantity: z.number().min(0).optional(),
+    unitPrice: z.number().min(0).default(0),
+    discountPercent: z.number().min(0).max(100).optional(),
+    taxRate: z.number().min(0).max(100).optional(),
+    approved: z.boolean().optional(),
+});
+
 export const CreateQuotationSchema = z.object({
     customerId: z.string().uuid(),
     validUntil: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
     notes: z.string().optional(),
     globalDiscountPercent: z.number().min(0).max(100).optional(),
-    items: z.array(z.union([QuotationCatalogItemSchema, QuotationCustomItemSchema])).min(1),
+    items: z.array(z.union([QuotationCatalogItemSchema, QuotationCustomItemSchema, QuotationNoteItemSchema])).min(1),
 });
 
 export const UpdateQuotationSchema = CreateQuotationSchema;

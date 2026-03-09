@@ -3,7 +3,7 @@ import { AppError } from '../../../shared/utils/response';
 import { QuotationService } from './quotation.service';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DocumentCategory, DocumentStatus, ProductTaxStatus } from '@scaffold/types';
+import { DocumentCategory, DocumentStatus, ProductTaxStatus, QuotationItemLineType } from '@scaffold/types';
 import { ControlledDocument } from '../entities/controlled-document.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
 
@@ -49,19 +49,22 @@ html(lang="es")
       .totals tr:last-child td { border-bottom: none; font-weight: 700; font-size: 13px; color: #0f172a; border-top: 2px solid #e2e8f0; padding-top: 6px; }
       .tax-legend { margin-top: 8px; font-size: 9px; color: #64748b; text-align: right; }
       
-      .notes-card { margin-top: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 16px 20px; break-inside: avoid; page-break-inside: avoid; }
-      .notes-title { margin: 0 0 12px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #334155; }
-      .notes-chip { display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #0f4c81; background: #e8f2fb; border: 1px solid #bfdbfe; border-radius: 999px; padding: 2px 8px; margin-bottom: 12px; }
-      .notes-intro { margin: 0 0 12px 0; font-size: 11px; color: #334155; }
-      .notes-section { padding: 12px 0; border-top: 1px dashed #cbd5e1; margin-top: 0; break-inside: avoid; page-break-inside: avoid; }
-      .notes-section:first-of-type { margin-top: 4px; padding-top: 12px; }
+      .notes-card { margin-top: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; padding: 14px 18px; break-inside: avoid; page-break-inside: avoid; }
+      .notes-title { margin: 0 0 10px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #334155; }
+      .notes-chip { display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #0f4c81; background: #e8f2fb; border: 1px solid #bfdbfe; border-radius: 999px; padding: 2px 8px; margin-bottom: 10px; }
+      .notes-intro { margin: 0 0 10px 0; font-size: 11px; color: #334155; }
+      .notes-section { padding: 9px 0; border-top: 1px dashed #cbd5e1; margin-top: 0; break-inside: avoid; page-break-inside: avoid; }
+      .notes-section:first-of-type { margin-top: 2px; padding-top: 9px; }
       .notes-section:last-of-type { padding-bottom: 0; }
-      .notes-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 6px 0; font-size: 11px; color: #1e293b; font-weight: 700; line-height: 1.4; }
+      .notes-section-title { display: flex; align-items: center; gap: 10px; margin: 0 0 4px 0; font-size: 11px; color: #1e293b; font-weight: 700; line-height: 1.35; }
       .notes-index { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; background: #e2e8f0; color: #475569; font-size: 10px; font-weight: 700; }
-      .notes-paragraph { margin: 0 0 4px 28px; color: #334155; font-size: 11px; line-height: 1.5; }
-      .notes-bullets { margin: 0 0 4px 28px; padding: 0 0 0 16px; color: #334155; font-size: 11px; line-height: 1.5; }
-      .notes-bullets li { margin: 0 0 4px 0; padding-left: 2px; }
+      .notes-paragraph { margin: 0 0 3px 28px; color: #334155; font-size: 11px; line-height: 1.4; }
+      .notes-bullets { margin: 0 0 3px 28px; padding: 0 0 0 16px; color: #334155; font-size: 11px; line-height: 1.4; }
+      .notes-bullets li { margin: 0 0 3px 0; padding-left: 2px; }
       .notes-bullets li::marker { color: #64748b; font-size: 10px; }
+      .detail-notes { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #cbd5e1; }
+      .detail-note-list { margin: 0; padding: 0; list-style: none; }
+      .detail-note-list li { margin: 0 0 4px 0; color: #334155; font-size: 11px; line-height: 1.45; white-space: pre-wrap; }
   body
     h1 Cotización #{quotation.code}
     .muted Fecha: #{quotationDate} | Vigencia: #{validUntil}
@@ -130,6 +133,18 @@ html(lang="es")
                     li= bullet
         else
           div(style="white-space: pre-wrap; font-size: 11px; color: #334155; margin-top: 4px; line-height: 1.4;")= quotation.notes
+        if detailNotes.length > 0
+          .detail-notes
+            h2.notes-title(style="margin-bottom: 6px;") Notas de detalle
+            ul.detail-note-list
+              each detailNote in detailNotes
+                li= '- ' + detailNote
+    else if detailNotes.length > 0
+      .notes-card
+        h2.notes-title Notas de detalle
+        ul.detail-note-list
+          each detailNote in detailNotes
+            li= '- ' + detailNote
 `;
 
 export class QuotationPdfService {
@@ -450,30 +465,39 @@ export class QuotationPdfService {
         const logoDataUrl = this.getLogoDataUrl();
         const { docCode, docTitle, docVersion, docDate, processLabel } = await this.resolveDocMeta(quotation.quotationDate, docOptions);
 
-        const items = quotation.items.getItems().map((item) => ({
-            label: item.isCatalogItem
-                ? `${item.product?.name || 'Producto'}${item.variant ? ` - ${item.variant.name}` : ''}`
-                : item.customDescription || 'Ítem libre',
-            meta: (() => {
-                const discountPercent = Number(item.discountPercent || 0);
-                const finalUnitPrice = Number(item.unitPrice || 0);
-                const listUnitPrice = (discountPercent <= 0 || discountPercent >= 100 || finalUnitPrice <= 0)
-                    ? finalUnitPrice
-                    : finalUnitPrice / (1 - (discountPercent / 100));
-                if (discountPercent <= 0) return '';
-                return `Lista: ${this.formatCurrency(listUnitPrice)} | Desc: ${discountPercent.toFixed(2)}%`;
-            })(),
-            quantity: Number(item.quantity || 0),
-            netUnitPrice: this.formatCurrency(Number(item.unitPrice || 0)),
-            taxRate: this.formatCompactTaxLabel({
-                isCatalogItem: item.isCatalogItem,
-                taxRate: Number(item.taxRate || 0),
-                variantTaxStatus: item.variant?.taxStatus,
-            }),
-            netSubtotal: this.formatCurrency(Number(item.netSubtotal || 0)),
-        }));
+        const detailNotes = quotation.items.getItems()
+            .filter((item) => item.lineType === QuotationItemLineType.NOTE)
+            .map((item) => item.noteText || item.customDescription || '')
+            .filter((note) => note.trim().length > 0);
+
+        const items = quotation.items.getItems()
+            .filter((item) => item.lineType !== QuotationItemLineType.NOTE)
+            .map((item) => ({
+                lineType: QuotationItemLineType.ITEM,
+                label: item.isCatalogItem
+                    ? `${item.product?.name || 'Producto'}${item.variant ? ` - ${item.variant.name}` : ''}`
+                    : item.customDescription || 'Ítem libre',
+                meta: (() => {
+                    const discountPercent = Number(item.discountPercent || 0);
+                    const finalUnitPrice = Number(item.unitPrice || 0);
+                    const listUnitPrice = (discountPercent <= 0 || discountPercent >= 100 || finalUnitPrice <= 0)
+                        ? finalUnitPrice
+                        : finalUnitPrice / (1 - (discountPercent / 100));
+                    if (discountPercent <= 0) return '';
+                    return `Lista: ${this.formatCurrency(listUnitPrice)} | Desc: ${discountPercent.toFixed(2)}%`;
+                })(),
+                quantity: Number(item.quantity || 0),
+                netUnitPrice: this.formatCurrency(Number(item.unitPrice || 0)),
+                taxRate: this.formatCompactTaxLabel({
+                    isCatalogItem: item.isCatalogItem,
+                    taxRate: Number(item.taxRate || 0),
+                    variantTaxStatus: item.variant?.taxStatus,
+                }),
+                netSubtotal: this.formatCurrency(Number(item.netSubtotal || 0)),
+            }));
 
         const listSubtotal = quotation.items.getItems().reduce((acc, item) => {
+            if (item.lineType === QuotationItemLineType.NOTE) return acc;
             const discountPercent = Number(item.discountPercent || 0);
             const finalUnitPrice = Number(item.unitPrice || 0);
             const qty = Number(item.quantity || 0);
@@ -490,6 +514,7 @@ export class QuotationPdfService {
             quotationDate: this.formatDate(quotation.quotationDate),
             validUntil: this.formatDate(quotation.validUntil),
             items,
+            detailNotes,
             taxLegend: 'G: Gravado | EXE: Exento | EXC: Excluido',
             quotationNotes: this.parseQuotationNotes(quotation.notes),
             totals: {
