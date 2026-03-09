@@ -418,12 +418,14 @@ export default function QuotationFormPage() {
                 if (isEditMode && id) {
                     const q = await mrpApi.getQuotation(id);
                     const currentNotes = q.notes || '';
+                    const freeNotes = splitCustomNotes(currentNotes);
+                    const termsBlock = extractCommercialTermsBlock(currentNotes);
                     setCustomerId((q as any).customerId || (q as any).customer?.id || '');
                     setValidUntil(q.validUntil ? new Date(q.validUntil as string).toISOString().slice(0, 10) : '');
-                    setNotes(splitCustomNotes(currentNotes));
-                    const termsBlock = extractCommercialTermsBlock(currentNotes);
+                    setNotes(freeNotes);
                     setManualTermsEnabled(false);
                     setManualTermsText('');
+                    setCommercialTermsExpanded(Boolean(termsBlock));
                     if (termsBlock) {
                         setManualTermsEnabled(true);
                         setManualTermsText(termsBlock);
@@ -991,6 +993,11 @@ export default function QuotationFormPage() {
                                 rows={2}
                                 className="border-slate-300 resize-none"
                             />
+                            {manualTermsEnabled && (
+                                <p className="mt-1 text-[11px] text-slate-500">
+                                    El texto visible para el cliente se edita en <span className="font-semibold">Términos Comerciales</span>.
+                                </p>
+                            )}
                         </div>
 
                         <div className="rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-cyan-50 p-4 space-y-4">
