@@ -208,22 +208,60 @@ const ensureCommercialTermsHeading = (raw: string, companyName: string) => {
     return `${COMMERCIAL_TERMS_HEADING_PREFIX}${companyName}\n\n${trimmed}`;
 };
 
-const splitCustomNotes = (raw?: string) => {
+const splitLegacyQuotationNotes = (raw?: string) => {
     const content = (raw || '').trim();
-    if (!content) return '';
-    const sectionStart = content.indexOf(COMMERCIAL_TERMS_HEADING_PREFIX);
-    if (sectionStart < 0) return looksLikeCommercialTerms(content) ? '' : content;
-    return content.slice(0, sectionStart).trim();
+    if (!content) {
+        return {
+            customNotes: '',
+            commercialSegments: [] as string[],
+        };
+    }
+
+    const lines = content.split(/\r?\n/);
+    const segments: string[] = [];
+    let buffer: string[] = [];
+
+    const flush = () => {
+        const chunk = buffer.join('\n').trim();
+        if (chunk) segments.push(chunk);
+        buffer = [];
+    };
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        const startsCommercialBlock =
+            trimmed.toUpperCase().startsWith(COMMERCIAL_TERMS_HEADING_PREFIX) ||
+            /^1\.\s*(VIGENCIA|PAGO|PRODUCCION|GARANT|CAMBIOS|GENERAL)/i.test(trimmed);
+
+        if (startsCommercialBlock && buffer.length > 0) {
+            flush();
+        }
+
+        buffer.push(line);
+    }
+
+    flush();
+
+    const commercialSegments = segments.filter((segment) => looksLikeCommercialTerms(segment));
+    const customNotes = segments
+        .filter((segment) => !looksLikeCommercialTerms(segment))
+        .join('\n\n')
+        .trim();
+
+    return {
+        customNotes,
+        commercialSegments,
+    };
+};
+
+const splitCustomNotes = (raw?: string) => {
+    return splitLegacyQuotationNotes(raw).customNotes;
 };
 
 const extractCommercialTermsBlock = (raw?: string) => {
-    const content = (raw || '').trim();
-    if (!content) return '';
-    const sectionStart = content.indexOf(COMMERCIAL_TERMS_HEADING_PREFIX);
-    if (sectionStart < 0) {
-        return looksLikeCommercialTerms(content) ? ensureCommercialTermsHeading(content, defaultCommercialTerms.companyName) : '';
-    }
-    return content.slice(sectionStart).trim();
+    const { commercialSegments } = splitLegacyQuotationNotes(raw);
+    if (commercialSegments.length === 0) return '';
+    return ensureCommercialTermsHeading(commercialSegments[commercialSegments.length - 1], defaultCommercialTerms.companyName);
 };
 
 const buildCommercialTermsText = (terms: CommercialTermsForm) => {
