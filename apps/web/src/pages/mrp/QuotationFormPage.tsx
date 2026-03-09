@@ -199,15 +199,6 @@ const looksLikeCommercialTerms = (raw?: string) => {
     return numberedSections >= 2 || commercialMarkers >= 2;
 };
 
-const ensureCommercialTermsHeading = (raw: string, companyName: string) => {
-    const trimmed = raw.trim();
-    if (!trimmed) return '';
-    if (trimmed.toUpperCase().startsWith(COMMERCIAL_TERMS_HEADING_PREFIX)) {
-        return trimmed;
-    }
-    return `${COMMERCIAL_TERMS_HEADING_PREFIX}${companyName}\n\n${trimmed}`;
-};
-
 const splitLegacyQuotationNotes = (raw?: string) => {
     const content = (raw || '').trim();
     if (!content) {
@@ -261,7 +252,7 @@ const splitCustomNotes = (raw?: string) => {
 const extractCommercialTermsBlock = (raw?: string) => {
     const { commercialSegments } = splitLegacyQuotationNotes(raw);
     if (commercialSegments.length === 0) return '';
-    return ensureCommercialTermsHeading(commercialSegments[commercialSegments.length - 1], defaultCommercialTerms.companyName);
+    return commercialSegments[commercialSegments.length - 1].trim();
 };
 
 const buildCommercialTermsText = (terms: CommercialTermsForm) => {
@@ -339,7 +330,7 @@ const composeQuotationNotes = (
     const notesText = freeNotes.trim();
     const manualTermsText = (options?.manualTermsText || '').trim();
     const termsText = options?.manualTermsEnabled && manualTermsText
-        ? ensureCommercialTermsHeading(manualTermsText, terms.companyName)
+        ? manualTermsText
         : buildCommercialTermsText(terms);
     if (notesText && termsText) return `${notesText}\n\n${termsText}`;
     return notesText || termsText || '';
@@ -401,7 +392,7 @@ export default function QuotationFormPage() {
         setCommercialTerms(selectedTemplate);
         if (selectedTemplate.manualText?.trim()) {
             setManualTermsEnabled(true);
-            setManualTermsText(ensureCommercialTermsHeading(selectedTemplate.manualText.trim(), selectedTemplate.companyName));
+            setManualTermsText(selectedTemplate.manualText.trim());
         } else {
             setManualTermsEnabled(false);
             setManualTermsText('');
