@@ -7,6 +7,7 @@ import DashboardPage from '@/pages/dashboard/DashboardPage';
 import UsersPage from '@/pages/dashboard/UsersPage';
 import ProductListPage from '@/pages/mrp/ProductListPage';
 import ProductGroupListPage from '@/pages/mrp/ProductGroupListPage';
+import PriceListPage from '@/pages/mrp/PriceListPage';
 import ProductFormPage from '@/pages/mrp/ProductFormPage';
 import ProductDetailPage from '@/pages/mrp/ProductDetailPage';
 import ProductBOMPage from '@/pages/mrp/ProductBOMPage';
@@ -137,6 +138,7 @@ export default function App() {
 
                         {/* MRP Routes */}
                         <Route path="/mrp/products" element={<ProductListPage />} />
+                        <Route path="/mrp/price-list" element={<PriceListPage />} />
                         <Route path="/mrp/product-groups" element={<ProductGroupListPage />} />
                         <Route path="/mrp/products/new" element={<ProductFormPage />} />
                         <Route path="/mrp/products/:id/bom" element={<ProductBOMPage />} />

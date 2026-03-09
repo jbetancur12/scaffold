@@ -229,6 +229,14 @@ export default function ProductListPage() {
                             <Upload className="mr-2 h-4 w-4" />
                             {previewingImport ? 'Validando...' : 'Importar CSV'}
                         </Button>
+                        <Button
+                            onClick={() => navigate('/mrp/price-list')}
+                            variant="ghost"
+                            className="h-10 px-4 text-emerald-700 hover:text-emerald-900 hover:bg-emerald-50 w-full sm:w-auto"
+                        >
+                            <Package className="mr-2 h-4 w-4" />
+                            Lista de Precios
+                        </Button>
                     </div>
                     <input
                         ref={fileInputRef}
