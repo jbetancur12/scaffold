@@ -1449,11 +1449,11 @@ export default function QuotationFormPage() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mt-3 pl-0 md:pl-[58%]">
-                                            <div className="md:col-span-6">
+                                        <div className="flex flex-wrap justify-end gap-x-4 gap-y-2 mt-3">
+                                            <div>
                                                 <div className="flex items-center gap-2">
-                                                    <Label className="text-[11px] font-semibold text-slate-500 w-16 mb-0 block">Desc %</Label>
-                                                    <div className="flex-1 space-y-1">
+                                                    <Label className="text-[11px] font-semibold text-slate-500 shrink-0 mb-0 block">Desc %</Label>
+                                                    <div className="w-24 space-y-1">
                                                         <Input
                                                             type="number"
                                                             min={0}
@@ -1478,16 +1478,16 @@ export default function QuotationFormPage() {
                                                 })()}
                                             </div>
 
-                                            <div className="md:col-span-6">
+                                            <div className="min-w-[200px]">
                                                 <div className="flex items-center gap-2">
-                                                    <Label className="text-[11px] font-semibold text-slate-500 w-12 mb-0 block">IVA %</Label>
-                                                    <div className="flex-1 flex gap-2">
+                                                    <Label className="text-[11px] font-semibold text-slate-500 shrink-0 mb-0 block">IVA %</Label>
+                                                    <div className="flex-1 flex gap-2 min-w-0">
                                                         {it.isCatalogItem ? (
-                                                            <div className="h-8 w-full rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700 flex items-center justify-between">
-                                                                <span>
+                                                            <div className="h-8 flex-1 rounded-md border border-slate-200 bg-slate-50 flex items-center overflow-hidden text-sm">
+                                                                <span className="px-2.5 text-slate-500 truncate">
                                                                     {getTaxStatusLabel(resolveCatalogTax(it.productId, it.variantId).taxStatus)}
                                                                 </span>
-                                                                <span className="font-semibold">
+                                                                <span className="ml-auto shrink-0 bg-slate-200 px-2.5 h-full flex items-center font-semibold text-slate-700">
                                                                     {Number(it.taxRate || 0).toFixed(2)}%
                                                                 </span>
                                                             </div>
@@ -1496,16 +1496,17 @@ export default function QuotationFormPage() {
                                                                 <Input
                                                                     type="number"
                                                                     min={0}
-                                                                    value={it.taxRate || ''}
+                                                                    value={it.taxRate ?? ''}
+                                                                    placeholder="0"
                                                                     onChange={(e) => patchItem(idx, { taxRate: Number(e.target.value) })}
-                                                                    className="h-8 border-slate-300 text-sm py-1"
+                                                                    className="h-8 flex-1 min-w-0 border-slate-300 text-sm py-1"
                                                                 />
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => patchItem(idx, { taxRate: Number(it.taxRate) === 19 ? 0 : 19 })}
                                                                     className={`h-8 px-2 rounded-md border text-xs font-medium shrink-0 transition-colors ${Number(it.taxRate) === 19
-                                                                            ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
-                                                                            : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
+                                                                        ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                                                                        : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'
                                                                         }`}
                                                                 >
                                                                     19%
