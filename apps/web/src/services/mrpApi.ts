@@ -10,6 +10,7 @@ import {
     ProductionBatch,
     ProductionBatchUnit,
     ProductVariant,
+    ProductImage,
     InventoryItem,
     OperationalConfig,
     Warehouse,
@@ -141,6 +142,7 @@ import type {
     ResolveIncomingInspectionPayload,
     CorrectIncomingInspectionCostPayload,
     UploadIncomingInspectionEvidencePayload,
+    UploadProductImagePayload,
     UpsertBatchReleaseChecklistPayload,
     SignBatchReleasePayload,
     ApproveControlledDocumentPayload,
@@ -353,6 +355,17 @@ export const mrpApi = {
     },
     deleteProduct: async (id: string): Promise<void> => {
         await api.delete(`/mrp/products/${id}`);
+    },
+    uploadProductImage: async (productId: string, payload: UploadProductImagePayload): Promise<ProductImage> => {
+        const response = await api.post(`/mrp/products/${productId}/images`, payload);
+        return response.data;
+    },
+    downloadProductImage: async (productId: string, imageId: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/products/${productId}/images/${imageId}`, { responseType: 'blob' });
+        return response.data as Blob;
+    },
+    deleteProductImage: async (productId: string, imageId: string): Promise<void> => {
+        await api.delete(`/mrp/products/${productId}/images/${imageId}`);
     },
     exportProductsCsv: async (): Promise<Blob> => {
         const response = await api.get('/mrp/products/export/csv', { responseType: 'blob' });

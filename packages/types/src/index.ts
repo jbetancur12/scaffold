@@ -735,6 +735,17 @@ export interface ProductGroup {
     updatedAt: string | Date;
 }
 
+export interface ProductImage {
+    id: string;
+    productId: string;
+    fileName: string;
+    fileMime: string;
+    filePath: string;
+    sortOrder: number;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
 export interface Product {
     id: string;
     name: string;
@@ -754,6 +765,7 @@ export interface Product {
     createdAt: string | Date;
     updatedAt: string | Date;
     variants?: ProductVariant[];
+    images?: ProductImage[];
 }
 
 export interface ProductVariant {

@@ -29,6 +29,9 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/products/:id', (req, res, next) => mrpController.getProduct(req, res, next));
     router.put('/products/:id', (req, res, next) => mrpController.updateProduct(req, res, next));
     router.delete('/products/:id', (req, res, next) => mrpController.deleteProduct(req, res, next));
+    router.post('/products/:productId/images', (req, res, next) => mrpController.uploadProductImage(req, res, next));
+    router.get('/products/:productId/images/:imageId', (req, res, next) => mrpController.downloadProductImage(req, res, next));
+    router.delete('/products/:productId/images/:imageId', (req, res, next) => mrpController.deleteProductImage(req, res, next));
 
     // Variants
     router.post('/products/:productId/variants', (req, res, next) => mrpController.createVariant(req, res, next));

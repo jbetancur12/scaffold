@@ -3,6 +3,7 @@ import { BaseEntity } from '../../../shared/entities/base.entity';
 import { ProductVariant } from './product-variant.entity';
 import { InvimaRegistration } from './invima-registration.entity';
 import { ProductGroup } from './product-group.entity';
+import { ProductImage } from './product-image.entity';
 
 @Entity()
 export class Product extends BaseEntity {
@@ -54,4 +55,7 @@ export class Product extends BaseEntity {
 
     @OneToMany(() => ProductVariant, variant => variant.product, { cascade: [Cascade.ALL], orphanRemoval: true })
     variants = new Collection<ProductVariant>(this);
+
+    @OneToMany(() => ProductImage, image => image.product, { cascade: [Cascade.ALL], orphanRemoval: true })
+    images = new Collection<ProductImage>(this);
 }

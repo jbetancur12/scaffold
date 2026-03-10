@@ -27,6 +27,7 @@ import {
     ProductSchema,
     ProductGroupSchema,
     UpdateProductSchema,
+    UploadProductImageSchema,
     UpdateProductGroupSchema,
     ProductionOrderSchema,
     RawMaterialSchema,
@@ -336,6 +337,39 @@ export class MrpController {
             const { id } = req.params;
             await this.productService.deleteProduct(id);
             return ApiResponse.success(res, null, 'Producto eliminado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async uploadProductImage(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productId } = req.params;
+            const payload = UploadProductImageSchema.parse(req.body);
+            const image = await this.productService.uploadProductImage(productId, payload);
+            return ApiResponse.success(res, image, 'Imagen cargada', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadProductImage(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productId, imageId } = req.params;
+            const file = await this.productService.readProductImage(productId, imageId);
+            res.setHeader('Content-Type', file.mimeType);
+            res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
+            return res.send(file.buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteProductImage(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { productId, imageId } = req.params;
+            await this.productService.deleteProductImage(productId, imageId);
+            return ApiResponse.success(res, null, 'Imagen eliminada');
         } catch (error) {
             next(error);
         }

@@ -1,13 +1,15 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
-import { ListProductGroupsQuerySchema, ProductGroupSchema, ProductSchema, UpdateProductGroupSchema, UpdateProductSchema } from '@scaffold/schemas';
+import { ListProductGroupsQuerySchema, ProductGroupSchema, ProductSchema, UpdateProductGroupSchema, UpdateProductSchema, UploadProductImageSchema } from '@scaffold/schemas';
 import { OperationalConfig } from '../entities/operational-config.entity';
 import { InvimaRegistrationStatus, ProductTaxStatus } from '@scaffold/types';
 import { AppError } from '../../../shared/utils/response';
 import { InvimaRegistration } from '../entities/invima-registration.entity';
 import { z } from 'zod';
 import { ProductGroup } from '../entities/product-group.entity';
+import { ObjectStorageService } from '../../../shared/services/object-storage.service';
+import { ProductImage } from '../entities/product-image.entity';
 
 export class ProductService {
     private readonly em: EntityManager;
@@ -15,6 +17,8 @@ export class ProductService {
     private readonly variantRepo: EntityRepository<ProductVariant>;
     private readonly invimaRepo: EntityRepository<InvimaRegistration>;
     private readonly productGroupRepo: EntityRepository<ProductGroup>;
+    private readonly productImageRepo: EntityRepository<ProductImage>;
+    private readonly storageService: ObjectStorageService;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -22,6 +26,18 @@ export class ProductService {
         this.variantRepo = em.getRepository(ProductVariant);
         this.invimaRepo = em.getRepository(InvimaRegistration);
         this.productGroupRepo = em.getRepository(ProductGroup);
+        this.productImageRepo = em.getRepository(ProductImage);
+        this.storageService = new ObjectStorageService();
+    }
+
+    private decodeBase64Data(base64Data: string): Buffer {
+        const normalized = base64Data.includes(',')
+            ? base64Data.split(',').pop() ?? ''
+            : base64Data;
+        if (!normalized) {
+            throw new AppError('Archivo base64 inválido', 400);
+        }
+        return Buffer.from(normalized, 'base64');
     }
 
     private slugifyGroup(value: string) {
@@ -412,7 +428,7 @@ export class ProductService {
             invimaRegistration,
         } as unknown as Product);
         await this.em.persistAndFlush(product);
-        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category'] });
+        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category', 'images'] });
     }
 
     async createProductGroup(data: z.infer<typeof ProductGroupSchema>): Promise<ProductGroup> {
@@ -516,11 +532,15 @@ export class ProductService {
             invimaRegistration,
         });
         await this.em.persistAndFlush(product);
-        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category'] });
+        return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category', 'images'] });
     }
 
     async deleteProduct(id: string): Promise<void> {
-        const product = await this.productRepo.findOneOrFail({ id }, { populate: ['variants', 'variants.bomItems'] });
+        const product = await this.productRepo.findOneOrFail({ id }, { populate: ['variants', 'variants.bomItems', 'images'] });
+        const images = product.images?.getItems() ?? [];
+        for (const image of images) {
+            await this.storageService.deleteObject(image.filePath);
+        }
         await this.em.removeAndFlush(product);
     }
 
@@ -546,7 +566,7 @@ export class ProductService {
     }
 
     async getProduct(id: string): Promise<Product | null> {
-        return this.productRepo.findOne({ id }, { populate: ['variants', 'invimaRegistration', 'category'] });
+        return this.productRepo.findOne({ id }, { populate: ['variants', 'invimaRegistration', 'category', 'images'] });
     }
 
     async listProducts(page = 1, limit = 10, search?: string, categoryId?: string): Promise<{ products: Product[]; total: number }> {
@@ -572,6 +592,58 @@ export class ProductService {
             }
         );
         return { products, total };
+    }
+
+    async uploadProductImage(productId: string, payload: z.infer<typeof UploadProductImageSchema>): Promise<ProductImage> {
+        const product = await this.productRepo.findOneOrFail({ id: productId });
+        const buffer = this.decodeBase64Data(payload.base64Data);
+        const maxBytes = 8 * 1024 * 1024; // 8 MB
+        if (buffer.length === 0 || buffer.length > maxBytes) {
+            throw new AppError('La imagen debe tener entre 1 byte y 8 MB', 400);
+        }
+        if (!payload.mimeType.toLowerCase().startsWith('image/')) {
+            throw new AppError('El archivo debe ser una imagen válida', 400);
+        }
+
+        const folderPrefix = `products/${product.id}`;
+        const persisted = await this.storageService.saveObject({
+            fileName: payload.fileName,
+            mimeType: payload.mimeType,
+            buffer,
+            folderPrefix,
+        });
+
+        const image = this.productImageRepo.create({
+            product,
+            fileName: payload.fileName,
+            fileMime: payload.mimeType,
+            filePath: persisted.storagePath,
+            sortOrder: Number(payload.sortOrder || 0),
+        } as unknown as ProductImage);
+        await this.em.persistAndFlush(image);
+        return image;
+    }
+
+    async readProductImage(productId: string, imageId: string): Promise<{ fileName: string; mimeType: string; buffer: Buffer }> {
+        const image = await this.productImageRepo.findOneOrFail({ id: imageId }, { populate: ['product'] });
+        if (image.product.id !== productId) {
+            throw new AppError('Imagen no encontrada para este producto', 404);
+        }
+        const buffer = await this.storageService.readObject(image.filePath);
+        return {
+            fileName: image.fileName,
+            mimeType: image.fileMime || 'application/octet-stream',
+            buffer,
+        };
+    }
+
+    async deleteProductImage(productId: string, imageId: string): Promise<void> {
+        const image = await this.productImageRepo.findOneOrFail({ id: imageId }, { populate: ['product'] });
+        if (image.product.id !== productId) {
+            throw new AppError('Imagen no encontrada para este producto', 404);
+        }
+        await this.storageService.deleteObject(image.filePath);
+        await this.em.removeAndFlush(image);
     }
 
     async exportProductsCsv(): Promise<{ fileName: string; content: string }> {

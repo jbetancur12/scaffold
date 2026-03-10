@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { generateVariantDisplayName, generateVariantSku, generateVariantSkuFromAttributes } from '@/utils/skuGenerator';
 import { ProductTaxStatus, ProductVariant } from '@scaffold/types';
@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
-import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw, Package, Layers, Clock, ShieldCheck, BoxSelect, AreaChart, DollarSign, Activity, Hash, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw, Package, Layers, Clock, ShieldCheck, BoxSelect, AreaChart, DollarSign, Activity, Hash, ChevronDown, ChevronRight, ImagePlus, Image } from 'lucide-react';
 import { CreateProductVariantSchema, UpdateProductVariantSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
 import {
@@ -30,6 +30,7 @@ import { useOperationalConfigQuery } from '@/hooks/mrp/useOperationalConfig';
 import { useDeleteProductMutation, useDeleteVariantMutation, useProductQuery, useSaveVariantMutation } from '@/hooks/mrp/useProducts';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 import { Badge } from '@/components/ui/badge';
+import { mrpApi } from '@/services/mrpApi';
 
 interface VariantFormData {
     id?: string;
@@ -74,6 +75,10 @@ export default function ProductDetailPage() {
     const [variantNameManuallyEdited, setVariantNameManuallyEdited] = useState(false);
     const [variantSkuManuallyEdited, setVariantSkuManuallyEdited] = useState(false);
     const [variantIdentityOpen, setVariantIdentityOpen] = useState(true);
+    const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+    const [uploadingImage, setUploadingImage] = useState(false);
+    const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
+    const imageUrlRef = useRef<Record<string, string>>({});
 
     const { data: operationalConfig } = useOperationalConfigQuery();
     const { data: product, loading, error, execute: reloadProduct } = useProductQuery(id);
@@ -82,6 +87,37 @@ export default function ProductDetailPage() {
     const { execute: deleteVariant } = useDeleteVariantMutation();
 
     useMrpQueryErrorRedirect(error, 'No se pudo cargar el producto', '/mrp/products');
+
+    useEffect(() => {
+        const previousUrls = Object.values(imageUrlRef.current);
+        previousUrls.forEach((url) => URL.revokeObjectURL(url));
+        imageUrlRef.current = {};
+        setImageUrls({});
+
+        if (!id || !product?.images || product.images.length === 0) {
+            return;
+        }
+
+        let cancelled = false;
+        const loadImages = async () => {
+            for (const image of product.images || []) {
+                try {
+                    const blob = await mrpApi.downloadProductImage(id, image.id);
+                    if (cancelled) return;
+                    const url = URL.createObjectURL(blob);
+                    imageUrlRef.current = { ...imageUrlRef.current, [image.id]: url };
+                    setImageUrls((prev) => ({ ...prev, [image.id]: url }));
+                } catch {
+                    if (cancelled) return;
+                }
+            }
+        };
+        loadImages();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [id, product?.images]);
 
     // Variant SKU generation listener
     useEffect(() => {
@@ -157,6 +193,70 @@ export default function ProductDetailPage() {
         setVariantSkuManuallyEdited(true);
         setVariantIdentityOpen(true);
         setShowVariantDialog(true);
+    };
+
+    const toBase64 = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+            reader.readAsDataURL(file);
+        });
+
+    const handleUploadImage = () => {
+        if (!id) return;
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file) return;
+            try {
+                setUploadingImage(true);
+                const base64Data = await toBase64(file);
+                await mrpApi.uploadProductImage(id, {
+                    fileName: file.name,
+                    mimeType: file.type || 'application/octet-stream',
+                    base64Data,
+                    actor: 'sistema-web',
+                });
+                toast({
+                    title: 'Imagen cargada',
+                    description: 'La imagen del producto se guardó correctamente.',
+                });
+                await reloadProduct();
+            } catch (error) {
+                toast({
+                    title: 'Error',
+                    description: getErrorMessage(error, 'No se pudo cargar la imagen'),
+                    variant: 'destructive',
+                });
+            } finally {
+                setUploadingImage(false);
+            }
+        };
+        input.click();
+    };
+
+    const handleDeleteImage = async (imageId: string) => {
+        if (!id) return;
+        try {
+            setDeletingImageId(imageId);
+            await mrpApi.deleteProductImage(id, imageId);
+            toast({
+                title: 'Imagen eliminada',
+                description: 'La imagen fue eliminada del producto.',
+            });
+            await reloadProduct();
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo eliminar la imagen'),
+                variant: 'destructive',
+            });
+        } finally {
+            setDeletingImageId(null);
+        }
     };
 
     const getTaxStatusLabel = (status?: ProductTaxStatus) => {
@@ -389,74 +489,134 @@ export default function ProductDetailPage() {
 
                 {/* Technical Info Tab */}
                 <TabsContent value="info" className="focus-visible:outline-none focus-visible:ring-0">
-                    <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
-                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
-                                <Package className="h-5 w-5 text-slate-400" />
-                                Información General
-                            </h3>
-                            <Button variant="outline" size="sm" onClick={() => navigate(`/mrp/products/${id}/edit`)} className="h-8">
-                                <Edit2 className="h-3.5 w-3.5 mr-2" />
-                                Editar
-                            </Button>
+                    <div className="space-y-6">
+                        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm">
+                            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                                <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                    <Package className="h-5 w-5 text-slate-400" />
+                                    Información General
+                                </h3>
+                                <Button variant="outline" size="sm" onClick={() => navigate(`/mrp/products/${id}/edit`)} className="h-8">
+                                    <Edit2 className="h-3.5 w-3.5 mr-2" />
+                                    Editar
+                                </Button>
+                            </div>
+
+                            <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
+                                <div className="space-y-1">
+                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nombre del Producto</span>
+                                    <div className="text-slate-900 font-medium">{product.name}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">SKU Multi-Variante</span>
+                                    <div className="text-slate-900 font-medium font-mono bg-slate-50 px-2 py-1 rounded border border-slate-100 w-fit">{product.sku}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Referencia (EAN/UPC)</span>
+                                    <div className="text-slate-900 font-medium">{product.productReference || <span className="text-slate-400 italic">No especificada</span>}</div>
+                                </div>
+
+                                <div className="md:col-span-2 mt-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Dimensiones</span>
+                                        <Badge variant="outline" className="bg-white text-slate-600 border-slate-200">
+                                            Unidad: cm / g
+                                        </Badge>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                            <p className="text-[11px] text-slate-500 uppercase tracking-wide">Largo</p>
+                                            <p className="text-base font-semibold text-slate-900">{product.lengthCm != null ? `${Number(product.lengthCm).toFixed(2)} cm` : '-'}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                            <p className="text-[11px] text-slate-500 uppercase tracking-wide">Ancho</p>
+                                            <p className="text-base font-semibold text-slate-900">{product.widthCm != null ? `${Number(product.widthCm).toFixed(2)} cm` : '-'}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                            <p className="text-[11px] text-slate-500 uppercase tracking-wide">Alto</p>
+                                            <p className="text-base font-semibold text-slate-900">{product.heightCm != null ? `${Number(product.heightCm).toFixed(2)} cm` : '-'}</p>
+                                        </div>
+                                        <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                            <p className="text-[11px] text-slate-500 uppercase tracking-wide">Peso</p>
+                                            <p className="text-base font-semibold text-slate-900">{product.weightKg != null ? `${Math.round(Number(product.weightKg) * 1000)} g` : '-'}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Invima Info Box */}
+                                <div className="md:col-span-2 mt-2 bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-start gap-4">
+                                    <ShieldCheck className={`h-6 w-6 shrink-0 mt-0.5 ${product.requiresInvima ? 'text-blue-500' : 'text-slate-300'}`} />
+                                    <div>
+                                        <div className="font-semibold text-sm text-slate-800 mb-1">Control Regulatorio (INVIMA)</div>
+                                        {product.requiresInvima ? (
+                                            <div className="text-sm text-slate-600">
+                                                Producto sujeto a control sanitario. Registro actual: <span className="font-bold text-blue-700">{product.invimaRegistration?.code || 'No vinculado'}</span>
+                                                {product.invimaRegistration?.holderName ? ` a nombre de ${product.invimaRegistration.holderName}.` : '.'}
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-slate-500 italic">Este producto no requiere registro sanitario INVIMA.</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="grid gap-x-8 gap-y-6 md:grid-cols-2">
-                            <div className="space-y-1">
-                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nombre del Producto</span>
-                                <div className="text-slate-900 font-medium">{product.name}</div>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">SKU Multi-Variante</span>
-                                <div className="text-slate-900 font-medium font-mono bg-slate-50 px-2 py-1 rounded border border-slate-100 w-fit">{product.sku}</div>
-                            </div>
-                            <div className="space-y-1">
-                                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Referencia (EAN/UPC)</span>
-                                <div className="text-slate-900 font-medium">{product.productReference || <span className="text-slate-400 italic">No especificada</span>}</div>
-                            </div>
-
-                            <div className="md:col-span-2 mt-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Dimensiones</span>
-                                    <Badge variant="outline" className="bg-white text-slate-600 border-slate-200">
-                                        Unidad: cm / g
-                                    </Badge>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                        <p className="text-[11px] text-slate-500 uppercase tracking-wide">Largo</p>
-                                        <p className="text-base font-semibold text-slate-900">{product.lengthCm != null ? `${Number(product.lengthCm).toFixed(2)} cm` : '-'}</p>
-                                    </div>
-                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                        <p className="text-[11px] text-slate-500 uppercase tracking-wide">Ancho</p>
-                                        <p className="text-base font-semibold text-slate-900">{product.widthCm != null ? `${Number(product.widthCm).toFixed(2)} cm` : '-'}</p>
-                                    </div>
-                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                        <p className="text-[11px] text-slate-500 uppercase tracking-wide">Alto</p>
-                                        <p className="text-base font-semibold text-slate-900">{product.heightCm != null ? `${Number(product.heightCm).toFixed(2)} cm` : '-'}</p>
-                                    </div>
-                                    <div className="rounded-lg border border-slate-200 bg-white p-3">
-                                        <p className="text-[11px] text-slate-500 uppercase tracking-wide">Peso</p>
-                                        <p className="text-base font-semibold text-slate-900">{product.weightKg != null ? `${Math.round(Number(product.weightKg) * 1000)} g` : '-'}</p>
-                                    </div>
-                                </div>
+                        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm">
+                            <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100">
+                                <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                    <Image className="h-5 w-5 text-slate-400" />
+                                    Imágenes del Producto
+                                </h3>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8"
+                                    disabled={uploadingImage}
+                                    onClick={handleUploadImage}
+                                >
+                                    <ImagePlus className="h-3.5 w-3.5 mr-2" />
+                                    {uploadingImage ? 'Subiendo...' : 'Agregar'}
+                                </Button>
                             </div>
 
-                            {/* Invima Info Box */}
-                            <div className="md:col-span-2 mt-2 bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-start gap-4">
-                                <ShieldCheck className={`h-6 w-6 shrink-0 mt-0.5 ${product.requiresInvima ? 'text-blue-500' : 'text-slate-300'}`} />
-                                <div>
-                                    <div className="font-semibold text-sm text-slate-800 mb-1">Control Regulatorio (INVIMA)</div>
-                                    {product.requiresInvima ? (
-                                        <div className="text-sm text-slate-600">
-                                            Producto sujeto a control sanitario. Registro actual: <span className="font-bold text-blue-700">{product.invimaRegistration?.code || 'No vinculado'}</span>
-                                            {product.invimaRegistration?.holderName ? ` a nombre de ${product.invimaRegistration.holderName}.` : '.'}
-                                        </div>
-                                    ) : (
-                                        <div className="text-sm text-slate-500 italic">Este producto no requiere registro sanitario INVIMA.</div>
-                                    )}
+                            {product.images && product.images.length > 0 ? (
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {product.images
+                                        .slice()
+                                        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
+                                        .map((image) => (
+                                            <div key={image.id} className="group relative rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+                                                {imageUrls[image.id] ? (
+                                                    <img
+                                                        src={imageUrls[image.id]}
+                                                        alt={image.fileName}
+                                                        className="h-40 w-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <div className="h-40 w-full flex items-center justify-center text-slate-400 text-sm">
+                                                        Cargando...
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-2">
+                                                    <span className="text-xs text-white truncate">{image.fileName}</span>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-white hover:bg-white/20"
+                                                        disabled={deletingImageId === image.id}
+                                                        onClick={() => handleDeleteImage(image.id)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-slate-500">
+                                    No hay imágenes cargadas. Sube la primera para mostrarla en el catálogo.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </TabsContent>

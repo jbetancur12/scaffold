@@ -251,6 +251,14 @@ const validateProductInvima = (
 export const ProductSchema = ProductBaseSchema.superRefine(validateProductInvima);
 export const UpdateProductSchema = ProductBaseSchema.partial().superRefine(validateProductInvima);
 
+export const UploadProductImageSchema = z.object({
+    fileName: z.string().min(1),
+    mimeType: z.string().min(3),
+    base64Data: z.string().min(8),
+    sortOrder: z.number().int().min(0).optional(),
+    actor: z.string().optional(),
+});
+
 export const ProductVariantSchema = z.object({
     productId: z.string().uuid(),
     name: z.string().min(1, 'El nombre es obligatorio'),
@@ -1543,6 +1551,7 @@ export type CreateQualityTrainingEvidencePayload = DateInputValue<z.input<typeof
 export type ResolveIncomingInspectionPayload = DateInputValue<z.input<typeof ResolveIncomingInspectionSchema>>;
 export type CorrectIncomingInspectionCostPayload = DateInputValue<z.input<typeof CorrectIncomingInspectionCostSchema>>;
 export type UploadIncomingInspectionEvidencePayload = DateInputValue<z.input<typeof UploadIncomingInspectionEvidenceSchema>>;
+export type UploadProductImagePayload = DateInputValue<z.input<typeof UploadProductImageSchema>>;
 export type UpsertBatchReleaseChecklistPayload = DateInputValue<z.input<typeof UpsertBatchReleaseChecklistSchema>>;
 export type SignBatchReleasePayload = DateInputValue<z.input<typeof SignBatchReleaseSchema>>;
 export type ApproveControlledDocumentPayload = DateInputValue<z.input<typeof ApproveControlledDocumentSchema>>;
