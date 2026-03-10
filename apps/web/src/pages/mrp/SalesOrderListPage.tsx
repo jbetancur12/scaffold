@@ -50,7 +50,7 @@ export default function SalesOrderListPage() {
     useMrpQueryErrorToast(ordersError, 'No se pudieron cargar los pedidos de clientes');
 
     const handleCancel = async (id: string) => {
-        if (!confirm('¿Estás seguro de cancelar este pedido?')) return;
+        if (!confirm('¿Estás seguro de cancelar este pedido? Si tiene producción iniciada, el sistema bloqueará la cancelación automática.')) return;
 
         try {
             await updateStatus({ id, payload: { status: SalesOrderStatus.CANCELLED } });

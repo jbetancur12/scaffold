@@ -152,6 +152,7 @@ import type {
     UpdateSalesOrderPayload,
     ListSalesOrdersFilters,
     UpdateSalesOrderStatusPayload,
+    CancelSalesOrderWithSettlementPayload,
     CreateQuotationPayload,
     UpdateQuotationPayload,
     ListQuotationsFilters,
@@ -523,6 +524,10 @@ export const mrpApi = {
     },
     updateSalesOrderStatus: async (id: string, data: UpdateSalesOrderStatusPayload): Promise<SalesOrder> => {
         const response = await api.patch<SalesOrder>(`/mrp/sales-orders/${id}/status`, data);
+        return response.data;
+    },
+    cancelSalesOrderWithSettlement: async (id: string, data: CancelSalesOrderWithSettlementPayload): Promise<SalesOrder> => {
+        const response = await api.post<SalesOrder>(`/mrp/sales-orders/${id}/cancel-with-settlement`, data);
         return response.data;
     },
     getSalesOrderPdf: async (

@@ -1328,6 +1328,15 @@ export const UpdateSalesOrderStatusSchema = z.object({
     status: z.nativeEnum(SalesOrderStatus),
 });
 
+export const CancelSalesOrderWithSettlementSchema = z.object({
+    warehouseId: z.string().uuid('La bodega es obligatoria'),
+    notes: z.string().optional(),
+    items: z.array(z.object({
+        variantId: z.string().uuid(),
+        completedQuantity: z.number().min(0, 'La cantidad terminada debe ser mayor o igual a 0'),
+    })).min(1, 'Debes registrar al menos una variante'),
+});
+
 const QuotationCatalogItemSchema = z.object({
     lineType: z.literal('item').optional(),
     isCatalogItem: z.literal(true).optional(),
@@ -1537,6 +1546,7 @@ export type CreateSalesOrderPayload = DateInputValue<z.input<typeof CreateSalesO
 export type UpdateSalesOrderPayload = DateInputValue<z.input<typeof UpdateSalesOrderSchema>>;
 export type ListSalesOrdersFilters = DateInputValue<z.input<typeof ListSalesOrdersQuerySchema>>;
 export type UpdateSalesOrderStatusPayload = DateInputValue<z.input<typeof UpdateSalesOrderStatusSchema>>;
+export type CancelSalesOrderWithSettlementPayload = DateInputValue<z.input<typeof CancelSalesOrderWithSettlementSchema>>;
 export type ProductionAnalyticsFilters = DateInputValue<z.input<typeof ProductionAnalyticsQuerySchema>>;
 export type CalculateThreadConsumptionPayload = DateInputValue<z.input<typeof CalculateThreadConsumptionSchema>>;
 export type CreateProductThreadProcessPayload = DateInputValue<z.input<typeof CreateProductThreadProcessSchema>>;

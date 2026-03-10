@@ -4,12 +4,15 @@ import { SalesOrderItem } from '../entities/sales-order-item.entity';
 import { Customer } from '../entities/customer.entity';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
+import { Quotation } from '../entities/quotation.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
-import { CreateSalesOrderPayload, ProductionOrderStatus, SalesOrderStatus, WarehouseType } from '@scaffold/types';
+import { CreateSalesOrderPayload, ProductionOrderStatus, QuotationItemLineType, QuotationStatus, SalesOrderStatus, WarehouseType } from '@scaffold/types';
 import { ProductionOrder } from '../entities/production-order.entity';
 import { ProductionOrderItem } from '../entities/production-order-item.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
+import { Warehouse } from '../entities/warehouse.entity';
 import { AppError } from '../../../shared/utils/response';
+import type { CancelSalesOrderWithSettlementPayload } from '@scaffold/schemas';
 
 export class SalesOrderService {
     private salesOrderRepo: EntityRepository<SalesOrder>;
@@ -18,6 +21,69 @@ export class SalesOrderService {
         private em: EntityManager
     ) {
         this.salesOrderRepo = em.getRepository(SalesOrder);
+    }
+
+    private getQuotationStatusFromItems(quotation: Quotation) {
+        const items = quotation.items.getItems().filter((item) => item.lineType !== QuotationItemLineType.NOTE);
+        if (items.length === 0) return QuotationStatus.DRAFT;
+        const approvedItems = items.filter((item) => item.approved && Number(item.approvedQuantity || 0) > 0);
+        if (approvedItems.length === 0) return QuotationStatus.REJECTED;
+        if (approvedItems.length === items.length && items.every((item) => Number(item.approvedQuantity || 0) >= Number(item.quantity || 0))) {
+            return QuotationStatus.APPROVED_FULL;
+        }
+        return QuotationStatus.APPROVED_PARTIAL;
+    }
+
+    private async revertQuotationConversion(order: SalesOrder, tx: EntityManager) {
+        const quotationRepo = tx.getRepository(Quotation);
+        const quotation = await quotationRepo.findOne(
+            { convertedSalesOrder: order.id },
+            { populate: ['items', 'items.product', 'items.variant'] }
+        );
+        if (!quotation) return;
+
+        const remainingToRevert = new Map<string, number>();
+        for (const orderItem of order.items.getItems()) {
+            const key = `${orderItem.product.id}:${orderItem.variant?.id || ''}`;
+            remainingToRevert.set(key, Number(remainingToRevert.get(key) || 0) + Number(orderItem.quantity || 0));
+        }
+
+        for (const quotationItem of quotation.items.getItems()) {
+            const key = `${quotationItem.product?.id || ''}:${quotationItem.variant?.id || ''}`;
+            const pending = Number(remainingToRevert.get(key) || 0);
+            if (pending <= 0) continue;
+            const currentConverted = Number(quotationItem.convertedQuantity || 0);
+            if (currentConverted <= 0) continue;
+            const revertQty = Math.min(currentConverted, pending);
+            quotationItem.convertedQuantity = currentConverted - revertQty;
+            remainingToRevert.set(key, pending - revertQty);
+        }
+
+        quotation.convertedSalesOrder = undefined;
+        quotation.status = this.getQuotationStatusFromItems(quotation);
+        tx.persist(quotation);
+    }
+
+    private async cancelPendingProductionOrders(order: SalesOrder, tx: EntityManager) {
+        const linkedProductionOrders = order.productionOrders.getItems();
+        const blockingOrder = linkedProductionOrders.find((productionOrder) =>
+            productionOrder.status === ProductionOrderStatus.IN_PROGRESS ||
+            productionOrder.status === ProductionOrderStatus.COMPLETED
+        );
+
+        if (blockingOrder) {
+            throw new AppError(
+                'El pedido ya tiene producción iniciada o finalizada. Debes liquidar/cerrar manualmente la producción antes de cancelar el pedido.',
+                409
+            );
+        }
+
+        for (const productionOrder of linkedProductionOrders) {
+            if ([ProductionOrderStatus.DRAFT, ProductionOrderStatus.PLANNED].includes(productionOrder.status)) {
+                productionOrder.status = ProductionOrderStatus.CANCELLED;
+                tx.persist(productionOrder);
+            }
+        }
     }
 
     async getSalesOrders(page: number = 1, limit: number = 10, search?: string, status?: SalesOrderStatus) {
@@ -54,6 +120,8 @@ export class SalesOrderService {
                 'items.product',
                 'items.variant',
                 'productionOrders',
+                'productionOrders.items',
+                'productionOrders.items.variant',
             ]
         });
     }
@@ -233,12 +301,111 @@ export class SalesOrderService {
             if (status === SalesOrderStatus.IN_PRODUCTION) {
                 const automation = await this.ensureProductionCoverage(order, tx);
                 order.status = automation.nextStatus;
+            } else if (status === SalesOrderStatus.CANCELLED) {
+                await this.cancelPendingProductionOrders(order, tx);
+                await this.revertQuotationConversion(order, tx);
+                order.status = status;
             } else {
                 order.status = status;
             }
 
             await tx.persistAndFlush(order);
             return order;
+        });
+    }
+
+    async cancelSalesOrderWithSettlement(id: string, payload: CancelSalesOrderWithSettlementPayload): Promise<SalesOrder> {
+        return this.em.transactional(async (tx) => {
+            const order = await tx.getRepository(SalesOrder).findOneOrFail(
+                { id },
+                { populate: ['items', 'items.variant', 'items.product', 'productionOrders', 'productionOrders.items', 'productionOrders.items.variant'] }
+            );
+
+            if (order.status === SalesOrderStatus.SHIPPED) {
+                throw new AppError('No se puede cancelar un pedido ya despachado', 400);
+            }
+
+            const activeProductionOrders = order.productionOrders.getItems().filter((productionOrder) =>
+                productionOrder.status !== ProductionOrderStatus.CANCELLED
+            );
+
+            if (activeProductionOrders.length === 0) {
+                throw new AppError('El pedido no tiene órdenes de producción activas para liquidar', 400);
+            }
+
+            if (activeProductionOrders.some((productionOrder) => productionOrder.status === ProductionOrderStatus.COMPLETED)) {
+                throw new AppError('Existe una OP completada. Debes gestionarla manualmente antes de cancelar el pedido.', 409);
+            }
+
+            if (activeProductionOrders.every((productionOrder) =>
+                productionOrder.status === ProductionOrderStatus.DRAFT || productionOrder.status === ProductionOrderStatus.PLANNED
+            )) {
+                throw new AppError('La producción aún no ha iniciado. Usa la cancelación normal del pedido.', 400);
+            }
+
+            const warehouseRepo = tx.getRepository(Warehouse);
+            const inventoryRepo = tx.getRepository(InventoryItem);
+            const variantRepo = tx.getRepository(ProductVariant);
+
+            const warehouse = await warehouseRepo.findOneOrFail({ id: payload.warehouseId });
+            if (warehouse.type !== WarehouseType.FINISHED_GOODS) {
+                throw new AppError('La bodega seleccionada debe ser de producto terminado', 400);
+            }
+
+            const allowedByVariant = new Map<string, number>();
+            for (const productionOrder of activeProductionOrders) {
+                for (const item of productionOrder.items.getItems()) {
+                    const variantId = item.variant?.id;
+                    if (!variantId) continue;
+                    allowedByVariant.set(variantId, Number(allowedByVariant.get(variantId) || 0) + Number(item.quantity || 0));
+                }
+            }
+
+            for (const row of payload.items) {
+                const allowed = Number(allowedByVariant.get(row.variantId) || 0);
+                if (allowed <= 0) {
+                    throw new AppError('Se incluyó una variante que no pertenece a las OP vinculadas al pedido', 400);
+                }
+                if (Number(row.completedQuantity || 0) > allowed) {
+                    throw new AppError('La cantidad terminada no puede superar la cantidad planificada en producción', 400);
+                }
+            }
+
+            for (const row of payload.items) {
+                const completedQuantity = Number(row.completedQuantity || 0);
+                if (completedQuantity <= 0) continue;
+                const variant = await variantRepo.findOneOrFail({ id: row.variantId });
+                let inventoryRow = await inventoryRepo.findOne({ warehouse, variant });
+                if (!inventoryRow) {
+                    inventoryRow = inventoryRepo.create({
+                        warehouse,
+                        variant,
+                        quantity: 0,
+                    } as InventoryItem);
+                }
+                inventoryRow.quantity = Number(inventoryRow.quantity || 0) + completedQuantity;
+                tx.persist(inventoryRow);
+            }
+
+            const settlementNote = payload.notes?.trim() || 'Cancelación con liquidación parcial de producción';
+
+            for (const productionOrder of activeProductionOrders) {
+                if (productionOrder.status === ProductionOrderStatus.COMPLETED || productionOrder.status === ProductionOrderStatus.CANCELLED) continue;
+                productionOrder.status = ProductionOrderStatus.CANCELLED;
+                productionOrder.notes = [productionOrder.notes, `Liquidación parcial por cancelación de pedido: ${settlementNote}`]
+                    .filter(Boolean)
+                    .join('\n');
+                tx.persist(productionOrder);
+            }
+
+            order.status = SalesOrderStatus.CANCELLED;
+            order.notes = [order.notes, `Pedido cancelado con liquidación parcial. ${settlementNote}`]
+                .filter(Boolean)
+                .join('\n');
+            tx.persist(order);
+
+            await tx.flush();
+            return this.getSalesOrderById(order.id);
         });
     }
 

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import {
     ArrowLeft,
@@ -31,8 +32,9 @@ import {
     DialogFooter,
 } from '@/components/ui/dialog';
 import { useSalesOrderQuery, useUpdateSalesOrderStatusMutation } from '@/hooks/mrp/useSalesOrders';
+import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
-import { SalesOrderStatus, ProductionOrder, ProductionOrderStatus, ControlledDocument, DocumentCategory } from '@scaffold/types';
+import { SalesOrderStatus, ProductionOrder, ProductionOrderStatus, ControlledDocument, DocumentCategory, WarehouseType } from '@scaffold/types';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -78,6 +80,7 @@ export default function SalesOrderDetailPage() {
 
     const { data: order, loading: isLoading, error, execute: reloadOrder } = useSalesOrderQuery(id!);
     const { execute: updateStatus, loading: isUpdatingStatus } = useUpdateSalesOrderStatusMutation();
+    const { data: warehouses } = useWarehousesQuery();
 
     // Link Production Order dialog
     const [showLinkPoDialog, setShowLinkPoDialog] = useState(false);
@@ -85,6 +88,11 @@ export default function SalesOrderDetailPage() {
     const [selectedPoId, setSelectedPoId] = useState('');
     const [linkingPo, setLinkingPo] = useState(false);
     const [unlinkingPoId, setUnlinkingPoId] = useState<string | null>(null);
+    const [showSettlementDialog, setShowSettlementDialog] = useState(false);
+    const [settlementWarehouseId, setSettlementWarehouseId] = useState('');
+    const [settlementNotes, setSettlementNotes] = useState('');
+    const [settlementQuantities, setSettlementQuantities] = useState<Record<string, number>>({});
+    const [submittingSettlement, setSubmittingSettlement] = useState(false);
 
     // PDF dialog state
     const [showPdfDialog, setShowPdfDialog] = useState(false);
@@ -124,6 +132,13 @@ export default function SalesOrderDetailPage() {
         setDraftProductionCode(operationalConfig?.defaultSalesOrderProductionDocCode || '');
         setDraftBillingCode(operationalConfig?.defaultSalesOrderBillingDocCode || '');
     }, [operationalConfig]);
+
+    useEffect(() => {
+        const finishedGoodsWarehouse = (warehouses || []).find((warehouse) => warehouse.type === WarehouseType.FINISHED_GOODS);
+        if (finishedGoodsWarehouse && !settlementWarehouseId) {
+            setSettlementWarehouseId(finishedGoodsWarehouse.id);
+        }
+    }, [warehouses, settlementWarehouseId]);
 
     const handleOpenLinkDialog = async () => {
         try {
@@ -184,6 +199,52 @@ export default function SalesOrderDetailPage() {
             toast({ title: 'Éxito', description: 'Estado actualizado correctamente' });
         } catch {
             toast({ title: 'Error', description: 'No se pudo actualizar el estado', variant: 'destructive' });
+        }
+    };
+
+    const settlementRows = useMemo(() => (
+        (order.items || [])
+            .filter((item) => item.variantId)
+            .map((item) => ({
+                variantId: item.variantId as string,
+                productName: item.product?.name || 'Producto',
+                variantName: item.variant?.name || item.variant?.sku || 'Variante',
+                quantity: Number(item.quantity || 0),
+            }))
+    ), [order.items]);
+
+    const openSettlementDialog = () => {
+        const initialQuantities = Object.fromEntries(
+            settlementRows.map((row) => [row.variantId, 0])
+        ) as Record<string, number>;
+        setSettlementQuantities(initialQuantities);
+        setSettlementNotes('');
+        setShowSettlementDialog(true);
+    };
+
+    const handleSubmitSettlement = async () => {
+        if (!settlementWarehouseId) {
+            toast({ title: 'Dato requerido', description: 'Selecciona una bodega de producto terminado', variant: 'destructive' });
+            return;
+        }
+
+        try {
+            setSubmittingSettlement(true);
+            await mrpApi.cancelSalesOrderWithSettlement(order.id, {
+                warehouseId: settlementWarehouseId,
+                notes: settlementNotes || undefined,
+                items: settlementRows.map((row) => ({
+                    variantId: row.variantId,
+                    completedQuantity: Number(settlementQuantities[row.variantId] || 0),
+                })),
+            });
+            await reloadOrder({ force: true });
+            setShowSettlementDialog(false);
+            toast({ title: 'Pedido cancelado', description: 'Se liquidó la producción parcial y se canceló el pedido.' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo cancelar con liquidación parcial'), variant: 'destructive' });
+        } finally {
+            setSubmittingSettlement(false);
         }
     };
 
@@ -277,10 +338,16 @@ export default function SalesOrderDetailPage() {
                                 <Package className="mr-2 h-4 w-4" />Planificar cumplimiento
                             </Button>
                         )}
-                        <Button variant="destructive"
-                            onClick={() => { if (confirm('¿Estás seguro de cancelar este pedido? Ten en cuenta que las órdenes de producción vinculadas no se cancelarán solas.')) handleUpdateStatus(SalesOrderStatus.CANCELLED); }}>
-                            <XCircle className="mr-2 h-4 w-4" />Cancelar Pedido
-                        </Button>
+                        {order.status === SalesOrderStatus.PENDING ? (
+                            <Button variant="destructive"
+                                onClick={() => { if (confirm('¿Estás seguro de cancelar este pedido? Si la producción no ha iniciado, se cancelará automáticamente. Si ya inició, deberás liquidarla manualmente antes.')) handleUpdateStatus(SalesOrderStatus.CANCELLED); }}>
+                                <XCircle className="mr-2 h-4 w-4" />Cancelar Pedido
+                            </Button>
+                        ) : (
+                            <Button variant="destructive" onClick={openSettlementDialog}>
+                                <XCircle className="mr-2 h-4 w-4" />Cancelar con liquidación
+                            </Button>
+                        )}
                     </div>
                 );
             case SalesOrderStatus.READY_TO_SHIP:
@@ -614,6 +681,81 @@ export default function SalesOrderDetailPage() {
                         <Button variant="outline" onClick={() => setShowLinkPoDialog(false)}>Cancelar</Button>
                         <Button onClick={handleLinkPo} disabled={!selectedPoId || linkingPo} className="bg-blue-600 hover:bg-blue-700">
                             {linkingPo ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Vinculando...</> : <><Link className="mr-2 h-4 w-4" />Vincular</>}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showSettlementDialog} onOpenChange={setShowSettlementDialog}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Cancelar con Liquidación Parcial</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Bodega destino</Label>
+                            <select
+                                value={settlementWarehouseId}
+                                onChange={(e) => setSettlementWarehouseId(e.target.value)}
+                                className="w-full h-10 rounded-md border border-slate-200 px-3 text-sm"
+                            >
+                                <option value="">Selecciona una bodega...</option>
+                                {(warehouses || [])
+                                    .filter((warehouse) => warehouse.type === WarehouseType.FINISHED_GOODS)
+                                    .map((warehouse) => (
+                                        <option key={warehouse.id} value={warehouse.id}>
+                                            {warehouse.name}
+                                        </option>
+                                    ))}
+                            </select>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Label>Cantidades terminadas a ingresar</Label>
+                            {settlementRows.map((row) => (
+                                <div key={row.variantId} className="grid grid-cols-1 md:grid-cols-[1.8fr_0.8fr_0.8fr] gap-3 rounded-lg border border-slate-200 p-3">
+                                    <div>
+                                        <p className="font-medium text-slate-900">{row.productName}</p>
+                                        <p className="text-sm text-slate-500">{row.variantName}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs uppercase tracking-wide text-slate-500">Planeado</p>
+                                        <p className="text-sm font-semibold text-slate-900">{row.quantity}</p>
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs uppercase tracking-wide text-slate-500">Terminado</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={row.quantity}
+                                            step={0.001}
+                                            value={settlementQuantities[row.variantId] || ''}
+                                            onChange={(e) =>
+                                                setSettlementQuantities((current) => ({
+                                                    ...current,
+                                                    [row.variantId]: Math.max(0, Math.min(row.quantity, Number(e.target.value) || 0)),
+                                                }))
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Observación</Label>
+                            <Input
+                                value={settlementNotes}
+                                onChange={(e) => setSettlementNotes(e.target.value)}
+                                placeholder="Motivo o contexto de la cancelación parcial"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowSettlementDialog(false)}>Cerrar</Button>
+                        <Button onClick={handleSubmitSettlement} disabled={submittingSettlement} className="bg-red-600 hover:bg-red-700">
+                            {submittingSettlement ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            Confirmar cancelación
                         </Button>
                     </DialogFooter>
                 </DialogContent>

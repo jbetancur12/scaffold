@@ -349,6 +349,7 @@ export class ProductionService {
 
         const so = await soRepo.findOne({ id: salesOrderId });
         if (!so) return;
+        if (so.status === SalesOrderStatus.CANCELLED) return;
 
         const linkedPos = await poRepo.find({ salesOrder: salesOrderId });
         if (linkedPos.length === 0) {

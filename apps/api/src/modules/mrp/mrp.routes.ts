@@ -213,6 +213,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/sales-orders/:id', (req, res, next) => mrpController.getSalesOrder(req, res, next));
     router.put('/sales-orders/:id', (req, res, next) => mrpController.updateSalesOrder(req, res, next));
     router.patch('/sales-orders/:id/status', (req, res, next) => mrpController.updateSalesOrderStatus(req, res, next));
+    router.post('/sales-orders/:id/cancel-with-settlement', (req, res, next) => mrpController.cancelSalesOrderWithSettlement(req, res, next));
     router.get('/sales-orders/:id/pdf', (req, res, next) => mrpController.downloadSalesOrderPdf(req, res, next));
 
     // Quotations

@@ -137,6 +137,7 @@ import {
     UpdateSalesOrderSchema,
     ListSalesOrdersQuerySchema,
     UpdateSalesOrderStatusSchema,
+    CancelSalesOrderWithSettlementSchema,
     CreateQuotationSchema,
     UpdateQuotationSchema,
     ListQuotationsQuerySchema,
@@ -2269,6 +2270,17 @@ export class MrpController {
             const { status } = UpdateSalesOrderStatusSchema.parse(req.body);
             const order = await this.salesOrderService.updateSalesOrderStatus(id, status);
             return ApiResponse.success(res, order, 'Estado del pedido actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async cancelSalesOrderWithSettlement(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = CancelSalesOrderWithSettlementSchema.parse(req.body);
+            const order = await this.salesOrderService.cancelSalesOrderWithSettlement(id, payload);
+            return ApiResponse.success(res, order, 'Pedido cancelado con liquidación parcial');
         } catch (error) {
             next(error);
         }
