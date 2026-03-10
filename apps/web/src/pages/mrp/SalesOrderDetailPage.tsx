@@ -189,6 +189,50 @@ export default function SalesOrderDetailPage() {
 
     useMrpQueryErrorToast(error, 'No se pudo cargar el pedido');
 
+    const settlementRows = useMemo(
+        () =>
+            (order?.items ?? [])
+                .filter((item) => item.variantId)
+                .map((item) => ({
+                    variantId: item.variantId as string,
+                    productName: item.product?.name || 'Producto',
+                    variantName: item.variant?.name || item.variant?.sku || 'Variante',
+                    quantity: Number(item.quantity || 0),
+                })),
+        [order?.items]
+    );
+
+    const settlementTotalsByVariant = useMemo(
+        () =>
+            Object.fromEntries(
+                settlementRows.map((row) => {
+                    const completed = Number(settlementQuantities[row.variantId] || 0);
+                    const rejected = Number(settlementRejectedQuantities[row.variantId] || 0);
+                    return [row.variantId, Math.max(0, row.quantity - completed - rejected)];
+                })
+            ) as Record<string, number>,
+        [settlementQuantities, settlementRejectedQuantities, settlementRows]
+    );
+
+    const settlementTotals = useMemo(
+        () =>
+            settlementRows.reduce(
+                (acc, row) => {
+                    const completed = Number(settlementQuantities[row.variantId] || 0);
+                    const rejected = Number(settlementRejectedQuantities[row.variantId] || 0);
+                    const cancelled = Math.max(0, row.quantity - completed - rejected);
+                    return {
+                        planned: acc.planned + row.quantity,
+                        completed: acc.completed + completed,
+                        rejected: acc.rejected + rejected,
+                        cancelled: acc.cancelled + cancelled,
+                    };
+                },
+                { planned: 0, completed: 0, rejected: 0, cancelled: 0 }
+            ),
+        [settlementQuantities, settlementRejectedQuantities, settlementRows]
+    );
+
     if (isLoading || !order) {
         return (
             <div className="p-6 flex justify-center items-center min-h-[400px]">
@@ -210,17 +254,6 @@ export default function SalesOrderDetailPage() {
             toast({ title: 'Error', description: 'No se pudo actualizar el estado', variant: 'destructive' });
         }
     };
-
-    const settlementRows = useMemo(() => (
-        (order.items || [])
-            .filter((item) => item.variantId)
-            .map((item) => ({
-                variantId: item.variantId as string,
-                productName: item.product?.name || 'Producto',
-                variantName: item.variant?.name || item.variant?.sku || 'Variante',
-                quantity: Number(item.quantity || 0),
-            }))
-    ), [order.items]);
 
     const openSettlementDialog = () => {
         const initialQuantities = Object.fromEntries(
@@ -261,26 +294,6 @@ export default function SalesOrderDetailPage() {
             setSubmittingSettlement(false);
         }
     };
-
-    const settlementTotalsByVariant = useMemo(() => Object.fromEntries(
-        settlementRows.map((row) => {
-            const completed = Number(settlementQuantities[row.variantId] || 0);
-            const rejected = Number(settlementRejectedQuantities[row.variantId] || 0);
-            return [row.variantId, Math.max(0, row.quantity - completed - rejected)];
-        })
-    ) as Record<string, number>, [settlementQuantities, settlementRejectedQuantities, settlementRows]);
-
-    const settlementTotals = useMemo(() => settlementRows.reduce((acc, row) => {
-        const completed = Number(settlementQuantities[row.variantId] || 0);
-        const rejected = Number(settlementRejectedQuantities[row.variantId] || 0);
-        const cancelled = Math.max(0, row.quantity - completed - rejected);
-        return {
-            planned: acc.planned + row.quantity,
-            completed: acc.completed + completed,
-            rejected: acc.rejected + rejected,
-            cancelled: acc.cancelled + cancelled,
-        };
-    }, { planned: 0, completed: 0, rejected: 0, cancelled: 0 }), [settlementQuantities, settlementRejectedQuantities, settlementRows]);
     const cancellationSettlement = order.cancellationSettlement;
 
     const handleSaveDocCode = async (mode: 'production' | 'billing') => {
