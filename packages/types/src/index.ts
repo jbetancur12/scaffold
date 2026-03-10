@@ -562,6 +562,7 @@ export interface SalesOrder {
     discountAmount: number;
     netTotalAmount: number;
     cancellationSettlement?: CancellationSettlement;
+    sourceQuotation?: Pick<Quotation, 'id' | 'code' | 'status'>;
     items?: SalesOrderItem[];
     productionOrders?: ProductionOrder[];
     shipments?: Shipment[];
@@ -609,6 +610,7 @@ export interface Quotation {
     totalAmount: number;
     netTotalAmount: number;
     convertedSalesOrderId?: string;
+    convertedSalesOrder?: Pick<SalesOrder, 'id' | 'code' | 'status'>;
     items?: QuotationItem[];
 }
 
@@ -832,6 +834,9 @@ export interface ProductionOrder {
     endDate?: string | Date;
     notes?: string;
     cancellationSettlement?: CancellationSettlement;
+    salesOrder?: Pick<SalesOrder, 'id' | 'code' | 'status'> & {
+        customer?: Pick<Customer, 'id' | 'name'>;
+    };
     createdAt: string | Date;
     updatedAt: string | Date;
     items?: ProductionOrderItem[];

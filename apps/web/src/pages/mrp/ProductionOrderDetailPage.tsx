@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2, Factory, FileText, Package, Layers, AlertTriangle, TrendingDown, Boxes, Save, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2, Factory, FileText, Package, Layers, AlertTriangle, TrendingDown, Boxes, Save, ChevronDown, ChevronUp, ExternalLink, Receipt } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ProductionRequirementsTable } from '@/components/mrp/ProductionRequirementsTable';
 import {
@@ -1129,6 +1129,33 @@ export default function ProductionOrderDetailPage() {
                         </div>
                     </div>
                 </div>
+
+                {order.salesOrder && (
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                                <div className="p-2.5 bg-blue-50 rounded-xl ring-1 ring-blue-100 shrink-0">
+                                    <Receipt className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Pedido origen</p>
+                                    <p className="mt-1 text-base font-bold text-slate-900">{order.salesOrder.code}</p>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        {order.salesOrder.customer?.name || 'Sin cliente'} · {order.salesOrder.status}
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                variant="outline"
+                                onClick={() => navigate(`/mrp/sales-orders/${order.salesOrder?.id}`)}
+                                className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                            >
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                Ver pedido
+                            </Button>
+                        </div>
+                    </div>
+                )}
 
                 <Tabs defaultValue="details" className="w-full">
                     <TabsList className="bg-white border border-slate-200 rounded-2xl p-1 h-auto shadow-sm">

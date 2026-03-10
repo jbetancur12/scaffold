@@ -7,7 +7,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { mrpApi } from '@/services/mrpApi';
 import { ControlledDocument, DocumentCategory, DocumentStatus, Quotation, QuotationItemLineType, QuotationStatus } from '@scaffold/types';
-import { FileDown, Pencil, RefreshCcw, Settings, ArrowLeft, Package, User, Calculator, CheckCircle2, StickyNote } from 'lucide-react';
+import { FileDown, Pencil, RefreshCcw, Settings, ArrowLeft, Package, User, Calculator, CheckCircle2, StickyNote, ExternalLink, Receipt } from 'lucide-react';
 import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
 import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/hooks/mrp/useOperationalConfig';
 import { formatCurrency } from '@/lib/utils';
@@ -394,6 +394,35 @@ export default function QuotationDetailPage() {
                             </div>
                         </div>
                     </div>
+
+                    {row.convertedSalesOrder && (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100">
+                                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                    <Receipt className="h-5 w-5 text-purple-600" />
+                                    Pedido Vinculado
+                                </h2>
+                            </div>
+                            <div className="p-5 space-y-4">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Pedido generado</label>
+                                    <div className="text-sm font-medium text-slate-900">{row.convertedSalesOrder.code}</div>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Estado</label>
+                                    <div className="text-sm text-slate-700">{row.convertedSalesOrder.status}</div>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => navigate(`/mrp/sales-orders/${row.convertedSalesOrder?.id}`)}
+                                    className="w-full border-slate-200 text-slate-700 hover:bg-slate-50"
+                                >
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    Ver pedido
+                                </Button>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="p-5 border-b border-slate-100">

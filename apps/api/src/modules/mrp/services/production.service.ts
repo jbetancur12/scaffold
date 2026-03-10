@@ -402,6 +402,8 @@ export class ProductionService {
                     'batches',
                     'batches.variant',
                     'batches.units',
+                    'salesOrder',
+                    'salesOrder.customer',
                 ],
             }
         );

@@ -86,6 +86,17 @@ export class SalesOrderService {
         }
     }
 
+    private async attachSourceQuotation(order: SalesOrder, tx: EntityManager) {
+        const quotation = await tx.getRepository(Quotation).findOne(
+            { convertedSalesOrder: order.id },
+            { fields: ['id', 'code', 'status'] as never }
+        );
+        (order as SalesOrder & { sourceQuotation?: { id: string; code: string; status: QuotationStatus } }).sourceQuotation = quotation
+            ? { id: quotation.id, code: quotation.code, status: quotation.status }
+            : undefined;
+        return order;
+    }
+
     async getSalesOrders(page: number = 1, limit: number = 10, search?: string, status?: SalesOrderStatus) {
         const query: any = {};
         if (search) {
@@ -114,7 +125,7 @@ export class SalesOrderService {
     }
 
     async getSalesOrderById(id: string) {
-        return this.salesOrderRepo.findOneOrFail({ id }, {
+        const order = await this.salesOrderRepo.findOneOrFail({ id }, {
             populate: [
                 'customer',
                 'items.product',
@@ -124,6 +135,7 @@ export class SalesOrderService {
                 'productionOrders.items.variant',
             ]
         });
+        return this.attachSourceQuotation(order, this.em);
     }
 
     async createSalesOrder(data: CreateSalesOrderPayload): Promise<SalesOrder> {

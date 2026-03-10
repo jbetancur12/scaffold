@@ -574,6 +574,35 @@ export default function SalesOrderDetailPage() {
                         </div>
                     </div>
 
+                    {order.sourceQuotation && (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100">
+                                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                    <FileText className="h-5 w-5 text-indigo-600" />
+                                    Cotización Origen
+                                </h2>
+                            </div>
+                            <div className="p-5 space-y-4">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Cotización</label>
+                                    <div className="text-sm font-medium text-slate-900">{order.sourceQuotation.code}</div>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">Estado</label>
+                                    <div className="text-sm text-slate-700">{order.sourceQuotation.status}</div>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => navigate(`/mrp/quotations/${order.sourceQuotation?.id}`)}
+                                    className="w-full border-slate-200 text-slate-700 hover:bg-slate-50"
+                                >
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    Ver cotización
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
                             <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
