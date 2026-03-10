@@ -49,6 +49,14 @@ const formatDate = (dateString?: string | Date | null) => {
     }).format(new Date(dateString));
 };
 
+const formatQuantity = (value?: number | null) => {
+    const numericValue = Number(value || 0);
+    return new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: Number.isInteger(numericValue) ? 0 : 2,
+        maximumFractionDigits: 3,
+    }).format(numericValue);
+};
+
 const statusColors = {
     [SalesOrderStatus.PENDING]: 'bg-yellow-100 text-yellow-800 border-yellow-200',
     [SalesOrderStatus.IN_PRODUCTION]: 'bg-purple-100 text-purple-800 border-purple-200',
@@ -92,6 +100,7 @@ export default function SalesOrderDetailPage() {
     const [settlementWarehouseId, setSettlementWarehouseId] = useState('');
     const [settlementNotes, setSettlementNotes] = useState('');
     const [settlementQuantities, setSettlementQuantities] = useState<Record<string, number>>({});
+    const [settlementRejectedQuantities, setSettlementRejectedQuantities] = useState<Record<string, number>>({});
     const [submittingSettlement, setSubmittingSettlement] = useState(false);
 
     // PDF dialog state
@@ -217,7 +226,11 @@ export default function SalesOrderDetailPage() {
         const initialQuantities = Object.fromEntries(
             settlementRows.map((row) => [row.variantId, 0])
         ) as Record<string, number>;
+        const initialRejectedQuantities = Object.fromEntries(
+            settlementRows.map((row) => [row.variantId, 0])
+        ) as Record<string, number>;
         setSettlementQuantities(initialQuantities);
+        setSettlementRejectedQuantities(initialRejectedQuantities);
         setSettlementNotes('');
         setShowSettlementDialog(true);
     };
@@ -236,6 +249,7 @@ export default function SalesOrderDetailPage() {
                 items: settlementRows.map((row) => ({
                     variantId: row.variantId,
                     completedQuantity: Number(settlementQuantities[row.variantId] || 0),
+                    rejectedQuantity: Number(settlementRejectedQuantities[row.variantId] || 0),
                 })),
             });
             await reloadOrder({ force: true });
@@ -247,6 +261,27 @@ export default function SalesOrderDetailPage() {
             setSubmittingSettlement(false);
         }
     };
+
+    const settlementTotalsByVariant = useMemo(() => Object.fromEntries(
+        settlementRows.map((row) => {
+            const completed = Number(settlementQuantities[row.variantId] || 0);
+            const rejected = Number(settlementRejectedQuantities[row.variantId] || 0);
+            return [row.variantId, Math.max(0, row.quantity - completed - rejected)];
+        })
+    ) as Record<string, number>, [settlementQuantities, settlementRejectedQuantities, settlementRows]);
+
+    const settlementTotals = useMemo(() => settlementRows.reduce((acc, row) => {
+        const completed = Number(settlementQuantities[row.variantId] || 0);
+        const rejected = Number(settlementRejectedQuantities[row.variantId] || 0);
+        const cancelled = Math.max(0, row.quantity - completed - rejected);
+        return {
+            planned: acc.planned + row.quantity,
+            completed: acc.completed + completed,
+            rejected: acc.rejected + rejected,
+            cancelled: acc.cancelled + cancelled,
+        };
+    }, { planned: 0, completed: 0, rejected: 0, cancelled: 0 }), [settlementQuantities, settlementRejectedQuantities, settlementRows]);
+    const cancellationSettlement = order.cancellationSettlement;
 
     const handleSaveDocCode = async (mode: 'production' | 'billing') => {
         if (!operationalConfig) return;
@@ -585,6 +620,92 @@ export default function SalesOrderDetailPage() {
                         </div>
                     </div>
 
+                    {cancellationSettlement && (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100">
+                                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                    <XCircle className="h-5 w-5 text-red-600" />
+                                    Liquidación de Cancelación
+                                </h2>
+                                <p className="mt-1 text-sm text-slate-500">
+                                    Registrada el {formatDate(cancellationSettlement.settledAt)}
+                                </p>
+                            </div>
+                            <div className="p-5 space-y-4">
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Bodega destino</p>
+                                            <p className="mt-1 text-sm font-semibold text-slate-900">{cancellationSettlement.warehouseName}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">OP vinculadas</p>
+                                            <p className="mt-1 text-sm text-slate-900">{cancellationSettlement.productionOrderCodes.join(', ') || 'Sin OP'}</p>
+                                        </div>
+                                    </div>
+                                    {cancellationSettlement.notes && (
+                                        <div>
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Observación</p>
+                                            <p className="mt-1 text-sm text-slate-700 whitespace-pre-wrap">{cancellationSettlement.notes}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                        <p className="text-[11px] uppercase tracking-wide text-slate-500">Planeado</p>
+                                        <p className="mt-1 font-bold text-slate-900">{formatQuantity(cancellationSettlement.totalPlanned)}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                                        <p className="text-[11px] uppercase tracking-wide text-emerald-700">Terminado</p>
+                                        <p className="mt-1 font-bold text-emerald-900">{formatQuantity(cancellationSettlement.totalCompleted)}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                                        <p className="text-[11px] uppercase tracking-wide text-rose-700">Rechazado</p>
+                                        <p className="mt-1 font-bold text-rose-900">{formatQuantity(cancellationSettlement.totalRejected)}</p>
+                                    </div>
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                        <p className="text-[11px] uppercase tracking-wide text-amber-700">Cancelado</p>
+                                        <p className="mt-1 font-bold text-amber-900">{formatQuantity(cancellationSettlement.totalCancelled)}</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Detalle por variante</p>
+                                    <div className="space-y-2">
+                                        {cancellationSettlement.items.map((item) => (
+                                            <div key={item.variantId} className="rounded-lg border border-slate-200 p-3">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-slate-900">{item.productName}</p>
+                                                        <p className="text-xs text-slate-500">
+                                                            {item.variantName}
+                                                            {item.variantSku ? ` · ${item.variantSku}` : ''}
+                                                        </p>
+                                                    </div>
+                                                    <p className="text-xs font-medium text-slate-500">
+                                                        Planeado {formatQuantity(item.plannedQuantity)}
+                                                    </p>
+                                                </div>
+                                                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                                                    <div className="rounded-md bg-emerald-50 px-2 py-2 text-emerald-800">
+                                                        Terminado: {formatQuantity(item.completedQuantity)}
+                                                    </div>
+                                                    <div className="rounded-md bg-rose-50 px-2 py-2 text-rose-800">
+                                                        Rechazado: {formatQuantity(item.rejectedQuantity)}
+                                                    </div>
+                                                    <div className="rounded-md bg-amber-50 px-2 py-2 text-amber-800">
+                                                        Cancelado: {formatQuantity(item.cancelledQuantity)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
 
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="p-5 border-b border-slate-100">
@@ -692,6 +813,9 @@ export default function SalesOrderDetailPage() {
                         <DialogTitle>Cancelar con Liquidación Parcial</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                            La liquidación parcial ingresará a bodega solo las cantidades terminadas. El resto quedará repartido entre rechazo y cancelación.
+                        </div>
                         <div className="space-y-1.5">
                             <Label>Bodega destino</Label>
                             <select
@@ -713,10 +837,13 @@ export default function SalesOrderDetailPage() {
                         <div className="space-y-3">
                             <Label>Cantidades terminadas a ingresar</Label>
                             {settlementRows.map((row) => (
-                                <div key={row.variantId} className="grid grid-cols-1 md:grid-cols-[1.8fr_0.8fr_0.8fr] gap-3 rounded-lg border border-slate-200 p-3">
+                                <div key={row.variantId} className="grid grid-cols-1 md:grid-cols-[1.6fr_0.6fr_0.8fr_0.8fr] gap-3 rounded-lg border border-slate-200 p-3">
                                     <div>
                                         <p className="font-medium text-slate-900">{row.productName}</p>
                                         <p className="text-sm text-slate-500">{row.variantName}</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            Cancelado: {settlementTotalsByVariant[row.variantId] ?? row.quantity}
+                                        </p>
                                     </div>
                                     <div>
                                         <p className="text-xs uppercase tracking-wide text-slate-500">Planeado</p>
@@ -731,10 +858,36 @@ export default function SalesOrderDetailPage() {
                                             step={0.001}
                                             value={settlementQuantities[row.variantId] || ''}
                                             onChange={(e) =>
-                                                setSettlementQuantities((current) => ({
-                                                    ...current,
-                                                    [row.variantId]: Math.max(0, Math.min(row.quantity, Number(e.target.value) || 0)),
-                                                }))
+                                                {
+                                                    const nextCompleted = Math.max(0, Number(e.target.value) || 0);
+                                                    const currentRejected = Number(settlementRejectedQuantities[row.variantId] || 0);
+                                                    const boundedCompleted = Math.min(row.quantity - currentRejected, nextCompleted);
+                                                    setSettlementQuantities((current) => ({
+                                                        ...current,
+                                                        [row.variantId]: boundedCompleted,
+                                                    }));
+                                                }
+                                            }
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs uppercase tracking-wide text-slate-500">Rechazado</Label>
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={row.quantity}
+                                            step={0.001}
+                                            value={settlementRejectedQuantities[row.variantId] || ''}
+                                            onChange={(e) =>
+                                                {
+                                                    const nextRejected = Math.max(0, Number(e.target.value) || 0);
+                                                    const currentCompleted = Number(settlementQuantities[row.variantId] || 0);
+                                                    const boundedRejected = Math.min(row.quantity - currentCompleted, nextRejected);
+                                                    setSettlementRejectedQuantities((current) => ({
+                                                        ...current,
+                                                        [row.variantId]: boundedRejected,
+                                                    }));
+                                                }
                                             }
                                         />
                                     </div>
@@ -749,6 +902,24 @@ export default function SalesOrderDetailPage() {
                                 onChange={(e) => setSettlementNotes(e.target.value)}
                                 placeholder="Motivo o contexto de la cancelación parcial"
                             />
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <p className="text-[11px] uppercase tracking-wide text-slate-500">Planeado</p>
+                                <p className="mt-1 font-bold text-slate-900">{settlementTotals.planned}</p>
+                            </div>
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                                <p className="text-[11px] uppercase tracking-wide text-emerald-700">Terminado</p>
+                                <p className="mt-1 font-bold text-emerald-900">{settlementTotals.completed}</p>
+                            </div>
+                            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                                <p className="text-[11px] uppercase tracking-wide text-rose-700">Rechazado</p>
+                                <p className="mt-1 font-bold text-rose-900">{settlementTotals.rejected}</p>
+                            </div>
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                <p className="text-[11px] uppercase tracking-wide text-amber-700">Cancelado</p>
+                                <p className="mt-1 font-bold text-amber-900">{settlementTotals.cancelled}</p>
+                            </div>
                         </div>
                     </div>
                     <DialogFooter>

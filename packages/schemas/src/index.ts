@@ -1334,7 +1334,21 @@ export const CancelSalesOrderWithSettlementSchema = z.object({
     items: z.array(z.object({
         variantId: z.string().uuid(),
         completedQuantity: z.number().min(0, 'La cantidad terminada debe ser mayor o igual a 0'),
+        rejectedQuantity: z.number().min(0, 'La cantidad rechazada debe ser mayor o igual a 0').default(0),
     })).min(1, 'Debes registrar al menos una variante'),
+}).superRefine((payload, ctx) => {
+    const seen = new Set<string>();
+    payload.items.forEach((item, index) => {
+        if (seen.has(item.variantId)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['items', index, 'variantId'],
+                message: 'No puedes repetir la misma variante en la liquidación',
+            });
+            return;
+        }
+        seen.add(item.variantId);
+    });
 });
 
 const QuotationCatalogItemSchema = z.object({

@@ -522,6 +522,31 @@ export interface SalesOrderItem {
     subtotal: number;
 }
 
+export interface CancellationSettlementItem {
+    variantId: string;
+    productName: string;
+    variantName: string;
+    variantSku?: string;
+    plannedQuantity: number;
+    completedQuantity: number;
+    rejectedQuantity: number;
+    cancelledQuantity: number;
+}
+
+export interface CancellationSettlement {
+    settledAt: string | Date;
+    warehouseId: string;
+    warehouseName: string;
+    notes?: string;
+    totalPlanned: number;
+    totalCompleted: number;
+    totalRejected: number;
+    totalCancelled: number;
+    productionOrderIds: string[];
+    productionOrderCodes: string[];
+    items: CancellationSettlementItem[];
+}
+
 export interface SalesOrder {
     id: string;
     code: string;
@@ -536,6 +561,7 @@ export interface SalesOrder {
     taxTotal: number;
     discountAmount: number;
     netTotalAmount: number;
+    cancellationSettlement?: CancellationSettlement;
     items?: SalesOrderItem[];
     productionOrders?: ProductionOrder[];
     shipments?: Shipment[];
@@ -805,6 +831,7 @@ export interface ProductionOrder {
     startDate?: string | Date;
     endDate?: string | Date;
     notes?: string;
+    cancellationSettlement?: CancellationSettlement;
     createdAt: string | Date;
     updatedAt: string | Date;
     items?: ProductionOrderItem[];

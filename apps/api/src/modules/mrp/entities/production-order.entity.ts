@@ -1,6 +1,6 @@
 import { Entity, Property, Enum, OneToMany, Collection, ManyToOne } from '@mikro-orm/core';
 import { BaseEntity } from '../../../shared/entities/base.entity';
-import { ProductionOrderStatus } from '@scaffold/types';
+import { CancellationSettlement, ProductionOrderStatus } from '@scaffold/types';
 import { ProductionOrderItem } from './production-order-item.entity';
 import { ProductionBatch } from './production-batch.entity';
 import { SalesOrder } from './sales-order.entity';
@@ -21,6 +21,9 @@ export class ProductionOrder extends BaseEntity {
 
     @Property({ nullable: true })
     notes?: string;
+
+    @Property({ type: 'json', nullable: true })
+    cancellationSettlement?: CancellationSettlement;
 
     @OneToMany(() => ProductionOrderItem, item => item.productionOrder)
     items = new Collection<ProductionOrderItem>(this);

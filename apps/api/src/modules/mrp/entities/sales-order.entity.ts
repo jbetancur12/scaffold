@@ -1,6 +1,6 @@
 import { Entity, Property, ManyToOne, OneToMany, Collection, Cascade } from '@mikro-orm/core';
 import { BaseEntity } from '../../../shared/entities/base.entity';
-import { SalesOrderStatus } from '@scaffold/types';
+import { CancellationSettlement, SalesOrderStatus } from '@scaffold/types';
 import { Customer } from './customer.entity';
 import { SalesOrderItem } from './sales-order-item.entity';
 import { ProductionOrder } from './production-order.entity';
@@ -29,6 +29,9 @@ export class SalesOrder extends BaseEntity {
 
     @Property({ type: 'text', nullable: true })
     notes?: string;
+
+    @Property({ type: 'json', nullable: true })
+    cancellationSettlement?: CancellationSettlement;
 
     @Property({ type: 'decimal', precision: 12, scale: 2 })
     totalAmount!: number;

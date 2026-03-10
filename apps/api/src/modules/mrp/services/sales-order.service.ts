@@ -6,7 +6,7 @@ import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { Quotation } from '../entities/quotation.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
-import { CreateSalesOrderPayload, ProductionOrderStatus, QuotationItemLineType, QuotationStatus, SalesOrderStatus, WarehouseType } from '@scaffold/types';
+import { CancellationSettlement, CreateSalesOrderPayload, ProductionOrderStatus, QuotationItemLineType, QuotationStatus, SalesOrderStatus, WarehouseType } from '@scaffold/types';
 import { ProductionOrder } from '../entities/production-order.entity';
 import { ProductionOrderItem } from '../entities/production-order-item.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
@@ -353,6 +353,16 @@ export class SalesOrderService {
             }
 
             const allowedByVariant = new Map<string, number>();
+            const orderItemMetaByVariant = new Map<string, { productName: string; variantName: string; variantSku?: string }>();
+            for (const orderItem of order.items.getItems()) {
+                const variantId = orderItem.variant?.id;
+                if (!variantId) continue;
+                orderItemMetaByVariant.set(variantId, {
+                    productName: orderItem.product?.name || 'Producto',
+                    variantName: orderItem.variant?.name || orderItem.variant?.sku || 'Variante',
+                    variantSku: orderItem.variant?.sku || undefined,
+                });
+            }
             for (const productionOrder of activeProductionOrders) {
                 for (const item of productionOrder.items.getItems()) {
                     const variantId = item.variant?.id;
@@ -361,20 +371,70 @@ export class SalesOrderService {
                 }
             }
 
-            for (const row of payload.items) {
-                const allowed = Number(allowedByVariant.get(row.variantId) || 0);
+            const payloadByVariant = new Map(
+                payload.items.map((row) => [row.variantId, row])
+            );
+
+            for (const [variantId, allowed] of allowedByVariant.entries()) {
+                const row = payloadByVariant.get(variantId) || {
+                    variantId,
+                    completedQuantity: 0,
+                    rejectedQuantity: 0,
+                };
                 if (allowed <= 0) {
                     throw new AppError('Se incluyó una variante que no pertenece a las OP vinculadas al pedido', 400);
                 }
-                if (Number(row.completedQuantity || 0) > allowed) {
-                    throw new AppError('La cantidad terminada no puede superar la cantidad planificada en producción', 400);
+                const completedQuantity = Number(row.completedQuantity || 0);
+                const rejectedQuantity = Number(row.rejectedQuantity || 0);
+                if (completedQuantity + rejectedQuantity > allowed) {
+                    throw new AppError('La suma de terminado y rechazo no puede superar la cantidad planificada en producción', 400);
                 }
             }
 
             for (const row of payload.items) {
+                if (!allowedByVariant.has(row.variantId)) {
+                    throw new AppError('Se incluyó una variante que no pertenece a las OP vinculadas al pedido', 400);
+                }
+            }
+
+            const settlementSummaryRows: string[] = [];
+            const settlementItems: CancellationSettlement['items'] = [];
+            let totalCompleted = 0;
+            let totalRejected = 0;
+            let totalCancelled = 0;
+
+            for (const [variantId, plannedQuantity] of allowedByVariant.entries()) {
+                const row = payloadByVariant.get(variantId) || {
+                    variantId,
+                    completedQuantity: 0,
+                    rejectedQuantity: 0,
+                };
                 const completedQuantity = Number(row.completedQuantity || 0);
+                const rejectedQuantity = Number(row.rejectedQuantity || 0);
+                const cancelledQuantity = Math.max(0, plannedQuantity - completedQuantity - rejectedQuantity);
+                const variant = await variantRepo.findOneOrFail({ id: variantId });
+
+                totalCompleted += completedQuantity;
+                totalRejected += rejectedQuantity;
+                totalCancelled += cancelledQuantity;
+                const orderItemMeta = orderItemMetaByVariant.get(variantId);
+
+                settlementItems.push({
+                    variantId,
+                    productName: orderItemMeta?.productName || 'Producto',
+                    variantName: orderItemMeta?.variantName || variant.name || variant.sku || 'Variante',
+                    variantSku: orderItemMeta?.variantSku || variant.sku || undefined,
+                    plannedQuantity,
+                    completedQuantity,
+                    rejectedQuantity,
+                    cancelledQuantity,
+                });
+
+                settlementSummaryRows.push(
+                    `- ${variant.sku || variant.name}: planeado ${plannedQuantity}, terminado ${completedQuantity}, rechazado ${rejectedQuantity}, cancelado ${cancelledQuantity}`
+                );
+
                 if (completedQuantity <= 0) continue;
-                const variant = await variantRepo.findOneOrFail({ id: row.variantId });
                 let inventoryRow = await inventoryRepo.findOne({ warehouse, variant });
                 if (!inventoryRow) {
                     inventoryRow = inventoryRepo.create({
@@ -388,18 +448,40 @@ export class SalesOrderService {
             }
 
             const settlementNote = payload.notes?.trim() || 'Cancelación con liquidación parcial de producción';
+            const settlementHeader = [
+                `Liquidación parcial por cancelación de pedido`,
+                `Bodega destino: ${warehouse.name}`,
+                `Totales -> terminado ${totalCompleted}, rechazado ${totalRejected}, cancelado ${totalCancelled}`,
+                `Observación: ${settlementNote}`,
+            ].join('\n');
+            const settlementSummary = [settlementHeader, settlementSummaryRows.join('\n')].filter(Boolean).join('\n');
+            const settlementRecord: CancellationSettlement = {
+                settledAt: new Date(),
+                warehouseId: warehouse.id,
+                warehouseName: warehouse.name,
+                notes: payload.notes?.trim() || undefined,
+                totalPlanned: Array.from(allowedByVariant.values()).reduce((sum, qty) => sum + Number(qty || 0), 0),
+                totalCompleted,
+                totalRejected,
+                totalCancelled,
+                productionOrderIds: activeProductionOrders.map((productionOrder) => productionOrder.id),
+                productionOrderCodes: activeProductionOrders.map((productionOrder) => productionOrder.code),
+                items: settlementItems,
+            };
 
             for (const productionOrder of activeProductionOrders) {
                 if (productionOrder.status === ProductionOrderStatus.COMPLETED || productionOrder.status === ProductionOrderStatus.CANCELLED) continue;
                 productionOrder.status = ProductionOrderStatus.CANCELLED;
-                productionOrder.notes = [productionOrder.notes, `Liquidación parcial por cancelación de pedido: ${settlementNote}`]
+                productionOrder.cancellationSettlement = settlementRecord;
+                productionOrder.notes = [productionOrder.notes, settlementSummary]
                     .filter(Boolean)
                     .join('\n');
                 tx.persist(productionOrder);
             }
 
             order.status = SalesOrderStatus.CANCELLED;
-            order.notes = [order.notes, `Pedido cancelado con liquidación parcial. ${settlementNote}`]
+            order.cancellationSettlement = settlementRecord;
+            order.notes = [order.notes, `Pedido cancelado con liquidación parcial.`, settlementSummary]
                 .filter(Boolean)
                 .join('\n');
             tx.persist(order);
