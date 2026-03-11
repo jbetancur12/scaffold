@@ -55,6 +55,7 @@ import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 import { ProcessDeviation } from '../entities/process-deviation.entity';
 import { OosCase } from '../entities/oos-case.entity';
 import { ChangeControl } from '../entities/change-control.entity';
+import { Customer } from '../entities/customer.entity';
 import { QualityDhrService } from './quality-dhr.service';
 import { QualityDhrPdfService } from './quality-dhr-pdf.service';
 import { QualityPostmarketService } from './quality-postmarket.service';
@@ -388,6 +389,7 @@ export class QualityService {
         phone?: string;
         address?: string;
         notes?: string;
+        shippingLabelTemplate?: Customer['shippingLabelTemplate'];
     }, actor?: string) {
         return this.postmarketService.createCustomer(payload, actor);
     }
@@ -409,6 +411,7 @@ export class QualityService {
         phone: string;
         address: string;
         notes: string;
+        shippingLabelTemplate: Customer['shippingLabelTemplate'];
     }>, actor?: string) {
         return this.postmarketService.updateCustomer(id, payload, actor);
     }

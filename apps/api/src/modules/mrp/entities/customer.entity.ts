@@ -31,4 +31,7 @@ export class Customer extends BaseEntity implements ICustomer {
 
     @Property({ type: 'json', nullable: true })
     quotationTermsTemplate?: ICustomer['quotationTermsTemplate'];
+
+    @Property({ type: 'json', nullable: true })
+    shippingLabelTemplate?: ICustomer['shippingLabelTemplate'];
 }

@@ -520,6 +520,7 @@ export class QualityPostmarketService {
         address?: string;
         notes?: string;
         quotationTermsTemplate?: QuotationTermsTemplate | null;
+        shippingLabelTemplate?: Customer['shippingLabelTemplate'];
     }, actor?: string) {
         const row = this.customerRepo.create({
             ...payload,
@@ -561,6 +562,7 @@ export class QualityPostmarketService {
         address: string;
         notes: string;
         quotationTermsTemplate: QuotationTermsTemplate | null;
+        shippingLabelTemplate: Customer['shippingLabelTemplate'];
     }>, actor?: string) {
         const customer = await this.customerRepo.findOneOrFail({ id });
         this.customerRepo.assign(customer, payload);

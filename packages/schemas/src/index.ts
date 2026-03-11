@@ -120,18 +120,6 @@ const QuotationTermsTemplateSchema = z.object({
     }),
 });
 
-export const CustomerSchema = z.object({
-    name: z.string().min(2, 'El nombre es obligatorio'),
-    documentType: z.string().optional(),
-    documentNumber: z.string().optional(),
-    contactName: z.string().optional(),
-    email: z.string().email('Email inválido').optional().or(z.literal('')),
-    phone: z.string().optional(),
-    address: z.string().optional(),
-    notes: z.string().optional(),
-    quotationTermsTemplate: QuotationTermsTemplateSchema.nullish(),
-});
-
 export const CustomerShippingLabelSchema = z.object({
     senderName: z.string().min(1),
     senderDocument: z.string().optional(),
@@ -148,6 +136,19 @@ export const CustomerShippingLabelSchema = z.object({
     footerLine: z.string().optional(),
     footerEmail: z.string().optional(),
     actor: z.string().optional(),
+});
+
+export const CustomerSchema = z.object({
+    name: z.string().min(2, 'El nombre es obligatorio'),
+    documentType: z.string().optional(),
+    documentNumber: z.string().optional(),
+    contactName: z.string().optional(),
+    email: z.string().email('Email inválido').optional().or(z.literal('')),
+    phone: z.string().optional(),
+    address: z.string().optional(),
+    notes: z.string().optional(),
+    quotationTermsTemplate: QuotationTermsTemplateSchema.nullish(),
+    shippingLabelTemplate: CustomerShippingLabelSchema.nullish(),
 });
 
 export const ListCustomersQuerySchema = z.object({

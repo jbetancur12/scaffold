@@ -1411,8 +1411,26 @@ export interface Customer {
     address?: string;
     notes?: string;
     quotationTermsTemplate?: QuotationTermsTemplate | null;
+    shippingLabelTemplate?: CustomerShippingLabelTemplate | null;
     createdAt: string | Date;
     updatedAt: string | Date;
+}
+
+export interface CustomerShippingLabelTemplate {
+    senderName?: string;
+    senderDocument?: string;
+    senderAddress?: string;
+    senderPhone?: string;
+    senderMobile?: string;
+    senderCity?: string;
+    recipientName?: string;
+    recipientContact?: string;
+    recipientAddress?: string;
+    recipientPhone?: string;
+    recipientCity?: string;
+    recipientDepartment?: string;
+    footerLine?: string;
+    footerEmail?: string;
 }
 
 export interface ShipmentItem {

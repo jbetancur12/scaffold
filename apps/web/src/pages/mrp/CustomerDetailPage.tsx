@@ -44,14 +44,23 @@ export default function CustomerDetailPage() {
 
     useEffect(() => {
         if (!customer) return;
+        const template = customer.shippingLabelTemplate || {};
         setLabelForm((prev) => ({
             ...prev,
-            recipientName: prev.recipientName || customer.name || '',
-            recipientContact: prev.recipientContact || customer.contactName || '',
-            recipientAddress: prev.recipientAddress || customer.address || '',
-            recipientPhone: prev.recipientPhone || customer.phone || '',
-            recipientCity: prev.recipientCity || '',
-            recipientDepartment: prev.recipientDepartment || '',
+            senderName: template.senderName ?? prev.senderName,
+            senderDocument: template.senderDocument ?? prev.senderDocument,
+            senderAddress: template.senderAddress ?? prev.senderAddress,
+            senderPhone: template.senderPhone ?? prev.senderPhone,
+            senderMobile: template.senderMobile ?? prev.senderMobile,
+            senderCity: template.senderCity ?? prev.senderCity,
+            recipientName: template.recipientName ?? customer.name ?? '',
+            recipientContact: template.recipientContact ?? customer.contactName ?? '',
+            recipientAddress: template.recipientAddress ?? customer.address ?? '',
+            recipientPhone: template.recipientPhone ?? customer.phone ?? '',
+            recipientCity: template.recipientCity ?? prev.recipientCity ?? '',
+            recipientDepartment: template.recipientDepartment ?? prev.recipientDepartment ?? '',
+            footerLine: template.footerLine ?? prev.footerLine,
+            footerEmail: template.footerEmail ?? prev.footerEmail,
         }));
     }, [customer]);
 
@@ -59,7 +68,7 @@ export default function CustomerDetailPage() {
         if (!id) return;
         try {
             setGeneratingPdf(true);
-            const blob = await mrpApi.downloadCustomerShippingLabel(id, {
+            const payload = {
                 senderName: labelForm.senderName,
                 senderDocument: labelForm.senderDocument || undefined,
                 senderAddress: labelForm.senderAddress || undefined,
@@ -75,7 +84,28 @@ export default function CustomerDetailPage() {
                 footerLine: labelForm.footerLine || undefined,
                 footerEmail: labelForm.footerEmail || undefined,
                 actor: 'sistema-web',
+            };
+
+            await mrpApi.updateCustomer(id, {
+                shippingLabelTemplate: {
+                    senderName: payload.senderName,
+                    senderDocument: payload.senderDocument,
+                    senderAddress: payload.senderAddress,
+                    senderPhone: payload.senderPhone,
+                    senderMobile: payload.senderMobile,
+                    senderCity: payload.senderCity,
+                    recipientName: payload.recipientName,
+                    recipientContact: payload.recipientContact,
+                    recipientAddress: payload.recipientAddress,
+                    recipientPhone: payload.recipientPhone,
+                    recipientCity: payload.recipientCity,
+                    recipientDepartment: payload.recipientDepartment,
+                    footerLine: payload.footerLine,
+                    footerEmail: payload.footerEmail,
+                },
             });
+
+            const blob = await mrpApi.downloadCustomerShippingLabel(id, payload);
 
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
