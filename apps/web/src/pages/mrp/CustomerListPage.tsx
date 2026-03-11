@@ -296,7 +296,7 @@ export default function CustomerListPage() {
                                     <TableRow
                                         key={customer.id}
                                         className="group hover:bg-slate-50/80 transition-colors cursor-pointer"
-                                        onClick={() => navigate(`/mrp/customers/${customer.id}/edit`)}
+                                        onClick={() => navigate(`/mrp/customers/${customer.id}`)}
                                     >
                                         <TableCell>
                                             <div className="flex items-center gap-3">

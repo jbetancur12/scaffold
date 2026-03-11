@@ -145,6 +145,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/quality/customers/import/preview', (req, res, next) => mrpController.previewCustomersImport(req, res, next));
     router.post('/quality/customers/import', (req, res, next) => mrpController.importCustomersCsv(req, res, next));
     router.get('/quality/customers/:id', (req, res, next) => mrpController.getCustomer(req, res, next));
+    router.post('/quality/customers/:id/shipping-label', (req, res, next) => mrpController.downloadCustomerShippingLabel(req, res, next));
     router.patch('/quality/customers/:id', (req, res, next) => mrpController.updateCustomer(req, res, next));
     router.delete('/quality/customers/:id', (req, res, next) => mrpController.deleteCustomer(req, res, next));
     router.post('/quality/shipments', (req, res, next) => mrpController.createShipment(req, res, next));

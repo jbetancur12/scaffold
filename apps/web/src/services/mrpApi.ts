@@ -167,6 +167,7 @@ import type {
     ProductCsvImportPayload,
     SupplierCsvImportPayload,
     CustomerCsvImportPayload,
+    CustomerShippingLabelPayload,
     RawMaterialCsvImportPayload,
     CalculateThreadConsumptionPayload,
     CreateProductThreadProcessPayload,
@@ -1091,6 +1092,10 @@ export const mrpApi = {
     getCustomer: async (id: string): Promise<Customer> => {
         const response = await api.get<Customer>(`/mrp/quality/customers/${id}`);
         return response.data;
+    },
+    downloadCustomerShippingLabel: async (id: string, payload: CustomerShippingLabelPayload): Promise<Blob> => {
+        const response = await api.post(`/mrp/quality/customers/${id}/shipping-label`, payload, { responseType: 'blob' });
+        return response.data as Blob;
     },
     updateCustomer: async (id: string, data: Partial<CreateCustomerPayload>): Promise<Customer> => {
         const response = await api.patch<Customer>(`/mrp/quality/customers/${id}`, data);

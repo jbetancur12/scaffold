@@ -23,6 +23,7 @@ import { ThreadProcessService } from './services/thread-process.service';
 import { QuotationService } from './services/quotation.service';
 import { QuotationPdfService } from './services/quotation-pdf.service';
 import { ProductionAnalyticsService } from './services/production-analytics.service';
+import { CustomerShippingLabelPdfService } from './services/customer-shipping-label-pdf.service';
 import {
     ProductSchema,
     ProductGroupSchema,
@@ -92,6 +93,7 @@ import {
     CreateRecallCaseSchema,
     ListRecallCasesQuerySchema,
     CustomerSchema,
+    CustomerShippingLabelSchema,
     ListCustomersQuerySchema,
     CreateShipmentSchema,
     ListShipmentsQuerySchema,
@@ -188,6 +190,7 @@ export class MrpController {
     private get purchaseRequisitionService() { return new PurchaseRequisitionService(this.em); }
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
+    private get customerShippingLabelPdfService() { return new CustomerShippingLabelPdfService(); }
     private get salesOrderService() { return new SalesOrderService(this.em); }
     private get quotationService() { return new QuotationService(this.em); }
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
@@ -1444,6 +1447,20 @@ export class MrpController {
             const { id } = req.params;
             const row = await this.qualityService.getCustomer(id);
             return ApiResponse.success(res, row);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadCustomerShippingLabel(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            await this.qualityService.getCustomer(id);
+            const payload = CustomerShippingLabelSchema.parse(req.body);
+            const file = await this.customerShippingLabelPdfService.generateLabel(payload);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename=\"${file.fileName}\"`);
+            return res.send(file.buffer);
         } catch (error) {
             next(error);
         }

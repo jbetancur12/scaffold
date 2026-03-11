@@ -132,6 +132,24 @@ export const CustomerSchema = z.object({
     quotationTermsTemplate: QuotationTermsTemplateSchema.nullish(),
 });
 
+export const CustomerShippingLabelSchema = z.object({
+    senderName: z.string().min(1),
+    senderDocument: z.string().optional(),
+    senderAddress: z.string().optional(),
+    senderPhone: z.string().optional(),
+    senderMobile: z.string().optional(),
+    senderCity: z.string().optional(),
+    recipientName: z.string().min(1),
+    recipientContact: z.string().optional(),
+    recipientAddress: z.string().optional(),
+    recipientPhone: z.string().optional(),
+    recipientCity: z.string().optional(),
+    recipientDepartment: z.string().optional(),
+    footerLine: z.string().optional(),
+    footerEmail: z.string().optional(),
+    actor: z.string().optional(),
+});
+
 export const ListCustomersQuerySchema = z.object({
     search: z.string().optional(),
 });
@@ -1537,6 +1555,7 @@ export type CreateRecallNotificationPayload = DateInputValue<z.input<typeof Crea
 export type UpdateRecallNotificationPayload = DateInputValue<z.input<typeof UpdateRecallNotificationSchema>>;
 export type CloseRecallCasePayload = DateInputValue<z.input<typeof CloseRecallCaseSchema>>;
 export type CreateCustomerPayload = DateInputValue<z.input<typeof CustomerSchema>>;
+export type CustomerShippingLabelPayload = DateInputValue<z.input<typeof CustomerShippingLabelSchema>>;
 export type CreateShipmentPayload = DateInputValue<z.input<typeof CreateShipmentSchema>>;
 export type CreateDmrTemplatePayload = DateInputValue<z.input<typeof CreateDmrTemplateSchema>>;
 export type ProductCsvImportPayload = DateInputValue<z.input<typeof ProductCsvImportSchema>>;

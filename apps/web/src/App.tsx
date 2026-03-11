@@ -15,6 +15,7 @@ import SupplierListPage from '@/pages/mrp/SupplierListPage';
 import SupplierFormPage from '@/pages/mrp/SupplierFormPage';
 import SupplierDetailPage from '@/pages/mrp/SupplierDetailPage';
 import CustomerListPage from '@/pages/mrp/CustomerListPage';
+import CustomerDetailPage from '@/pages/mrp/CustomerDetailPage';
 import CustomerFormPage from '@/pages/mrp/CustomerFormPage';
 import RawMaterialListPage from '@/pages/mrp/RawMaterialListPage';
 import RawMaterialFormPage from '@/pages/mrp/RawMaterialFormPage';
@@ -151,6 +152,7 @@ export default function App() {
                         <Route path="/mrp/suppliers/:id/edit" element={<SupplierFormPage />} />
 
                         <Route path="/mrp/customers" element={<CustomerListPage />} />
+                        <Route path="/mrp/customers/:id" element={<CustomerDetailPage />} />
                         <Route path="/mrp/customers/new" element={<CustomerFormPage />} />
                         <Route path="/mrp/customers/:id/edit" element={<CustomerFormPage />} />
 
