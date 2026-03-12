@@ -585,7 +585,7 @@ export const ListProductGroupsQuerySchema = z.object({
 export const PriceListConfigSchema = z.object({
     showCover: z.boolean().default(true),
     headerTitle: z.string().min(1).optional(),
-    headerSubtitle: z.string().min(1).optional(),
+    headerSubtitle: z.string().optional(),
     introText: z.string().optional(),
     sections: z.array(z.object({
         title: z.string().min(1, 'El título es obligatorio'),
