@@ -43,6 +43,9 @@ html(lang="es")
       .policy { break-inside: avoid; margin-bottom: 12px; }
       .policy-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; background: #c7dcf5; padding: 4px 8px; display: block; margin-bottom: 6px; border-radius: 2px; }
       .policy-body { white-space: pre-wrap; }
+      .policy-body table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10px; }
+      .policy-body th, .policy-body td { border: 1px solid #94a3b8; padding: 4px 6px; text-align: left; vertical-align: top; }
+      .policy-body th { background: #eef2ff; text-transform: uppercase; font-size: 9px; letter-spacing: .04em; }
       .page-break { page-break-after: always; }
       .header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 12px; border-bottom: 2px solid #e2e8f0; }
       .title { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
@@ -80,7 +83,7 @@ html(lang="es")
           each section in cover.sections
             .policy
               .policy-title= section.title
-              .policy-body= section.body
+              .policy-body !{section.bodyHtml}
       .page-break
     .header
       if logoDataUrl
@@ -176,6 +179,76 @@ export class ProductCatalogPdfService {
       minimumFractionDigits: 0,
       maximumFractionDigits: 2,
     }).format(numeric);
+  }
+
+  private escapeHtml(value: string) {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  private parseTableBlock(lines: string[], startIndex: number) {
+    const header = lines[startIndex];
+    const divider = lines[startIndex + 1];
+    if (!header || !divider) return null;
+    if (!header.includes('|')) return null;
+    if (!/^\s*\|?[\s-:|]+\|?\s*$/.test(divider)) return null;
+
+    const parseRow = (line: string) => line
+      .split('|')
+      .map((cell) => cell.trim())
+      .filter((cell) => cell.length > 0);
+
+    const headers = parseRow(header);
+    if (headers.length === 0) return null;
+
+    const rows: string[][] = [];
+    let index = startIndex + 2;
+    while (index < lines.length) {
+      const line = lines[index];
+      if (!line.includes('|')) break;
+      const cells = parseRow(line);
+      if (cells.length === 0) break;
+      rows.push(cells);
+      index += 1;
+    }
+
+    return { headers, rows, nextIndex: index };
+  }
+
+  private bodyToHtml(body: string) {
+    const lines = body.split(/\r?\n/);
+    const chunks: string[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const table = this.parseTableBlock(lines, i);
+      if (table) {
+        const headerHtml = table.headers.map((cell) => `<th>${this.escapeHtml(cell)}</th>`).join('');
+        const rowsHtml = table.rows.map((row) => {
+          const cols = row.map((cell) => `<td>${this.escapeHtml(cell)}</td>`).join('');
+          return `<tr>${cols}</tr>`;
+        }).join('');
+        chunks.push(`<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`);
+        i = table.nextIndex;
+        continue;
+      }
+
+      if (line.trim().length === 0) {
+        chunks.push('<br/>');
+        i += 1;
+        continue;
+      }
+
+      chunks.push(`<div>${this.escapeHtml(line)}</div>`);
+      i += 1;
+    }
+
+    return chunks.join('');
   }
 
   private getLogoDataUrl(): string | undefined {
@@ -302,6 +375,7 @@ export class ProductCatalogPdfService {
         sections: (config.sections || []).map((section) => ({
           title: section.title,
           body: section.body,
+          bodyHtml: this.bodyToHtml(section.body || ''),
         })),
         logoDataUrl: this.getLogoDataUrl(),
       }
