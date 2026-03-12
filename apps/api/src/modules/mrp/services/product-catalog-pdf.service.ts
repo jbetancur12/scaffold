@@ -35,7 +35,7 @@ html(lang="es")
       * { box-sizing: border-box; }
       body { font-family: Arial, sans-serif; color: #0f172a; font-size: 11px; margin: 0; }
       .cover { padding: 28px 36px 12px; }
-      .cover-head { margin-top: 10px; background: #93b0df; padding: 10px 14px; display: inline-block; }
+      .cover-head { margin-top: 10px; background: #93b0df; padding: 10px 14px; display: block; width: 100%; }
       .cover-title { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: .2px; }
       .cover-subtitle { margin-top: 4px; font-size: 13px; font-weight: 700; color: #0f172a; }
       .cover-body { margin-top: 18px; column-count: 2; column-gap: 28px; }
