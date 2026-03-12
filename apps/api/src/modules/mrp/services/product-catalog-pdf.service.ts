@@ -34,13 +34,15 @@ html(lang="es")
     style.
       * { box-sizing: border-box; }
       body { font-family: Arial, sans-serif; color: #0f172a; font-size: 11px; margin: 0; }
-      .cover { padding: 32px 36px 12px; }
-      .cover-title { font-size: 20px; font-weight: 800; background: #93b0df; color: #0f172a; padding: 8px 12px; display: inline-block; }
-      .cover-subtitle { margin-top: 6px; font-size: 16px; font-weight: 700; }
+      .cover { padding: 28px 36px 12px; }
+      .cover-head { background: #93b0df; padding: 10px 14px; display: inline-block; }
+      .cover-title { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: .2px; }
+      .cover-subtitle { margin-top: 4px; font-size: 14px; font-weight: 700; color: #0f172a; }
       .cover-body { margin-top: 18px; column-count: 2; column-gap: 28px; }
-      .cover-intro { margin-bottom: 14px; }
+      .cover-intro { margin-bottom: 14px; white-space: pre-wrap; }
       .policy { break-inside: avoid; margin-bottom: 12px; }
-      .policy-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1d4ed8; background: #dbeafe; padding: 4px 6px; display: inline-block; margin-bottom: 6px; }
+      .policy-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; background: #c7dcf5; padding: 4px 8px; display: block; margin-bottom: 6px; border-radius: 2px; }
+      .policy-body { white-space: pre-wrap; }
       .page-break { page-break-after: always; }
       .header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 12px; border-bottom: 2px solid #e2e8f0; }
       .title { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
@@ -68,16 +70,17 @@ html(lang="es")
       .cover
         if cover.logoDataUrl
           img.logo(src=cover.logoDataUrl)
-        .cover-title= cover.headerTitle
-        if cover.headerSubtitle
-          .cover-subtitle= cover.headerSubtitle
+        .cover-head
+          .cover-title= cover.headerTitle
+          if cover.headerSubtitle
+            .cover-subtitle= cover.headerSubtitle
         .cover-body
           if cover.introText
             .cover-intro= cover.introText
           each section in cover.sections
             .policy
               .policy-title= section.title
-              div= section.body
+              .policy-body= section.body
       .page-break
     .header
       if logoDataUrl
