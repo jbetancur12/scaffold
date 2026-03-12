@@ -582,6 +582,11 @@ export const ListProductGroupsQuerySchema = z.object({
     activeOnly: z.coerce.boolean().optional(),
 });
 
+export const PriceListSnapshotsQuerySchema = z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+    version: z.coerce.number().int().positive().optional(),
+});
+
 export const PriceListConfigSchema = z.object({
     showCover: z.boolean().default(true),
     orientation: z.enum(['landscape', 'portrait']).default('landscape'),

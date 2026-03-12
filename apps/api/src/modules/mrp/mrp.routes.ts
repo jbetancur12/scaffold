@@ -25,6 +25,9 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/products/catalog/pdf', (req, res, next) => mrpController.downloadProductCatalogPdf(req, res, next));
     router.get('/price-list/config', (req, res, next) => mrpController.getPriceListConfig(req, res, next));
     router.put('/price-list/config', (req, res, next) => mrpController.updatePriceListConfig(req, res, next));
+    router.get('/price-list/pdf', (req, res, next) => mrpController.downloadPriceListPdf(req, res, next));
+    router.get('/price-list/snapshots', (req, res, next) => mrpController.listPriceListSnapshots(req, res, next));
+    router.post('/price-list/snapshots/regenerate', (req, res, next) => mrpController.regeneratePriceListSnapshot(req, res, next));
     router.get('/products/export/csv', (req, res, next) => mrpController.exportProductsCsv(req, res, next));
     router.get('/products/import/template/csv', (req, res, next) => mrpController.getProductsImportTemplateCsv(req, res, next));
     router.post('/products/import/preview', (req, res, next) => mrpController.previewProductsImport(req, res, next));

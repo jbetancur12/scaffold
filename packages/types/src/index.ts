@@ -747,6 +747,42 @@ export interface PriceListConfig {
     updatedAt: string | Date;
 }
 
+export interface PriceListConfigSnapshot {
+    showCover: boolean;
+    orientation: 'landscape' | 'portrait';
+    headerTitle?: string;
+    headerSubtitle?: string;
+    introText?: string;
+    sections: Array<{ title: string; body: string }>;
+}
+
+export interface PriceListSnapshotItem {
+    productId: string;
+    sku: string;
+    name: string;
+    description: string;
+    categoryId?: string;
+    groupName: string;
+    groupSortOrder: number;
+    price: number;
+    taxStatus: ProductTaxStatus;
+    taxRate: number;
+    imageFilePath?: string;
+    imageMime?: string;
+    imageSortOrder?: number;
+}
+
+export interface PriceListSnapshot {
+    id: string;
+    month: string; // YYYY-MM
+    version: number;
+    configSnapshot: PriceListConfigSnapshot;
+    items: PriceListSnapshotItem[];
+    source?: 'auto' | 'manual';
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
 export interface ProductImage {
     id: string;
     productId: string;

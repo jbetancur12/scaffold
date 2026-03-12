@@ -26,6 +26,7 @@ import { ProductionAnalyticsService } from './services/production-analytics.serv
 import { CustomerShippingLabelPdfService } from './services/customer-shipping-label-pdf.service';
 import { ProductCatalogPdfService } from './services/product-catalog-pdf.service';
 import { PriceListConfigService } from './services/price-list-config.service';
+import { PriceListSnapshotService } from './services/price-list-snapshot.service';
 import {
     ProductSchema,
     ProductGroupSchema,
@@ -49,6 +50,7 @@ import {
     ListProductsQuerySchema,
     ListProductGroupsQuerySchema,
     UpdatePriceListConfigSchema,
+    PriceListSnapshotsQuerySchema,
     ListRawMaterialsQuerySchema,
     AddSupplierMaterialSchema,
     UpdateProductionOrderStatusSchema,
@@ -196,6 +198,7 @@ export class MrpController {
     private get customerShippingLabelPdfService() { return new CustomerShippingLabelPdfService(); }
     private get productCatalogPdfService() { return new ProductCatalogPdfService(this.em); }
     private get priceListConfigService() { return new PriceListConfigService(this.em); }
+    private get priceListSnapshotService() { return new PriceListSnapshotService(this.em); }
     private get salesOrderService() { return new SalesOrderService(this.em); }
     private get quotationService() { return new QuotationService(this.em); }
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
@@ -255,10 +258,47 @@ export class MrpController {
     async downloadProductCatalogPdf(req: Request, res: Response, next: NextFunction) {
         try {
             const { search, categoryId } = ListProductsQuerySchema.parse(req.query);
-            const pdf = await this.productCatalogPdfService.generateProductCatalogPdf({ search, categoryId });
+            const { month, version } = PriceListSnapshotsQuerySchema.parse(req.query);
+            const snapshot = await this.priceListSnapshotService.ensureSnapshot(month);
+            const selected = version ? await this.priceListSnapshotService.getSnapshot(snapshot.month, version) : snapshot;
+            const pdf = await this.productCatalogPdfService.generateProductCatalogPdfFromSnapshot(selected || snapshot, { search, categoryId });
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
             return res.send(pdf.buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadPriceListPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { month, version } = PriceListSnapshotsQuerySchema.parse(req.query);
+            const snapshot = await this.priceListSnapshotService.ensureSnapshot(month);
+            const selected = version ? await this.priceListSnapshotService.getSnapshot(snapshot.month, version) : snapshot;
+            const pdf = await this.productCatalogPdfService.generateProductCatalogPdfFromSnapshot(selected || snapshot);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
+            return res.send(pdf.buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listPriceListSnapshots(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { month } = PriceListSnapshotsQuerySchema.parse(req.query);
+            const rows = await this.priceListSnapshotService.listSnapshots(month);
+            return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async regeneratePriceListSnapshot(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { month } = PriceListSnapshotsQuerySchema.parse(req.query);
+            const row = await this.priceListSnapshotService.regenerateSnapshot(month);
+            return ApiResponse.success(res, row, 'Snapshot regenerado');
         } catch (error) {
             next(error);
         }

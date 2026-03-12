@@ -5,7 +5,7 @@ import { Product } from '../entities/product.entity';
 import { ProductImage } from '../entities/product-image.entity';
 import { ObjectStorageService } from '../../../shared/services/object-storage.service';
 import { AppError } from '../../../shared/utils/response';
-import { ProductTaxStatus } from '@scaffold/types';
+import { PriceListSnapshot, PriceListSnapshotItem, ProductTaxStatus } from '@scaffold/types';
 import { PriceListConfigService } from './price-list-config.service';
 
 type PugModule = {
@@ -308,6 +308,17 @@ export class ProductCatalogPdfService {
     }
   }
 
+  private async resolveSnapshotImage(item: PriceListSnapshotItem): Promise<string | undefined> {
+    if (!item.imageFilePath) return undefined;
+    try {
+      const buffer = await this.storageService.readObject(item.imageFilePath);
+      const mime = item.imageMime || 'image/jpeg';
+      return `data:${mime};base64,${buffer.toString('base64')}`;
+    } catch {
+      return undefined;
+    }
+  }
+
   private pickPricingVariant(product: Product) {
     const variants = product.variants?.getItems?.() ?? [];
     if (!variants || variants.length === 0) return null;
@@ -436,6 +447,122 @@ export class ProductCatalogPdfService {
       });
       return {
         fileName: `catalogo_precios_${now.toISOString().slice(0, 10)}.pdf`,
+        buffer: pdfBuffer,
+      };
+    } finally {
+      await browser.close();
+    }
+  }
+
+  async generateProductCatalogPdfFromSnapshot(snapshot: PriceListSnapshot, filters?: { search?: string; categoryId?: string }) {
+    const search = filters?.search?.trim().toLowerCase() || '';
+    const categoryId = filters?.categoryId;
+
+    const items = (snapshot.items || []).filter((item) => {
+      if (categoryId && item.categoryId !== categoryId) return false;
+      if (!search) return true;
+      return (
+        item.sku.toLowerCase().includes(search) ||
+        item.name.toLowerCase().includes(search) ||
+        item.groupName.toLowerCase().includes(search)
+      );
+    });
+
+    const grouped = new Map<string, { sortOrder: number; rows: CatalogRow[] }>();
+    for (const item of items) {
+      const taxRate = item.taxStatus === ProductTaxStatus.GRAVADO ? Number(item.taxRate || 0) : 0;
+      const taxAmount = Number(item.price || 0) * (taxRate / 100);
+      const total = Number(item.price || 0) + taxAmount;
+      const ivaLabel = item.taxStatus === ProductTaxStatus.GRAVADO
+        ? `${taxRate}%`
+        : (item.taxStatus === ProductTaxStatus.EXENTO ? 'Exento' : 'Excluido');
+
+      const imageUrl = await this.resolveSnapshotImage(item);
+      const row: CatalogRow = {
+        sku: item.sku,
+        name: item.name,
+        description: item.description || 'Sin descripción',
+        imageUrl,
+        subtotal: this.formatCurrency(item.price),
+        ivaLabel,
+        total: this.formatCurrency(total),
+      };
+
+      const current = grouped.get(item.groupName) || { sortOrder: item.groupSortOrder ?? 9999, rows: [] };
+      current.rows.push(row);
+      grouped.set(item.groupName, current);
+    }
+
+    const groups: CatalogGroup[] = Array.from(grouped.entries())
+      .sort(([aName, aData], [bName, bData]) => {
+        const normalize = (value: string) => value.trim().toLowerCase();
+        const aKey = normalize(aName);
+        const bKey = normalize(bName);
+        const aIsOther = aKey === 'otros' || aKey === 'sin grupo';
+        const bIsOther = bKey === 'otros' || bKey === 'sin grupo';
+        if (aIsOther && !bIsOther) return 1;
+        if (bIsOther && !aIsOther) return -1;
+        if (aData.sortOrder !== bData.sortOrder) return aData.sortOrder - bData.sortOrder;
+        return aName.localeCompare(bName);
+      })
+      .map(([name, data]) => ({
+        name,
+        sortOrder: data.sortOrder,
+        rows: data.rows.sort((a, b) => a.sku.localeCompare(b.sku)),
+      }));
+
+    const coverConfig = snapshot.configSnapshot;
+    const cover = coverConfig?.showCover && (coverConfig.headerTitle || coverConfig.introText || (coverConfig.sections?.length || 0) > 0)
+      ? {
+        headerTitle: coverConfig.headerTitle || 'POLÍTICAS COMERCIALES',
+        headerSubtitle: (coverConfig.headerSubtitle || '').trim() || undefined,
+        introText: coverConfig.introText || '',
+        sections: (coverConfig.sections || []).map((section) => ({
+          title: section.title,
+          body: section.body,
+          bodyHtml: this.bodyToHtml(section.body || ''),
+        })),
+        logoDataUrl: this.getLogoDataUrl(),
+      }
+      : undefined;
+
+    const orientation = coverConfig?.orientation === 'portrait' ? 'portrait' : 'landscape';
+    const pug = this.loadPug();
+    const playwright = this.loadPlaywright();
+    const compile = pug.compile(productCatalogPdfTemplate);
+    const logoDataUrl = this.getLogoDataUrl();
+    const now = new Date();
+    const monthLabel = snapshot.month;
+    const versionLabel = snapshot.version > 1 ? ` v${snapshot.version}` : '';
+    const html = compile({
+      title: `Lista de precios ${monthLabel}${versionLabel}`,
+      subtitle: `Generado el ${now.toLocaleDateString('es-CO')}`,
+      logoDataUrl,
+      cover,
+      groups,
+    });
+
+    const browser = await playwright.chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle' });
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        landscape: orientation === 'landscape',
+        printBackground: true,
+        margin: {
+          top: '20px',
+          bottom: '24px',
+          left: '16px',
+          right: '16px',
+        },
+      });
+      return {
+        fileName: `lista_precios_${monthLabel}${versionLabel.replace(' ', '_')}.pdf`,
         buffer: pdfBuffer,
       };
     } finally {

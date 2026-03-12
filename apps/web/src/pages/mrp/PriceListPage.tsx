@@ -114,6 +114,11 @@ export default function PriceListPage() {
         introText: '',
         sections: [] as Array<{ title: string; body: string }>,
     });
+    const [snapshotMonth, setSnapshotMonth] = useState(() => new Date().toISOString().slice(0, 7));
+    const [snapshotVersion, setSnapshotVersion] = useState<number | null>(null);
+    const [snapshots, setSnapshots] = useState<Array<{ version: number; createdAt: string | Date }>>([]);
+    const [loadingSnapshots, setLoadingSnapshots] = useState(false);
+    const [regeneratingSnapshot, setRegeneratingSnapshot] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -158,6 +163,29 @@ export default function PriceListPage() {
         };
         loadConfig();
     }, []);
+
+    useEffect(() => {
+        const loadSnapshots = async () => {
+            setLoadingSnapshots(true);
+            try {
+                const rows = await mrpApi.getPriceListSnapshots(snapshotMonth);
+                const normalized = rows
+                    .map((row) => ({ version: row.version, createdAt: row.createdAt }))
+                    .sort((a, b) => b.version - a.version);
+                setSnapshots(normalized);
+                setSnapshotVersion(null);
+            } catch (snapshotError) {
+                toast({
+                    title: 'Error',
+                    description: getErrorMessage(snapshotError, 'No se pudieron cargar las versiones del mes'),
+                    variant: 'destructive',
+                });
+            } finally {
+                setLoadingSnapshots(false);
+            }
+        };
+        loadSnapshots();
+    }, [snapshotMonth]);
 
     const rows = useMemo(() => buildRows(productsResponse?.products || []), [productsResponse?.products]);
 
@@ -292,14 +320,37 @@ export default function PriceListPage() {
 
     const handleExportPdf = async () => {
         try {
-            const blob = await mrpApi.downloadProductCatalogPdf(debouncedSearch, categoryId);
-            downloadBlob(blob, `catalogo_precios_${new Date().toISOString().slice(0, 10)}.pdf`);
+            const blob = await mrpApi.downloadPriceListPdf(snapshotMonth, snapshotVersion || undefined);
+            const versionLabel = snapshotVersion ? `_v${snapshotVersion}` : '';
+            downloadBlob(blob, `lista_precios_${snapshotMonth}${versionLabel}.pdf`);
         } catch (exportError) {
             toast({
                 title: 'Error',
                 description: getErrorMessage(exportError, 'No se pudo exportar el catálogo PDF'),
                 variant: 'destructive',
             });
+        }
+    };
+
+    const handleRegenerateSnapshot = async () => {
+        setRegeneratingSnapshot(true);
+        try {
+            await mrpApi.regeneratePriceListSnapshot(snapshotMonth);
+            const rows = await mrpApi.getPriceListSnapshots(snapshotMonth);
+            const normalized = rows
+                .map((row) => ({ version: row.version, createdAt: row.createdAt }))
+                .sort((a, b) => b.version - a.version);
+            setSnapshots(normalized);
+            setSnapshotVersion(normalized[0]?.version || null);
+            toast({ title: 'Listo', description: 'Se creó una nueva versión del mes.' });
+        } catch (snapshotError) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(snapshotError, 'No se pudo regenerar la lista del mes'),
+                variant: 'destructive',
+            });
+        } finally {
+            setRegeneratingSnapshot(false);
         }
     };
 
@@ -370,6 +421,41 @@ export default function PriceListPage() {
                     </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 h-11">
+                            <label className="text-xs text-slate-500">Mes</label>
+                            <input
+                                type="month"
+                                className="text-sm text-slate-700 outline-none"
+                                value={snapshotMonth}
+                                onChange={(e) => setSnapshotMonth(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 h-11">
+                            <label className="text-xs text-slate-500">Versión</label>
+                            <select
+                                className="text-sm text-slate-700 bg-transparent outline-none"
+                                value={snapshotVersion ?? ''}
+                                onChange={(e) => setSnapshotVersion(e.target.value ? Number(e.target.value) : null)}
+                                disabled={loadingSnapshots}
+                            >
+                                <option value="">Última</option>
+                                {snapshots.map((snap) => (
+                                    <option key={`v-${snap.version}`} value={snap.version}>
+                                        v{snap.version}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <Button
+                            variant="outline"
+                            className="h-11 px-4 border-slate-200 text-slate-700 hover:bg-slate-50"
+                            onClick={handleRegenerateSnapshot}
+                            disabled={regeneratingSnapshot}
+                        >
+                            {regeneratingSnapshot ? 'Regenerando...' : 'Regenerar mes'}
+                        </Button>
+                    </div>
                     <Button
                         variant="outline"
                         className="h-11 px-4 border-slate-200 text-slate-700 hover:bg-slate-50"

@@ -12,6 +12,7 @@ import {
     ProductVariant,
     ProductImage,
     PriceListConfig,
+    PriceListSnapshot,
     InventoryItem,
     OperationalConfig,
     Warehouse,
@@ -382,6 +383,28 @@ export const mrpApi = {
             },
         });
         return response.data as Blob;
+    },
+    downloadPriceListPdf: async (month?: string, version?: number): Promise<Blob> => {
+        const response = await api.get('/mrp/price-list/pdf', {
+            responseType: 'blob',
+            params: {
+                month: month || undefined,
+                version: version || undefined,
+            },
+        });
+        return response.data as Blob;
+    },
+    getPriceListSnapshots: async (month?: string): Promise<PriceListSnapshot[]> => {
+        const response = await api.get('/mrp/price-list/snapshots', {
+            params: { month: month || undefined },
+        });
+        return response.data;
+    },
+    regeneratePriceListSnapshot: async (month?: string): Promise<PriceListSnapshot> => {
+        const response = await api.post('/mrp/price-list/snapshots/regenerate', null, {
+            params: { month: month || undefined },
+        });
+        return response.data;
     },
     getPriceListConfig: async (): Promise<PriceListConfig> => {
         const response = await api.get('/mrp/price-list/config');
