@@ -100,6 +100,7 @@ export default function PriceListPage() {
     const [savingConfig, setSavingConfig] = useState(false);
     const [priceListConfig, setPriceListConfig] = useState<{
         showCover: boolean;
+        orientation: 'landscape' | 'portrait';
         headerTitle: string;
         headerSubtitle: string;
         introText: string;
@@ -107,6 +108,7 @@ export default function PriceListPage() {
     } | null>(null);
     const [configForm, setConfigForm] = useState({
         showCover: true,
+        orientation: 'landscape' as 'landscape' | 'portrait',
         headerTitle: '',
         headerSubtitle: '',
         introText: '',
@@ -127,8 +129,16 @@ export default function PriceListPage() {
             setLoadingConfig(true);
             try {
                 const config = await mrpApi.getPriceListConfig();
-                const normalized = {
+                const normalized: {
+                    showCover: boolean;
+                    orientation: 'landscape' | 'portrait';
+                    headerTitle: string;
+                    headerSubtitle: string;
+                    introText: string;
+                    sections: Array<{ title: string; body: string }>;
+                } = {
                     showCover: config.showCover ?? true,
+                    orientation: config.orientation === 'portrait' ? 'portrait' : 'landscape',
                     headerTitle: config.headerTitle || '',
                     headerSubtitle: config.headerSubtitle || '',
                     introText: config.introText || '',
@@ -305,6 +315,7 @@ export default function PriceListPage() {
         try {
             const trimmed = {
                 showCover: configForm.showCover,
+                orientation: configForm.orientation,
                 headerTitle: configForm.headerTitle.trim(),
                 headerSubtitle: configForm.headerSubtitle.trim(),
                 introText: configForm.introText.trim(),
@@ -314,8 +325,16 @@ export default function PriceListPage() {
                 })).filter((section) => section.title.length > 0 && section.body.length > 0),
             };
             const saved = await mrpApi.updatePriceListConfig(trimmed);
-            const normalized = {
+            const normalized: {
+                showCover: boolean;
+                orientation: 'landscape' | 'portrait';
+                headerTitle: string;
+                headerSubtitle: string;
+                introText: string;
+                sections: Array<{ title: string; body: string }>;
+            } = {
                 showCover: saved.showCover ?? true,
+                orientation: saved.orientation === 'portrait' ? 'portrait' : 'landscape',
                 headerTitle: saved.headerTitle || '',
                 headerSubtitle: saved.headerSubtitle || '',
                 introText: saved.introText || '',
@@ -477,11 +496,11 @@ export default function PriceListPage() {
             </div>
 
             <Dialog open={configOpen} onOpenChange={setConfigOpen}>
-                <DialogContent className="max-w-3xl">
+                <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden p-0">
                     <DialogHeader>
                         <DialogTitle>Portada de Políticas Comerciales</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-5">
+                    <div className="px-6 pb-6 pt-2 max-h-[calc(85vh-120px)] overflow-y-auto space-y-5">
                         <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                             <div>
                                 <p className="text-sm font-semibold text-slate-800">Mostrar portada</p>
@@ -510,6 +529,17 @@ export default function PriceListPage() {
                                     onChange={(e) => setConfigForm((prev) => ({ ...prev, headerSubtitle: e.target.value }))}
                                     placeholder="DATASAVE MEDICAL SAS 2026"
                                 />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Orientación del PDF</Label>
+                                <select
+                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"
+                                    value={configForm.orientation}
+                                    onChange={(e) => setConfigForm((prev) => ({ ...prev, orientation: e.target.value as 'landscape' | 'portrait' }))}
+                                >
+                                    <option value="landscape">Horizontal (Landscape)</option>
+                                    <option value="portrait">Vertical (Portrait)</option>
+                                </select>
                             </div>
                         </div>
                         <div className="space-y-2">
@@ -585,7 +615,7 @@ export default function PriceListPage() {
                             ))}
                         </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="px-6 pb-6 pt-3 border-t border-slate-200 bg-white">
                         <Button variant="outline" onClick={() => setConfigOpen(false)}>
                             Cancelar
                         </Button>

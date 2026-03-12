@@ -584,6 +584,7 @@ export const ListProductGroupsQuerySchema = z.object({
 
 export const PriceListConfigSchema = z.object({
     showCover: z.boolean().default(true),
+    orientation: z.enum(['landscape', 'portrait']).default('landscape'),
     headerTitle: z.string().min(1).optional(),
     headerSubtitle: z.string().optional(),
     introText: z.string().optional(),

@@ -738,6 +738,7 @@ export interface ProductGroup {
 export interface PriceListConfig {
     id: string;
     showCover: boolean;
+    orientation: 'landscape' | 'portrait';
     headerTitle?: string;
     headerSubtitle?: string;
     introText?: string;

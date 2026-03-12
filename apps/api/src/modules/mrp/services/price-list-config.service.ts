@@ -14,6 +14,7 @@ export class PriceListConfigService {
         const now = new Date();
         const created = this.repo.create({
             showCover: true,
+            orientation: 'landscape',
             headerTitle: 'POLÍTICAS COMERCIALES',
             headerSubtitle: 'LISTA DE PRECIOS',
             introText: '',
@@ -29,6 +30,7 @@ export class PriceListConfigService {
         const row = await this.getConfig();
         this.repo.assign(row, {
             showCover: data.showCover ?? row.showCover,
+            orientation: data.orientation ?? row.orientation,
             headerTitle: data.headerTitle ?? row.headerTitle,
             headerSubtitle: data.headerSubtitle ?? row.headerSubtitle,
             introText: data.introText ?? row.introText,

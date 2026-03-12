@@ -7,6 +7,9 @@ export class PriceListConfig extends BaseEntity implements IPriceListConfig {
     @Property({ default: true })
     showCover: boolean = true;
 
+    @Property({ default: 'landscape' })
+    orientation: 'landscape' | 'portrait' = 'landscape';
+
     @Property({ nullable: true })
     headerTitle?: string;
 

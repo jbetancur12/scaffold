@@ -380,6 +380,7 @@ export class ProductCatalogPdfService {
         logoDataUrl: this.getLogoDataUrl(),
       }
       : undefined;
+    const orientation = config.orientation === 'portrait' ? 'portrait' : 'landscape';
 
     const pug = this.loadPug();
     const playwright = this.loadPlaywright();
@@ -404,7 +405,7 @@ export class ProductCatalogPdfService {
       await page.setContent(html, { waitUntil: 'networkidle' });
       const pdfBuffer = await page.pdf({
         format: 'A4',
-        landscape: true,
+        landscape: orientation === 'landscape',
         printBackground: true,
         margin: {
           top: '20px',
