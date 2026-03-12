@@ -49,6 +49,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    volumes:
+      - api_storage:/app/storage
     networks:
       - mrp_network # Ejecutar migraciones antes de iniciar
     command: >
@@ -104,6 +106,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  api_storage:
 
 
 networks:
