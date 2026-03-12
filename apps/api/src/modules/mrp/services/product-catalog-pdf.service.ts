@@ -53,9 +53,11 @@ html(lang="es")
       .title { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
       .subtitle { font-size: 11px; color: #64748b; margin-top: 4px; }
       .logo { height: 48px; max-width: 180px; object-fit: contain; }
-      .group { margin: 18px 24px 0; page-break-inside: avoid; }
+      .group { margin: 18px 24px 0; }
       .group-title { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; background: #dbeafe; padding: 7px 10px; border: 1px solid #93c5fd; text-align: center; color: #1e3a8a; }
       table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+      thead { display: table-header-group; }
+      tr { break-inside: avoid; }
       th, td { border: 1px solid #e2e8f0; padding: 6px; vertical-align: top; }
       th { background: #f8fafc; text-transform: uppercase; font-size: 9px; letter-spacing: .05em; color: #475569; }
       .col-sku { width: 9%; }
