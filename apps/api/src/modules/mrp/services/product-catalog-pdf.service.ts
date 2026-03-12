@@ -110,6 +110,7 @@ type CatalogRow = {
 
 type CatalogGroup = {
   name: string;
+  sortOrder: number;
   rows: CatalogRow[];
 };
 
@@ -213,9 +214,10 @@ export class ProductCatalogPdfService {
       populate: ['variants', 'category', 'images'],
     });
 
-    const grouped = new Map<string, CatalogRow[]>();
+    const grouped = new Map<string, { sortOrder: number; rows: CatalogRow[] }>();
     for (const product of products) {
       const groupName = product.category?.name || 'Sin grupo';
+      const sortOrder = Number(product.category?.sortOrder ?? 9999);
       const variant = this.pickPricingVariant(product);
       const price = Number(variant?.price || 0);
       const taxRate = variant && variant.taxStatus === ProductTaxStatus.GRAVADO ? Number(variant.taxRate || 0) : 0;
@@ -239,16 +241,27 @@ export class ProductCatalogPdfService {
         total: this.formatCurrency(total),
       };
 
-      const current = grouped.get(groupName) || [];
-      current.push(row);
+      const current = grouped.get(groupName) || { sortOrder, rows: [] };
+      current.rows.push(row);
       grouped.set(groupName, current);
     }
 
     const groups: CatalogGroup[] = Array.from(grouped.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([name, rows]) => ({
+      .sort(([aName, aData], [bName, bData]) => {
+        const normalize = (value: string) => value.trim().toLowerCase();
+        const aKey = normalize(aName);
+        const bKey = normalize(bName);
+        const aIsOther = aKey === 'otros' || aKey === 'sin grupo';
+        const bIsOther = bKey === 'otros' || bKey === 'sin grupo';
+        if (aIsOther && !bIsOther) return 1;
+        if (bIsOther && !aIsOther) return -1;
+        if (aData.sortOrder !== bData.sortOrder) return aData.sortOrder - bData.sortOrder;
+        return aName.localeCompare(bName);
+      })
+      .map(([name, data]) => ({
         name,
-        rows: rows.sort((a, b) => a.sku.localeCompare(b.sku)),
+        sortOrder: data.sortOrder,
+        rows: data.rows.sort((a, b) => a.sku.localeCompare(b.sku)),
       }));
 
     const pug = this.loadPug();

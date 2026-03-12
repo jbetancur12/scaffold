@@ -757,7 +757,7 @@ export interface Product {
     weightKg?: number;
     sku: string;
     categoryId?: string;
-    category?: Pick<ProductGroup, 'id' | 'name' | 'slug' | 'parentId'>;
+    category?: Pick<ProductGroup, 'id' | 'name' | 'slug' | 'parentId' | 'sortOrder'>;
     requiresInvima: boolean;
     showInCatalogPdf: boolean;
     productReference?: string;

@@ -16,7 +16,9 @@ type PriceRow = {
     productId: string;
     productSku: string;
     productName: string;
+    groupId: string;
     groupName: string;
+    groupSortOrder: number;
     sizes: string;
     colors: string;
     productionCost: number;
@@ -27,6 +29,7 @@ type PriceRow = {
 
 type GroupedPriceRows = {
     groupName: string;
+    groupSortOrder: number;
     rows: PriceRow[];
 };
 
@@ -61,7 +64,9 @@ const buildRows = (products: Product[]): PriceRow[] => {
             productId: product.id,
             productSku: product.sku,
             productName: product.name,
+            groupId: product.category?.id || 'none',
             groupName: product.category?.name || 'Sin grupo',
+            groupSortOrder: Number(product.category?.sortOrder ?? 9999),
             sizes: uniqueSizes.join(', '),
             colors: uniqueColors.join(', '),
             productionCost: maxCost,
@@ -118,18 +123,30 @@ export default function PriceListPage() {
     }, [filteredRows, productsResponse?.products]);
 
     const groupedRows = useMemo<GroupedPriceRows[]>(() => {
-        const map = new Map<string, PriceRow[]>();
+        const map = new Map<string, { groupName: string; groupSortOrder: number; rows: PriceRow[] }>();
         for (const row of filteredRows) {
-            const current = map.get(row.groupName) || [];
-            current.push(row);
+            const current = map.get(row.groupName) || { groupName: row.groupName, groupSortOrder: row.groupSortOrder, rows: [] };
+            current.groupSortOrder = Math.min(current.groupSortOrder, row.groupSortOrder);
+            current.rows.push(row);
             map.set(row.groupName, current);
         }
 
-        return Array.from(map.entries())
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([groupName, rows]) => ({
-                groupName,
-                rows: rows.sort((a, b) => a.productSku.localeCompare(b.productSku)),
+        return Array.from(map.values())
+            .sort((a, b) => {
+                const normalize = (value: string) => value.trim().toLowerCase();
+                const aKey = normalize(a.groupName);
+                const bKey = normalize(b.groupName);
+                const aIsOther = aKey === 'otros' || aKey === 'sin grupo';
+                const bIsOther = bKey === 'otros' || bKey === 'sin grupo';
+                if (aIsOther && !bIsOther) return 1;
+                if (bIsOther && !aIsOther) return -1;
+                if (a.groupSortOrder !== b.groupSortOrder) return a.groupSortOrder - b.groupSortOrder;
+                return a.groupName.localeCompare(b.groupName);
+            })
+            .map((group) => ({
+                groupName: group.groupName,
+                groupSortOrder: group.groupSortOrder,
+                rows: group.rows.sort((a, b) => a.productSku.localeCompare(b.productSku)),
             }));
     }, [filteredRows]);
 
@@ -152,18 +169,29 @@ export default function PriceListPage() {
                 ['CODIGO', 'ARTICULO', 'GRUPO', 'TALLAS', 'COLORES', 'COSTO PRODUCCION', 'COSTO + 40%', 'PRECIO DISTRIBUIDOR', 'PVP SUGERIDO'],
             ];
 
-            const groupedExportRows = exportRows.reduce<Map<string, PriceRow[]>>((acc, row) => {
-                const current = acc.get(row.groupName) || [];
-                current.push(row);
+            const groupedExportRows = exportRows.reduce<Map<string, { groupName: string; groupSortOrder: number; rows: PriceRow[] }>>((acc, row) => {
+                const current = acc.get(row.groupName) || { groupName: row.groupName, groupSortOrder: row.groupSortOrder, rows: [] };
+                current.groupSortOrder = Math.min(current.groupSortOrder, row.groupSortOrder);
+                current.rows.push(row);
                 acc.set(row.groupName, current);
                 return acc;
             }, new Map());
 
-            Array.from(groupedExportRows.entries())
-                .sort(([a], [b]) => a.localeCompare(b))
-                .forEach(([groupName, rows]) => {
-                    csvRows.push(['', '', groupName.toUpperCase(), '', '', '', '', '', '']);
-                    rows
+            Array.from(groupedExportRows.values())
+                .sort((a, b) => {
+                    const normalize = (value: string) => value.trim().toLowerCase();
+                    const aKey = normalize(a.groupName);
+                    const bKey = normalize(b.groupName);
+                    const aIsOther = aKey === 'otros' || aKey === 'sin grupo';
+                    const bIsOther = bKey === 'otros' || bKey === 'sin grupo';
+                    if (aIsOther && !bIsOther) return 1;
+                    if (bIsOther && !aIsOther) return -1;
+                    if (a.groupSortOrder !== b.groupSortOrder) return a.groupSortOrder - b.groupSortOrder;
+                    return a.groupName.localeCompare(b.groupName);
+                })
+                .forEach((group) => {
+                    csvRows.push(['', '', group.groupName.toUpperCase(), '', '', '', '', '', '']);
+                    group.rows
                         .sort((a, b) => a.productSku.localeCompare(b.productSku))
                         .forEach((row) => {
                             csvRows.push([
