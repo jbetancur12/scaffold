@@ -408,31 +408,36 @@ export default function PriceListPage() {
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-                <div className="flex items-start gap-4">
-                    <div className="hidden sm:flex h-14 w-14 rounded-2xl border border-emerald-200 bg-emerald-50 items-center justify-center">
-                        <Package className="h-7 w-7 text-emerald-700" />
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+                {/* Title block */}
+                <div className="flex items-center gap-4">
+                    <div className="hidden sm:flex h-12 w-12 rounded-2xl border border-emerald-200 bg-emerald-50 items-center justify-center shrink-0">
+                        <Package className="h-6 w-6 text-emerald-700" />
                     </div>
                     <div>
-                        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">Lista de Precios</h1>
-                        <p className="mt-1 text-slate-500 max-w-2xl">
+                        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Lista de Precios</h1>
+                        <p className="mt-1 text-sm text-slate-500 max-w-xl">
                             Busca por producto, SKU, talla o color y descarga la lista en CSV compatible con Excel. Cada producto se consolida en una sola fila.
                         </p>
                     </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 h-11">
-                            <label className="text-xs text-slate-500">Mes</label>
+
+                {/* Controls block */}
+                <div className="flex flex-col gap-2 shrink-0">
+                    {/* Row 1: Snapshot controls */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 h-9">
+                            <label className="text-xs font-medium text-slate-400">Mes</label>
                             <input
                                 type="month"
-                                className="text-sm text-slate-700 outline-none"
+                                className="text-sm text-slate-700 outline-none bg-transparent"
                                 value={snapshotMonth}
                                 onChange={(e) => setSnapshotMonth(e.target.value)}
                             />
                         </div>
-                        <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 h-11">
-                            <label className="text-xs text-slate-500">Versión</label>
+                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 h-9">
+                            <label className="text-xs font-medium text-slate-400">Versión</label>
                             <select
                                 className="text-sm text-slate-700 bg-transparent outline-none"
                                 value={snapshotVersion ?? ''}
@@ -449,30 +454,45 @@ export default function PriceListPage() {
                         </div>
                         <Button
                             variant="outline"
-                            className="h-11 px-4 border-slate-200 text-slate-700 hover:bg-slate-50"
+                            size="sm"
+                            className="h-9 px-3 border-slate-200 text-slate-600 hover:bg-slate-50 text-xs"
                             onClick={handleRegenerateSnapshot}
                             disabled={regeneratingSnapshot}
                         >
                             {regeneratingSnapshot ? 'Regenerando...' : 'Regenerar mes'}
                         </Button>
                     </div>
-                    <Button
-                        variant="outline"
-                        className="h-11 px-4 border-slate-200 text-slate-700 hover:bg-slate-50"
-                        onClick={openConfigModal}
-                        disabled={loadingConfig}
-                    >
-                        <Settings className="mr-2 h-4 w-4" />
-                        Portada PDF
-                    </Button>
-                    <Button onClick={handleExportPdf} variant="outline" className="h-11 px-5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
-                        <Download className="mr-2 h-4 w-4" />
-                        Descargar PDF
-                    </Button>
-                    <Button onClick={handleExport} className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-5">
-                        <Download className="mr-2 h-4 w-4" />
-                        Descargar Excel (CSV)
-                    </Button>
+
+                    {/* Row 2: Action buttons */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 px-3 border-slate-200 text-slate-600 hover:bg-slate-50 text-xs"
+                            onClick={openConfigModal}
+                            disabled={loadingConfig}
+                        >
+                            <Settings className="mr-1.5 h-3.5 w-3.5" />
+                            Portada PDF
+                        </Button>
+                        <Button
+                            onClick={handleExportPdf}
+                            variant="outline"
+                            size="sm"
+                            className="h-9 px-3 border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs"
+                        >
+                            <Download className="mr-1.5 h-3.5 w-3.5" />
+                            Descargar PDF
+                        </Button>
+                        <Button
+                            onClick={handleExport}
+                            size="sm"
+                            className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                        >
+                            <Download className="mr-1.5 h-3.5 w-3.5" />
+                            Descargar Excel (CSV)
+                        </Button>
+                    </div>
                 </div>
             </div>
 
