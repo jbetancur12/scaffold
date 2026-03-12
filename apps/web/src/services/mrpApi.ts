@@ -11,6 +11,7 @@ import {
     ProductionBatchUnit,
     ProductVariant,
     ProductImage,
+    PriceListConfig,
     InventoryItem,
     OperationalConfig,
     Warehouse,
@@ -381,6 +382,14 @@ export const mrpApi = {
             },
         });
         return response.data as Blob;
+    },
+    getPriceListConfig: async (): Promise<PriceListConfig> => {
+        const response = await api.get('/mrp/price-list/config');
+        return response.data;
+    },
+    updatePriceListConfig: async (data: Partial<PriceListConfig>): Promise<PriceListConfig> => {
+        const response = await api.put('/mrp/price-list/config', data);
+        return response.data;
     },
     downloadProductsImportTemplateCsv: async (): Promise<Blob> => {
         const response = await api.get('/mrp/products/import/template/csv', { responseType: 'blob' });

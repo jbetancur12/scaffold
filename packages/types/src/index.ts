@@ -735,6 +735,17 @@ export interface ProductGroup {
     updatedAt: string | Date;
 }
 
+export interface PriceListConfig {
+    id: string;
+    showCover: boolean;
+    headerTitle?: string;
+    headerSubtitle?: string;
+    introText?: string;
+    sections: Array<{ title: string; body: string }>;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
 export interface ProductImage {
     id: string;
     productId: string;

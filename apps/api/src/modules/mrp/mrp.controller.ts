@@ -25,6 +25,7 @@ import { QuotationPdfService } from './services/quotation-pdf.service';
 import { ProductionAnalyticsService } from './services/production-analytics.service';
 import { CustomerShippingLabelPdfService } from './services/customer-shipping-label-pdf.service';
 import { ProductCatalogPdfService } from './services/product-catalog-pdf.service';
+import { PriceListConfigService } from './services/price-list-config.service';
 import {
     ProductSchema,
     ProductGroupSchema,
@@ -47,6 +48,7 @@ import {
     PaginationQuerySchema,
     ListProductsQuerySchema,
     ListProductGroupsQuerySchema,
+    UpdatePriceListConfigSchema,
     ListRawMaterialsQuerySchema,
     AddSupplierMaterialSchema,
     UpdateProductionOrderStatusSchema,
@@ -193,6 +195,7 @@ export class MrpController {
     private get documentControlService() { return new DocumentControlService(this.em); }
     private get customerShippingLabelPdfService() { return new CustomerShippingLabelPdfService(); }
     private get productCatalogPdfService() { return new ProductCatalogPdfService(this.em); }
+    private get priceListConfigService() { return new PriceListConfigService(this.em); }
     private get salesOrderService() { return new SalesOrderService(this.em); }
     private get quotationService() { return new QuotationService(this.em); }
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
@@ -225,6 +228,25 @@ export class MrpController {
             const { page, limit, search, categoryId } = ListProductsQuerySchema.parse(req.query);
             const result = await this.productService.listProducts(page || 1, limit || 10, search, categoryId);
             return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getPriceListConfig(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const config = await this.priceListConfigService.getConfig();
+            return ApiResponse.success(res, config);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updatePriceListConfig(req: Request, res: Response, next: NextFunction) {
+        try {
+            const data = UpdatePriceListConfigSchema.parse(req.body);
+            const config = await this.priceListConfigService.updateConfig(data);
+            return ApiResponse.success(res, config, 'Configuración de portada actualizada');
         } catch (error) {
             next(error);
         }

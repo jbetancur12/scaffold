@@ -9,8 +9,17 @@ import { formatCurrency } from '@/lib/utils';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useProductGroupsQuery, useProductsQuery } from '@/hooks/mrp/useProducts';
 import { mrpApi } from '@/services/mrpApi';
-import { Download, Package, Search } from 'lucide-react';
+import { Download, Package, Search, Settings, Plus, Trash2 } from 'lucide-react';
 import { Product } from '@scaffold/types';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 type PriceRow = {
     productId: string;
@@ -86,6 +95,23 @@ export default function PriceListPage() {
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [categoryId, setCategoryId] = useState('');
+    const [configOpen, setConfigOpen] = useState(false);
+    const [loadingConfig, setLoadingConfig] = useState(false);
+    const [savingConfig, setSavingConfig] = useState(false);
+    const [priceListConfig, setPriceListConfig] = useState<{
+        showCover: boolean;
+        headerTitle: string;
+        headerSubtitle: string;
+        introText: string;
+        sections: Array<{ title: string; body: string }>;
+    } | null>(null);
+    const [configForm, setConfigForm] = useState({
+        showCover: true,
+        headerTitle: '',
+        headerSubtitle: '',
+        introText: '',
+        sections: [] as Array<{ title: string; body: string }>,
+    });
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -95,6 +121,33 @@ export default function PriceListPage() {
     const { data: productsResponse, loading, error } = useProductsQuery(1, LIST_LIMIT, debouncedSearch, categoryId);
     const { data: productGroups } = useProductGroupsQuery(true);
     useMrpQueryErrorToast(error, 'No se pudo cargar la lista de precios');
+
+    useEffect(() => {
+        const loadConfig = async () => {
+            setLoadingConfig(true);
+            try {
+                const config = await mrpApi.getPriceListConfig();
+                const normalized = {
+                    showCover: config.showCover ?? true,
+                    headerTitle: config.headerTitle || '',
+                    headerSubtitle: config.headerSubtitle || '',
+                    introText: config.introText || '',
+                    sections: Array.isArray(config.sections) ? config.sections : [],
+                };
+                setPriceListConfig(normalized);
+                setConfigForm(normalized);
+            } catch (configError) {
+                toast({
+                    title: 'Error',
+                    description: getErrorMessage(configError, 'No se pudo cargar la portada del PDF'),
+                    variant: 'destructive',
+                });
+            } finally {
+                setLoadingConfig(false);
+            }
+        };
+        loadConfig();
+    }, []);
 
     const rows = useMemo(() => buildRows(productsResponse?.products || []), [productsResponse?.products]);
 
@@ -240,6 +293,49 @@ export default function PriceListPage() {
         }
     };
 
+    const openConfigModal = () => {
+        if (priceListConfig) {
+            setConfigForm(priceListConfig);
+        }
+        setConfigOpen(true);
+    };
+
+    const handleSaveConfig = async () => {
+        setSavingConfig(true);
+        try {
+            const trimmed = {
+                showCover: configForm.showCover,
+                headerTitle: configForm.headerTitle.trim(),
+                headerSubtitle: configForm.headerSubtitle.trim(),
+                introText: configForm.introText.trim(),
+                sections: configForm.sections.map((section) => ({
+                    title: section.title.trim(),
+                    body: section.body.trim(),
+                })).filter((section) => section.title.length > 0 && section.body.length > 0),
+            };
+            const saved = await mrpApi.updatePriceListConfig(trimmed);
+            const normalized = {
+                showCover: saved.showCover ?? true,
+                headerTitle: saved.headerTitle || '',
+                headerSubtitle: saved.headerSubtitle || '',
+                introText: saved.introText || '',
+                sections: Array.isArray(saved.sections) ? saved.sections : [],
+            };
+            setPriceListConfig(normalized);
+            setConfigForm(normalized);
+            setConfigOpen(false);
+            toast({ title: 'Listo', description: 'Portada actualizada correctamente.' });
+        } catch (configError) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(configError, 'No se pudo guardar la portada'),
+                variant: 'destructive',
+            });
+        } finally {
+            setSavingConfig(false);
+        }
+    };
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
@@ -255,6 +351,15 @@ export default function PriceListPage() {
                     </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                        variant="outline"
+                        className="h-11 px-4 border-slate-200 text-slate-700 hover:bg-slate-50"
+                        onClick={openConfigModal}
+                        disabled={loadingConfig}
+                    >
+                        <Settings className="mr-2 h-4 w-4" />
+                        Portada PDF
+                    </Button>
                     <Button onClick={handleExportPdf} variant="outline" className="h-11 px-5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
                         <Download className="mr-2 h-4 w-4" />
                         Descargar PDF
@@ -370,6 +475,126 @@ export default function PriceListPage() {
                     </Table>
                 </div>
             </div>
+
+            <Dialog open={configOpen} onOpenChange={setConfigOpen}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Portada de Políticas Comerciales</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-5">
+                        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <div>
+                                <p className="text-sm font-semibold text-slate-800">Mostrar portada</p>
+                                <p className="text-xs text-slate-500">Incluye una primera hoja con políticas comerciales.</p>
+                            </div>
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={configForm.showCover}
+                                onChange={(e) => setConfigForm((prev) => ({ ...prev, showCover: e.target.checked }))}
+                            />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Título principal</Label>
+                                <Input
+                                    value={configForm.headerTitle}
+                                    onChange={(e) => setConfigForm((prev) => ({ ...prev, headerTitle: e.target.value }))}
+                                    placeholder="POLÍTICAS COMERCIALES"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Subtítulo</Label>
+                                <Input
+                                    value={configForm.headerSubtitle}
+                                    onChange={(e) => setConfigForm((prev) => ({ ...prev, headerSubtitle: e.target.value }))}
+                                    placeholder="DATASAVE MEDICAL SAS 2026"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Introducción</Label>
+                            <Textarea
+                                rows={3}
+                                value={configForm.introText}
+                                onChange={(e) => setConfigForm((prev) => ({ ...prev, introText: e.target.value }))}
+                                placeholder="Texto introductorio para distribuidores..."
+                            />
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-semibold text-slate-800">Secciones</h3>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="h-8 px-3"
+                                    onClick={() => setConfigForm((prev) => ({
+                                        ...prev,
+                                        sections: [...prev.sections, { title: '', body: '' }],
+                                    }))}
+                                >
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Agregar
+                                </Button>
+                            </div>
+                            {configForm.sections.length === 0 && (
+                                <p className="text-xs text-slate-500">No hay secciones agregadas.</p>
+                            )}
+                            {configForm.sections.map((section, index) => (
+                                <div key={`section-${index}`} className="rounded-xl border border-slate-200 p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-xs text-slate-500">Sección {index + 1}</p>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-red-600 hover:bg-red-50"
+                                            onClick={() => setConfigForm((prev) => ({
+                                                ...prev,
+                                                sections: prev.sections.filter((_, idx) => idx !== index),
+                                            }))}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Título</Label>
+                                        <Input
+                                            value={section.title}
+                                            onChange={(e) => setConfigForm((prev) => ({
+                                                ...prev,
+                                                sections: prev.sections.map((item, idx) => idx === index ? { ...item, title: e.target.value } : item),
+                                            }))}
+                                            placeholder="GARANTÍA DE LOS EQUIPOS MÉDICOS"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Contenido</Label>
+                                        <Textarea
+                                            rows={4}
+                                            value={section.body}
+                                            onChange={(e) => setConfigForm((prev) => ({
+                                                ...prev,
+                                                sections: prev.sections.map((item, idx) => idx === index ? { ...item, body: e.target.value } : item),
+                                            }))}
+                                            placeholder="Describe la política..."
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConfigOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button onClick={handleSaveConfig} disabled={savingConfig}>
+                            {savingConfig ? 'Guardando...' : 'Guardar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

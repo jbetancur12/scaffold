@@ -582,6 +582,19 @@ export const ListProductGroupsQuerySchema = z.object({
     activeOnly: z.coerce.boolean().optional(),
 });
 
+export const PriceListConfigSchema = z.object({
+    showCover: z.boolean().default(true),
+    headerTitle: z.string().min(1).optional(),
+    headerSubtitle: z.string().min(1).optional(),
+    introText: z.string().optional(),
+    sections: z.array(z.object({
+        title: z.string().min(1, 'El título es obligatorio'),
+        body: z.string().min(1, 'El contenido es obligatorio'),
+    })).default([]),
+});
+
+export const UpdatePriceListConfigSchema = PriceListConfigSchema.partial();
+
 export const AddSupplierMaterialSchema = z.object({
     rawMaterialId: z.string().uuid(),
     price: z.number().min(0).optional(),
@@ -1573,6 +1586,7 @@ export type ResolveIncomingInspectionPayload = DateInputValue<z.input<typeof Res
 export type CorrectIncomingInspectionCostPayload = DateInputValue<z.input<typeof CorrectIncomingInspectionCostSchema>>;
 export type UploadIncomingInspectionEvidencePayload = DateInputValue<z.input<typeof UploadIncomingInspectionEvidenceSchema>>;
 export type UploadProductImagePayload = DateInputValue<z.input<typeof UploadProductImageSchema>>;
+export type UpdatePriceListConfigPayload = DateInputValue<z.input<typeof UpdatePriceListConfigSchema>>;
 export type UpsertBatchReleaseChecklistPayload = DateInputValue<z.input<typeof UpsertBatchReleaseChecklistSchema>>;
 export type SignBatchReleasePayload = DateInputValue<z.input<typeof SignBatchReleaseSchema>>;
 export type ApproveControlledDocumentPayload = DateInputValue<z.input<typeof ApproveControlledDocumentSchema>>;

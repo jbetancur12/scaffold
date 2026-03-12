@@ -6,6 +6,7 @@ import { ProductImage } from '../entities/product-image.entity';
 import { ObjectStorageService } from '../../../shared/services/object-storage.service';
 import { AppError } from '../../../shared/utils/response';
 import { ProductTaxStatus } from '@scaffold/types';
+import { PriceListConfigService } from './price-list-config.service';
 
 type PugModule = {
   compile: (template: string, options?: { pretty?: boolean }) => (locals: Record<string, unknown>) => string;
@@ -33,6 +34,14 @@ html(lang="es")
     style.
       * { box-sizing: border-box; }
       body { font-family: Arial, sans-serif; color: #0f172a; font-size: 11px; margin: 0; }
+      .cover { padding: 32px 36px 12px; }
+      .cover-title { font-size: 20px; font-weight: 800; background: #93b0df; color: #0f172a; padding: 8px 12px; display: inline-block; }
+      .cover-subtitle { margin-top: 6px; font-size: 16px; font-weight: 700; }
+      .cover-body { margin-top: 18px; column-count: 2; column-gap: 28px; }
+      .cover-intro { margin-bottom: 14px; }
+      .policy { break-inside: avoid; margin-bottom: 12px; }
+      .policy-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1d4ed8; background: #dbeafe; padding: 4px 6px; display: inline-block; margin-bottom: 6px; }
+      .page-break { page-break-after: always; }
       .header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 12px; border-bottom: 2px solid #e2e8f0; }
       .title { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
       .subtitle { font-size: 11px; color: #64748b; margin-top: 4px; }
@@ -55,6 +64,21 @@ html(lang="es")
       .right { text-align: right; }
       .nowrap { white-space: nowrap; }
   body
+    if cover
+      .cover
+        if cover.logoDataUrl
+          img.logo(src=cover.logoDataUrl)
+        .cover-title= cover.headerTitle
+        if cover.headerSubtitle
+          .cover-subtitle= cover.headerSubtitle
+        .cover-body
+          if cover.introText
+            .cover-intro= cover.introText
+          each section in cover.sections
+            .policy
+              .policy-title= section.title
+              div= section.body
+      .page-break
     .header
       if logoDataUrl
         img.logo(src=logoDataUrl)
@@ -116,9 +140,11 @@ type CatalogGroup = {
 
 export class ProductCatalogPdfService {
   private readonly storageService: ObjectStorageService;
+  private readonly configService: PriceListConfigService;
 
   constructor(private readonly em: EntityManager) {
     this.storageService = new ObjectStorageService();
+    this.configService = new PriceListConfigService(em);
   }
 
   private loadPug(): PugModule {
@@ -264,6 +290,20 @@ export class ProductCatalogPdfService {
         rows: data.rows.sort((a, b) => a.sku.localeCompare(b.sku)),
       }));
 
+    const config = await this.configService.getConfig();
+    const cover = config.showCover && (config.headerTitle || config.headerSubtitle || config.introText || (config.sections?.length || 0) > 0)
+      ? {
+        headerTitle: config.headerTitle || 'POLÍTICAS COMERCIALES',
+        headerSubtitle: config.headerSubtitle || '',
+        introText: config.introText || '',
+        sections: (config.sections || []).map((section) => ({
+          title: section.title,
+          body: section.body,
+        })),
+        logoDataUrl: this.getLogoDataUrl(),
+      }
+      : undefined;
+
     const pug = this.loadPug();
     const playwright = this.loadPlaywright();
     const compile = pug.compile(productCatalogPdfTemplate);
@@ -273,6 +313,7 @@ export class ProductCatalogPdfService {
       title: 'Catálogo de Precios',
       subtitle: `Generado el ${now.toLocaleDateString('es-CO')}`,
       logoDataUrl,
+      cover,
       groups,
     });
 
