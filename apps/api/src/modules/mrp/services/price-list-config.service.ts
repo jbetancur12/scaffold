@@ -9,7 +9,7 @@ export class PriceListConfigService {
     }
 
     async getConfig(): Promise<PriceListConfig> {
-        const row = await this.repo.findOne({}, { orderBy: { createdAt: 'DESC' } });
+        const row = await this.repo.findOne({ id: { $ne: null } }, { orderBy: { createdAt: 'DESC' } });
         if (row) return row;
         const now = new Date();
         const created = this.repo.create({
