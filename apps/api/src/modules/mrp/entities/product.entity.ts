@@ -42,6 +42,9 @@ export class Product extends BaseEntity {
     @Property({ default: false })
     requiresInvima: boolean = false;
 
+    @Property({ fieldName: 'show_in_catalog_pdf', default: true })
+    showInCatalogPdf: boolean = true;
+
     @Property({ nullable: true })
     productReference?: string;
 

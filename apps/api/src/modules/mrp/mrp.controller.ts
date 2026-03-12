@@ -24,6 +24,7 @@ import { QuotationService } from './services/quotation.service';
 import { QuotationPdfService } from './services/quotation-pdf.service';
 import { ProductionAnalyticsService } from './services/production-analytics.service';
 import { CustomerShippingLabelPdfService } from './services/customer-shipping-label-pdf.service';
+import { ProductCatalogPdfService } from './services/product-catalog-pdf.service';
 import {
     ProductSchema,
     ProductGroupSchema,
@@ -191,6 +192,7 @@ export class MrpController {
     private get qualityService() { return new QualityService(this.em); }
     private get documentControlService() { return new DocumentControlService(this.em); }
     private get customerShippingLabelPdfService() { return new CustomerShippingLabelPdfService(); }
+    private get productCatalogPdfService() { return new ProductCatalogPdfService(this.em); }
     private get salesOrderService() { return new SalesOrderService(this.em); }
     private get quotationService() { return new QuotationService(this.em); }
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
@@ -223,6 +225,18 @@ export class MrpController {
             const { page, limit, search, categoryId } = ListProductsQuerySchema.parse(req.query);
             const result = await this.productService.listProducts(page || 1, limit || 10, search, categoryId);
             return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadProductCatalogPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { search, categoryId } = ListProductsQuerySchema.parse(req.query);
+            const pdf = await this.productCatalogPdfService.generateProductCatalogPdf({ search, categoryId });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
+            return res.send(pdf.buffer);
         } catch (error) {
             next(error);
         }

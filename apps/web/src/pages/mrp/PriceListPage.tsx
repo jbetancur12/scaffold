@@ -133,6 +133,17 @@ export default function PriceListPage() {
             }));
     }, [filteredRows]);
 
+    const downloadBlob = (blob: Blob, fileName: string) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    };
+
     const handleExport = async () => {
         try {
             const { products } = await mrpApi.getProducts(1, EXPORT_LIMIT, debouncedSearch, categoryId);
@@ -188,6 +199,19 @@ export default function PriceListPage() {
         }
     };
 
+    const handleExportPdf = async () => {
+        try {
+            const blob = await mrpApi.downloadProductCatalogPdf(debouncedSearch, categoryId);
+            downloadBlob(blob, `catalogo_precios_${new Date().toISOString().slice(0, 10)}.pdf`);
+        } catch (exportError) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(exportError, 'No se pudo exportar el catálogo PDF'),
+                variant: 'destructive',
+            });
+        }
+    };
+
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
@@ -202,10 +226,16 @@ export default function PriceListPage() {
                         </p>
                     </div>
                 </div>
-                <Button onClick={handleExport} className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-5">
-                    <Download className="mr-2 h-4 w-4" />
-                    Descargar Excel (CSV)
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <Button onClick={handleExportPdf} variant="outline" className="h-11 px-5 border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                        <Download className="mr-2 h-4 w-4" />
+                        Descargar PDF
+                    </Button>
+                    <Button onClick={handleExport} className="bg-emerald-600 hover:bg-emerald-700 text-white h-11 px-5">
+                        <Download className="mr-2 h-4 w-4" />
+                        Descargar Excel (CSV)
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

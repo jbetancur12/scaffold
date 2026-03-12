@@ -232,6 +232,7 @@ const ProductBaseSchema = z.object({
     sku: z.string().min(1, 'SKU es obligatorio'),
     categoryId: z.string().uuid().optional(),
     requiresInvima: z.boolean().default(false),
+    showInCatalogPdf: z.boolean().default(true),
     productReference: z.string().min(2).optional(),
     invimaRegistrationId: z.string().uuid().optional(),
 });

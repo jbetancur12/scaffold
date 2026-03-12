@@ -30,6 +30,7 @@ export default function ProductFormPage() {
         heightCm: '',
         weightGrams: '',
         requiresInvima: false,
+        showInCatalogPdf: true,
         productReference: '',
         categoryId: '',
         invimaRegistrationId: '',
@@ -62,6 +63,7 @@ export default function ProductFormPage() {
                 heightCm: product.heightCm != null ? String(product.heightCm) : '',
                 weightGrams: product.weightKg != null ? String(Number(product.weightKg) * 1000) : '',
                 requiresInvima: product.requiresInvima || false,
+                showInCatalogPdf: product.showInCatalogPdf ?? true,
                 productReference: product.productReference || '',
                 categoryId: product.categoryId || product.category?.id || '',
                 invimaRegistrationId: product.invimaRegistrationId || '',
@@ -85,6 +87,7 @@ export default function ProductFormPage() {
                 productReference: formData.productReference || undefined,
                 categoryId: formData.categoryId || undefined,
                 invimaRegistrationId: formData.invimaRegistrationId || undefined,
+                showInCatalogPdf: formData.showInCatalogPdf,
             };
             ProductSchema.parse(payload);
 
@@ -417,6 +420,41 @@ export default function ProductFormPage() {
                                         )}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* Catalog PDF Card */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                            <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                                <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+                                    <FileText className="h-5 w-5" />
+                                </div>
+                                <h2 className="text-lg font-semibold text-slate-800">Catálogo PDF</h2>
+                            </div>
+                            <div className="p-5 sm:p-6">
+                                <div className={`p-4 rounded-xl border transition-colors ${formData.showInCatalogPdf ? 'bg-emerald-50/60 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                                    <Label htmlFor="showInCatalogPdf" className="flex flex-col gap-3 cursor-pointer group">
+                                        <div className="flex items-center justify-between">
+                                            <span className={`font-semibold ${formData.showInCatalogPdf ? 'text-emerald-900' : 'text-slate-700'}`}>Mostrar en portafolio</span>
+                                            <div className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    id="showInCatalogPdf"
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={formData.showInCatalogPdf}
+                                                    onChange={(e) => setFormData((prev) => ({
+                                                        ...prev,
+                                                        showInCatalogPdf: e.target.checked,
+                                                    }))}
+                                                />
+                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                            </div>
+                                        </div>
+                                        <span className="text-sm text-slate-500 font-normal leading-relaxed">
+                                            Si desactivas esta opción, el producto no aparecerá en el PDF de portafolio/lista de precios.
+                                        </span>
+                                    </Label>
+                                </div>
                             </div>
                         </div>
 

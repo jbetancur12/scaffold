@@ -759,6 +759,7 @@ export interface Product {
     categoryId?: string;
     category?: Pick<ProductGroup, 'id' | 'name' | 'slug' | 'parentId'>;
     requiresInvima: boolean;
+    showInCatalogPdf: boolean;
     productReference?: string;
     invimaRegistrationId?: string;
     invimaRegistration?: Pick<InvimaRegistration, 'id' | 'code' | 'status' | 'holderName' | 'manufacturerName' | 'validFrom' | 'validUntil'>;

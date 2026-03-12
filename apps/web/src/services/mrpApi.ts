@@ -372,6 +372,16 @@ export const mrpApi = {
         const response = await api.get('/mrp/products/export/csv', { responseType: 'blob' });
         return response.data as Blob;
     },
+    downloadProductCatalogPdf: async (search = '', categoryId = ''): Promise<Blob> => {
+        const response = await api.get('/mrp/products/catalog/pdf', {
+            responseType: 'blob',
+            params: {
+                search: search || undefined,
+                categoryId: categoryId || undefined,
+            },
+        });
+        return response.data as Blob;
+    },
     downloadProductsImportTemplateCsv: async (): Promise<Blob> => {
         const response = await api.get('/mrp/products/import/template/csv', { responseType: 'blob' });
         return response.data as Blob;
