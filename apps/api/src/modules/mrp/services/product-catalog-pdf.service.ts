@@ -43,6 +43,8 @@ html(lang="es")
       .policy { break-inside: avoid; margin-bottom: 12px; }
       .policy-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; background: #c7dcf5; padding: 4px 8px; display: block; margin-bottom: 6px; border-radius: 2px; }
       .policy-body { white-space: pre-wrap; }
+      .policy-body ul { margin: 6px 0 0 18px; padding: 0; }
+      .policy-body li { margin-bottom: 4px; }
       .policy-body table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10px; }
       .policy-body th, .policy-body td { border: 1px solid #94a3b8; padding: 4px 6px; text-align: left; vertical-align: top; }
       .policy-body th { background: #eef2ff; text-transform: uppercase; font-size: 9px; letter-spacing: .04em; }
@@ -219,6 +221,13 @@ export class ProductCatalogPdfService {
     return { headers, rows, nextIndex: index };
   }
 
+  private inlineMarkdownToHtml(value: string) {
+    let text = this.escapeHtml(value);
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    return text;
+  }
+
   private bodyToHtml(body: string) {
     const lines = body.split(/\r?\n/);
     const chunks: string[] = [];
@@ -228,13 +237,24 @@ export class ProductCatalogPdfService {
       const line = lines[i];
       const table = this.parseTableBlock(lines, i);
       if (table) {
-        const headerHtml = table.headers.map((cell) => `<th>${this.escapeHtml(cell)}</th>`).join('');
+        const headerHtml = table.headers.map((cell) => `<th>${this.inlineMarkdownToHtml(cell)}</th>`).join('');
         const rowsHtml = table.rows.map((row) => {
-          const cols = row.map((cell) => `<td>${this.escapeHtml(cell)}</td>`).join('');
+          const cols = row.map((cell) => `<td>${this.inlineMarkdownToHtml(cell)}</td>`).join('');
           return `<tr>${cols}</tr>`;
         }).join('');
         chunks.push(`<table><thead><tr>${headerHtml}</tr></thead><tbody>${rowsHtml}</tbody></table>`);
         i = table.nextIndex;
+        continue;
+      }
+
+      if (/^\s*[-*]\s+/.test(line)) {
+        const items: string[] = [];
+        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+          const itemText = lines[i].replace(/^\s*[-*]\s+/, '');
+          items.push(`<li>${this.inlineMarkdownToHtml(itemText)}</li>`);
+          i += 1;
+        }
+        chunks.push(`<ul>${items.join('')}</ul>`);
         continue;
       }
 
@@ -244,7 +264,7 @@ export class ProductCatalogPdfService {
         continue;
       }
 
-      chunks.push(`<div>${this.escapeHtml(line)}</div>`);
+      chunks.push(`<div>${this.inlineMarkdownToHtml(line)}</div>`);
       i += 1;
     }
 
