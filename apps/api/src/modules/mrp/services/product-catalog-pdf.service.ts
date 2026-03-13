@@ -44,7 +44,12 @@ html(lang="es")
       .policy-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; background: #c7dcf5; padding: 4px 8px; display: block; margin-bottom: 6px; border-radius: 2px; }
       .policy-title { break-after: avoid; }
       .policy-body { white-space: pre-wrap; break-inside: auto; }
+      .policy-body h1, .policy-body h2, .policy-body h3 { margin: 8px 0 6px; font-weight: 700; color: #0f172a; }
+      .policy-body h1 { font-size: 13px; }
+      .policy-body h2 { font-size: 12px; }
+      .policy-body h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .02em; }
       .policy-body ul { margin: 6px 0 0 18px; padding: 0; }
+      .policy-body ol { margin: 6px 0 0 18px; padding: 0; }
       .policy-body li { margin-bottom: 4px; }
       .policy-body table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10px; }
       .policy-body th, .policy-body td { border: 1px solid #94a3b8; padding: 4px 6px; text-align: left; vertical-align: top; }
@@ -84,7 +89,7 @@ html(lang="es")
             .cover-subtitle= cover.headerSubtitle
         .cover-body
           if cover.introText
-            .cover-intro= cover.introText
+            .cover-intro !{cover.introHtml}
           each section in cover.sections
             .policy
               .policy-title= section.title
@@ -261,6 +266,25 @@ export class ProductCatalogPdfService {
         continue;
       }
 
+      if (/^\s*\d+\.\s+/.test(line)) {
+        const items: string[] = [];
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+          const itemText = lines[i].replace(/^\s*\d+\.\s+/, '');
+          items.push(`<li>${this.inlineMarkdownToHtml(itemText)}</li>`);
+          i += 1;
+        }
+        chunks.push(`<ol>${items.join('')}</ol>`);
+        continue;
+      }
+
+      if (/^\s*#{1,3}\s+/.test(line)) {
+        const level = Math.min(3, line.match(/^\s*(#+)\s+/)?.[1].length || 3);
+        const titleText = line.replace(/^\s*#{1,3}\s+/, '').trim();
+        chunks.push(`<h${level}>${this.inlineMarkdownToHtml(titleText)}</h${level}>`);
+        i += 1;
+        continue;
+      }
+
       if (line.trim().length === 0) {
         chunks.push('<br/>');
         i += 1;
@@ -272,6 +296,10 @@ export class ProductCatalogPdfService {
     }
 
     return chunks.join('');
+  }
+
+  private introToHtml(body: string) {
+    return this.bodyToHtml(body);
   }
 
   private getLogoDataUrl(): string | undefined {
@@ -406,6 +434,7 @@ export class ProductCatalogPdfService {
         headerTitle: config.headerTitle || 'POLÍTICAS COMERCIALES',
         headerSubtitle: (config.headerSubtitle || '').trim() || undefined,
         introText: config.introText || '',
+        introHtml: this.introToHtml(config.introText || ''),
         sections: (config.sections || []).map((section) => ({
           title: section.title,
           body: section.body,
@@ -520,6 +549,7 @@ export class ProductCatalogPdfService {
         headerTitle: coverConfig.headerTitle || 'POLÍTICAS COMERCIALES',
         headerSubtitle: (coverConfig.headerSubtitle || '').trim() || undefined,
         introText: coverConfig.introText || '',
+        introHtml: this.introToHtml(coverConfig.introText || ''),
         sections: (coverConfig.sections || []).map((section) => ({
           title: section.title,
           body: section.body,
