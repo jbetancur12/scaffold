@@ -74,7 +74,6 @@ html(lang="es")
       .col-iva { width: 11%; }
       .col-total { width: 10%; }
       .thumb { width: 64px; height: 64px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; display: block; margin: 0 auto; }
-      .thumb-placeholder { width: 64px; height: 64px; border: 1px dashed #cbd5e1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #94a3b8; margin: 0 auto; }
       .muted { color: #64748b; font-size: 10px; }
       .right { text-align: right; }
       .nowrap { white-space: nowrap; }
@@ -126,8 +125,6 @@ html(lang="es")
                 td.col-image
                   if row.imageUrl
                     img.thumb(src=row.imageUrl)
-                  else
-                    .thumb-placeholder Sin imagen
                 td.col-desc
                   div= row.description
                 td.col-subtotal.right
