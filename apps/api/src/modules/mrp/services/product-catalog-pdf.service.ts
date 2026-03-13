@@ -33,12 +33,13 @@ html(lang="es")
     title= title
     style.
       * { box-sizing: border-box; }
+      html, body { height: 100%; }
       body { font-family: Arial, sans-serif; color: #0f172a; font-size: 11px; margin: 0; }
-      .cover { padding: 28px 36px 12px; min-height: 100vh; }
+      .cover { padding: 28px 36px 12px; min-height: 100%; display: flex; flex-direction: column; }
       .cover-head { margin-top: 10px; background: #93b0df; padding: 10px 14px; display: block; width: 100%; text-align: center; }
       .cover-title { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: .2px; text-align: center; }
       .cover-subtitle { margin-top: 4px; font-size: 13px; font-weight: 700; color: #0f172a; text-align: center; }
-      .cover-body { margin-top: 18px; column-count: 2; column-gap: 28px; column-fill: auto; height: calc(100vh - 170px); }
+      .cover-body { margin-top: 18px; column-count: 2; column-gap: 28px; column-fill: auto; -webkit-column-fill: auto; flex: 1; }
       .cover-intro { margin-bottom: 14px; }
       .policy { break-inside: auto; margin-bottom: 12px; }
       .policy-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; background: #c7dcf5; padding: 4px 8px; display: block; margin-bottom: 6px; border-radius: 2px; }
