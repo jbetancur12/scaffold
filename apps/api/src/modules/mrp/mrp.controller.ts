@@ -249,6 +249,7 @@ export class MrpController {
         try {
             const data = UpdatePriceListConfigSchema.parse(req.body);
             const config = await this.priceListConfigService.updateConfig(data);
+            await this.priceListSnapshotService.regenerateSnapshot();
             return ApiResponse.success(res, config, 'Configuración de portada actualizada');
         } catch (error) {
             next(error);
