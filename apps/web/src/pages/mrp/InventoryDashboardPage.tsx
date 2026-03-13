@@ -109,9 +109,9 @@ export default function InventoryDashboardPage() {
             if (item.rawMaterial) {
                 const key = `wh:${item.warehouse?.id || item.warehouseId || 'na'}:raw:${item.rawMaterial?.id || item.rawMaterialId || 'na'}`;
                 const existing = grouped.get(key);
-                const specLabel = item.rawMaterialSpecification
-                    ? `${item.rawMaterialSpecification.name}${item.rawMaterialSpecification.sku ? ` (${item.rawMaterialSpecification.sku})` : ''}`
-                    : 'Genérica';
+                // const specLabel = item.rawMaterialSpecification
+                //     ? `${item.rawMaterialSpecification.name}${item.rawMaterialSpecification.sku ? ` (${item.rawMaterialSpecification.sku})` : ''}`
+                //     : 'Genérica';
 
                 if (!existing) {
                     grouped.set(key, {
