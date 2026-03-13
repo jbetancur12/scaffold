@@ -67,7 +67,6 @@ export default function InventoryDashboardPage() {
     const [kardexDateTo, setKardexDateTo] = useState('');
     const [activeView, setActiveView] = useState<'stock' | 'kardex'>('stock');
     const [groupMode, setGroupMode] = useState<'grouped' | 'detailed'>('grouped');
-    const [specFilterId, setSpecFilterId] = useState<string>('all');
     const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
     const { data: inventoryData, error: inventoryError, execute: refetchInventory, loading } = useInventoryQuery(1, 100, warehouseId);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
@@ -91,35 +90,14 @@ export default function InventoryDashboardPage() {
     useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar información auxiliar');
     useMrpQueryErrorToast(warehousesError, 'No se pudo cargar información auxiliar');
 
-    const specOptions = useMemo(() => {
-        const options: { id: string; label: string }[] = [];
-        rawMaterials.forEach((material) => {
-            (material.specifications || []).forEach((spec) => {
-                options.push({
-                    id: spec.id,
-                    label: `${material.name} · ${spec.name}${spec.sku ? ` (${spec.sku})` : ''}`,
-                });
-            });
-        });
-        return options;
-    }, [rawMaterials]);
-
-    const filteredInventory = useMemo(() => {
-        if (specFilterId === 'all') return inventory;
-        if (specFilterId === '__none__') {
-            return inventory.filter((item) => item.rawMaterial && !item.rawMaterialSpecification);
-        }
-        return inventory.filter((item) => item.rawMaterialSpecification?.id === specFilterId);
-    }, [inventory, specFilterId]);
-
     const inventoryDisplay = useMemo<InventoryDisplayItem[]>(() => {
         if (groupMode === 'detailed') {
-            return filteredInventory.map(item => ({ ...item, specCount: item.rawMaterial ? 1 : undefined }));
+            return inventory.map(item => ({ ...item, specCount: item.rawMaterial ? 1 : undefined }));
         }
 
         const grouped = new Map<string, InventoryDisplayItem>();
 
-        filteredInventory.forEach((item) => {
+        inventory.forEach((item) => {
             if (item.variant) {
                 const key = `wh:${item.warehouse?.id || item.warehouseId || 'na'}:variant:${item.variant?.id || item.variantId || 'na'}`;
                 if (!grouped.has(key)) {
@@ -141,20 +119,16 @@ export default function InventoryDashboardPage() {
                         rawMaterialSpecification: undefined,
                         rawMaterialSpecificationId: undefined,
                         specCount: 1,
-                        specLabels: [specLabel],
                     });
                 } else {
                     existing.quantity = Number(existing.quantity) + Number(item.quantity);
-                    const labels = new Set(existing.specLabels || []);
-                    labels.add(specLabel);
-                    existing.specLabels = Array.from(labels);
-                    existing.specCount = labels.size;
+                    existing.specCount = (existing.specCount || 0) + 1;
                 }
             }
         });
 
         return Array.from(grouped.values());
-    }, [filteredInventory, groupMode]);
+    }, [inventory, groupMode]);
 
     // Memos para KPIs
     const kpis = useMemo(() => {
@@ -411,18 +385,6 @@ export default function InventoryDashboardPage() {
                         <div className="p-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
                             <h2 className="text-lg font-bold text-slate-800">Stock Actual</h2>
                             <div className="flex items-center gap-3">
-                                <Select value={specFilterId} onValueChange={setSpecFilterId}>
-                                    <SelectTrigger className="w-[240px] bg-slate-50 border-slate-200">
-                                        <SelectValue placeholder="Todas las especificaciones" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Todas las especificaciones</SelectItem>
-                                        <SelectItem value="__none__">Genérica (sin especificación)</SelectItem>
-                                        {specOptions.map((spec) => (
-                                            <SelectItem key={spec.id} value={spec.id}>{spec.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
                                 <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
                                     <Button
                                         variant={groupMode === 'grouped' ? 'default' : 'ghost'}
@@ -501,14 +463,7 @@ export default function InventoryDashboardPage() {
                                                             {item.rawMaterial && groupMode === 'grouped' && (
                                                                 <div className="text-xs text-slate-500 mt-1">
                                                                     <span className="font-medium text-slate-600">Especificaciones:</span>{' '}
-                                                                    {item.specLabels && item.specLabels.length > 0 ? (
-                                                                        <>
-                                                                            {item.specLabels.slice(0, 2).join(', ')}
-                                                                            {item.specLabels.length > 2 ? ` +${item.specLabels.length - 2} más` : ''}
-                                                                        </>
-                                                                    ) : (
-                                                                        item.specCount || 1
-                                                                    )}
+                                                                    {item.specCount || 1}
                                                                 </div>
                                                             )}
                                                         </div>
