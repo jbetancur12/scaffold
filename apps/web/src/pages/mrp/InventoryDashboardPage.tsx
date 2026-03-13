@@ -45,6 +45,11 @@ interface PopulatedInventoryItem extends InventoryItem {
     warehouse?: Warehouse;
 }
 
+interface InventoryDisplayItem extends PopulatedInventoryItem {
+    specCount?: number;
+    specLabels?: string[];
+}
+
 export default function InventoryDashboardPage() {
     const { toast } = useToast();
 
@@ -61,6 +66,8 @@ export default function InventoryDashboardPage() {
     const [kardexDateFrom, setKardexDateFrom] = useState('');
     const [kardexDateTo, setKardexDateTo] = useState('');
     const [activeView, setActiveView] = useState<'stock' | 'kardex'>('stock');
+    const [groupMode, setGroupMode] = useState<'grouped' | 'detailed'>('grouped');
+    const [specFilterId, setSpecFilterId] = useState<string>('all');
     const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
     const { data: inventoryData, error: inventoryError, execute: refetchInventory, loading } = useInventoryQuery(1, 100, warehouseId);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
@@ -84,22 +91,87 @@ export default function InventoryDashboardPage() {
     useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar información auxiliar');
     useMrpQueryErrorToast(warehousesError, 'No se pudo cargar información auxiliar');
 
+    const specOptions = useMemo(() => {
+        const options: { id: string; label: string }[] = [];
+        rawMaterials.forEach((material) => {
+            (material.specifications || []).forEach((spec) => {
+                options.push({
+                    id: spec.id,
+                    label: `${material.name} · ${spec.name}${spec.sku ? ` (${spec.sku})` : ''}`,
+                });
+            });
+        });
+        return options;
+    }, [rawMaterials]);
+
+    const filteredInventory = useMemo(() => {
+        if (specFilterId === 'all') return inventory;
+        if (specFilterId === '__none__') {
+            return inventory.filter((item) => item.rawMaterial && !item.rawMaterialSpecification);
+        }
+        return inventory.filter((item) => item.rawMaterialSpecification?.id === specFilterId);
+    }, [inventory, specFilterId]);
+
+    const inventoryDisplay = useMemo<InventoryDisplayItem[]>(() => {
+        if (groupMode === 'detailed') {
+            return filteredInventory.map(item => ({ ...item, specCount: item.rawMaterial ? 1 : undefined }));
+        }
+
+        const grouped = new Map<string, InventoryDisplayItem>();
+
+        filteredInventory.forEach((item) => {
+            if (item.variant) {
+                const key = `wh:${item.warehouse?.id || item.warehouseId || 'na'}:variant:${item.variant?.id || item.variantId || 'na'}`;
+                if (!grouped.has(key)) {
+                    grouped.set(key, { ...item });
+                }
+                return;
+            }
+
+            if (item.rawMaterial) {
+                const key = `wh:${item.warehouse?.id || item.warehouseId || 'na'}:raw:${item.rawMaterial?.id || item.rawMaterialId || 'na'}`;
+                const existing = grouped.get(key);
+                const specLabel = item.rawMaterialSpecification
+                    ? `${item.rawMaterialSpecification.name}${item.rawMaterialSpecification.sku ? ` (${item.rawMaterialSpecification.sku})` : ''}`
+                    : 'Genérica';
+
+                if (!existing) {
+                    grouped.set(key, {
+                        ...item,
+                        rawMaterialSpecification: undefined,
+                        rawMaterialSpecificationId: undefined,
+                        specCount: 1,
+                        specLabels: [specLabel],
+                    });
+                } else {
+                    existing.quantity = Number(existing.quantity) + Number(item.quantity);
+                    const labels = new Set(existing.specLabels || []);
+                    labels.add(specLabel);
+                    existing.specLabels = Array.from(labels);
+                    existing.specCount = labels.size;
+                }
+            }
+        });
+
+        return Array.from(grouped.values());
+    }, [filteredInventory, groupMode]);
+
     // Memos para KPIs
     const kpis = useMemo(() => {
         let rawMaterialCount = 0;
         let productCount = 0;
 
-        inventory.forEach(item => {
+        inventoryDisplay.forEach(item => {
             if (item.variant) productCount++;
             else if (item.rawMaterial) rawMaterialCount++;
         });
 
         return {
-            total: inventory.length,
+            total: inventoryDisplay.length,
             rawMaterials: rawMaterialCount,
             products: productCount
         };
-    }, [inventory]);
+    }, [inventoryDisplay]);
 
     const handleManualAdd = async () => {
         if (!selectedMaterialId || !manualQuantity || !manualCost) {
@@ -147,6 +219,16 @@ export default function InventoryDashboardPage() {
             return item.rawMaterial.name;
         }
         return 'N/A';
+    };
+
+    const getSpecificationLabel = (item: PopulatedInventoryItem) => {
+        if (item.rawMaterialSpecification) {
+            return `${item.rawMaterialSpecification.name}${item.rawMaterialSpecification.sku ? ` (${item.rawMaterialSpecification.sku})` : ''}`;
+        }
+        if (item.rawMaterial) {
+            return 'Genérica';
+        }
+        return '';
     };
 
     return (
@@ -328,9 +410,39 @@ export default function InventoryDashboardPage() {
                     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="p-4 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
                             <h2 className="text-lg font-bold text-slate-800">Stock Actual</h2>
-                            <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-medium">
-                                {kpis.total} ítems
-                            </Badge>
+                            <div className="flex items-center gap-3">
+                                <Select value={specFilterId} onValueChange={setSpecFilterId}>
+                                    <SelectTrigger className="w-[240px] bg-slate-50 border-slate-200">
+                                        <SelectValue placeholder="Todas las especificaciones" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todas las especificaciones</SelectItem>
+                                        <SelectItem value="__none__">Genérica (sin especificación)</SelectItem>
+                                        {specOptions.map((spec) => (
+                                            <SelectItem key={spec.id} value={spec.id}>{spec.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                                    <Button
+                                        variant={groupMode === 'grouped' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setGroupMode('grouped')}
+                                    >
+                                        Agrupado
+                                    </Button>
+                                    <Button
+                                        variant={groupMode === 'detailed' ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setGroupMode('detailed')}
+                                    >
+                                        Detalle
+                                    </Button>
+                                </div>
+                                <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-medium">
+                                    {kpis.total} ítems
+                                </Badge>
+                            </div>
                         </div>
                         <div className="overflow-x-auto">
                             <Table>
@@ -343,7 +455,7 @@ export default function InventoryDashboardPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {inventory.length === 0 ? (
+                                    {inventoryDisplay.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={4} className="h-[400px]">
                                                 <div className="flex flex-col items-center justify-center text-center h-full space-y-4">
@@ -364,7 +476,7 @@ export default function InventoryDashboardPage() {
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        inventory.map((item) => (
+                                        inventoryDisplay.map((item) => (
                                             <TableRow key={item.id} className="group hover:bg-slate-50/50 transition-colors">
                                                 <TableCell className="py-4">
                                                     <div className="flex items-center gap-3">
@@ -378,6 +490,25 @@ export default function InventoryDashboardPage() {
                                                             {(item.variant?.sku || item.rawMaterial?.sku) && (
                                                                 <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
                                                                     <span className="font-mono bg-slate-100 px-1 rounded">{item.variant?.sku || item.rawMaterial?.sku}</span>
+                                                                </div>
+                                                            )}
+                                                            {item.rawMaterial && groupMode === 'detailed' && (
+                                                                <div className="text-xs text-slate-500 mt-1">
+                                                                    <span className="font-medium text-slate-600">Especificación:</span>{' '}
+                                                                    {getSpecificationLabel(item)}
+                                                                </div>
+                                                            )}
+                                                            {item.rawMaterial && groupMode === 'grouped' && (
+                                                                <div className="text-xs text-slate-500 mt-1">
+                                                                    <span className="font-medium text-slate-600">Especificaciones:</span>{' '}
+                                                                    {item.specLabels && item.specLabels.length > 0 ? (
+                                                                        <>
+                                                                            {item.specLabels.slice(0, 2).join(', ')}
+                                                                            {item.specLabels.length > 2 ? ` +${item.specLabels.length - 2} más` : ''}
+                                                                        </>
+                                                                    ) : (
+                                                                        item.specCount || 1
+                                                                    )}
                                                                 </div>
                                                             )}
                                                         </div>

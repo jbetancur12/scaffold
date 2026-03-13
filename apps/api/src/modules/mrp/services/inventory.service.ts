@@ -168,7 +168,7 @@ export class InventoryService {
             {
                 limit,
                 offset: (page - 1) * limit,
-                populate: ['rawMaterial', 'variant', 'variant.product', 'warehouse'],
+                populate: ['rawMaterial', 'rawMaterialSpecification', 'variant', 'variant.product', 'warehouse'],
             }
         );
         return { items, total };
