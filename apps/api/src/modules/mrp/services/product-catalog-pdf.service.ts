@@ -38,11 +38,12 @@ html(lang="es")
       .cover-head { margin-top: 10px; background: #93b0df; padding: 10px 14px; display: block; width: 100%; text-align: center; }
       .cover-title { font-size: 18px; font-weight: 800; color: #0f172a; letter-spacing: .2px; text-align: center; }
       .cover-subtitle { margin-top: 4px; font-size: 13px; font-weight: 700; color: #0f172a; text-align: center; }
-      .cover-body { margin-top: 18px; column-count: 2; column-gap: 28px; }
+      .cover-body { margin-top: 18px; column-count: 2; column-gap: 28px; column-fill: auto; }
       .cover-intro { margin-bottom: 14px; white-space: pre-wrap; }
-      .policy { break-inside: avoid; margin-bottom: 12px; }
+      .policy { break-inside: auto; margin-bottom: 12px; }
       .policy-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #1e3a8a; background: #c7dcf5; padding: 4px 8px; display: block; margin-bottom: 6px; border-radius: 2px; }
-      .policy-body { white-space: pre-wrap; }
+      .policy-title { break-after: avoid; }
+      .policy-body { white-space: pre-wrap; break-inside: auto; }
       .policy-body ul { margin: 6px 0 0 18px; padding: 0; }
       .policy-body li { margin-bottom: 4px; }
       .policy-body table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 10px; }
