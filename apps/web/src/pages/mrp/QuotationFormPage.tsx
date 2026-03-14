@@ -643,6 +643,39 @@ export default function QuotationFormPage() {
         };
     };
 
+    const resolveMarginStatus = (item: ItemForm) => {
+        if (!item.isCatalogItem || !item.productId) return null;
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) return null;
+        const variant = item.variantId
+            ? product.variants?.find((v) => v.id === item.variantId)
+            : product.variants?.[0];
+        if (!variant) return null;
+
+        const listPrice = Number(item.unitPrice || 0);
+        if (listPrice <= 0) return null;
+        const effectiveDiscount = globalDiscountPercent > 0 ? Number(globalDiscountPercent || 0) : Number(item.discountPercent || 0);
+        const finalUnitPrice = listPrice * (1 - (effectiveDiscount / 100));
+        if (finalUnitPrice <= 0) return null;
+
+        const minAllowedMargin = Math.max(0, Number(variant.targetMargin || 0.4) - 0.1);
+        const margin = (finalUnitPrice - Number(variant.cost || 0)) / finalUnitPrice;
+
+        return {
+            marginPercent: margin * 100,
+            minAllowedMarginPercent: minAllowedMargin * 100,
+            isBelowMin: margin + 1e-9 < minAllowedMargin,
+        };
+    };
+
+    const marginBelowMinCount = useMemo(() => {
+        if (!operationalConfig?.allowQuotationBelowMargin) return 0;
+        return items
+            .filter((it) => it.lineType === QuotationItemLineType.ITEM)
+            .map((it) => resolveMarginStatus(it))
+            .filter((status) => status?.isBelowMin).length;
+    }, [items, products, globalDiscountPercent, operationalConfig?.allowQuotationBelowMargin]);
+
     const globalDiscountLimit = useMemo(() => {
         const limits = items
             .filter((it) => it.lineType === QuotationItemLineType.ITEM)
@@ -912,6 +945,11 @@ export default function QuotationFormPage() {
                 <p className="text-sm text-slate-500 mt-1">
                     {isEditMode ? 'Actualiza los datos de la propuesta.' : 'Crea una nueva propuesta comercial para tu cliente.'}
                 </p>
+                {operationalConfig?.allowQuotationBelowMargin && marginBelowMinCount > 0 && (
+                    <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        Hay {marginBelowMinCount} ítem(s) por debajo del margen mínimo. Se permite por configuración temporal.
+                    </div>
+                )}
             </div>
 
             <form onSubmit={onSubmit} className="flex flex-col xl:flex-row gap-6 items-start">
@@ -1361,6 +1399,9 @@ export default function QuotationFormPage() {
                                 const effectiveDiscount = globalDiscountPercent > 0 ? Number(globalDiscountPercent || 0) : Number(it.discountPercent || 0);
                                 const unitListPrice = Number(it.unitPrice || 0);
                                 const unitNetPrice = unitListPrice * (1 - (effectiveDiscount / 100));
+                                const marginStatus = operationalConfig?.allowQuotationBelowMargin
+                                    ? resolveMarginStatus(it)
+                                    : null;
 
                                 return (
                                     <div key={idx} className={`bg-white border-b border-slate-100 last:border-0 p-5 relative ${activeCatalogComboboxIdx === idx ? 'z-50' : 'z-10'}`}>
@@ -1594,6 +1635,17 @@ export default function QuotationFormPage() {
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {marginStatus && (
+                                            <div className={`mt-2 text-[11px] px-2.5 py-2 rounded-md border ${marginStatus.isBelowMin
+                                                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                                                : 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                                }`}
+                                            >
+                                                Margen actual: {marginStatus.marginPercent.toFixed(1)}% · Mínimo: {marginStatus.minAllowedMarginPercent.toFixed(1)}%
+                                                {marginStatus.isBelowMin ? ' (por debajo del mínimo)' : ''}
+                                            </div>
+                                        )}
 
                                         {effectiveDiscount > 0 && unitNetPrice !== unitListPrice && (
                                             <div className="text-[11px] text-slate-500 text-right mt-2 pr-2">

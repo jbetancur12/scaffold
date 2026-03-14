@@ -1,66 +1,73 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Toaster } from '@/components/ui/toaster';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import LoginPage from '@/pages/auth/LoginPage';
-import DashboardPage from '@/pages/dashboard/DashboardPage';
-import UsersPage from '@/pages/dashboard/UsersPage';
-import ProductListPage from '@/pages/mrp/ProductListPage';
-import ProductGroupListPage from '@/pages/mrp/ProductGroupListPage';
-import PriceListPage from '@/pages/mrp/PriceListPage';
-import ProductFormPage from '@/pages/mrp/ProductFormPage';
-import ProductDetailPage from '@/pages/mrp/ProductDetailPage';
-import ProductBOMPage from '@/pages/mrp/ProductBOMPage';
-import SupplierListPage from '@/pages/mrp/SupplierListPage';
-import SupplierFormPage from '@/pages/mrp/SupplierFormPage';
-import SupplierDetailPage from '@/pages/mrp/SupplierDetailPage';
-import CustomerListPage from '@/pages/mrp/CustomerListPage';
-import CustomerDetailPage from '@/pages/mrp/CustomerDetailPage';
-import CustomerFormPage from '@/pages/mrp/CustomerFormPage';
-import RawMaterialListPage from '@/pages/mrp/RawMaterialListPage';
-import RawMaterialFormPage from '@/pages/mrp/RawMaterialFormPage';
-import RawMaterialDetailPage from '@/pages/mrp/RawMaterialDetailPage';
-import ProductionOrderListPage from '@/pages/mrp/ProductionOrderListPage';
-import ProductionOrderFormPage from '@/pages/mrp/ProductionOrderFormPage';
-import InventoryDashboardPage from '@/pages/mrp/InventoryDashboardPage';
-import PurchaseOrderListPage from '@/pages/mrp/PurchaseOrderListPage';
-import PurchaseOrderFormPage from '@/pages/mrp/PurchaseOrderFormPage';
-import PurchaseOrderDetailPage from '@/pages/mrp/PurchaseOrderDetailPage';
-import PurchaseRequisitionListPage from '@/pages/mrp/PurchaseRequisitionListPage';
-import PurchaseRequisitionFormPage from '@/pages/mrp/PurchaseRequisitionFormPage';
-import PurchaseRequisitionDetailPage from '@/pages/mrp/PurchaseRequisitionDetailPage';
-import SalesOrderListPage from '@/pages/mrp/SalesOrderListPage';
-import SalesOrderFormPage from '@/pages/mrp/SalesOrderFormPage';
-import SalesOrderDetailPage from '@/pages/mrp/SalesOrderDetailPage';
-import QuotationListPage from '@/pages/mrp/QuotationListPage';
-import QuotationFormPage from '@/pages/mrp/QuotationFormPage';
-import QuotationDetailPage from '@/pages/mrp/QuotationDetailPage';
-import ProductionOrderDetailPage from '@/pages/mrp/ProductionOrderDetailPage';
-import OperationalSettingsPage from '@/pages/mrp/OperationalSettingsPage';
-import ThreadCalculatorPage from '@/pages/mrp/ThreadCalculatorPage';
-import WarehouseListPage from '@/pages/mrp/WarehouseListPage';
-import WarehouseFormPage from '@/pages/mrp/WarehouseFormPage';
-import ProductionAnalyticsPage from '@/pages/mrp/ProductionAnalyticsPage';
 import { qualitySections } from '@/constants/mrpNavigation';
-import {
-    PostmarketRecallPage,
-    PostmarketShipmentPage,
-    PostmarketTechnoPage,
-    QualityAuditPage,
-    QualityBatchReleasePage,
-    QualityCapaPage,
-    QualityChangeControlPage,
-    QualityComplianceDashboardPage,
-    QualityAlertsPage,
-    QualityDeviationsOosPage,
-    QualityDhrDmrPage,
-    QualityDocsPage,
-    QualityEquipmentPage,
-    QualityIncomingPage,
-    QualityInvimaPage,
-    QualityLabelingPage,
-    QualityNcPage,
-} from '@/pages/quality/QualitySectionPages';
+
+const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
+const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
+const UsersPage = lazy(() => import('@/pages/dashboard/UsersPage'));
+const ProductListPage = lazy(() => import('@/pages/mrp/ProductListPage'));
+const ProductGroupListPage = lazy(() => import('@/pages/mrp/ProductGroupListPage'));
+const PriceListPage = lazy(() => import('@/pages/mrp/PriceListPage'));
+const ProductFormPage = lazy(() => import('@/pages/mrp/ProductFormPage'));
+const ProductDetailPage = lazy(() => import('@/pages/mrp/ProductDetailPage'));
+const ProductBOMPage = lazy(() => import('@/pages/mrp/ProductBOMPage'));
+const SupplierListPage = lazy(() => import('@/pages/mrp/SupplierListPage'));
+const SupplierFormPage = lazy(() => import('@/pages/mrp/SupplierFormPage'));
+const SupplierDetailPage = lazy(() => import('@/pages/mrp/SupplierDetailPage'));
+const CustomerListPage = lazy(() => import('@/pages/mrp/CustomerListPage'));
+const CustomerDetailPage = lazy(() => import('@/pages/mrp/CustomerDetailPage'));
+const CustomerFormPage = lazy(() => import('@/pages/mrp/CustomerFormPage'));
+const RawMaterialListPage = lazy(() => import('@/pages/mrp/RawMaterialListPage'));
+const RawMaterialFormPage = lazy(() => import('@/pages/mrp/RawMaterialFormPage'));
+const RawMaterialDetailPage = lazy(() => import('@/pages/mrp/RawMaterialDetailPage'));
+const ProductionOrderListPage = lazy(() => import('@/pages/mrp/ProductionOrderListPage'));
+const ProductionOrderFormPage = lazy(() => import('@/pages/mrp/ProductionOrderFormPage'));
+const InventoryDashboardPage = lazy(() => import('@/pages/mrp/InventoryDashboardPage'));
+const PurchaseOrderListPage = lazy(() => import('@/pages/mrp/PurchaseOrderListPage'));
+const PurchaseOrderFormPage = lazy(() => import('@/pages/mrp/PurchaseOrderFormPage'));
+const PurchaseOrderDetailPage = lazy(() => import('@/pages/mrp/PurchaseOrderDetailPage'));
+const PurchaseRequisitionListPage = lazy(() => import('@/pages/mrp/PurchaseRequisitionListPage'));
+const PurchaseRequisitionFormPage = lazy(() => import('@/pages/mrp/PurchaseRequisitionFormPage'));
+const PurchaseRequisitionDetailPage = lazy(() => import('@/pages/mrp/PurchaseRequisitionDetailPage'));
+const SalesOrderListPage = lazy(() => import('@/pages/mrp/SalesOrderListPage'));
+const SalesOrderFormPage = lazy(() => import('@/pages/mrp/SalesOrderFormPage'));
+const SalesOrderDetailPage = lazy(() => import('@/pages/mrp/SalesOrderDetailPage'));
+const QuotationListPage = lazy(() => import('@/pages/mrp/QuotationListPage'));
+const QuotationFormPage = lazy(() => import('@/pages/mrp/QuotationFormPage'));
+const QuotationDetailPage = lazy(() => import('@/pages/mrp/QuotationDetailPage'));
+const ProductionOrderDetailPage = lazy(() => import('@/pages/mrp/ProductionOrderDetailPage'));
+const OperationalSettingsPage = lazy(() => import('@/pages/mrp/OperationalSettingsPage'));
+const ThreadCalculatorPage = lazy(() => import('@/pages/mrp/ThreadCalculatorPage'));
+const WarehouseListPage = lazy(() => import('@/pages/mrp/WarehouseListPage'));
+const WarehouseFormPage = lazy(() => import('@/pages/mrp/WarehouseFormPage'));
+const ProductionAnalyticsPage = lazy(() => import('@/pages/mrp/ProductionAnalyticsPage'));
+
+const QualityNcPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityNcPage })));
+const QualityCapaPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityCapaPage })));
+const QualityDeviationsOosPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityDeviationsOosPage })));
+const QualityDhrDmrPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityDhrDmrPage })));
+const QualityLabelingPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityLabelingPage })));
+const QualityIncomingPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityIncomingPage })));
+const QualityBatchReleasePage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityBatchReleasePage })));
+const QualityEquipmentPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityEquipmentPage })));
+const QualityInvimaPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityInvimaPage })));
+const QualityComplianceDashboardPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityComplianceDashboardPage })));
+const QualityAlertsPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityAlertsPage })));
+const QualityChangeControlPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityChangeControlPage })));
+const QualityDocsPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityDocsPage })));
+const QualityAuditPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityAuditPage })));
+const PostmarketTechnoPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.PostmarketTechnoPage })));
+const PostmarketRecallPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.PostmarketRecallPage })));
+const PostmarketShipmentPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.PostmarketShipmentPage })));
+
+const PageFallback = () => (
+    <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Cargando...</div>
+    </div>
+);
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, isLoading } = useAuth();
@@ -114,110 +121,112 @@ export default function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
-                <Routes>
-                    <Route
-                        path="/login"
-                        element={
-                            <PublicRoute>
-                                <LoginPage />
-                            </PublicRoute>
-                        }
-                    />
+                <Suspense fallback={<PageFallback />}>
+                    <Routes>
+                        <Route
+                            path="/login"
+                            element={
+                                <PublicRoute>
+                                    <LoginPage />
+                                </PublicRoute>
+                            }
+                        />
 
-                    {/* Dashboard Layout Route - wraps all protected pages */}
-                    <Route
-                        element={
-                            <ProtectedRoute>
-                                <DashboardLayout>
-                                    <Outlet />
-                                </DashboardLayout>
-                            </ProtectedRoute>
-                        }
-                    >
-                        <Route path="/" element={<DashboardPage />} />
-                        <Route path="/users" element={<UsersPage />} />
+                        {/* Dashboard Layout Route - wraps all protected pages */}
+                        <Route
+                            element={
+                                <ProtectedRoute>
+                                    <DashboardLayout>
+                                        <Outlet />
+                                    </DashboardLayout>
+                                </ProtectedRoute>
+                            }
+                        >
+                            <Route path="/" element={<DashboardPage />} />
+                            <Route path="/users" element={<UsersPage />} />
 
-                        {/* MRP Routes */}
-                        <Route path="/mrp/products" element={<ProductListPage />} />
-                        <Route path="/mrp/price-list" element={<PriceListPage />} />
-                        <Route path="/mrp/product-groups" element={<ProductGroupListPage />} />
-                        <Route path="/mrp/products/new" element={<ProductFormPage />} />
-                        <Route path="/mrp/products/:id/bom" element={<ProductBOMPage />} />
-                        <Route path="/mrp/products/:id" element={<ProductDetailPage />} />
-                        <Route path="/mrp/products/:id/edit" element={<ProductFormPage />} />
+                            {/* MRP Routes */}
+                            <Route path="/mrp/products" element={<ProductListPage />} />
+                            <Route path="/mrp/price-list" element={<PriceListPage />} />
+                            <Route path="/mrp/product-groups" element={<ProductGroupListPage />} />
+                            <Route path="/mrp/products/new" element={<ProductFormPage />} />
+                            <Route path="/mrp/products/:id/bom" element={<ProductBOMPage />} />
+                            <Route path="/mrp/products/:id" element={<ProductDetailPage />} />
+                            <Route path="/mrp/products/:id/edit" element={<ProductFormPage />} />
 
-                        <Route path="/mrp/suppliers" element={<SupplierListPage />} />
-                        <Route path="/mrp/suppliers/new" element={<SupplierFormPage />} />
-                        <Route path="/mrp/suppliers/:id" element={<SupplierDetailPage />} />
-                        <Route path="/mrp/suppliers/:id/edit" element={<SupplierFormPage />} />
+                            <Route path="/mrp/suppliers" element={<SupplierListPage />} />
+                            <Route path="/mrp/suppliers/new" element={<SupplierFormPage />} />
+                            <Route path="/mrp/suppliers/:id" element={<SupplierDetailPage />} />
+                            <Route path="/mrp/suppliers/:id/edit" element={<SupplierFormPage />} />
 
-                        <Route path="/mrp/customers" element={<CustomerListPage />} />
-                        <Route path="/mrp/customers/:id" element={<CustomerDetailPage />} />
-                        <Route path="/mrp/customers/new" element={<CustomerFormPage />} />
-                        <Route path="/mrp/customers/:id/edit" element={<CustomerFormPage />} />
+                            <Route path="/mrp/customers" element={<CustomerListPage />} />
+                            <Route path="/mrp/customers/:id" element={<CustomerDetailPage />} />
+                            <Route path="/mrp/customers/new" element={<CustomerFormPage />} />
+                            <Route path="/mrp/customers/:id/edit" element={<CustomerFormPage />} />
 
-                        <Route path="/mrp/raw-materials" element={<RawMaterialListPage />} />
-                        <Route path="/mrp/raw-materials/new" element={<RawMaterialFormPage />} />
-                        <Route path="/mrp/raw-materials/:id" element={<RawMaterialDetailPage />} />
-                        <Route path="/mrp/raw-materials/:id/edit" element={<RawMaterialFormPage />} />
+                            <Route path="/mrp/raw-materials" element={<RawMaterialListPage />} />
+                            <Route path="/mrp/raw-materials/new" element={<RawMaterialFormPage />} />
+                            <Route path="/mrp/raw-materials/:id" element={<RawMaterialDetailPage />} />
+                            <Route path="/mrp/raw-materials/:id/edit" element={<RawMaterialFormPage />} />
 
-                        <Route path="/mrp/production-orders" element={<ProductionOrderListPage />} />
-                        <Route path="/mrp/production-orders/new" element={<ProductionOrderFormPage />} />
-                        <Route path="/mrp/production-orders/:id" element={<ProductionOrderDetailPage />} />
-                        <Route path="/mrp/production-orders/:id/edit" element={<ProductionOrderFormPage />} />
-                        <Route path="/mrp/production-analytics" element={<ProductionAnalyticsPage />} />
+                            <Route path="/mrp/production-orders" element={<ProductionOrderListPage />} />
+                            <Route path="/mrp/production-orders/new" element={<ProductionOrderFormPage />} />
+                            <Route path="/mrp/production-orders/:id" element={<ProductionOrderDetailPage />} />
+                            <Route path="/mrp/production-orders/:id/edit" element={<ProductionOrderFormPage />} />
+                            <Route path="/mrp/production-analytics" element={<ProductionAnalyticsPage />} />
 
-                        <Route path="/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
-                        <Route path="/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />
-                        <Route path="/mrp/purchase-orders/:id/edit" element={<PurchaseOrderFormPage />} />
-                        <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
-                        <Route path="/mrp/purchase-requisitions" element={<PurchaseRequisitionListPage />} />
-                        <Route path="/mrp/purchase-requisitions/new" element={<PurchaseRequisitionFormPage />} />
-                        <Route path="/mrp/purchase-requisitions/:id" element={<PurchaseRequisitionDetailPage />} />
+                            <Route path="/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
+                            <Route path="/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />
+                            <Route path="/mrp/purchase-orders/:id/edit" element={<PurchaseOrderFormPage />} />
+                            <Route path="/mrp/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+                            <Route path="/mrp/purchase-requisitions" element={<PurchaseRequisitionListPage />} />
+                            <Route path="/mrp/purchase-requisitions/new" element={<PurchaseRequisitionFormPage />} />
+                            <Route path="/mrp/purchase-requisitions/:id" element={<PurchaseRequisitionDetailPage />} />
 
-                        <Route path="/mrp/sales-orders" element={<SalesOrderListPage />} />
-                        <Route path="/mrp/sales-orders/new" element={<SalesOrderFormPage />} />
-                        <Route path="/mrp/sales-orders/:id/edit" element={<SalesOrderFormPage />} />
-                        <Route path="/mrp/sales-orders/:id" element={<SalesOrderDetailPage />} />
-                        <Route path="/mrp/quotations" element={<QuotationListPage />} />
-                        <Route path="/mrp/quotations/new" element={<QuotationFormPage />} />
-                        <Route path="/mrp/quotations/:id/edit" element={<QuotationFormPage />} />
-                        <Route path="/mrp/quotations/:id" element={<QuotationDetailPage />} />
+                            <Route path="/mrp/sales-orders" element={<SalesOrderListPage />} />
+                            <Route path="/mrp/sales-orders/new" element={<SalesOrderFormPage />} />
+                            <Route path="/mrp/sales-orders/:id/edit" element={<SalesOrderFormPage />} />
+                            <Route path="/mrp/sales-orders/:id" element={<SalesOrderDetailPage />} />
+                            <Route path="/mrp/quotations" element={<QuotationListPage />} />
+                            <Route path="/mrp/quotations/new" element={<QuotationFormPage />} />
+                            <Route path="/mrp/quotations/:id/edit" element={<QuotationFormPage />} />
+                            <Route path="/mrp/quotations/:id" element={<QuotationDetailPage />} />
 
-                        <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
-                        <Route path="/mrp/thread-calculator" element={<ThreadCalculatorPage />} />
-                        <Route path="/quality" element={<Navigate to="/quality/nc" replace />} />
-                        <Route path="/quality/nc" element={<QualityNcPage />} />
-                        <Route path="/quality/capa" element={<QualityCapaPage />} />
-                        <Route path="/quality/deviations-oos" element={<QualityDeviationsOosPage />} />
-                        <Route path="/quality/dhr-dmr" element={<QualityDhrDmrPage />} />
-                        <Route path="/quality/labeling" element={<QualityLabelingPage />} />
-                        <Route path="/quality/incoming" element={<QualityIncomingPage />} />
-                        <Route path="/quality/batch-release" element={<QualityBatchReleasePage />} />
-                        <Route path="/quality/equipment" element={<QualityEquipmentPage />} />
-                        <Route path="/quality/invima" element={<QualityInvimaPage />} />
-                        <Route path="/quality/compliance" element={<QualityComplianceDashboardPage />} />
-                        <Route path="/quality/alerts" element={<QualityAlertsPage />} />
-                        <Route path="/quality/change-control" element={<QualityChangeControlPage />} />
-                        <Route path="/quality/docs" element={<QualityDocsPage />} />
-                        <Route path="/quality/audit" element={<QualityAuditPage />} />
-                        <Route path="/quality/:section" element={<LegacyQualitySectionRedirect />} />
-                        <Route path="/postmarket" element={<Navigate to="/postmarket/techno" replace />} />
-                        <Route path="/postmarket/techno" element={<PostmarketTechnoPage />} />
-                        <Route path="/postmarket/recall" element={<PostmarketRecallPage />} />
-                        <Route path="/postmarket/shipment" element={<PostmarketShipmentPage />} />
-                        <Route path="/postmarket/:section" element={<LegacyPostmarketSectionRedirect />} />
-                        <Route path="/mrp/quality" element={<Navigate to="/quality/nc" replace />} />
-                        <Route path="/mrp/quality/:section" element={<LegacyQualitySectionRedirect />} />
-                        <Route path="/mrp/postmarket" element={<Navigate to="/postmarket/techno" replace />} />
-                        <Route path="/mrp/postmarket/:section" element={<LegacyPostmarketSectionRedirect />} />
+                            <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
+                            <Route path="/mrp/thread-calculator" element={<ThreadCalculatorPage />} />
+                            <Route path="/quality" element={<Navigate to="/quality/nc" replace />} />
+                            <Route path="/quality/nc" element={<QualityNcPage />} />
+                            <Route path="/quality/capa" element={<QualityCapaPage />} />
+                            <Route path="/quality/deviations-oos" element={<QualityDeviationsOosPage />} />
+                            <Route path="/quality/dhr-dmr" element={<QualityDhrDmrPage />} />
+                            <Route path="/quality/labeling" element={<QualityLabelingPage />} />
+                            <Route path="/quality/incoming" element={<QualityIncomingPage />} />
+                            <Route path="/quality/batch-release" element={<QualityBatchReleasePage />} />
+                            <Route path="/quality/equipment" element={<QualityEquipmentPage />} />
+                            <Route path="/quality/invima" element={<QualityInvimaPage />} />
+                            <Route path="/quality/compliance" element={<QualityComplianceDashboardPage />} />
+                            <Route path="/quality/alerts" element={<QualityAlertsPage />} />
+                            <Route path="/quality/change-control" element={<QualityChangeControlPage />} />
+                            <Route path="/quality/docs" element={<QualityDocsPage />} />
+                            <Route path="/quality/audit" element={<QualityAuditPage />} />
+                            <Route path="/quality/:section" element={<LegacyQualitySectionRedirect />} />
+                            <Route path="/postmarket" element={<Navigate to="/postmarket/techno" replace />} />
+                            <Route path="/postmarket/techno" element={<PostmarketTechnoPage />} />
+                            <Route path="/postmarket/recall" element={<PostmarketRecallPage />} />
+                            <Route path="/postmarket/shipment" element={<PostmarketShipmentPage />} />
+                            <Route path="/postmarket/:section" element={<LegacyPostmarketSectionRedirect />} />
+                            <Route path="/mrp/quality" element={<Navigate to="/quality/nc" replace />} />
+                            <Route path="/mrp/quality/:section" element={<LegacyQualitySectionRedirect />} />
+                            <Route path="/mrp/postmarket" element={<Navigate to="/postmarket/techno" replace />} />
+                            <Route path="/mrp/postmarket/:section" element={<LegacyPostmarketSectionRedirect />} />
 
-                        <Route path="/mrp/inventory" element={<InventoryDashboardPage />} />
-                        <Route path="/mrp/warehouses" element={<WarehouseListPage />} />
-                        <Route path="/mrp/warehouses/new" element={<WarehouseFormPage />} />
-                        <Route path="/mrp/warehouses/:id/edit" element={<WarehouseFormPage />} />
-                    </Route>
-                </Routes>
+                            <Route path="/mrp/inventory" element={<InventoryDashboardPage />} />
+                            <Route path="/mrp/warehouses" element={<WarehouseListPage />} />
+                            <Route path="/mrp/warehouses/new" element={<WarehouseFormPage />} />
+                            <Route path="/mrp/warehouses/:id/edit" element={<WarehouseFormPage />} />
+                        </Route>
+                    </Routes>
+                </Suspense>
                 <Toaster />
             </AuthProvider>
         </BrowserRouter>
