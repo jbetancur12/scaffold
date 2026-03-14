@@ -2272,6 +2272,7 @@ export interface OperationalConfig {
     costPerMinute: number; // MO Cost + CIF Cost
     purchasePaymentMethods: string[];
     quotationTermsTemplate?: QuotationTermsTemplate | null;
+    allowQuotationBelowMargin?: boolean;
     purchaseWithholdingRules: Array<{
         key: string;
         label: string;

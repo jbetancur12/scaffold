@@ -75,6 +75,9 @@ export class OperationalConfigService {
             if (!config.quotationTermsTemplate) {
                 config.quotationTermsTemplate = this.getDefaultQuotationTermsTemplate();
             }
+            if (config.allowQuotationBelowMargin === undefined || config.allowQuotationBelowMargin === null) {
+                config.allowQuotationBelowMargin = false;
+            }
             return config;
         }
 
@@ -99,6 +102,7 @@ export class OperationalConfigService {
         config.cifCostPerMinute = 0;
         config.costPerMinute = 0;
         config.purchasePaymentMethods = ['Contado', 'Crédito 30 días', 'Transferencia'];
+        config.allowQuotationBelowMargin = false;
         config.defaultPurchaseOrderControlledDocumentId = undefined;
         config.defaultPurchaseOrderControlledDocumentCode = undefined;
         config.defaultIncomingInspectionControlledDocumentCode = undefined;
@@ -191,6 +195,9 @@ export class OperationalConfigService {
         }
         if (data.quotationTermsTemplate !== undefined) {
             config.quotationTermsTemplate = data.quotationTermsTemplate || this.getDefaultQuotationTermsTemplate();
+        }
+        if (data.allowQuotationBelowMargin !== undefined) {
+            config.allowQuotationBelowMargin = Boolean(data.allowQuotationBelowMargin);
         }
         if (config.shippingCoverageLimitShared < config.shippingCoverageLimitFull) {
             throw new AppError('El tope compartido de envío debe ser mayor o igual al tope de cobertura total', 400);

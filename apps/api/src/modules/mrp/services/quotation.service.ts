@@ -90,6 +90,7 @@ export class QuotationService {
         listedUnitPrice: number;
         finalUnitPrice: number;
         itemLabel: string;
+        allowBelowMargin?: boolean;
     }) {
         const minAllowedMargin = this.minMargin(params.targetMargin);
         if (params.finalUnitPrice <= 0) {
@@ -97,6 +98,9 @@ export class QuotationService {
         }
         const finalMargin = (params.finalUnitPrice - params.baseUnitCost) / params.finalUnitPrice;
         if (finalMargin + 1e-9 < minAllowedMargin) {
+            if (params.allowBelowMargin) {
+                return minAllowedMargin;
+            }
             const minAllowedUnitPrice = minAllowedMargin >= 1
                 ? Number.POSITIVE_INFINITY
                 : (params.baseUnitCost / (1 - minAllowedMargin));
@@ -123,7 +127,8 @@ export class QuotationService {
         quotation: Quotation,
         row: QuotationInputItem,
         index: number,
-        globalDiscountPercent: number
+        globalDiscountPercent: number,
+        allowBelowMargin: boolean
     ) {
         if (row.lineType === QuotationItemLineType.NOTE) {
             const noteText = (row.noteText || '').trim();
@@ -204,6 +209,7 @@ export class QuotationService {
             listedUnitPrice,
             finalUnitPrice,
             itemLabel: label,
+            allowBelowMargin,
         });
 
         const subtotal = this.round(quantity * finalUnitPrice);
@@ -559,6 +565,8 @@ export class QuotationService {
     async create(payload: CreateQuotationInput) {
         return this.em.transactional(async (tx) => {
             const customer = await tx.getRepository(Customer).findOneOrFail({ id: payload.customerId, deletedAt: null as never });
+            const [config] = await tx.getRepository(OperationalConfig).find({}, { orderBy: { createdAt: 'DESC' }, limit: 1 });
+            const allowBelowMargin = Boolean(config?.allowQuotationBelowMargin);
             const quotation = new Quotation();
             quotation.customer = customer;
             quotation.code = await this.generateCode(tx);
@@ -581,7 +589,7 @@ export class QuotationService {
             }
 
             for (let i = 0; i < payload.items.length; i += 1) {
-                const item = await this.buildItem(tx, quotation, payload.items[i], i, quotation.globalDiscountPercent);
+                const item = await this.buildItem(tx, quotation, payload.items[i], i, quotation.globalDiscountPercent, allowBelowMargin);
                 quotation.items.add(item);
             }
             this.recalculateHeader(quotation);
@@ -597,6 +605,8 @@ export class QuotationService {
                 { id, deletedAt: null as never },
                 { populate: ['items'] }
             );
+            const [config] = await tx.getRepository(OperationalConfig).find({}, { orderBy: { createdAt: 'DESC' }, limit: 1 });
+            const allowBelowMargin = Boolean(config?.allowQuotationBelowMargin);
             if (![QuotationStatus.DRAFT, QuotationStatus.SENT].includes(quotation.status)) {
                 throw new AppError('Solo se puede editar una cotización en borrador o enviada', 400);
             }
@@ -624,7 +634,7 @@ export class QuotationService {
             quotation.items.removeAll();
 
             for (let i = 0; i < payload.items.length; i += 1) {
-                const item = await this.buildItem(tx, quotation, payload.items[i], i, quotation.globalDiscountPercent);
+                const item = await this.buildItem(tx, quotation, payload.items[i], i, quotation.globalDiscountPercent, allowBelowMargin);
                 quotation.items.add(item);
             }
 

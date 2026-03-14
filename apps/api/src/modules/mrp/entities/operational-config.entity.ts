@@ -43,6 +43,9 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
     @Property({ type: 'json', nullable: true })
     quotationTermsTemplate?: IOperationalConfig['quotationTermsTemplate'];
 
+    @Property({ type: 'boolean', default: false })
+    allowQuotationBelowMargin: boolean = false;
+
     @Property({ nullable: true })
     defaultPurchaseOrderControlledDocumentId?: string | null;
 
