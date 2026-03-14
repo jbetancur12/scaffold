@@ -85,6 +85,7 @@ export default function OperationalSettingsPage() {
         shippingCoverageLimitFull: 0,
         shippingCoverageLimitShared: 0,
         uvtValue: 47065,
+        allowQuotationBelowMargin: false,
         quotationTermsTemplate: defaultQuotationTermsTemplate,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -265,6 +266,7 @@ export default function OperationalSettingsPage() {
                     productionMaxDays: Math.max(Number(tpl.productionMaxDays || 1), Number(tpl.productionMinDays || 1)),
                     shippingMaxDays: Math.max(Number(tpl.shippingMaxDays || 0), Number(tpl.shippingMinDays || 0)),
                 },
+                allowQuotationBelowMargin: Boolean(config.allowQuotationBelowMargin),
             };
             const updated = await saveOperationalConfig(payload);
             setConfig(updated);
@@ -1097,6 +1099,27 @@ export default function OperationalSettingsPage() {
                                 </div>
                             </CardHeader>
                             <CardContent className="pt-6 space-y-5">
+                                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                                    Este ajuste es temporal. Úsalo solo mientras se cargan precios reales. Cuando termine, desactívalo.
+                                </div>
+                                <label className="inline-flex items-start gap-2 text-sm font-medium text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(config.allowQuotationBelowMargin)}
+                                        onChange={(e) => setConfig({
+                                            ...config,
+                                            allowQuotationBelowMargin: e.target.checked,
+                                        })}
+                                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                    />
+                                    <span>
+                                        Permitir cotizaciones por debajo del margen mínimo (no recomendado).
+                                        <span className="block text-xs text-slate-500">
+                                            Desactívalo cuando tengas precios actualizados.
+                                        </span>
+                                    </span>
+                                </label>
+
                                 <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
                                     <input
                                         type="checkbox"
