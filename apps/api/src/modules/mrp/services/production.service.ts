@@ -27,6 +27,7 @@ import { Supplier } from '../entities/supplier.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
 import { ShipmentItem } from '../entities/shipment-item.entity';
+import { FinishedGoodsLotInventory } from '../entities/finished-goods-lot-inventory.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
 import { BatchRelease } from '../entities/batch-release.entity';
@@ -1282,6 +1283,7 @@ export class ProductionService {
                 const batches = order.batches.getItems();
                 const itemVariantIds = order.items.getItems().map((i) => i.variant.id);
                 const variantQuantities = new Map<string, number>();
+                const batchCompletedQuantities = new Map<string, number>();
 
                 for (const variantId of itemVariantIds) {
                     const related = batches.filter((b) => b.variant.id === variantId);
@@ -1300,19 +1302,23 @@ export class ProductionService {
                         }
 
                         const units = batch.units.getItems();
+                        let batchCompleted = 0;
                         if (units.length > 0) {
                             const allGood = units.every((u) => u.rejected || (u.qcPassed && u.packaged));
                             if (!allGood) {
                                 throw new AppError(`El lote ${batch.code} tiene unidades sin liberar`, 400);
                             }
-                            totalCompleted += units.filter((u) => !u.rejected && u.packaged).length;
+                            batchCompleted = units.filter((u) => !u.rejected && u.packaged).length;
                         } else {
-                            totalCompleted += batch.producedQty > 0 ? batch.producedQty : batch.plannedQty;
+                            batchCompleted = batch.producedQty > 0 ? batch.producedQty : batch.plannedQty;
                         }
+                        totalCompleted += batchCompleted;
+                        batchCompletedQuantities.set(batch.id, batchCompleted);
                     }
                     variantQuantities.set(variantId, totalCompleted);
                 }
 
+                const dispatchedByBatch = new Map<string, number>();
                 const dispatchedByVariant = new Map<string, number>();
                 if (batches.length > 0) {
                     const shipmentItemRepo = tx.getRepository(ShipmentItem);
@@ -1325,8 +1331,10 @@ export class ProductionService {
                         { populate: ['productionBatch'] }
                     );
                     for (const item of shipmentItems) {
+                        const batchId = item.productionBatch.id;
                         const variantId = batchIdToVariant.get(item.productionBatch.id);
                         if (!variantId) continue;
+                        dispatchedByBatch.set(batchId, (dispatchedByBatch.get(batchId) || 0) + Number(item.quantity || 0));
                         const current = dispatchedByVariant.get(variantId) || 0;
                         dispatchedByVariant.set(variantId, current + Number(item.quantity || 0));
                     }
@@ -1615,6 +1623,29 @@ export class ProductionService {
                         type: WarehouseType.FINISHED_GOODS
                     } as Warehouse);
                     tx.persist(warehouse);
+                }
+
+                const lotInventoryRepo = tx.getRepository(FinishedGoodsLotInventory);
+                for (const batch of batches) {
+                    const completedQty = batchCompletedQuantities.get(batch.id) || 0;
+                    const dispatchedQty = dispatchedByBatch.get(batch.id) || 0;
+                    const netQty = Math.max(0, Number(completedQty) - Number(dispatchedQty));
+                    if (netQty <= 0) continue;
+
+                    let lotInventory = await lotInventoryRepo.findOne({
+                        productionBatch: batch.id,
+                        warehouse
+                    });
+                    if (lotInventory) {
+                        lotInventory.quantity = Number(lotInventory.quantity) + Number(netQty);
+                    } else {
+                        lotInventory = lotInventoryRepo.create({
+                            productionBatch: batch,
+                            warehouse,
+                            quantity: netQty
+                        } as unknown as FinishedGoodsLotInventory);
+                    }
+                    tx.persist(lotInventory);
                 }
 
                 for (const item of order.items) {

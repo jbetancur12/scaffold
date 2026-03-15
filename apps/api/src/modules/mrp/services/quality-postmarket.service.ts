@@ -27,6 +27,7 @@ import { BatchRelease } from '../entities/batch-release.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { FinishedGoodsLotInventory } from '../entities/finished-goods-lot-inventory.entity';
 
 type QualityAuditLogger = (payload: {
     entityType: string;
@@ -780,6 +781,7 @@ export class QualityPostmarketService {
             const batchReleaseRepo = tx.getRepository(BatchRelease);
             const inventoryRepo = tx.getRepository(InventoryItem);
             const warehouseRepo = tx.getRepository(Warehouse);
+            const lotInventoryRepo = tx.getRepository(FinishedGoodsLotInventory);
 
             const customer = await customerRepo.findOneOrFail({ id: payload.customerId });
             const shipment = shipmentRepo.create({
@@ -865,6 +867,31 @@ export class QualityPostmarketService {
                 const variantId = batch.variant?.id;
                 if (!variantId) continue;
                 dispatchedByVariant.set(variantId, (dispatchedByVariant.get(variantId) || 0) + Number(item.quantity || 0));
+            }
+
+            for (const [batchId, qty] of addedByBatch.entries()) {
+                const rows = await lotInventoryRepo.find(
+                    { productionBatch: batchId, warehouse: { type: WarehouseType.FINISHED_GOODS } },
+                    { populate: ['warehouse'], orderBy: { quantity: 'DESC' } }
+                );
+                if (rows.length === 0) {
+                    continue;
+                }
+                let remaining = Number(qty);
+                const totalAvailable = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+                if (totalAvailable < remaining) {
+                    const batch = batchById.get(batchId);
+                    throw new AppError(`Stock insuficiente en lote ${batch?.code || batchId} (disponible ${totalAvailable}, requerido ${qty})`, 400);
+                }
+                for (const row of rows) {
+                    if (remaining <= 0) break;
+                    const currentQty = Number(row.quantity || 0);
+                    if (currentQty <= 0) continue;
+                    const consume = Math.min(currentQty, remaining);
+                    row.quantity = currentQty - consume;
+                    remaining -= consume;
+                    tx.persist(row);
+                }
             }
 
             for (const [variantId, qty] of dispatchedByVariant.entries()) {
