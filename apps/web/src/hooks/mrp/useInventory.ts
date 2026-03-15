@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { InventoryItem } from '@scaffold/types';
+import { FinishedGoodsLotInventory, InventoryItem } from '@scaffold/types';
 import { mrpApi, RawMaterialKardexRow } from '@/services/mrpApi';
 import { useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
@@ -36,4 +36,18 @@ export const useInventoryKardexQuery = (filters?: {
 
     const queryKey = `mrp.inventory-kardex.${JSON.stringify(filters || {})}`;
     return useMrpQuery(fetchKardex, true, queryKey);
+};
+
+export const useFinishedGoodsLotInventoryQuery = (filters?: {
+    page?: number;
+    limit?: number;
+    warehouseId?: string;
+    search?: string;
+}) => {
+    const fetchLots = useCallback(async (): Promise<{ items: FinishedGoodsLotInventory[]; total: number }> => {
+        return mrpApi.getFinishedGoodsLotInventory(filters);
+    }, [filters?.limit, filters?.page, filters?.search, filters?.warehouseId]);
+
+    const queryKey = `mrp.inventory-fg-lots.${JSON.stringify(filters || {})}`;
+    return useMrpQuery(fetchLots, true, queryKey);
 };

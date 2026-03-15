@@ -887,6 +887,17 @@ export interface InventoryItem {
     updatedAt: string | Date;
 }
 
+export interface FinishedGoodsLotInventory {
+    id: string;
+    productionBatchId: string;
+    warehouseId: string;
+    quantity: number;
+    productionBatch?: ProductionBatch & { variant?: ProductVariant & { product?: Product } };
+    warehouse?: Warehouse;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
 export interface ProductionOrder {
     id: string;
     code: string;

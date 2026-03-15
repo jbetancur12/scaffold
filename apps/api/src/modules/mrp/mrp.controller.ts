@@ -57,6 +57,7 @@ import {
     UpdateProductionOrderStatusSchema,
     InventoryQuerySchema,
     InventoryKardexQuerySchema,
+    FinishedGoodsLotInventoryQuerySchema,
     ListPurchaseOrdersQuerySchema,
     CreatePurchaseRequisitionSchema,
     CreatePurchaseRequisitionFromProductionOrderSchema,
@@ -2102,6 +2103,16 @@ export class MrpController {
                 dateFrom: filters.dateFrom,
                 dateTo: filters.dateTo,
             });
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getFinishedGoodsLotInventory(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { page, limit, warehouseId, search } = FinishedGoodsLotInventoryQuerySchema.parse(req.query);
+            const result = await this.inventoryService.getFinishedGoodsLotInventory(page || 1, limit || 100, warehouseId, search);
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);

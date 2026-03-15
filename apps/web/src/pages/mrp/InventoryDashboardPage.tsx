@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { InventoryItem, ProductVariant, RawMaterial, Warehouse, Product } from '@scaffold/types';
+import { FinishedGoodsLotInventory, InventoryItem, ProductVariant, RawMaterial, Warehouse, Product } from '@scaffold/types';
 import {
     Table,
     TableBody,
@@ -32,7 +32,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { formatQuantity } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-error';
-import { useInventoryQuery, useManualStockMutation } from '@/hooks/mrp/useInventory';
+import { useInventoryQuery, useManualStockMutation, useFinishedGoodsLotInventoryQuery } from '@/hooks/mrp/useInventory';
 import { useInventoryKardexQuery } from '@/hooks/mrp/useInventory';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
@@ -65,8 +65,9 @@ export default function InventoryDashboardPage() {
     const [kardexReference, setKardexReference] = useState('');
     const [kardexDateFrom, setKardexDateFrom] = useState('');
     const [kardexDateTo, setKardexDateTo] = useState('');
-    const [activeView, setActiveView] = useState<'stock' | 'kardex'>('stock');
+    const [activeView, setActiveView] = useState<'stock' | 'kardex' | 'lots'>('stock');
     const [groupMode, setGroupMode] = useState<'grouped' | 'detailed'>('grouped');
+    const [lotSearch, setLotSearch] = useState('');
     const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
     const { data: inventoryData, error: inventoryError, execute: refetchInventory, loading } = useInventoryQuery(1, 100, warehouseId);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
@@ -81,11 +82,19 @@ export default function InventoryDashboardPage() {
         dateFrom: kardexDateFrom || undefined,
         dateTo: kardexDateTo || undefined,
     });
+    const { data: lotInventoryData, loading: loadingLots, error: lotInventoryError } = useFinishedGoodsLotInventoryQuery({
+        page: 1,
+        limit: 100,
+        warehouseId,
+        search: lotSearch.trim() || undefined,
+    });
     const inventory = (inventoryData?.items as PopulatedInventoryItem[]) ?? [];
     const kardexRows = (kardexData?.items as RawMaterialKardexRow[]) ?? [];
+    const lotInventory = (lotInventoryData?.items as FinishedGoodsLotInventory[]) ?? [];
     const warehouses: Warehouse[] = warehousesData ?? [];
     const inventoryErrorMessage = inventoryError ? getErrorMessage(inventoryError, 'Error al cargar el inventario') : '';
     const kardexErrorMessage = kardexError ? getErrorMessage(kardexError, 'Error al cargar kardex') : '';
+    const lotInventoryErrorMessage = lotInventoryError ? getErrorMessage(lotInventoryError, 'Error al cargar inventario por lote') : '';
 
     useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar información auxiliar');
     useMrpQueryErrorToast(warehousesError, 'No se pudo cargar información auxiliar');
@@ -369,6 +378,13 @@ export default function InventoryDashboardPage() {
                 >
                     Kardex MP
                 </Button>
+                <Button
+                    variant={activeView === 'lots' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setActiveView('lots')}
+                >
+                    Lotes PT
+                </Button>
             </div>
 
             {activeView === 'stock' ? (
@@ -610,6 +626,78 @@ export default function InventoryDashboardPage() {
                     )}
                 </div>
             </div>
+            ) : null}
+
+            {activeView === 'lots' ? (
+                loadingLots ? (
+                    <div className="flex justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                ) : lotInventoryErrorMessage ? (
+                    <div className="p-4 text-red-500 bg-red-50 rounded-md">
+                        {lotInventoryErrorMessage}
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white">
+                            <h2 className="text-lg font-bold text-slate-800">Inventario por Lote (PT)</h2>
+                            <div className="flex items-center gap-2">
+                                <Input
+                                    value={lotSearch}
+                                    onChange={(e) => setLotSearch(e.target.value)}
+                                    placeholder="Buscar por lote, SKU o producto"
+                                    className="w-full sm:w-[260px] h-9"
+                                />
+                                <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-medium">
+                                    {lotInventory.length} ítems
+                                </Badge>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader className="bg-slate-50/80">
+                                    <TableRow className="hover:bg-transparent">
+                                        <TableHead className="w-[20%] text-xs font-semibold text-slate-500 uppercase tracking-wider py-4">Lote</TableHead>
+                                        <TableHead className="w-[30%] text-xs font-semibold text-slate-500 uppercase tracking-wider py-4">Producto</TableHead>
+                                        <TableHead className="w-[20%] text-xs font-semibold text-slate-500 uppercase tracking-wider py-4">Variante</TableHead>
+                                        <TableHead className="w-[20%] text-xs font-semibold text-slate-500 uppercase tracking-wider py-4">Almacén</TableHead>
+                                        <TableHead className="w-[10%] text-right text-xs font-semibold text-slate-500 uppercase tracking-wider py-4">Cantidad</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {lotInventory.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="h-[240px]">
+                                                <div className="flex flex-col items-center justify-center text-center h-full space-y-3">
+                                                    <div className="p-4 bg-slate-50 rounded-full ring-8 ring-slate-50/50">
+                                                        <Search className="h-8 w-8 text-slate-300" />
+                                                    </div>
+                                                    <p className="text-sm text-slate-500">Sin lotes en inventario terminado.</p>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : lotInventory.map((row) => (
+                                        <TableRow key={row.id} className="hover:bg-slate-50/80">
+                                            <TableCell className="font-mono text-xs text-slate-700">{row.productionBatch?.code || row.productionBatchId}</TableCell>
+                                            <TableCell className="text-sm text-slate-800">
+                                                {row.productionBatch?.variant?.product?.name || 'Producto'}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-slate-600">
+                                                {row.productionBatch?.variant?.name || row.productionBatch?.variant?.sku || '—'}
+                                            </TableCell>
+                                            <TableCell className="text-sm text-slate-600">
+                                                {row.warehouse?.name || '—'}
+                                            </TableCell>
+                                            <TableCell className="text-right font-semibold text-slate-900">
+                                                {formatQuantity(Number(row.quantity || 0))}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
+                )
             ) : null}
         </div>
     );

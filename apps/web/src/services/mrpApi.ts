@@ -14,6 +14,7 @@ import {
     PriceListConfig,
     PriceListSnapshot,
     InventoryItem,
+    FinishedGoodsLotInventory,
     OperationalConfig,
     Warehouse,
     NonConformity,
@@ -1409,6 +1410,15 @@ export const mrpApi = {
         dateTo?: string;
     }) => {
         const response = await api.get<{ items: RawMaterialKardexRow[], total: number }>(`/mrp/inventory/kardex`, { params });
+        return response.data;
+    },
+    getFinishedGoodsLotInventory: async (params?: {
+        page?: number;
+        limit?: number;
+        warehouseId?: string;
+        search?: string;
+    }) => {
+        const response = await api.get<{ items: FinishedGoodsLotInventory[], total: number }>(`/mrp/inventory/finished-goods-lots`, { params });
         return response.data;
     },
     addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }): Promise<InventoryItem> => {

@@ -4,6 +4,7 @@ import { Warehouse } from '../entities/warehouse.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { RawMaterialLot } from '../entities/raw-material-lot.entity';
 import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
+import { FinishedGoodsLotInventory } from '../entities/finished-goods-lot-inventory.entity';
 import { WarehouseSchema, InventoryItemSchema } from '@scaffold/schemas';
 import { WarehouseType } from '@scaffold/types';
 import { z } from 'zod';
@@ -67,6 +68,36 @@ export class InventoryService {
 
         await this.em.persistAndFlush(inventoryItem);
         return inventoryItem;
+    }
+
+    async getFinishedGoodsLotInventory(
+        page = 1,
+        limit = 100,
+        warehouseId?: string,
+        search?: string
+    ): Promise<{ items: FinishedGoodsLotInventory[]; total: number }> {
+        const query: FilterQuery<FinishedGoodsLotInventory> = {};
+        if (warehouseId) query.warehouse = warehouseId;
+        const term = search?.trim();
+        if (term) {
+            query.$or = [
+                { productionBatch: { code: { $ilike: `%${term}%` } } },
+                { productionBatch: { variant: { name: { $ilike: `%${term}%` } } } },
+                { productionBatch: { variant: { sku: { $ilike: `%${term}%` } } } },
+                { productionBatch: { variant: { product: { name: { $ilike: `%${term}%` } } } } },
+            ];
+        }
+        const [items, total] = await this.em.findAndCount(
+            FinishedGoodsLotInventory,
+            query,
+            {
+                populate: ['productionBatch', 'productionBatch.variant', 'productionBatch.variant.product', 'warehouse'],
+                orderBy: { updatedAt: 'DESC' },
+                limit,
+                offset: (page - 1) * limit,
+            }
+        );
+        return { items, total };
     }
 
     async addManualStock(data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }): Promise<InventoryItem> {
