@@ -68,6 +68,7 @@ export default function InventoryDashboardPage() {
     const [activeView, setActiveView] = useState<'stock' | 'kardex' | 'lots'>('stock');
     const [groupMode, setGroupMode] = useState<'grouped' | 'detailed'>('grouped');
     const [lotSearch, setLotSearch] = useState('');
+    const [lotPositiveOnly, setLotPositiveOnly] = useState(true);
     const warehouseId = selectedFilterWarehouseId === 'all' ? undefined : selectedFilterWarehouseId;
     const { data: inventoryData, error: inventoryError, execute: refetchInventory, loading } = useInventoryQuery(1, 100, warehouseId);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
@@ -87,6 +88,7 @@ export default function InventoryDashboardPage() {
         limit: 100,
         warehouseId,
         search: lotSearch.trim() || undefined,
+        positiveOnly: lotPositiveOnly,
     });
     const inventory = (inventoryData?.items as PopulatedInventoryItem[]) ?? [];
     const kardexRows = (kardexData?.items as RawMaterialKardexRow[]) ?? [];
@@ -642,6 +644,22 @@ export default function InventoryDashboardPage() {
                         <div className="p-4 sm:px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white">
                             <h2 className="text-lg font-bold text-slate-800">Inventario por Lote (PT)</h2>
                             <div className="flex items-center gap-2">
+                                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                                    <Button
+                                        variant={lotPositiveOnly ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setLotPositiveOnly(true)}
+                                    >
+                                        Con saldo
+                                    </Button>
+                                    <Button
+                                        variant={!lotPositiveOnly ? 'default' : 'ghost'}
+                                        size="sm"
+                                        onClick={() => setLotPositiveOnly(false)}
+                                    >
+                                        Todos
+                                    </Button>
+                                </div>
                                 <Input
                                     value={lotSearch}
                                     onChange={(e) => setLotSearch(e.target.value)}

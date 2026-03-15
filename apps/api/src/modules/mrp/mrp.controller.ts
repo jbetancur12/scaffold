@@ -2111,8 +2111,8 @@ export class MrpController {
 
     async getFinishedGoodsLotInventory(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit, warehouseId, search } = FinishedGoodsLotInventoryQuerySchema.parse(req.query);
-            const result = await this.inventoryService.getFinishedGoodsLotInventory(page || 1, limit || 100, warehouseId, search);
+            const { page, limit, warehouseId, search, positiveOnly } = FinishedGoodsLotInventoryQuerySchema.parse(req.query);
+            const result = await this.inventoryService.getFinishedGoodsLotInventory(page || 1, limit || 100, warehouseId, search, positiveOnly);
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);

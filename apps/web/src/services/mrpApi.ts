@@ -1417,6 +1417,7 @@ export const mrpApi = {
         limit?: number;
         warehouseId?: string;
         search?: string;
+        positiveOnly?: boolean;
     }) => {
         const response = await api.get<{ items: FinishedGoodsLotInventory[], total: number }>(`/mrp/inventory/finished-goods-lots`, { params });
         return response.data;

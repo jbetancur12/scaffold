@@ -74,10 +74,12 @@ export class InventoryService {
         page = 1,
         limit = 100,
         warehouseId?: string,
-        search?: string
+        search?: string,
+        positiveOnly?: boolean
     ): Promise<{ items: FinishedGoodsLotInventory[]; total: number }> {
         const query: FilterQuery<FinishedGoodsLotInventory> = {};
         if (warehouseId) query.warehouse = warehouseId;
+        if (positiveOnly) query.quantity = { $gt: 0 };
         const term = search?.trim();
         if (term) {
             query.$or = [

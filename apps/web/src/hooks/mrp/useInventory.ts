@@ -43,10 +43,11 @@ export const useFinishedGoodsLotInventoryQuery = (filters?: {
     limit?: number;
     warehouseId?: string;
     search?: string;
+    positiveOnly?: boolean;
 }) => {
     const fetchLots = useCallback(async (): Promise<{ items: FinishedGoodsLotInventory[]; total: number }> => {
         return mrpApi.getFinishedGoodsLotInventory(filters);
-    }, [filters?.limit, filters?.page, filters?.search, filters?.warehouseId]);
+    }, [filters?.limit, filters?.page, filters?.positiveOnly, filters?.search, filters?.warehouseId]);
 
     const queryKey = `mrp.inventory-fg-lots.${JSON.stringify(filters || {})}`;
     return useMrpQuery(fetchLots, true, queryKey);
