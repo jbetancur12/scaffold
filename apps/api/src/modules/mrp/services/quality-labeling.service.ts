@@ -219,7 +219,6 @@ export class QualityLabelingService {
         const now = new Date();
         const doc = await this.controlledDocRepo.findOne({
             code,
-            process: DocumentProcess.EMPAQUE,
             documentCategory: DocumentCategory.FOR,
             status: DocumentStatus.APROBADO,
             $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],

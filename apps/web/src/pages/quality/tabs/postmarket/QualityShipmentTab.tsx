@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Truck, Users, Plus, X, Save, Trash2 } from 'lucide-react';
+import { Truck, Users, Plus, X, Save, Trash2, Download } from 'lucide-react';
 import type { QualityComplianceModel } from '../types';
+import { mrpApi } from '@/services/mrpApi';
+import { useToast } from '@/components/ui/use-toast';
+import { getErrorMessage } from '@/lib/api-error';
 
 const shortId = (value?: string) => {
     if (!value) return 'N/A';
@@ -13,8 +16,16 @@ const shortId = (value?: string) => {
 };
 
 export function QualityShipmentTab({ model }: { model: QualityComplianceModel }) {
+    const { toast } = useToast();
     const [showCustomerForm, setShowCustomerForm] = useState(false);
     const [showShipmentForm, setShowShipmentForm] = useState(false);
+    const [targetItemIndex, setTargetItemIndex] = useState(0);
+
+    useEffect(() => {
+        if (targetItemIndex >= model.shipmentForm.items.length) {
+            setTargetItemIndex(Math.max(0, model.shipmentForm.items.length - 1));
+        }
+    }, [model.shipmentForm.items.length, targetItemIndex]);
 
     const handleCustomerSubmit = async (e: React.FormEvent) => {
         await model.handleCreateCustomer(e);
@@ -23,6 +34,22 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
     const handleShipmentSubmit = async (e: React.FormEvent) => {
         await model.handleCreateShipment(e);
         setShowShipmentForm(false);
+    };
+
+    const handleDownloadShipmentPdf = async (shipmentId: string, commercialDocument?: string) => {
+        try {
+            const blob = await mrpApi.getShipmentPdf(shipmentId);
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = `remision-${commercialDocument || shipmentId}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(objectUrl);
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo generar la remisión'), variant: 'destructive' });
+        }
     };
 
     const inputClass = 'h-10 rounded-xl border-slate-200 focus-visible:ring-violet-500';
@@ -187,6 +214,72 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
                                 </div>
                             </div>
 
+                            {/* Batch Lookup */}
+                            <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Buscar lote</p>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <Input
+                                        value={model.batchLookupQuery}
+                                        onChange={(e) => model.setBatchLookupQuery(e.target.value)}
+                                        placeholder="Código lote, SKU o producto"
+                                        className="h-9 rounded-xl border-slate-200 focus-visible:ring-violet-500"
+                                    />
+                                    <select
+                                        className={selectClass}
+                                        value={String(targetItemIndex)}
+                                        onChange={(e) => setTargetItemIndex(Number(e.target.value))}
+                                    >
+                                        {model.shipmentForm.items.map((_, index) => (
+                                            <option key={`target-item-${index}`} value={String(index)}>
+                                                Aplicar a ítem {index + 1}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <Button
+                                        type="button"
+                                        onClick={model.lookupProductionBatches}
+                                        disabled={model.loadingBatchLookup || !model.batchLookupQuery.trim()}
+                                        className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-9 text-xs"
+                                    >
+                                        {model.loadingBatchLookup ? 'Buscando...' : 'Buscar lote'}
+                                    </Button>
+                                </div>
+                                {model.batchLookupResults.length > 0 && (
+                                    <div className="space-y-2">
+                                        {model.batchLookupResults.map((batch) => (
+                                            <div key={batch.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                                                <span className="font-semibold text-slate-800">{batch.code}</span>
+                                                <span className="text-slate-400">·</span>
+                                                <span className="text-slate-600">
+                                                    {(batch.variant?.product?.name || 'Producto')} {batch.variant?.name ? `— ${batch.variant?.name}` : ''}
+                                                </span>
+                                                {batch.productionOrder?.code && (
+                                                    <>
+                                                        <span className="text-slate-400">·</span>
+                                                        <span className="text-slate-500">OP {batch.productionOrder.code}</span>
+                                                    </>
+                                                )}
+                                                <span className="text-slate-400">·</span>
+                                                <span className="text-slate-500">QC {batch.qcStatus}</span>
+                                                <span className="text-slate-400">·</span>
+                                                <span className="text-slate-500">Empaque {batch.packagingStatus}</span>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => model.applyBatchToShipmentItem(targetItemIndex, batch.id)}
+                                                    className="ml-auto rounded-xl h-7 text-xs border-slate-200"
+                                                >
+                                                    Usar en ítem {targetItemIndex + 1}
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             {/* Items */}
                             <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
                                 <div className="flex items-center justify-between">
@@ -246,6 +339,15 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
                                 <span className="text-slate-400">·</span>
                                 <span className="font-semibold text-slate-600">{shipment.customer?.name || shortId(shipment.customerId)}</span>
                                 <span className="text-slate-400 text-xs ml-auto">{new Date(shipment.shippedAt).toLocaleString('es-CO')}</span>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleDownloadShipmentPdf(shipment.id, shipment.commercialDocument)}
+                                    className="rounded-xl h-7 text-xs border-slate-200"
+                                >
+                                    <Download className="h-3.5 w-3.5 mr-1" />Remisión PDF
+                                </Button>
                             </div>
                             {shipment.dispatchedBy && (
                                 <p className="text-xs text-slate-500">Responsable: <span className="font-medium text-slate-700">{shipment.dispatchedBy}</span></p>

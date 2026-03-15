@@ -871,6 +871,10 @@ export const mrpApi = {
         const response = await api.get<ProductionBatch[]>(`/mrp/production-orders/${orderId}/batches`);
         return response.data;
     },
+    lookupProductionBatches: async (params: { search: string; limit?: number }): Promise<ProductionBatch[]> => {
+        const response = await api.get<ProductionBatch[]>('/mrp/production-batches/lookup', { params });
+        return response.data;
+    },
     createProductionBatch: async (orderId: string, data: CreateProductionBatchPayload): Promise<ProductionBatch> => {
         const response = await api.post<ProductionBatch>(`/mrp/production-orders/${orderId}/batches`, data);
         return response.data;
@@ -1187,6 +1191,10 @@ export const mrpApi = {
     }): Promise<Shipment[]> => {
         const response = await api.get<Shipment[]>('/mrp/quality/shipments', { params: filters });
         return response.data;
+    },
+    getShipmentPdf: async (id: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/quality/shipments/${id}/pdf`, { responseType: 'blob' });
+        return response.data as Blob;
     },
     listRecallAffectedCustomers: async (recallCaseId: string): Promise<RecallAffectedCustomer[]> => {
         const response = await api.get<RecallAffectedCustomer[]>(`/mrp/quality/recalls/${recallCaseId}/affected-customers`);

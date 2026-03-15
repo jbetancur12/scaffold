@@ -569,6 +569,11 @@ export const ProductionAnalyticsQuerySchema = z.object({
     }
 });
 
+export const ListProductionBatchLookupQuerySchema = z.object({
+    search: z.string().optional(),
+    limit: z.coerce.number().int().positive().max(50).optional(),
+});
+
 export const ListRawMaterialsQuerySchema = PaginationQuerySchema.extend({
     search: z.string().optional(),
 });

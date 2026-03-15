@@ -8,6 +8,7 @@ import {
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
     TechnovigilanceReportChannel,
+    ProductionBatch,
 } from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -85,6 +86,9 @@ export const useQualityPostmarketFlow = () => {
         notes: '',
         items: [{ productionBatchId: '', productionBatchUnitId: '', quantity: 1 }],
     });
+    const [batchLookupQuery, setBatchLookupQuery] = useState('');
+    const [batchLookupResults, setBatchLookupResults] = useState<ProductionBatch[]>([]);
+    const [loadingBatchLookup, setLoadingBatchLookup] = useState(false);
 
     const technovigilanceCases = technovigilanceData ?? [];
     const recalls = recallsData ?? [];
@@ -248,6 +252,8 @@ export const useQualityPostmarketFlow = () => {
                 notes: '',
                 items: [{ productionBatchId: '', productionBatchUnitId: '', quantity: 1 }],
             });
+            setBatchLookupQuery('');
+            setBatchLookupResults([]);
             toast({ title: 'Despacho registrado', description: 'Trazabilidad bidireccional actualizada.' });
         } catch (err) {
             toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo registrar el despacho'), variant: 'destructive' });
@@ -275,6 +281,30 @@ export const useQualityPostmarketFlow = () => {
                 i === index ? { ...item, [field]: value } : item
             )),
         }));
+    };
+
+    const lookupProductionBatches = async () => {
+        const search = batchLookupQuery.trim();
+        if (!search) {
+            setBatchLookupResults([]);
+            return;
+        }
+        try {
+            setLoadingBatchLookup(true);
+            const rows = await mrpApi.lookupProductionBatches({ search, limit: 10 });
+            setBatchLookupResults(rows);
+            if (rows.length === 0) {
+                toast({ title: 'Sin resultados', description: 'No se encontraron lotes con ese criterio.' });
+            }
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo buscar lotes'), variant: 'destructive' });
+        } finally {
+            setLoadingBatchLookup(false);
+        }
+    };
+
+    const applyBatchToShipmentItem = (index: number, batchId: string) => {
+        updateShipmentItem(index, 'productionBatchId', batchId);
     };
 
     const quickShowRecallAffectedCustomers = async (recallCaseId: string) => {
@@ -382,14 +412,18 @@ export const useQualityPostmarketFlow = () => {
         recallForm,
         customerForm,
         shipmentForm,
+        batchLookupQuery,
+        batchLookupResults,
         setTechnoForm,
         setRecallForm,
         setCustomerForm,
         setShipmentForm,
+        setBatchLookupQuery,
         loadingTechno,
         loadingRecalls,
         loadingCustomers,
         loadingShipments,
+        loadingBatchLookup,
         creatingTechnoCase,
         creatingRecall,
         creatingCustomer,
@@ -400,6 +434,8 @@ export const useQualityPostmarketFlow = () => {
         handleCreateRecall,
         handleCreateCustomer,
         handleCreateShipment,
+        lookupProductionBatches,
+        applyBatchToShipmentItem,
         addShipmentItem,
         removeShipmentItem,
         updateShipmentItem,

@@ -944,6 +944,7 @@ export interface ProductionBatch {
     finishedInspectionFormDocumentVersion?: number;
     finishedInspectionFormDocumentDate?: string | Date;
     variant?: ProductVariant & { product?: Product };
+    productionOrder?: ProductionOrder;
     units?: ProductionBatchUnit[];
     createdAt: string | Date;
     updatedAt: string | Date;

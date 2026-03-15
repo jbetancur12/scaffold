@@ -150,6 +150,10 @@ export default function ProductionOrderDetailPage() {
     const batches = batchesData ?? [];
     const warehouses = warehousesData ?? [];
     const isSerialMode = operationalConfig?.operationMode === 'serial';
+    const defaultPackagingDocCode = operationalConfig?.defaultPackagingControlledDocumentCode || undefined;
+    const defaultFinishedInspectionDocCode = operationalConfig?.defaultFinishedInspectionControlledDocumentCode || undefined;
+    const defaultLabelingDocCode = operationalConfig?.defaultLabelingControlledDocumentCode || undefined;
+    const defaultBatchReleaseDocCode = operationalConfig?.defaultBatchReleaseControlledDocumentCode || undefined;
     const { execute: updateOrderStatus, loading: submitting } = useUpdateProductionOrderStatusMutation();
     const { execute: createBatch, loading: creatingBatch } = useCreateProductionBatchMutation();
     const { execute: addBatchUnits } = useAddProductionBatchUnitsMutation();
@@ -997,7 +1001,7 @@ export default function ProductionOrderDetailPage() {
         {
             key: 'packaging',
             title: 'FOR Empaque',
-            code: activeLotBatch?.packagingFormDocumentCode,
+            code: activeLotBatch?.packagingFormDocumentCode || defaultPackagingDocCode,
             version: activeLotBatch?.packagingFormDocumentVersion,
             date: activeLotBatch?.packagingFormDocumentDate,
             status: lotStepStatus.form ? 'Listo' : 'Pendiente',
@@ -1005,7 +1009,7 @@ export default function ProductionOrderDetailPage() {
         {
             key: 'finishedInspection',
             title: 'FOR Inspección PT',
-            code: activeLotBatch?.finishedInspectionFormDocumentCode,
+            code: activeLotBatch?.finishedInspectionFormDocumentCode || defaultFinishedInspectionDocCode,
             version: activeLotBatch?.finishedInspectionFormDocumentVersion,
             date: activeLotBatch?.finishedInspectionFormDocumentDate,
             status: lotStepStatus.finishedInspection ? 'Aprobado' : 'Pendiente',
@@ -1013,7 +1017,7 @@ export default function ProductionOrderDetailPage() {
         {
             key: 'labeling',
             title: 'FOR Etiquetado',
-            code: lotCenterLotLabel?.documentControlCode,
+            code: lotCenterLotLabel?.documentControlCode || defaultLabelingDocCode,
             version: lotCenterLotLabel?.documentControlVersion,
             date: lotCenterLotLabel?.documentControlDate,
             status: lotStepStatus.label ? 'Validado' : 'Pendiente',
@@ -1021,7 +1025,7 @@ export default function ProductionOrderDetailPage() {
         {
             key: 'release',
             title: 'FOR Liberación QA',
-            code: lotCenterRelease?.documentControlCode,
+            code: lotCenterRelease?.documentControlCode || defaultBatchReleaseDocCode,
             version: lotCenterRelease?.documentControlVersion,
             date: lotCenterRelease?.documentControlDate,
             status: lotStepStatus.qa ? 'Firmado' : 'Pendiente',

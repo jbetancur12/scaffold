@@ -27,6 +27,7 @@ import { CustomerShippingLabelPdfService } from './services/customer-shipping-la
 import { ProductCatalogPdfService } from './services/product-catalog-pdf.service';
 import { PriceListConfigService } from './services/price-list-config.service';
 import { PriceListSnapshotService } from './services/price-list-snapshot.service';
+import { ShipmentPdfService } from './services/shipment-pdf.service';
 import {
     ProductSchema,
     ProductGroupSchema,
@@ -118,6 +119,7 @@ import {
     CreateQualityTrainingEvidenceSchema,
     ListQualityTrainingEvidenceQuerySchema,
     ListIncomingInspectionsQuerySchema,
+    ListProductionBatchLookupQuerySchema,
     ResolveIncomingInspectionSchema,
     CorrectIncomingInspectionCostSchema,
     IncomingInspectionEvidenceTypeSchema,
@@ -197,6 +199,7 @@ export class MrpController {
     private get documentControlService() { return new DocumentControlService(this.em); }
     private get customerShippingLabelPdfService() { return new CustomerShippingLabelPdfService(); }
     private get productCatalogPdfService() { return new ProductCatalogPdfService(this.em); }
+    private get shipmentPdfService() { return new ShipmentPdfService(this.em); }
     private get priceListConfigService() { return new PriceListConfigService(this.em); }
     private get priceListSnapshotService() { return new PriceListSnapshotService(this.em); }
     private get salesOrderService() { return new SalesOrderService(this.em); }
@@ -933,6 +936,16 @@ export class MrpController {
         }
     }
 
+    async lookupProductionBatches(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { search, limit } = ListProductionBatchLookupQuerySchema.parse(req.query);
+            const batches = await this.productionService.lookupBatches({ search, limit });
+            return ApiResponse.success(res, batches);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async getProductionAnalyticsSummary(req: Request, res: Response, next: NextFunction) {
         try {
             const query = ProductionAnalyticsQuerySchema.parse(req.query);
@@ -1621,6 +1634,18 @@ export class MrpController {
             const filters = ListShipmentsQuerySchema.parse(req.query);
             const rows = await this.qualityService.listShipments(filters);
             return ApiResponse.success(res, rows);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadShipmentPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const pdf = await this.shipmentPdfService.generateShipmentPdf(id);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
+            return res.send(pdf.buffer);
         } catch (error) {
             next(error);
         }

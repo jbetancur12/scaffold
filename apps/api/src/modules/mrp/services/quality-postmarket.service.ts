@@ -12,6 +12,7 @@ import {
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
     TechnovigilanceReportChannel,
+    WarehouseType,
 } from '@scaffold/types';
 import { AppError } from '../../../shared/utils/response';
 import { Customer } from '../entities/customer.entity';
@@ -24,6 +25,8 @@ import { Shipment } from '../entities/shipment.entity';
 import { ShipmentItem } from '../entities/shipment-item.entity';
 import { BatchRelease } from '../entities/batch-release.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
+import { InventoryItem } from '../entities/inventory-item.entity';
+import { Warehouse } from '../entities/warehouse.entity';
 
 type QualityAuditLogger = (payload: {
     entityType: string;
@@ -768,68 +771,144 @@ export class QualityPostmarketService {
             quantity: number;
         }>;
     }, actor?: string) {
-        const customer = await this.customerRepo.findOneOrFail({ id: payload.customerId });
-        const shipment = this.shipmentRepo.create({
-            customer,
-            commercialDocument: payload.commercialDocument,
-            shippedAt: payload.shippedAt ?? new Date(),
-            dispatchedBy: payload.dispatchedBy,
-            notes: payload.notes,
-        } as unknown as Shipment);
+        return this.em.transactional(async (tx) => {
+            const customerRepo = tx.getRepository(Customer);
+            const batchRepo = tx.getRepository(ProductionBatch);
+            const batchUnitRepo = tx.getRepository(ProductionBatchUnit);
+            const shipmentRepo = tx.getRepository(Shipment);
+            const shipmentItemRepo = tx.getRepository(ShipmentItem);
+            const batchReleaseRepo = tx.getRepository(BatchRelease);
+            const inventoryRepo = tx.getRepository(InventoryItem);
+            const warehouseRepo = tx.getRepository(Warehouse);
 
-        for (const item of payload.items) {
-            const batch = await this.em.findOneOrFail(ProductionBatch, { id: item.productionBatchId }, { populate: ['units'] });
-            const release = await this.batchReleaseRepo.findOne({ productionBatch: batch.id });
-            if (!release || release.status !== BatchReleaseStatus.LIBERADO_QA) {
-                throw new AppError(`No puedes despachar: el lote ${batch.code} no esta liberado por QA`, 400);
-            }
-            const dispatchValidation = await this.validateDispatchReadiness(batch.id, actor);
-            if (!dispatchValidation.eligible) {
-                throw new AppError(`No puedes despachar lote ${batch.code}: ${dispatchValidation.errors.join(' | ')}`, 400);
-            }
-            const blockingIssues = await this.getBatchBlockingIssues(batch.id);
-            if (blockingIssues.length > 0) {
-                throw new AppError(`No puedes despachar lote ${batch.code}: ${blockingIssues.join(' | ')}`, 400);
-            }
+            const customer = await customerRepo.findOneOrFail({ id: payload.customerId });
+            const shipment = shipmentRepo.create({
+                customer,
+                commercialDocument: payload.commercialDocument,
+                shippedAt: payload.shippedAt ?? new Date(),
+                dispatchedBy: payload.dispatchedBy,
+                notes: payload.notes,
+            } as unknown as Shipment);
 
-            let batchUnit: ProductionBatchUnit | undefined;
-            if (item.productionBatchUnitId) {
-                batchUnit = await this.em.findOneOrFail(ProductionBatchUnit, { id: item.productionBatchUnitId }, { populate: ['batch'] });
-                if (batchUnit.batch.id !== batch.id) {
-                    throw new AppError('La unidad serial no pertenece al lote indicado', 400);
+            const batchIds = Array.from(new Set(payload.items.map((row) => row.productionBatchId)));
+            const batches = await batchRepo.find(
+                { id: { $in: batchIds } },
+                { populate: ['units', 'variant'] }
+            );
+            const batchById = new Map(batches.map((b) => [b.id, b]));
+            const existingItems = await shipmentItemRepo.find(
+                { productionBatch: { $in: batchIds } },
+                { populate: ['productionBatch', 'productionBatchUnit'] }
+            );
+            const dispatchedByBatch = new Map<string, number>();
+            for (const row of existingItems) {
+                const key = row.productionBatch.id;
+                dispatchedByBatch.set(key, (dispatchedByBatch.get(key) || 0) + Number(row.quantity || 0));
+            }
+            const addedByBatch = new Map<string, number>();
+
+            for (const item of payload.items) {
+                const batch = batchById.get(item.productionBatchId);
+                if (!batch) {
+                    throw new AppError('Lote no encontrado para despacho', 404);
                 }
-                const alreadyDispatched = await this.shipmentItemRepo.count({ productionBatchUnit: batchUnit.id });
-                if (alreadyDispatched > 0) {
-                    throw new AppError(`La unidad serial ${batchUnit.serialCode} ya fue despachada`, 409);
+                const release = await batchReleaseRepo.findOne({ productionBatch: batch.id });
+                if (!release || release.status !== BatchReleaseStatus.LIBERADO_QA) {
+                    throw new AppError(`No puedes despachar: el lote ${batch.code} no esta liberado por QA`, 400);
+                }
+                const dispatchValidation = await this.validateDispatchReadiness(batch.id, actor);
+                if (!dispatchValidation.eligible) {
+                    throw new AppError(`No puedes despachar lote ${batch.code}: ${dispatchValidation.errors.join(' | ')}`, 400);
+                }
+                const blockingIssues = await this.getBatchBlockingIssues(batch.id);
+                if (blockingIssues.length > 0) {
+                    throw new AppError(`No puedes despachar lote ${batch.code}: ${blockingIssues.join(' | ')}`, 400);
+                }
+
+                let batchUnit: ProductionBatchUnit | undefined;
+                if (item.productionBatchUnitId) {
+                    batchUnit = await batchUnitRepo.findOneOrFail({ id: item.productionBatchUnitId }, { populate: ['batch'] });
+                    if (batchUnit.batch.id !== batch.id) {
+                        throw new AppError('La unidad serial no pertenece al lote indicado', 400);
+                    }
+                    const alreadyDispatched = await shipmentItemRepo.count({ productionBatchUnit: batchUnit.id });
+                    if (alreadyDispatched > 0) {
+                        throw new AppError(`La unidad serial ${batchUnit.serialCode} ya fue despachada`, 409);
+                    }
+                }
+
+                const unitItems = batch.units.getItems();
+                const available = unitItems.length > 0
+                    ? unitItems.filter((u) => !u.rejected && u.packaged).length
+                    : Number(batch.producedQty > 0 ? batch.producedQty : batch.plannedQty);
+                const dispatched = dispatchedByBatch.get(batch.id) || 0;
+                const pending = addedByBatch.get(batch.id) || 0;
+                const remaining = Number(available) - Number(dispatched) - Number(pending);
+                if (Number(item.quantity) > remaining) {
+                    throw new AppError(`Cantidad a despachar supera el saldo del lote ${batch.code} (saldo ${Math.max(0, remaining)})`, 400);
+                }
+                addedByBatch.set(batch.id, pending + Number(item.quantity || 0));
+
+                const shipmentItem = shipmentItemRepo.create({
+                    shipment,
+                    productionBatch: batch,
+                    productionBatchUnit: batchUnit,
+                    quantity: item.quantity,
+                } as unknown as ShipmentItem);
+                shipment.items.add(shipmentItem);
+            }
+
+            const dispatchedByVariant = new Map<string, number>();
+            for (const item of payload.items) {
+                const batch = batchById.get(item.productionBatchId);
+                if (!batch) continue;
+                const variantId = batch.variant?.id;
+                if (!variantId) continue;
+                dispatchedByVariant.set(variantId, (dispatchedByVariant.get(variantId) || 0) + Number(item.quantity || 0));
+            }
+
+            for (const [variantId, qty] of dispatchedByVariant.entries()) {
+                const inventoryItems = await inventoryRepo.find(
+                    { variant: variantId, warehouse: { type: WarehouseType.FINISHED_GOODS } },
+                    { populate: ['warehouse'], orderBy: { quantity: 'DESC' } }
+                );
+                if (inventoryItems.length === 0) {
+                    continue;
+                }
+                let remaining = Number(qty);
+                const totalAvailable = inventoryItems.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+                if (totalAvailable < remaining) {
+                    throw new AppError(`Stock insuficiente en producto terminado para despachar (disponible ${totalAvailable}, requerido ${qty})`, 400);
+                }
+                for (const row of inventoryItems) {
+                    if (remaining <= 0) break;
+                    const currentQty = Number(row.quantity || 0);
+                    if (currentQty <= 0) continue;
+                    const consume = Math.min(currentQty, remaining);
+                    row.quantity = currentQty - consume;
+                    remaining -= consume;
+                    tx.persist(row);
                 }
             }
 
-            const shipmentItem = this.shipmentItemRepo.create({
-                shipment,
-                productionBatch: batch,
-                productionBatchUnit: batchUnit,
-                quantity: item.quantity,
-            } as unknown as ShipmentItem);
-            shipment.items.add(shipmentItem);
-        }
+            await tx.persistAndFlush(shipment);
+            await this.logEvent({
+                entityType: 'shipment',
+                entityId: shipment.id,
+                action: 'created',
+                actor: actor || payload.dispatchedBy,
+                metadata: {
+                    customerId: customer.id,
+                    commercialDocument: shipment.commercialDocument,
+                    items: payload.items.length,
+                },
+            });
 
-        await this.em.persistAndFlush(shipment);
-        await this.logEvent({
-            entityType: 'shipment',
-            entityId: shipment.id,
-            action: 'created',
-            actor: actor || payload.dispatchedBy,
-            metadata: {
-                customerId: customer.id,
-                commercialDocument: shipment.commercialDocument,
-                items: payload.items.length,
-            },
+            return shipmentRepo.findOneOrFail(
+                { id: shipment.id },
+                { populate: ['customer', 'items', 'items.productionBatch', 'items.productionBatchUnit'] }
+            );
         });
-
-        return this.shipmentRepo.findOneOrFail(
-            { id: shipment.id },
-            { populate: ['customer', 'items', 'items.productionBatch', 'items.productionBatchUnit'] }
-        );
     }
 
     async listShipments(filters: {

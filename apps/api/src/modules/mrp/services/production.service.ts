@@ -26,6 +26,7 @@ import { SupplierMaterial } from '../entities/supplier-material.entity';
 import { Supplier } from '../entities/supplier.entity';
 import { ProductionBatch } from '../entities/production-batch.entity';
 import { ProductionBatchUnit } from '../entities/production-batch-unit.entity';
+import { ShipmentItem } from '../entities/shipment-item.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RegulatoryLabel } from '../entities/regulatory-label.entity';
 import { BatchRelease } from '../entities/batch-release.entity';
@@ -473,6 +474,27 @@ export class ProductionService {
         return this.batchRepo.find(
             { productionOrder: orderId },
             { populate: ['variant', 'variant.product', 'units'], orderBy: { createdAt: 'DESC' } }
+        );
+    }
+
+    async lookupBatches(filters: { search?: string; limit?: number }) {
+        const search = filters.search?.trim();
+        if (!search) return [];
+        const limit = Math.min(Math.max(filters.limit ?? 10, 1), 50);
+        return this.batchRepo.find(
+            {
+                $or: [
+                    { code: { $ilike: `%${search}%` } },
+                    { variant: { name: { $ilike: `%${search}%` } } },
+                    { variant: { sku: { $ilike: `%${search}%` } } },
+                    { variant: { product: { name: { $ilike: `%${search}%` } } } },
+                ],
+            },
+            {
+                populate: ['variant', 'variant.product', 'productionOrder'],
+                orderBy: { createdAt: 'DESC' },
+                limit,
+            }
         );
     }
 
@@ -1291,6 +1313,25 @@ export class ProductionService {
                     variantQuantities.set(variantId, totalCompleted);
                 }
 
+                const dispatchedByVariant = new Map<string, number>();
+                if (batches.length > 0) {
+                    const shipmentItemRepo = tx.getRepository(ShipmentItem);
+                    const batchIdToVariant = new Map<string, string>();
+                    for (const batch of batches) {
+                        batchIdToVariant.set(batch.id, batch.variant.id);
+                    }
+                    const shipmentItems = await shipmentItemRepo.find(
+                        { productionBatch: { $in: batches.map((b) => b.id) } },
+                        { populate: ['productionBatch'] }
+                    );
+                    for (const item of shipmentItems) {
+                        const variantId = batchIdToVariant.get(item.productionBatch.id);
+                        if (!variantId) continue;
+                        const current = dispatchedByVariant.get(variantId) || 0;
+                        dispatchedByVariant.set(variantId, current + Number(item.quantity || 0));
+                    }
+                }
+
                 // Consume released raw materials based on actual completed production quantities.
                 const materialRequirements = new Map<string, {
                     required: number;
@@ -1564,12 +1605,12 @@ export class ProductionService {
                 }
 
                 if (!warehouse) {
-                    warehouse = await warehouseRepo.findOne({ name: 'Main Warehouse' });
+                    warehouse = await warehouseRepo.findOne({ type: WarehouseType.FINISHED_GOODS });
                 }
 
                 if (!warehouse) {
                     warehouse = warehouseRepo.create({
-                        name: 'Main Warehouse',
+                        name: 'Bodega de Producto Terminado',
                         location: 'Default',
                         type: WarehouseType.FINISHED_GOODS
                     } as Warehouse);
@@ -1578,18 +1619,23 @@ export class ProductionService {
 
                 for (const item of order.items) {
                     const completedQty = variantQuantities.get(item.variant.id) ?? item.quantity;
+                    const dispatchedQty = dispatchedByVariant.get(item.variant.id) || 0;
+                    const netQty = Math.max(0, Number(completedQty) - Number(dispatchedQty));
+                    if (netQty <= 0) {
+                        continue;
+                    }
                     let inventoryItem = await inventoryRepo.findOne({
                         variant: item.variant,
                         warehouse
                     });
 
                     if (inventoryItem) {
-                        inventoryItem.quantity = Number(inventoryItem.quantity) + Number(completedQty);
+                        inventoryItem.quantity = Number(inventoryItem.quantity) + Number(netQty);
                     } else {
                         inventoryItem = inventoryRepo.create({
                             variant: item.variant,
                             warehouse,
-                            quantity: completedQty,
+                            quantity: netQty,
                             lastUpdated: new Date()
                         } as unknown as InventoryItem);
                     }
@@ -1671,8 +1717,8 @@ export class ProductionService {
             if (!selected) {
                 throw new AppError('Documento controlado no encontrado para FOR de empaque', 404);
             }
-            if (selected.process !== DocumentProcess.EMPAQUE || selected.status !== DocumentStatus.APROBADO) {
-                throw new AppError('El documento seleccionado debe estar aprobado y pertenecer a Empaque', 400);
+            if (selected.status !== DocumentStatus.APROBADO) {
+                throw new AppError('El documento seleccionado debe estar aprobado', 400);
             }
             return selected;
         }
@@ -1686,7 +1732,6 @@ export class ProductionService {
         const now = new Date();
         const configured = await docRepo.findOne({
             code: configuredCode,
-            process: DocumentProcess.EMPAQUE,
             documentCategory: DocumentCategory.FOR,
             status: DocumentStatus.APROBADO,
             $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
@@ -1705,8 +1750,8 @@ export class ProductionService {
             if (!selected) {
                 throw new AppError('Documento controlado no encontrado para FOR de inspección final', 404);
             }
-            if (selected.process !== DocumentProcess.CONTROL_CALIDAD || selected.status !== DocumentStatus.APROBADO) {
-                throw new AppError('El documento seleccionado debe estar aprobado y pertenecer a Control de Calidad', 400);
+            if (selected.status !== DocumentStatus.APROBADO) {
+                throw new AppError('El documento seleccionado debe estar aprobado', 400);
             }
             return selected;
         }
@@ -1720,7 +1765,6 @@ export class ProductionService {
         const now = new Date();
         const configured = await docRepo.findOne({
             code: configuredCode,
-            process: DocumentProcess.CONTROL_CALIDAD,
             documentCategory: DocumentCategory.FOR,
             status: DocumentStatus.APROBADO,
             $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],

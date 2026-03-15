@@ -93,6 +93,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/production-orders/:id/material-returns', (req, res, next) => mrpController.returnProductionMaterial(req, res, next));
     router.get('/production-orders/:id/batches', (req, res, next) => mrpController.listProductionBatches(req, res, next));
     router.post('/production-orders/:id/batches', (req, res, next) => mrpController.createProductionBatch(req, res, next));
+    router.get('/production-batches/lookup', (req, res, next) => mrpController.lookupProductionBatches(req, res, next));
     router.post('/production-batches/:batchId/units', (req, res, next) => mrpController.addProductionBatchUnits(req, res, next));
     router.patch('/production-batches/:batchId/qc', (req, res, next) => mrpController.updateProductionBatchQc(req, res, next));
     router.patch('/production-batches/:batchId/packaging', (req, res, next) => mrpController.updateProductionBatchPackaging(req, res, next));
@@ -156,6 +157,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.delete('/quality/customers/:id', (req, res, next) => mrpController.deleteCustomer(req, res, next));
     router.post('/quality/shipments', (req, res, next) => mrpController.createShipment(req, res, next));
     router.get('/quality/shipments', (req, res, next) => mrpController.listShipments(req, res, next));
+    router.get('/quality/shipments/:id/pdf', (req, res, next) => mrpController.downloadShipmentPdf(req, res, next));
     router.post('/quality/dmr-templates', (req, res, next) => mrpController.createDmrTemplate(req, res, next));
     router.get('/quality/dmr-templates', (req, res, next) => mrpController.listDmrTemplates(req, res, next));
     router.get('/quality/dhr/:productionBatchId', (req, res, next) => mrpController.getBatchDhr(req, res, next));

@@ -170,7 +170,6 @@ export class QualityBatchReleaseService {
         const now = new Date();
         const doc = await this.controlledDocRepo.findOne({
             code,
-            process: DocumentProcess.CONTROL_CALIDAD,
             documentCategory: DocumentCategory.FOR,
             status: DocumentStatus.APROBADO,
             $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }],
