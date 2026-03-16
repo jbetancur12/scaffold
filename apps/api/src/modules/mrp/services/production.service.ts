@@ -1643,7 +1643,7 @@ export class ProductionService {
                             productionBatch: batch,
                             warehouse,
                             quantity: netQty
-                        } as unknown as FinishedGoodsLotInventory);
+                        } as any);
                     }
                     tx.persist(lotInventory);
                 }

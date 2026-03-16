@@ -59,7 +59,7 @@ async function run() {
                     productionBatch: batch,
                     warehouse,
                     quantity: net,
-                } as FinishedGoodsLotInventory);
+                } as any);
                 created += 1;
             }
             em.persist(row);
