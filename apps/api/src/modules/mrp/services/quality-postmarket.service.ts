@@ -26,7 +26,6 @@ import { ShipmentItem } from '../entities/shipment-item.entity';
 import { BatchRelease } from '../entities/batch-release.entity';
 import { TechnovigilanceCase } from '../entities/technovigilance-case.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
-import { Warehouse } from '../entities/warehouse.entity';
 import { FinishedGoodsLotInventory } from '../entities/finished-goods-lot-inventory.entity';
 
 type QualityAuditLogger = (payload: {
