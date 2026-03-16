@@ -1,7 +1,6 @@
 import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import {
     DocumentCategory,
-    DocumentProcess,
     DocumentStatus,
     DispatchValidationResult,
     InvimaRegistrationStatus,

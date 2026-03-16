@@ -48,8 +48,6 @@ export class QualityPostmarketService {
     private readonly recallNotificationRepo: EntityRepository<RecallNotification>;
     private readonly customerRepo: EntityRepository<Customer>;
     private readonly shipmentRepo: EntityRepository<Shipment>;
-    private readonly shipmentItemRepo: EntityRepository<ShipmentItem>;
-    private readonly batchReleaseRepo: EntityRepository<BatchRelease>;
     private readonly logEvent: QualityAuditLogger;
     private readonly validateDispatchReadiness: DispatchValidator;
     private readonly getBatchBlockingIssues: BatchBlockingValidator;
@@ -79,8 +77,6 @@ export class QualityPostmarketService {
         this.recallNotificationRepo = em.getRepository(RecallNotification);
         this.customerRepo = em.getRepository(Customer);
         this.shipmentRepo = em.getRepository(Shipment);
-        this.shipmentItemRepo = em.getRepository(ShipmentItem);
-        this.batchReleaseRepo = em.getRepository(BatchRelease);
     }
 
     private toCsvRow(values: ReadonlyArray<string | number | boolean | undefined | null>) {
@@ -780,7 +776,6 @@ export class QualityPostmarketService {
             const shipmentItemRepo = tx.getRepository(ShipmentItem);
             const batchReleaseRepo = tx.getRepository(BatchRelease);
             const inventoryRepo = tx.getRepository(InventoryItem);
-            const warehouseRepo = tx.getRepository(Warehouse);
             const lotInventoryRepo = tx.getRepository(FinishedGoodsLotInventory);
 
             const customer = await customerRepo.findOneOrFail({ id: payload.customerId });

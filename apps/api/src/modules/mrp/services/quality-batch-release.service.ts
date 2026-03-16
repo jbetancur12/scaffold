@@ -2,7 +2,6 @@ import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import {
     BatchReleaseStatus,
     DocumentCategory,
-    DocumentProcess,
     DocumentStatus,
     DispatchValidationResult,
     DocumentApprovalMethod,
