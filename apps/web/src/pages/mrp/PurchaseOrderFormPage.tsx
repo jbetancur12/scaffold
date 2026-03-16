@@ -50,6 +50,8 @@ export default function PurchaseOrderFormPage() {
     const [searchParams] = useSearchParams();
     const { toast } = useToast();
     const requisitionId = searchParams.get('requisitionId') || undefined;
+    const supplierIdParam = searchParams.get('supplierId') || undefined;
+    const isSupplierScoped = Boolean(supplierIdParam);
     const didHydrateRequisitionRef = useRef(false);
     const [loading, setLoading] = useState(false);
     const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(0);
@@ -121,9 +123,23 @@ export default function PurchaseOrderFormPage() {
         if (isEditing || !requisition || didHydrateRequisitionRef.current) return;
 
         const requisitionItems = requisition.items ?? [];
-        if (requisitionItems.length > 0) {
+        const filteredItems = supplierIdParam
+            ? requisitionItems.filter((item) => {
+                if (supplierIdParam === 'unassigned') return !item.suggestedSupplier?.id;
+                return item.suggestedSupplier?.id === supplierIdParam;
+            })
+            : requisitionItems;
+        if (supplierIdParam && filteredItems.length === 0) {
+            toast({
+                title: 'Sin ítems para proveedor',
+                description: 'No hay ítems asociados a este proveedor en la requisición. Se cargó la requisición completa.',
+            });
+        }
+        const itemsToLoad = filteredItems.length > 0 ? filteredItems : requisitionItems;
+
+        if (itemsToLoad.length > 0) {
             setItems(
-                requisitionItems.map((item) => ({
+                itemsToLoad.map((item) => ({
                     isCatalogItem: true,
                     rawMaterialId: item.rawMaterial.id,
                     rawMaterialSpecificationId: '',
@@ -140,14 +156,14 @@ export default function PurchaseOrderFormPage() {
             );
         }
 
-        const requisitionSuggestedSupplier = requisitionItems.find((item) => item.suggestedSupplier?.id)?.suggestedSupplier?.id;
+        const requisitionSuggestedSupplier = itemsToLoad.find((item) => item.suggestedSupplier?.id)?.suggestedSupplier?.id;
         const neededBy = requisition.neededBy ? new Date(requisition.neededBy) : null;
         const expectedDeliveryDate = neededBy && !Number.isNaN(neededBy.getTime())
             ? neededBy.toISOString().slice(0, 10)
             : '';
 
         setFormData((prev) => ({
-            supplierId: prev.supplierId || requisitionSuggestedSupplier || '',
+            supplierId: prev.supplierId || (supplierIdParam && supplierIdParam !== 'unassigned' ? supplierIdParam : requisitionSuggestedSupplier) || '',
             expectedDeliveryDate: prev.expectedDeliveryDate || expectedDeliveryDate,
             notes: prev.notes || requisition.notes || '',
         }));
@@ -506,7 +522,7 @@ export default function PurchaseOrderFormPage() {
                 ? await updatePurchaseOrder({ id, payload: validatedData })
                 : await createPurchaseOrder(validatedData);
 
-            if (!isEditing && requisitionId) {
+            if (!isEditing && requisitionId && !isSupplierScoped) {
                 try {
                     await markPurchaseRequisitionConverted({ id: requisitionId, purchaseOrderId: savedOrder.id });
                 } catch (markError) {
@@ -516,6 +532,12 @@ export default function PurchaseOrderFormPage() {
                         variant: 'destructive',
                     });
                 }
+            }
+            if (!isEditing && requisitionId && isSupplierScoped) {
+                toast({
+                    title: 'OC creada',
+                    description: 'Esta OC corresponde a un proveedor específico. La requisición queda pendiente para los demás proveedores.',
+                });
             }
 
             toast({

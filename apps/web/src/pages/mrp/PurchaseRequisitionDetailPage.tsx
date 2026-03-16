@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ClipboardList, FileDown, ShoppingCart, XCircle } from 'lucide-react';
 import { PurchaseRequisitionStatus } from '@scaffold/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
@@ -34,6 +35,7 @@ export default function PurchaseRequisitionDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { toast } = useToast();
+    const [showSupplierDialog, setShowSupplierDialog] = useState(false);
 
     const { data: requisition, loading, error, execute: reload } = usePurchaseRequisitionQuery(id);
     const { execute: updateStatus, loading: updatingStatus } = useUpdatePurchaseRequisitionStatusMutation();
@@ -48,6 +50,20 @@ export default function PurchaseRequisitionDetailPage() {
     const associatedProductionOrders = requisition?.productionOrderIds?.length
         ? requisition.productionOrderIds
         : (requisition?.productionOrderId ? [requisition.productionOrderId] : []);
+
+    const supplierGroups = useMemo(() => {
+        const items = requisition?.items ?? [];
+        const grouped = new Map<string, { supplierId: string; supplierName: string; totalQty: number; count: number }>();
+        for (const item of items) {
+            const supplierId = item.suggestedSupplier?.id || 'unassigned';
+            const supplierName = item.suggestedSupplier?.name || 'Sin proveedor sugerido';
+            const row = grouped.get(supplierId) || { supplierId, supplierName, totalQty: 0, count: 0 };
+            row.totalQty += Number(item.quantity || 0);
+            row.count += 1;
+            grouped.set(supplierId, row);
+        }
+        return Array.from(grouped.values()).sort((a, b) => a.supplierName.localeCompare(b.supplierName, 'es'));
+    }, [requisition?.items]);
 
     const handleUpdateStatus = async (status: PurchaseRequisitionStatus) => {
         if (!id) return;
@@ -154,6 +170,16 @@ export default function PurchaseRequisitionDetailPage() {
                             {(requisition.status === PurchaseRequisitionStatus.PENDIENTE || requisition.status === PurchaseRequisitionStatus.APROBADA) && (
                                 <Button
                                     variant="outline"
+                                    onClick={() => setShowSupplierDialog(true)}
+                                    className="border-slate-200 text-slate-700 hover:bg-slate-50"
+                                >
+                                    <ShoppingCart className="mr-2 h-4 w-4" />
+                                    OC por proveedor
+                                </Button>
+                            )}
+                            {(requisition.status === PurchaseRequisitionStatus.PENDIENTE || requisition.status === PurchaseRequisitionStatus.APROBADA) && (
+                                <Button
+                                    variant="outline"
                                     disabled={updatingStatus}
                                     onClick={() => handleUpdateStatus(PurchaseRequisitionStatus.CANCELADA)}
                                     className="border-red-200 text-red-700 hover:bg-red-50"
@@ -208,6 +234,40 @@ export default function PurchaseRequisitionDetailPage() {
                         </div>
                     )}
                 </div>
+
+                <Dialog open={showSupplierDialog} onOpenChange={setShowSupplierDialog}>
+                    <DialogContent className="max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>Crear OC por proveedor</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                            {supplierGroups.length === 0 ? (
+                                <p className="text-sm text-slate-500">No hay ítems en la requisición.</p>
+                            ) : supplierGroups.map((group) => (
+                                <div key={group.supplierId} className="flex items-center justify-between gap-3 border border-slate-200 rounded-xl px-3 py-2">
+                                    <div>
+                                        <p className="text-sm font-semibold text-slate-800">{group.supplierName}</p>
+                                        <p className="text-xs text-slate-500">{group.count} ítems · {group.totalQty.toLocaleString('es-CO')} unidades</p>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            setShowSupplierDialog(false);
+                                            navigate(`/mrp/purchase-orders/new?requisitionId=${requisition.id}&supplierId=${group.supplierId}`);
+                                        }}
+                                    >
+                                        Crear OC
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setShowSupplierDialog(false)}>
+                                Cerrar
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden print-shell">
                     <div className="px-6 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
