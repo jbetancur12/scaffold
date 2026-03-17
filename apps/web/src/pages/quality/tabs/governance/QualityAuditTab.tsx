@@ -34,6 +34,8 @@ const auditEntityLabels: Record<string, string> = {
   shipment: 'Despacho',
   raw_material_lot: 'Lote de materia prima',
   supplier: 'Proveedor',
+  warehouse: 'Bodega',
+  inventory: 'Inventario',
 };
 
 const auditActionLabels: Record<string, string> = {
@@ -74,6 +76,8 @@ const auditActionLabels: Record<string, string> = {
   bom_item_created: 'BOM agregado',
   bom_item_updated: 'BOM actualizado',
   bom_item_deleted: 'BOM eliminado',
+  stock_updated: 'Stock ajustado',
+  manual_stock_added: 'Ingreso manual',
 };
 
 const actionColors: Record<string, string> = {
@@ -104,6 +108,8 @@ const actionColors: Record<string, string> = {
   bom_item_created: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   bom_item_updated: 'bg-blue-50 text-blue-700 border-blue-200',
   bom_item_deleted: 'bg-rose-50 text-rose-700 border-rose-200',
+  stock_updated: 'bg-slate-100 text-slate-700 border-slate-200',
+  manual_stock_added: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 const shortId = (value?: string) => {
@@ -150,6 +156,11 @@ const formatAuditMetadata = (
     customersToUpdate: 'Clientes a actualizar',
     suppliersToCreate: 'Proveedores a crear',
     suppliersToUpdate: 'Proveedores a actualizar',
+    previousQuantity: 'Cantidad anterior',
+    addedQuantity: 'Cantidad agregada',
+    unitCost: 'Costo unitario',
+    averageCost: 'Costo promedio',
+    lotId: 'Lote',
   };
   const knownKeys = Object.keys(metadataLabels);
   const values = knownKeys

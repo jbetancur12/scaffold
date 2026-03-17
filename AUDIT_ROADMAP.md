@@ -16,7 +16,7 @@ Al final de cada fase se marca como completada.
 - [x] **Fase 1 (MRP núcleo)**: órdenes de producción, órdenes de compra, requisiciones, cotizaciones.
 - [x] **Fase 2 (Catálogo)**: productos, variantes, BOM, listas de precios.
 - [x] **Fase 3 (Comercial)**: pedidos de cliente, clientes, proveedores.
-- [ ] **Fase 4 (Acciones especiales)**: eliminaciones, cambios masivos, ajustes de inventario.
+- [x] **Fase 4 (Acciones especiales)**: eliminaciones, cambios masivos, ajustes de inventario.
 
 ## Detalle por Fase
 
@@ -75,9 +75,9 @@ Al final de cada fase se marca como completada.
   - [x] Crear / editar
   - [x] Importación masiva
 
-### Fase 4 - Acciones especiales
+### Fase 4 - Acciones especiales (Completada)
 - Objetivo: cubrir acciones de alto riesgo o impacto masivo.
 - Registrar actor + motivo cuando aplique.
-- [ ] **Eliminaciones** (soft delete/hard delete)
-- [ ] **Cambios masivos**
-- [ ] **Ajustes de inventario**
+- [x] **Eliminaciones** (soft delete/hard delete)
+- [x] **Cambios masivos** (importaciones)
+- [x] **Ajustes de inventario** (stock manual / stock actualizado)

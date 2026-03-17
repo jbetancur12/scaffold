@@ -5,6 +5,7 @@ import { RawMaterial } from '../entities/raw-material.entity';
 import { RawMaterialLot } from '../entities/raw-material-lot.entity';
 import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { FinishedGoodsLotInventory } from '../entities/finished-goods-lot-inventory.entity';
+import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { WarehouseSchema, InventoryItemSchema } from '@scaffold/schemas';
 import { WarehouseType } from '@scaffold/types';
 import { z } from 'zod';
@@ -15,6 +16,7 @@ export class InventoryService {
     private readonly warehouseRepo: EntityRepository<Warehouse>;
     private readonly rawMaterialLotRepo: EntityRepository<RawMaterialLot>;
     private readonly rawMaterialKardexRepo: EntityRepository<RawMaterialKardex>;
+    private readonly auditRepo: EntityRepository<QualityAuditEvent>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -22,12 +24,28 @@ export class InventoryService {
         this.warehouseRepo = em.getRepository(Warehouse);
         this.rawMaterialLotRepo = em.getRepository(RawMaterialLot);
         this.rawMaterialKardexRepo = em.getRepository(RawMaterialKardex);
+        this.auditRepo = em.getRepository(QualityAuditEvent);
+    }
+
+    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>) {
+        const event = this.auditRepo.create({
+            entityType,
+            entityId,
+            action,
+            metadata,
+        } as unknown as QualityAuditEvent);
+        await this.em.persistAndFlush(event);
     }
 
 
     async createWarehouse(data: z.infer<typeof WarehouseSchema>): Promise<Warehouse> {
         const warehouse = this.warehouseRepo.create(data as unknown as Warehouse);
         await this.em.persistAndFlush(warehouse);
+        await this.logAudit('warehouse', warehouse.id, 'created', {
+            name: warehouse.name,
+            type: warehouse.type,
+            location: warehouse.location,
+        });
         return warehouse;
     }
 
@@ -41,14 +59,22 @@ export class InventoryService {
 
     async updateWarehouse(id: string, data: Partial<z.infer<typeof WarehouseSchema>>): Promise<Warehouse> {
         const warehouse = await this.getWarehouse(id);
+        const before = { name: warehouse.name, type: warehouse.type, location: warehouse.location };
         Object.assign(warehouse, data);
         await this.em.persistAndFlush(warehouse);
+        const after = { name: warehouse.name, type: warehouse.type, location: warehouse.location };
+        await this.logAudit('warehouse', warehouse.id, 'updated', { before, after });
         return warehouse;
     }
 
     async deleteWarehouse(id: string): Promise<void> {
         const warehouse = await this.getWarehouse(id);
         await this.em.removeAndFlush(warehouse);
+        await this.logAudit('warehouse', id, 'deleted', {
+            name: warehouse.name,
+            type: warehouse.type,
+            location: warehouse.location,
+        });
     }
 
     async updateStock(data: z.infer<typeof InventoryItemSchema>): Promise<InventoryItem> {
@@ -59,6 +85,7 @@ export class InventoryService {
         if (data.variantId) query.variant = data.variantId;
 
         let inventoryItem = await this.inventoryRepo.findOne(query);
+        const previousQuantity = inventoryItem ? Number(inventoryItem.quantity || 0) : undefined;
 
         if (inventoryItem) {
             inventoryItem.quantity = data.quantity; // Or logic to increment/decrement
@@ -67,6 +94,14 @@ export class InventoryService {
         }
 
         await this.em.persistAndFlush(inventoryItem);
+        await this.logAudit('inventory', inventoryItem.id, 'stock_updated', {
+            warehouseId: data.warehouseId,
+            rawMaterialId: data.rawMaterialId,
+            rawMaterialSpecificationId: data.rawMaterialSpecificationId,
+            variantId: data.variantId,
+            previousQuantity,
+            quantity: inventoryItem.quantity,
+        });
         return inventoryItem;
     }
 
@@ -187,6 +222,16 @@ export class InventoryService {
 
         // 6. Save
         await this.em.persistAndFlush([inventory, rawMaterial, lot, kardex]);
+        await this.logAudit('inventory', inventory.id, 'manual_stock_added', {
+            warehouseId: warehouse.id,
+            rawMaterialId: rawMaterial.id,
+            previousQuantity: currentStock,
+            quantity: inventory.quantity,
+            addedQuantity: addedQty,
+            unitCost: addedCost,
+            averageCost: rawMaterial.averageCost,
+            lotId: lot.id,
+        });
         return inventory;
     }
 
