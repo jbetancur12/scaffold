@@ -9,6 +9,12 @@ import { useQualityEquipmentFlow } from '@/hooks/mrp/useQualityEquipmentFlow';
 import { useQualityOperationalAlertsFlow } from '@/hooks/mrp/useQualityOperationalAlertsFlow';
 import { useProductsQuery } from '@/hooks/mrp/useProducts';
 import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
+import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
+import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
+import { usePurchaseOrdersQuery } from '@/hooks/mrp/usePurchaseOrders';
+import { usePurchaseRequisitionsQuery } from '@/hooks/mrp/usePurchaseRequisitions';
+import { useSalesOrdersQuery } from '@/hooks/mrp/useSalesOrders';
+import { useProductionOrdersQuery } from '@/hooks/mrp/useProductionOrders';
 
 export const useQualityCompliance = () => {
     const ncCapaDocsFlow = useQualityNcCapaDocsFlow();
@@ -22,6 +28,12 @@ export const useQualityCompliance = () => {
     const operationalAlertsFlow = useQualityOperationalAlertsFlow();
     const productsCatalogQuery = useProductsQuery(1, 2000, '', '');
     const rawMaterialsCatalogQuery = useRawMaterialsQuery(1, 2000, '');
+    const suppliersCatalogQuery = useSuppliersQuery(1, 2000);
+    const warehousesCatalogQuery = useWarehousesQuery();
+    const purchaseOrdersCatalogQuery = usePurchaseOrdersQuery(1, 2000);
+    const purchaseRequisitionsCatalogQuery = usePurchaseRequisitionsQuery(1, 2000);
+    const salesOrdersCatalogQuery = useSalesOrdersQuery(1, 2000);
+    const productionOrdersCatalogQuery = useProductionOrdersQuery(1, 2000);
 
     return {
         ...ncCapaDocsFlow,
@@ -35,6 +47,12 @@ export const useQualityCompliance = () => {
         incomingInspections: receptionReleaseFlow.incomingInspections,
         productsCatalog: productsCatalogQuery.data?.products ?? [],
         rawMaterialsCatalog: rawMaterialsCatalogQuery.materials,
+        suppliersCatalog: suppliersCatalogQuery.data?.suppliers ?? [],
+        warehousesCatalog: warehousesCatalogQuery.data ?? [],
+        purchaseOrdersCatalog: purchaseOrdersCatalogQuery.data?.data ?? [],
+        purchaseRequisitionsCatalog: purchaseRequisitionsCatalogQuery.data?.data ?? [],
+        salesOrdersCatalog: salesOrdersCatalogQuery.data?.data ?? [],
+        productionOrdersCatalog: productionOrdersCatalogQuery.data?.orders ?? [],
         batchReleases: receptionReleaseFlow.batchReleases,
         invimaRegistrations: regulatoryFlow.invimaRegistrations,
         regulatoryLabelForm: regulatoryFlow.regulatoryLabelForm,

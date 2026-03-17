@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { TabsContent } from '@/components/ui/tabs';
 import { ScrollText, FileSearch } from 'lucide-react';
 import type { QualityComplianceModel } from '../types';
-import type { Product, ProductVariant, RawMaterial } from '@scaffold/types';
+import type { Product, ProductVariant, RawMaterial, Supplier, Warehouse, SalesOrder, PurchaseOrder, PurchaseRequisition, ProductionOrder, Customer } from '@scaffold/types';
 
 const auditEntityLabels: Record<string, string> = {
   incoming_inspection: 'Inspección de recepción',
@@ -113,16 +113,9 @@ const actionColors: Record<string, string> = {
   manual_stock_added: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
-const shortId = (value?: string) => {
-  if (!value) return 'N/A';
-  return value.length > 12 ? `${value.slice(0, 8)}…` : value;
-};
-
 const formatAuditMetadata = (
   metadata?: Record<string, unknown>,
-  rawMaterialLabelsById?: Record<string, string>,
-  productLabelsById?: Record<string, string>,
-  variantLabelsById?: Record<string, string>
+  labelsById?: Record<string, string>
 ) => {
   if (!metadata) return '';
   const metadataLabels: Record<string, string> = {
@@ -172,10 +165,10 @@ const formatAuditMetadata = (
       const value = metadata[key];
       const printable = typeof value === 'string' ? value : JSON.stringify(value);
       const label = metadataLabels[key] || key;
-      if (key === 'rawMaterialId' && rawMaterialLabelsById?.[printable]) return `${label}: ${rawMaterialLabelsById[printable]}`;
-      if (key === 'productId' && productLabelsById?.[printable]) return `${label}: ${productLabelsById[printable]}`;
-      if (key === 'variantId' && variantLabelsById?.[printable]) return `${label}: ${variantLabelsById[printable]}`;
-      if (key.toLowerCase().endsWith('id')) return `${label}: ${shortId(printable)}`;
+      if (key.toLowerCase().endsWith('id')) {
+        if (labelsById?.[printable]) return `${label}: ${labelsById[printable]}`;
+        return `${label}: N/D`;
+      }
       return `${label}: ${printable}`;
     });
   if (values.length > 0) return values.join(' · ');
@@ -224,13 +217,55 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
     },
     {}
   );
-  const customerLabelsById = (model.customers ?? []).reduce<Record<string, string>>((acc, customer) => {
+  const customerLabelsById = (model.customers ?? []).reduce<Record<string, string>>((acc, customer: Customer) => {
     if (customer?.id && customer.name) {
       const doc = [customer.documentType, customer.documentNumber].filter(Boolean).join(' ');
       acc[customer.id] = doc ? `${customer.name} (${doc})` : customer.name;
     }
     return acc;
   }, {});
+  const supplierLabelsById = (model.suppliersCatalog ?? []).reduce<Record<string, string>>((acc, supplier: Supplier) => {
+    if (supplier?.id && supplier.name) acc[supplier.id] = supplier.name;
+    return acc;
+  }, {});
+  const warehouseLabelsById = (model.warehousesCatalog ?? []).reduce<Record<string, string>>((acc, warehouse: Warehouse) => {
+    if (warehouse?.id && warehouse.name) acc[warehouse.id] = warehouse.name;
+    return acc;
+  }, {});
+  const purchaseOrderLabelsById = (model.purchaseOrdersCatalog ?? []).reduce<Record<string, string>>((acc, order: PurchaseOrder) => {
+    if (order?.id && order.code) acc[order.id] = order.code;
+    return acc;
+  }, {});
+  const salesOrderLabelsById = (model.salesOrdersCatalog ?? []).reduce<Record<string, string>>((acc, order: SalesOrder) => {
+    if (order?.id && order.code) acc[order.id] = order.code;
+    return acc;
+  }, {});
+  const productionOrderLabelsById = (model.productionOrdersCatalog ?? []).reduce<Record<string, string>>((acc, order: ProductionOrder) => {
+    if (order?.id && order.code) acc[order.id] = order.code;
+    return acc;
+  }, {});
+  const purchaseRequisitionLabelsById = (model.purchaseRequisitionsCatalog ?? []).reduce<Record<string, string>>(
+    (acc, requisition: PurchaseRequisition) => {
+      if (requisition?.id) {
+        const label = requisition.requestedBy ? `Req · ${requisition.requestedBy}` : 'Requisición';
+        acc[requisition.id] = label;
+      }
+      return acc;
+    },
+    {}
+  );
+  const labelsById = {
+    ...mergedRawMaterialLabelsById,
+    ...productLabelsById,
+    ...variantLabelsById,
+    ...customerLabelsById,
+    ...supplierLabelsById,
+    ...warehouseLabelsById,
+    ...purchaseOrderLabelsById,
+    ...salesOrderLabelsById,
+    ...productionOrderLabelsById,
+    ...purchaseRequisitionLabelsById,
+  };
   const auditFilters = model.auditFilters;
   const auditTotal = model.auditTotal;
   const auditPage = model.auditPage;
@@ -386,16 +421,16 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-sm font-semibold text-slate-800">{auditEntityLabels[a.entityType] || a.entityType}</span>
-                  {a.entityType === 'customer' && customerLabelsById[a.entityId] ? (
-                    <span className="text-xs text-slate-500" title={a.entityId}>{customerLabelsById[a.entityId]}</span>
+                  {labelsById[a.entityId] ? (
+                    <span className="text-xs text-slate-500" title={a.entityId}>{labelsById[a.entityId]}</span>
                   ) : (
-                    <span className="text-xs font-mono text-slate-400" title={a.entityId}>{shortId(a.entityId)}</span>
+                    <span className="text-xs text-slate-400">Sin referencia</span>
                   )}
                   {a.actor && <span className="text-xs text-slate-500">por <span className="font-medium text-slate-700">{a.actor}</span></span>}
                 </div>
                 {a.metadata && (
                   <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                    {formatAuditMetadata(a.metadata, mergedRawMaterialLabelsById, productLabelsById, variantLabelsById)}
+                    {formatAuditMetadata(a.metadata, labelsById)}
                   </p>
                 )}
                 {a.notes && (
