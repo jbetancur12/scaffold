@@ -7,6 +7,8 @@ import { useQualityDeviationOosFlow } from '@/hooks/mrp/useQualityDeviationOosFl
 import { useQualityChangeControlFlow } from '@/hooks/mrp/useQualityChangeControlFlow';
 import { useQualityEquipmentFlow } from '@/hooks/mrp/useQualityEquipmentFlow';
 import { useQualityOperationalAlertsFlow } from '@/hooks/mrp/useQualityOperationalAlertsFlow';
+import { useProductsQuery } from '@/hooks/mrp/useProducts';
+import { useRawMaterialsQuery } from '@/hooks/mrp/useRawMaterials';
 
 export const useQualityCompliance = () => {
     const ncCapaDocsFlow = useQualityNcCapaDocsFlow();
@@ -18,6 +20,8 @@ export const useQualityCompliance = () => {
     const changeControlFlow = useQualityChangeControlFlow();
     const equipmentFlow = useQualityEquipmentFlow();
     const operationalAlertsFlow = useQualityOperationalAlertsFlow();
+    const productsCatalogQuery = useProductsQuery(1, 2000, '', '');
+    const rawMaterialsCatalogQuery = useRawMaterialsQuery(1, 2000, '');
 
     return {
         ...ncCapaDocsFlow,
@@ -29,6 +33,8 @@ export const useQualityCompliance = () => {
         ...operationalAlertsFlow,
         regulatoryLabels: regulatoryFlow.regulatoryLabels,
         incomingInspections: receptionReleaseFlow.incomingInspections,
+        productsCatalog: productsCatalogQuery.data?.products ?? [],
+        rawMaterialsCatalog: rawMaterialsCatalogQuery.materials,
         batchReleases: receptionReleaseFlow.batchReleases,
         invimaRegistrations: regulatoryFlow.invimaRegistrations,
         regulatoryLabelForm: regulatoryFlow.regulatoryLabelForm,

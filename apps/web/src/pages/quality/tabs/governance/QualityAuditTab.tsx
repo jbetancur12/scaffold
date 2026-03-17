@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { TabsContent } from '@/components/ui/tabs';
 import { ScrollText, FileSearch } from 'lucide-react';
 import type { QualityComplianceModel } from '../types';
+import type { Product, ProductVariant, RawMaterial } from '@scaffold/types';
 
 const auditEntityLabels: Record<string, string> = {
   incoming_inspection: 'Inspección de recepción',
@@ -119,7 +120,9 @@ const shortId = (value?: string) => {
 
 const formatAuditMetadata = (
   metadata?: Record<string, unknown>,
-  rawMaterialLabelsById?: Record<string, string>
+  rawMaterialLabelsById?: Record<string, string>,
+  productLabelsById?: Record<string, string>,
+  variantLabelsById?: Record<string, string>
 ) => {
   if (!metadata) return '';
   const metadataLabels: Record<string, string> = {
@@ -170,6 +173,8 @@ const formatAuditMetadata = (
       const printable = typeof value === 'string' ? value : JSON.stringify(value);
       const label = metadataLabels[key] || key;
       if (key === 'rawMaterialId' && rawMaterialLabelsById?.[printable]) return `${label}: ${rawMaterialLabelsById[printable]}`;
+      if (key === 'productId' && productLabelsById?.[printable]) return `${label}: ${productLabelsById[printable]}`;
+      if (key === 'variantId' && variantLabelsById?.[printable]) return `${label}: ${variantLabelsById[printable]}`;
       if (key.toLowerCase().endsWith('id')) return `${label}: ${shortId(printable)}`;
       return `${label}: ${printable}`;
     });
@@ -188,6 +193,37 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
     }
     return acc;
   }, {});
+  const rawMaterialCatalogLabelsById = (model.rawMaterialsCatalog ?? []).reduce<Record<string, string>>(
+    (acc, material: RawMaterial) => {
+    if (material?.id && material.name) {
+      acc[material.id] = material.sku ? `${material.name} (${material.sku})` : material.name;
+    }
+    return acc;
+    },
+    {}
+  );
+  const mergedRawMaterialLabelsById = { ...rawMaterialCatalogLabelsById, ...rawMaterialLabelsById };
+  const productLabelsById = (model.productsCatalog ?? []).reduce<Record<string, string>>(
+    (acc, product: Product) => {
+    if (product?.id && product.name) {
+      acc[product.id] = product.sku ? `${product.name} (${product.sku})` : product.name;
+    }
+    return acc;
+    },
+    {}
+  );
+  const variantLabelsById = (model.productsCatalog ?? []).reduce<Record<string, string>>(
+    (acc, product: Product) => {
+    (product.variants ?? []).forEach((variant: ProductVariant) => {
+      if (variant?.id && (variant.name || variant.sku)) {
+        const label = variant.sku && variant.name ? `${variant.name} (${variant.sku})` : (variant.name || variant.sku || '');
+        if (label) acc[variant.id] = product?.name ? `${label} · ${product.name}` : label;
+      }
+    });
+    return acc;
+    },
+    {}
+  );
   const customerLabelsById = (model.customers ?? []).reduce<Record<string, string>>((acc, customer) => {
     if (customer?.id && customer.name) {
       const doc = [customer.documentType, customer.documentNumber].filter(Boolean).join(' ');
@@ -359,7 +395,7 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
                 </div>
                 {a.metadata && (
                   <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                    {formatAuditMetadata(a.metadata, rawMaterialLabelsById)}
+                    {formatAuditMetadata(a.metadata, mergedRawMaterialLabelsById, productLabelsById, variantLabelsById)}
                   </p>
                 )}
                 {a.notes && (
