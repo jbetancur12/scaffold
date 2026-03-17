@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { TabsContent } from '@/components/ui/tabs';
 import { ScrollText, FileSearch } from 'lucide-react';
 import type { QualityComplianceModel } from '../types';
@@ -127,6 +128,13 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
   const showingFrom = auditTotal === 0 ? 0 : (auditPage - 1) * auditLimit + 1;
   const showingTo = Math.min(auditPage * auditLimit, auditTotal);
   const actionOptions = Object.keys(auditActionLabels).sort();
+  const [actionSearch, setActionSearch] = useState('');
+  const filteredActions = actionOptions.filter((action) => {
+    const label = auditActionLabels[action] || action;
+    const q = actionSearch.trim().toLowerCase();
+    if (!q) return true;
+    return label.toLowerCase().includes(q) || action.toLowerCase().includes(q);
+  });
 
   return (
     <TabsContent value="audit" className="space-y-5">
@@ -160,50 +168,11 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-          <div className="md:col-span-2 space-y-1.5">
-            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Eventos</label>
-            <select
-              multiple
-              value={auditFilters.actions}
-              onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions).map((option) => option.value);
-                model.setAuditFilters((prev) => ({
-                  ...prev,
-                  actions: selected,
-                  page: 1,
-                }));
-              }}
-              className="h-24 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-            >
-              {actionOptions.map((action) => (
-                <option key={action} value={action}>
-                  {auditActionLabels[action] || action}
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-slate-400">Usa Ctrl/Cmd para seleccionar varios eventos.</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800">Filtros de auditoría</h3>
+            <p className="text-xs text-slate-500">Selecciona eventos y rango de fechas para afinar el historial.</p>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Desde</label>
-            <input
-              type="date"
-              value={auditFilters.dateFrom}
-              onChange={(e) => model.setAuditFilters((prev) => ({ ...prev, dateFrom: e.target.value, page: 1 }))}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Hasta</label>
-            <input
-              type="date"
-              value={auditFilters.dateTo}
-              onChange={(e) => model.setAuditFilters((prev) => ({ ...prev, dateTo: e.target.value, page: 1 }))}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
-            />
-          </div>
-        </div>
-        <div className="mt-3 flex justify-end">
           <button
             type="button"
             onClick={() => model.setAuditFilters({ actions: [], dateFrom: '', dateTo: '', page: 1, limit: auditLimit })}
@@ -211,6 +180,71 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
           >
             Limpiar filtros
           </button>
+        </div>
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Eventos</label>
+              <span className="text-[11px] text-slate-400">{auditFilters.actions.length} seleccionados</span>
+            </div>
+            <input
+              type="text"
+              value={actionSearch}
+              onChange={(e) => setActionSearch(e.target.value)}
+              placeholder="Buscar evento..."
+              className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+            <div className="mt-3 max-h-44 overflow-auto rounded-xl border border-slate-200 bg-slate-50/60 p-2">
+              <div className="flex flex-wrap gap-2">
+                {filteredActions.map((action) => {
+                  const selected = auditFilters.actions.includes(action);
+                  return (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => {
+                        model.setAuditFilters((prev) => {
+                          const next = selected
+                            ? prev.actions.filter((value) => value !== action)
+                            : [...prev.actions, action];
+                          return { ...prev, actions: next, page: 1 };
+                        });
+                      }}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition ${selected
+                        ? 'bg-violet-600 text-white border-violet-600'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-violet-200 hover:text-slate-800'
+                        }`}
+                    >
+                      {auditActionLabels[action] || action}
+                    </button>
+                  );
+                })}
+                {filteredActions.length === 0 && (
+                  <span className="text-xs text-slate-400 px-2 py-1">Sin resultados</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Desde</label>
+              <input
+                type="date"
+                value={auditFilters.dateFrom}
+                onChange={(e) => model.setAuditFilters((prev) => ({ ...prev, dateFrom: e.target.value, page: 1 }))}
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Hasta</label>
+              <input
+                type="date"
+                value={auditFilters.dateTo}
+                onChange={(e) => model.setAuditFilters((prev) => ({ ...prev, dateTo: e.target.value, page: 1 }))}
+                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+            </div>
+          </div>
         </div>
       </div>
 
