@@ -7,6 +7,7 @@ import { OperationalConfig } from '../entities/operational-config.entity';
 import { Supplier } from '../entities/supplier.entity';
 import { RawMaterialSpecification } from '../entities/raw-material-specification.entity';
 import { PurchasePresentation } from '../entities/purchase-presentation.entity';
+import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { RawMaterialSchema, BOMItemSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { UnitType } from '@scaffold/types';
@@ -19,6 +20,7 @@ export class MrpService {
     private readonly variantRepo: EntityRepository<ProductVariant>;
     private readonly rawMaterialSpecificationRepo: EntityRepository<RawMaterialSpecification>;
     private readonly purchasePresentationRepo: EntityRepository<PurchasePresentation>;
+    private readonly auditRepo: EntityRepository<QualityAuditEvent>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -27,6 +29,17 @@ export class MrpService {
         this.variantRepo = em.getRepository(ProductVariant);
         this.rawMaterialSpecificationRepo = em.getRepository(RawMaterialSpecification);
         this.purchasePresentationRepo = em.getRepository(PurchasePresentation);
+        this.auditRepo = em.getRepository(QualityAuditEvent);
+    }
+
+    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>) {
+        const event = this.auditRepo.create({
+            entityType: 'bom_item',
+            entityId,
+            action,
+            metadata,
+        } as unknown as QualityAuditEvent);
+        await this.em.persistAndFlush(event);
     }
 
     private async syncRawMaterialSpecifications(
@@ -573,6 +586,13 @@ export class MrpService {
         } as unknown as BOMItem);
 
         await this.em.persistAndFlush(bomItem);
+        await this.logAudit(bomItem.id, 'bom_item_created', {
+            variantId: variant.id,
+            rawMaterialId: rawMaterial.id,
+            rawMaterialSpecificationId: specification?.id,
+            quantity: bomItem.quantity,
+            usageNote: bomItem.usageNote,
+        });
 
         // Recalculate variant cost
         await this.calculateVariantCost(data.variantId);
@@ -589,6 +609,13 @@ export class MrpService {
 
     async updateBOMItem(id: string, data: Partial<z.infer<typeof BOMItemSchema>>): Promise<BOMItem> {
         const item = await this.bomItemRepo.findOneOrFail({ id });
+        const before = {
+            variantId: item.variantId,
+            rawMaterialId: item.rawMaterial?.id,
+            rawMaterialSpecificationId: item.rawMaterialSpecification?.id,
+            quantity: item.quantity,
+            usageNote: item.usageNote,
+        };
 
         // Update fields
         if (data.quantity !== undefined) item.quantity = data.quantity;
@@ -608,6 +635,14 @@ export class MrpService {
         }
 
         await this.em.persistAndFlush(item);
+        const after = {
+            variantId: item.variantId,
+            rawMaterialId: item.rawMaterial?.id,
+            rawMaterialSpecificationId: item.rawMaterialSpecification?.id,
+            quantity: item.quantity,
+            usageNote: item.usageNote,
+        };
+        await this.logAudit(item.id, 'bom_item_updated', { before, after });
 
         // Recalculate variant cost
         await this.calculateVariantCost(item.variantId);
@@ -619,6 +654,13 @@ export class MrpService {
         const item = await this.bomItemRepo.findOneOrFail({ id });
         const variantId = item.variantId;
 
+        await this.logAudit(item.id, 'bom_item_deleted', {
+            variantId: item.variantId,
+            rawMaterialId: item.rawMaterial?.id,
+            rawMaterialSpecificationId: item.rawMaterialSpecification?.id,
+            quantity: item.quantity,
+            usageNote: item.usageNote,
+        });
         await this.em.removeAndFlush(item);
 
         // Recalculate variant cost

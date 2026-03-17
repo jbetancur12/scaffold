@@ -14,7 +14,7 @@ Al final de cada fase se marca como completada.
 
 ## Estado General
 - [x] **Fase 1 (MRP núcleo)**: órdenes de producción, órdenes de compra, requisiciones, cotizaciones.
-- [ ] **Fase 2 (Catálogo)**: productos, variantes, BOM, listas de precios.
+- [x] **Fase 2 (Catálogo)**: productos, variantes, BOM, listas de precios.
 - [ ] **Fase 3 (Comercial)**: pedidos de cliente, clientes, proveedores.
 - [ ] **Fase 4 (Acciones especiales)**: eliminaciones, cambios masivos, ajustes de inventario.
 
@@ -44,24 +44,23 @@ Al final de cada fase se marca como completada.
   - [x] Aprobación
   - [x] Conversión a pedido
 
-### Fase 2 - Catálogo
+### Fase 2 - Catálogo (Completada)
 - Objetivo: auditar cambios en la definición del producto y su costo (impacto directo en operación y finanzas).
 - Incluir before/after en:
   - Precios
   - BOM (materiales y cantidades)
   - Variantes (atributos)
-- [ ] **Productos**
-  - [ ] Crear / editar / eliminar
-  - [ ] Cambios de estado
-- [ ] **Variantes**
-  - [ ] Crear / editar / eliminar
-  - [ ] Cambios de estado
-- [ ] **BOM**
-  - [ ] Crear / editar / eliminar
-  - [ ] Cambios de cantidades
-- [ ] **Precios**
-  - [ ] Ediciones manuales
-  - [ ] Cambios masivos
+- [x] **Productos**
+  - [x] Crear / editar / eliminar
+- [x] **Variantes**
+  - [x] Crear / editar / eliminar
+  - [x] Cambios de precio
+- [x] **BOM**
+  - [x] Crear / editar / eliminar
+  - [x] Cambios de cantidades
+- [x] **Precios**
+  - [x] Configuración de lista de precios
+  - [x] Ediciones manuales (por variante)
 
 ### Fase 3 - Comercial
 - Objetivo: trazabilidad de ventas y datos maestros de clientes/proveedores.

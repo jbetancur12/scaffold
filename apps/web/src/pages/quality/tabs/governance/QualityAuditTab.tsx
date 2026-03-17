@@ -18,6 +18,12 @@ const auditEntityLabels: Record<string, string> = {
   purchase_order: 'Orden de compra',
   purchase_requisition: 'Requisición de compra',
   quotation: 'Cotización',
+  product: 'Producto',
+  product_variant: 'Variante',
+  product_group: 'Grupo de productos',
+  product_catalog: 'Catálogo de productos',
+  bom_item: 'Ítem BOM',
+  price_list_config: 'Configuración lista de precios',
   quality_risk_control: 'Riesgo/control',
   quality_training_evidence: 'Capacitación',
   dmr_template: 'Plantilla DMR',
@@ -57,6 +63,14 @@ const auditActionLabels: Record<string, string> = {
   converted_to_sales_order: 'Convertido a pedido',
   sales_order_linked: 'Pedido vinculado',
   sales_order_unlinked: 'Pedido desvinculado',
+  deleted: 'Eliminado',
+  price_updated: 'Precio actualizado',
+  image_uploaded: 'Imagen cargada',
+  image_deleted: 'Imagen eliminada',
+  catalog_imported: 'Catálogo importado',
+  bom_item_created: 'BOM agregado',
+  bom_item_updated: 'BOM actualizado',
+  bom_item_deleted: 'BOM eliminado',
 };
 
 const actionColors: Record<string, string> = {
@@ -78,6 +92,14 @@ const actionColors: Record<string, string> = {
   converted_to_sales_order: 'bg-violet-50 text-violet-700 border-violet-200',
   sales_order_linked: 'bg-blue-50 text-blue-700 border-blue-200',
   sales_order_unlinked: 'bg-slate-100 text-slate-600 border-slate-200',
+  deleted: 'bg-rose-50 text-rose-700 border-rose-200',
+  price_updated: 'bg-amber-50 text-amber-700 border-amber-200',
+  image_uploaded: 'bg-sky-50 text-sky-700 border-sky-200',
+  image_deleted: 'bg-slate-100 text-slate-600 border-slate-200',
+  catalog_imported: 'bg-violet-50 text-violet-700 border-violet-200',
+  bom_item_created: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  bom_item_updated: 'bg-blue-50 text-blue-700 border-blue-200',
+  bom_item_deleted: 'bg-rose-50 text-rose-700 border-rose-200',
 };
 
 const shortId = (value?: string) => {
@@ -108,6 +130,13 @@ const formatAuditMetadata = (
     itemsCount: 'Ítems',
     salesOrderId: 'Pedido cliente',
     previousSalesOrderId: 'Pedido anterior',
+    productId: 'Producto',
+    variantId: 'Variante',
+    rawMaterialSpecificationId: 'Especificación',
+    previousPrice: 'Precio anterior',
+    price: 'Precio',
+    usageNote: 'Nota de uso',
+    fileName: 'Archivo',
   };
   const knownKeys = Object.keys(metadataLabels);
   const values = knownKeys

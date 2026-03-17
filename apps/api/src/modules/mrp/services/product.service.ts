@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { ProductGroup } from '../entities/product-group.entity';
 import { ObjectStorageService } from '../../../shared/services/object-storage.service';
 import { ProductImage } from '../entities/product-image.entity';
+import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 
 export class ProductService {
     private readonly em: EntityManager;
@@ -19,6 +20,7 @@ export class ProductService {
     private readonly productGroupRepo: EntityRepository<ProductGroup>;
     private readonly productImageRepo: EntityRepository<ProductImage>;
     private readonly storageService: ObjectStorageService;
+    private readonly auditRepo: EntityRepository<QualityAuditEvent>;
 
     constructor(em: EntityManager) {
         this.em = em;
@@ -28,6 +30,45 @@ export class ProductService {
         this.productGroupRepo = em.getRepository(ProductGroup);
         this.productImageRepo = em.getRepository(ProductImage);
         this.storageService = new ObjectStorageService();
+        this.auditRepo = em.getRepository(QualityAuditEvent);
+    }
+
+    private buildProductSnapshot(product: Product) {
+        return {
+            sku: product.sku,
+            name: product.name,
+            categoryId: product.category?.id,
+            requiresInvima: product.requiresInvima,
+            productReference: product.productReference,
+            invimaRegistrationId: product.invimaRegistration?.id,
+        };
+    }
+
+    private buildVariantSnapshot(variant: ProductVariant) {
+        return {
+            sku: variant.sku,
+            name: variant.name,
+            productId: (variant.product as Product | undefined)?.id,
+            price: variant.price,
+            pvpMargin: variant.pvpMargin,
+            pvpPrice: variant.pvpPrice,
+            taxStatus: variant.taxStatus,
+            taxRate: variant.taxRate,
+            targetMargin: variant.targetMargin,
+            productionMinutes: variant.productionMinutes,
+            laborCost: variant.laborCost,
+            indirectCost: variant.indirectCost,
+        };
+    }
+
+    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>) {
+        const event = this.auditRepo.create({
+            entityType,
+            entityId,
+            action,
+            metadata,
+        } as unknown as QualityAuditEvent);
+        await this.em.persistAndFlush(event);
     }
 
     private decodeBase64Data(base64Data: string): Buffer {
@@ -428,6 +469,7 @@ export class ProductService {
             invimaRegistration,
         } as unknown as Product);
         await this.em.persistAndFlush(product);
+        await this.logAudit('product', product.id, 'created', this.buildProductSnapshot(product));
         return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category', 'images'] });
     }
 
@@ -445,6 +487,12 @@ export class ProductService {
             active: data.active ?? true,
         } as ProductGroup);
         await this.em.persistAndFlush(row);
+        await this.logAudit('product_group', row.id, 'created', {
+            name: row.name,
+            slug: row.slug,
+            parentId: row.parent?.id,
+            active: row.active,
+        });
         return this.productGroupRepo.findOneOrFail({ id: row.id }, { populate: ['parent'] });
     }
 
@@ -479,6 +527,12 @@ export class ProductService {
         if (data.sortOrder !== undefined) row.sortOrder = Number(data.sortOrder);
         if (data.active !== undefined) row.active = data.active;
         await this.em.persistAndFlush(row);
+        await this.logAudit('product_group', row.id, 'updated', {
+            name: row.name,
+            slug: row.slug,
+            parentId: row.parent?.id,
+            active: row.active,
+        });
         return this.productGroupRepo.findOneOrFail({ id: row.id }, { populate: ['parent'] });
     }
 
@@ -490,6 +544,10 @@ export class ProductService {
         if (row.products.length > 0) {
             throw new AppError('No puedes eliminar un grupo asignado a productos', 409);
         }
+        await this.logAudit('product_group', row.id, 'deleted', {
+            name: row.name,
+            slug: row.slug,
+        });
         await this.em.removeAndFlush(row);
     }
 
@@ -526,12 +584,15 @@ export class ProductService {
             throw new AppError('Debes registrar la referencia del producto regulado', 400);
         }
 
+        const before = this.buildProductSnapshot(product);
         this.productRepo.assign(product, {
             ...productData,
             category,
             invimaRegistration,
         });
         await this.em.persistAndFlush(product);
+        const after = this.buildProductSnapshot(product);
+        await this.logAudit('product', product.id, 'updated', { before, after });
         return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category', 'images'] });
     }
 
@@ -541,6 +602,10 @@ export class ProductService {
         for (const image of images) {
             await this.storageService.deleteObject(image.filePath);
         }
+        await this.logAudit('product', product.id, 'deleted', {
+            sku: product.sku,
+            name: product.name,
+        });
         await this.em.removeAndFlush(product);
     }
 
@@ -549,19 +614,37 @@ export class ProductService {
         const variant = this.variantRepo.create({ ...this.enrichVariantPricing(data), product } as unknown as ProductVariant);
         await this.em.persistAndFlush(variant);
         await this.calculateVariantCost(variant.id);
+        await this.logAudit('product_variant', variant.id, 'created', this.buildVariantSnapshot(variant));
         return variant;
     }
 
     async updateVariant(variantId: string, data: Partial<ProductVariant>): Promise<ProductVariant> {
-        const variant = await this.variantRepo.findOneOrFail({ id: variantId });
+        const variant = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['product'] });
+        const before = this.buildVariantSnapshot(variant);
         this.variantRepo.assign(variant, this.enrichVariantPricing(data, variant));
         await this.em.persistAndFlush(variant);
         await this.calculateVariantCost(variant.id);
+        const refreshed = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['product'] });
+        const after = this.buildVariantSnapshot(refreshed);
+        await this.logAudit('product_variant', variantId, 'updated', { before, after });
+        if (Number(before.price) !== Number(after.price)) {
+            await this.logAudit('product_variant', variantId, 'price_updated', {
+                sku: after.sku,
+                productId: after.productId,
+                previousPrice: before.price,
+                price: after.price,
+            });
+        }
         return variant;
     }
 
     async deleteVariant(variantId: string): Promise<void> {
-        const variant = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['bomItems'] });
+        const variant = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['bomItems', 'product'] });
+        await this.logAudit('product_variant', variant.id, 'deleted', {
+            sku: variant.sku,
+            name: variant.name,
+            productId: (variant.product as Product | undefined)?.id,
+        });
         await this.em.removeAndFlush(variant);
     }
 
@@ -621,6 +704,10 @@ export class ProductService {
             sortOrder: Number(payload.sortOrder || 0),
         } as unknown as ProductImage);
         await this.em.persistAndFlush(image);
+        await this.logAudit('product', product.id, 'image_uploaded', {
+            fileName: image.fileName,
+            sortOrder: image.sortOrder,
+        });
         return image;
     }
 
@@ -642,6 +729,9 @@ export class ProductService {
         if (image.product.id !== productId) {
             throw new AppError('Imagen no encontrada para este producto', 404);
         }
+        await this.logAudit('product', image.product.id, 'image_deleted', {
+            fileName: image.fileName,
+        });
         await this.storageService.deleteObject(image.filePath);
         await this.em.removeAndFlush(image);
     }
@@ -877,10 +967,18 @@ export class ProductService {
         for (const variantId of result.changedVariantIds) {
             await this.calculateVariantCost(variantId);
         }
-        return {
+        const response = {
             actor: result.actor,
             ...preview.summary,
         };
+        await this.logAudit('product_catalog', 'import', 'catalog_imported', {
+            productsToCreate: response.productsToCreate,
+            productsToUpdate: response.productsToUpdate,
+            variantsToCreate: response.variantsToCreate,
+            variantsToUpdate: response.variantsToUpdate,
+            totalRows: response.totalRows,
+        });
+        return response;
     }
 
     async createInvimaRegistration(payload: {
