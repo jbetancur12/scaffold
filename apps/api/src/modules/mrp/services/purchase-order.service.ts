@@ -14,6 +14,7 @@ import { ControlledDocument } from '../entities/controlled-document.entity';
 import { OperationalConfig } from '../entities/operational-config.entity';
 import { RawMaterialSpecification } from '../entities/raw-material-specification.entity';
 import { PurchasePresentation } from '../entities/purchase-presentation.entity';
+import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 
 export class PurchaseOrderService {
     private purchaseOrderRepo: EntityRepository<PurchaseOrder>;
@@ -24,6 +25,36 @@ export class PurchaseOrderService {
     ) {
         this.purchaseOrderRepo = em.getRepository(PurchaseOrder);
         this.incomingInspectionRepo = em.getRepository(IncomingInspection);
+    }
+
+    private buildAuditSnapshot(purchaseOrder: PurchaseOrder) {
+        return {
+            code: purchaseOrder.code,
+            status: purchaseOrder.status,
+            supplierId: purchaseOrder.supplier?.id,
+            expectedDeliveryDate: purchaseOrder.expectedDeliveryDate,
+            subtotalBase: purchaseOrder.subtotalBase,
+            taxTotal: purchaseOrder.taxTotal,
+            totalAmount: purchaseOrder.totalAmount,
+            netTotalAmount: purchaseOrder.netTotalAmount,
+            currency: purchaseOrder.currency,
+        };
+    }
+
+    private async logAudit(
+        manager: EntityManager,
+        entityId: string,
+        action: string,
+        metadata?: Record<string, unknown>
+    ) {
+        const repo = manager.getRepository(QualityAuditEvent);
+        const event = repo.create({
+            entityType: 'purchase_order',
+            entityId,
+            action,
+            metadata,
+        } as unknown as QualityAuditEvent);
+        await manager.persistAndFlush(event);
     }
 
     private convertQuantity(quantity: number, fromUnit: UnitType, toUnit: UnitType): number {
@@ -191,6 +222,14 @@ export class PurchaseOrderService {
             this.applyPurchaseOrderTotals(purchaseOrder, data, totals);
 
             await tx.persistAndFlush(purchaseOrder);
+            await this.logAudit(tx, purchaseOrder.id, 'created', {
+                code: purchaseOrder.code,
+                status: purchaseOrder.status,
+                supplierId: supplier.id,
+                totalAmount: purchaseOrder.totalAmount,
+                netTotalAmount: purchaseOrder.netTotalAmount,
+                currency: purchaseOrder.currency,
+            });
             return purchaseOrder;
         });
     }
@@ -211,6 +250,8 @@ export class PurchaseOrderService {
                 throw new AppError('No se puede editar una orden de compra cancelada', 400);
             }
 
+            const before = this.buildAuditSnapshot(purchaseOrder);
+
             purchaseOrder.supplier = await tx.getRepository(Supplier).findOneOrFail({ id: data.supplierId });
             purchaseOrder.controlledDocumentId = controlDocument.id;
             purchaseOrder.expectedDeliveryDate = data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : undefined;
@@ -228,6 +269,8 @@ export class PurchaseOrderService {
             this.applyPurchaseOrderTotals(purchaseOrder, data, totals);
 
             await tx.persistAndFlush(purchaseOrder);
+            const after = this.buildAuditSnapshot(purchaseOrder);
+            await this.logAudit(tx, purchaseOrder.id, 'updated', { before, after });
             return purchaseOrder;
         });
     }
@@ -325,6 +368,7 @@ export class PurchaseOrderService {
 
     async updateStatus(id: string, status: PurchaseOrderStatus): Promise<PurchaseOrder> {
         const purchaseOrder = await this.purchaseOrderRepo.findOneOrFail({ id });
+        const previousStatus = purchaseOrder.status;
         purchaseOrder.status = status;
 
         if (status === PurchaseOrderStatus.CANCELLED) {
@@ -332,6 +376,11 @@ export class PurchaseOrderService {
         }
 
         await this.em.persistAndFlush(purchaseOrder);
+        await this.logAudit(this.em, purchaseOrder.id, 'status_updated', {
+            previousStatus,
+            status: purchaseOrder.status,
+            code: purchaseOrder.code,
+        });
         return purchaseOrder;
     }
 
@@ -364,6 +413,11 @@ export class PurchaseOrderService {
             purchaseOrder.receivedDate = new Date();
 
             await tx.persistAndFlush(purchaseOrder);
+            await this.logAudit(tx, purchaseOrder.id, 'received', {
+                code: purchaseOrder.code,
+                status: purchaseOrder.status,
+                receivedDate: purchaseOrder.receivedDate,
+            });
             return purchaseOrder;
         });
     }
@@ -507,6 +561,7 @@ export class PurchaseOrderService {
 
     async cancelPurchaseOrder(id: string): Promise<void> {
         const purchaseOrder = await this.purchaseOrderRepo.findOneOrFail({ id });
+        const previousStatus = purchaseOrder.status;
 
         if (purchaseOrder.status === PurchaseOrderStatus.RECEIVED) {
             throw new AppError('No se puede cancelar una orden de compra ya recibida', 400);
@@ -514,5 +569,10 @@ export class PurchaseOrderService {
 
         purchaseOrder.status = PurchaseOrderStatus.CANCELLED;
         await this.em.persistAndFlush(purchaseOrder);
+        await this.logAudit(this.em, purchaseOrder.id, 'cancelled', {
+            code: purchaseOrder.code,
+            previousStatus,
+            status: purchaseOrder.status,
+        });
     }
 }

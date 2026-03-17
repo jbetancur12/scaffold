@@ -1,13 +1,28 @@
-import { EntityManager, FilterQuery } from '@mikro-orm/core';
+import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { PurchaseRequisitionStatus } from '@scaffold/types';
 import { AppError } from '../../../shared/utils/response';
 import { PurchaseRequisition } from '../entities/purchase-requisition.entity';
 import { PurchaseRequisitionItem } from '../entities/purchase-requisition-item.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
 import { Supplier } from '../entities/supplier.entity';
+import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 
 export class PurchaseRequisitionService {
-    constructor(private readonly em: EntityManager) {}
+    private auditRepo: EntityRepository<QualityAuditEvent>;
+
+    constructor(private readonly em: EntityManager) {
+        this.auditRepo = em.getRepository(QualityAuditEvent);
+    }
+
+    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>) {
+        const event = this.auditRepo.create({
+            entityType: 'purchase_requisition',
+            entityId,
+            action,
+            metadata,
+        } as unknown as QualityAuditEvent);
+        await this.em.persistAndFlush(event);
+    }
 
     async create(data: {
         requestedBy: string;
@@ -59,6 +74,12 @@ export class PurchaseRequisitionService {
         }
 
         await this.em.persistAndFlush(requisition);
+        await this.logAudit(requisition.id, 'created', {
+            status: requisition.status,
+            requestedBy: requisition.requestedBy,
+            productionOrderId: requisition.productionOrderId,
+            itemsCount: requisition.items.length,
+        });
         return this.getById(requisition.id);
     }
 
@@ -85,19 +106,30 @@ export class PurchaseRequisitionService {
 
     async updateStatus(id: string, status: PurchaseRequisitionStatus) {
         const row = await this.em.findOneOrFail(PurchaseRequisition, { id });
+        const previousStatus = row.status;
         if (row.status === PurchaseRequisitionStatus.CONVERTIDA && status !== PurchaseRequisitionStatus.CONVERTIDA) {
             throw new AppError('No puedes reabrir una requisición convertida', 409);
         }
         row.status = status;
         await this.em.persistAndFlush(row);
+        await this.logAudit(row.id, 'status_updated', {
+            previousStatus,
+            status: row.status,
+        });
         return this.getById(id);
     }
 
     async markConverted(id: string, purchaseOrderId: string) {
         const row = await this.em.findOneOrFail(PurchaseRequisition, { id });
+        const previousStatus = row.status;
         row.status = PurchaseRequisitionStatus.CONVERTIDA;
         row.convertedPurchaseOrderId = purchaseOrderId;
         await this.em.persistAndFlush(row);
+        await this.logAudit(row.id, 'converted', {
+            previousStatus,
+            status: row.status,
+            purchaseOrderId,
+        });
         return this.getById(id);
     }
 }

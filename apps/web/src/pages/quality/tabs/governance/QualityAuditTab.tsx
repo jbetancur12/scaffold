@@ -15,6 +15,9 @@ const auditEntityLabels: Record<string, string> = {
   production_batch: 'Lote de producción',
   production_batch_unit: 'Unidad serial',
   production_order: 'Orden de producción',
+  purchase_order: 'Orden de compra',
+  purchase_requisition: 'Requisición de compra',
+  quotation: 'Cotización',
   quality_risk_control: 'Riesgo/control',
   quality_training_evidence: 'Capacitación',
   dmr_template: 'Plantilla DMR',
@@ -48,6 +51,12 @@ const auditActionLabels: Record<string, string> = {
   raw_material_consumed_by_production: 'Materia prima consumida',
   finished_inspection_form_updated: 'Inspección final actualizada',
   packaging_form_updated: 'Formato de empaque actualizado',
+  received: 'Recibido',
+  cancelled: 'Cancelado',
+  converted: 'Convertido',
+  converted_to_sales_order: 'Convertido a pedido',
+  sales_order_linked: 'Pedido vinculado',
+  sales_order_unlinked: 'Pedido desvinculado',
 };
 
 const actionColors: Record<string, string> = {
@@ -63,6 +72,12 @@ const actionColors: Record<string, string> = {
   raw_material_consumed_by_production: 'bg-orange-50 text-orange-700 border-orange-200',
   finished_inspection_form_updated: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   packaging_form_updated: 'bg-sky-50 text-sky-700 border-sky-200',
+  received: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  cancelled: 'bg-rose-50 text-rose-700 border-rose-200',
+  converted: 'bg-violet-50 text-violet-700 border-violet-200',
+  converted_to_sales_order: 'bg-violet-50 text-violet-700 border-violet-200',
+  sales_order_linked: 'bg-blue-50 text-blue-700 border-blue-200',
+  sales_order_unlinked: 'bg-slate-100 text-slate-600 border-slate-200',
 };
 
 const shortId = (value?: string) => {
@@ -79,13 +94,20 @@ const formatAuditMetadata = (
     code: 'Código', batchId: 'Lote', productionBatchId: 'Lote producción',
     batchUnitId: 'Unidad serial', rawMaterialId: 'Materia prima',
     purchaseOrderId: 'Orden compra', recallCaseId: 'Caso recall',
+    customerId: 'Cliente', supplierId: 'Proveedor',
     status: 'Estado', scopeType: 'Alcance',
+    previousStatus: 'Estado anterior',
     inspectionResult: 'Resultado', quantityAccepted: 'Aceptado',
     quantityRejected: 'Rechazado', quantity: 'Cantidad',
     coveragePercent: 'Cobertura (%)', reportNumber: 'Nro. reporte',
     reportChannel: 'Canal reporte',
     previousInvoiceNumber: 'Factura anterior',
     nextInvoiceNumber: 'Factura nueva',
+    totalAmount: 'Total',
+    netTotalAmount: 'Total neto',
+    itemsCount: 'Ítems',
+    salesOrderId: 'Pedido cliente',
+    previousSalesOrderId: 'Pedido anterior',
   };
   const knownKeys = Object.keys(metadataLabels);
   const values = knownKeys

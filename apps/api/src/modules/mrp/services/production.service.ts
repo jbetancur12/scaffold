@@ -51,7 +51,6 @@ export class ProductionService {
     private readonly inventoryRepo: EntityRepository<InventoryItem>;
     private readonly batchRepo: EntityRepository<ProductionBatch>;
     private readonly batchUnitRepo: EntityRepository<ProductionBatchUnit>;
-    private readonly auditRepo: EntityRepository<QualityAuditEvent>;
     private readonly regulatoryLabelRepo: EntityRepository<RegulatoryLabel>;
     private readonly batchReleaseRepo: EntityRepository<BatchRelease>;
     private readonly changeControlRepo: EntityRepository<ChangeControl>;
@@ -65,7 +64,6 @@ export class ProductionService {
         this.inventoryRepo = em.getRepository(InventoryItem);
         this.batchRepo = em.getRepository(ProductionBatch);
         this.batchUnitRepo = em.getRepository(ProductionBatchUnit);
-        this.auditRepo = em.getRepository(QualityAuditEvent);
         this.regulatoryLabelRepo = em.getRepository(RegulatoryLabel);
         this.batchReleaseRepo = em.getRepository(BatchRelease);
         this.changeControlRepo = em.getRepository(ChangeControl);
@@ -319,6 +317,12 @@ export class ProductionService {
         }
 
         await this.em.persistAndFlush(order);
+        await this.logAudit('production_order', order.id, 'created', {
+            code: order.code,
+            status: order.status,
+            salesOrderId: order.salesOrder?.id,
+            itemsCount: order.items.length,
+        });
         return order;
     }
 
@@ -339,6 +343,14 @@ export class ProductionService {
             }
             if (salesOrderId) {
                 await this.syncSalesOrderStatus(salesOrderId, tx);
+            }
+
+            if (oldSalesOrderId !== salesOrderId) {
+                await this.logAudit('production_order', order.id, salesOrderId ? 'sales_order_linked' : 'sales_order_unlinked', {
+                    previousSalesOrderId: oldSalesOrderId,
+                    salesOrderId,
+                    code: order.code,
+                }, tx);
             }
 
             return order;
@@ -1726,14 +1738,15 @@ export class ProductionService {
         }
     }
 
-    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>) {
-        const event = this.auditRepo.create({
+    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>, manager?: EntityManager) {
+        const repo = (manager ?? this.em).getRepository(QualityAuditEvent);
+        const event = repo.create({
             entityType,
             entityId,
             action,
             metadata,
         } as unknown as QualityAuditEvent);
-        await this.em.persistAndFlush(event);
+        await (manager ?? this.em).persistAndFlush(event);
     }
 
     private async assertProcessDocument(process: DocumentProcess) {

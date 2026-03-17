@@ -8,6 +8,7 @@ import { ProductVariant } from '../entities/product-variant.entity';
 import { ProductTaxStatus, QuotationItemLineType, QuotationStatus, SalesOrderStatus } from '@scaffold/types';
 import { SalesOrderService } from './sales-order.service';
 import { OperationalConfig } from '../entities/operational-config.entity';
+import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 
 type QuotationInputItem = {
     lineType?: QuotationItemLineType | 'item' | 'note';
@@ -40,6 +41,35 @@ export class QuotationService {
     constructor(em: EntityManager) {
         this.em = em;
         this.quotationRepo = em.getRepository(Quotation);
+    }
+
+    private buildAuditSnapshot(quotation: Quotation) {
+        return {
+            code: quotation.code,
+            status: quotation.status,
+            customerId: quotation.customer?.id,
+            subtotalBase: quotation.subtotalBase,
+            taxTotal: quotation.taxTotal,
+            totalAmount: quotation.totalAmount,
+            netTotalAmount: quotation.netTotalAmount,
+            globalDiscountPercent: quotation.globalDiscountPercent,
+        };
+    }
+
+    private async logAudit(
+        manager: EntityManager,
+        entityId: string,
+        action: string,
+        metadata?: Record<string, unknown>
+    ) {
+        const repo = manager.getRepository(QualityAuditEvent);
+        const event = repo.create({
+            entityType: 'quotation',
+            entityId,
+            action,
+            metadata,
+        } as unknown as QualityAuditEvent);
+        await manager.persistAndFlush(event);
     }
 
     private round(value: number, decimals = 2) {
@@ -595,6 +625,13 @@ export class QuotationService {
             this.recalculateHeader(quotation);
             tx.persist(quotation);
             await tx.flush();
+            await this.logAudit(tx, quotation.id, 'created', {
+                code: quotation.code,
+                status: quotation.status,
+                customerId: quotation.customer.id,
+                totalAmount: quotation.totalAmount,
+                netTotalAmount: quotation.netTotalAmount,
+            });
             return this.getById(quotation.id);
         });
     }
@@ -610,6 +647,8 @@ export class QuotationService {
             if (![QuotationStatus.DRAFT, QuotationStatus.SENT].includes(quotation.status)) {
                 throw new AppError('Solo se puede editar una cotización en borrador o enviada', 400);
             }
+
+            const before = this.buildAuditSnapshot(quotation);
 
             quotation.customer = await tx.getRepository(Customer).findOneOrFail({ id: payload.customerId, deletedAt: null as never });
             quotation.validUntil = payload.validUntil ? new Date(payload.validUntil) : undefined;
@@ -640,14 +679,22 @@ export class QuotationService {
 
             this.recalculateHeader(quotation);
             await tx.flush();
+            const after = this.buildAuditSnapshot(quotation);
+            await this.logAudit(tx, quotation.id, 'updated', { before, after });
             return this.getById(quotation.id);
         });
     }
 
     async updateStatus(id: string, status: QuotationStatus) {
         const quotation = await this.getById(id);
+        const previousStatus = quotation.status;
         quotation.status = status;
         await this.em.flush();
+        await this.logAudit(this.em, quotation.id, 'status_updated', {
+            previousStatus,
+            status: quotation.status,
+            code: quotation.code,
+        });
         return quotation;
     }
 
@@ -682,6 +729,10 @@ export class QuotationService {
 
             quotation.status = this.quoteStatusFromItems(quotation);
             await tx.flush();
+            await this.logAudit(tx, quotation.id, 'approved', {
+                status: quotation.status,
+                code: quotation.code,
+            });
             return this.getById(id);
         });
     }
@@ -745,6 +796,11 @@ export class QuotationService {
             }
 
             await tx.flush();
+            await this.logAudit(tx, quotation.id, 'converted_to_sales_order', {
+                salesOrderId: order.id,
+                status: quotation.status,
+                code: quotation.code,
+            });
             return {
                 quotationId: quotation.id,
                 quotationCode: quotation.code,
