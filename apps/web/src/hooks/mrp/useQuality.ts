@@ -143,7 +143,7 @@ export const useUpdateCapaMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityCapas);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -538,12 +538,23 @@ export const useEquipmentAlertsQuery = (daysAhead = 30) => {
     return useMrpQuery(fetcher, true, mrpQueryKeys.qualityEquipmentAlerts);
 };
 
-export const useQualityAuditQuery = (filters?: { entityType?: string; entityId?: string }) => {
-    const fetcher = useCallback(async (): Promise<AuditEvent[]> => {
+export const useQualityAuditQuery = (filters?: {
+    entityType?: string;
+    entityId?: string;
+    actor?: string;
+    actions?: string[];
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+}) => {
+    const fetcher = useCallback(async (): Promise<{ data: AuditEvent[]; total: number; page: number; limit: number }> => {
         return mrpApi.listQualityAuditEvents(filters);
     }, [filters]);
 
-    return useMrpQuery(fetcher, true, mrpQueryKeys.qualityAuditEvents);
+    const filtersKey = JSON.stringify(filters ?? {});
+    const queryKey = mrpQueryKeys.qualityAuditEventsList(filtersKey);
+    return useMrpQuery(fetcher, true, queryKey);
 };
 
 export const useTechnovigilanceCasesQuery = (filters?: {
@@ -578,7 +589,7 @@ export const useCreateTechnovigilanceCaseMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityTechnovigilanceCases);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -598,7 +609,7 @@ export const useUpdateTechnovigilanceCaseMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityTechnovigilanceCases);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -618,7 +629,7 @@ export const useReportTechnovigilanceCaseMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityTechnovigilanceCases);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -648,7 +659,7 @@ export const useCreateRecallCaseMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -712,7 +723,7 @@ export const useCreateShipmentMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityShipments);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -748,7 +759,7 @@ export const useCreateDmrTemplateMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityDmrTemplates);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -792,7 +803,7 @@ export const useUpdateRecallProgressMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -811,7 +822,7 @@ export const useCreateRecallNotificationMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -830,7 +841,7 @@ export const useUpdateRecallNotificationMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -848,7 +859,7 @@ export const useCloseRecallCaseMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityRecalls);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -890,7 +901,7 @@ export const useUpsertRegulatoryLabelMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityRegulatoryLabels);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -901,7 +912,7 @@ export const useValidateDispatchReadinessMutation = () => {
         async (payload) => mrpApi.validateDispatchReadiness(payload),
         {
             onSuccess: async () => {
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -964,7 +975,7 @@ export const useCreateRiskControlMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityRiskControls);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -993,7 +1004,7 @@ export const useCreateTrainingEvidenceMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityTrainingEvidence);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -1033,7 +1044,7 @@ export const useResolveIncomingInspectionMutation = () => {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityIncomingInspections);
                 invalidateMrpQuery(mrpQueryKeys.rawMaterials);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -1051,7 +1062,24 @@ export const useCorrectIncomingInspectionCostMutation = () => {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityIncomingInspections);
                 invalidateMrpQuery(mrpQueryKeys.rawMaterials);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
+            },
+        }
+    );
+};
+
+export const useUpdateIncomingInspectionInvoiceMutation = () => {
+    return useMrpMutation<{
+        id: string;
+        invoiceNumber: string;
+        reason: string;
+        actor?: string;
+    }, IncomingInspection>(
+        async ({ id, ...payload }) => mrpApi.updateIncomingInspectionInvoiceNumber(id, payload),
+        {
+            onSuccess: async () => {
+                invalidateMrpQuery(mrpQueryKeys.qualityIncomingInspections);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -1080,7 +1108,7 @@ export const useUpsertBatchReleaseChecklistMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityBatchReleases);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -1097,7 +1125,7 @@ export const useSignBatchReleaseMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQuery(mrpQueryKeys.qualityBatchReleases);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );
@@ -1193,7 +1221,7 @@ export const useUploadControlledDocumentSourceMutation = () => {
         {
             onSuccess: async () => {
                 invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityDocuments);
-                invalidateMrpQuery(mrpQueryKeys.qualityAuditEvents);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.qualityAuditEvents);
             },
         }
     );

@@ -186,6 +186,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/quality/incoming-inspections/:id/evidence/:evidenceType', (req, res, next) => mrpController.downloadIncomingInspectionEvidence(req, res, next));
     router.patch('/quality/incoming-inspections/:id/resolve', requireRole(qualityEditors), (req, res, next) => mrpController.resolveIncomingInspection(req, res, next));
     router.patch('/quality/incoming-inspections/:id/correct-cost', requireRole(qualityEditors), (req, res, next) => mrpController.correctResolvedIncomingInspectionCost(req, res, next));
+    router.patch('/quality/incoming-inspections/:id/invoice-number', requireRole(qualityEditors), (req, res, next) => mrpController.updateIncomingInspectionInvoiceNumber(req, res, next));
     router.post('/quality/batch-releases', (req, res, next) => mrpController.upsertBatchReleaseChecklist(req, res, next));
     router.get('/quality/batch-releases', (req, res, next) => mrpController.listBatchReleases(req, res, next));
     router.post('/quality/batch-releases/:productionBatchId/sign', (req, res, next) => mrpController.signBatchRelease(req, res, next));

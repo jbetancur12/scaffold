@@ -28,6 +28,8 @@ import {
 import { useWarehousesQuery } from '@/hooks/mrp/useWarehouses';
 import { useCancelPurchaseOrderMutation, usePurchaseOrderQuery, useReceivePurchaseOrderMutation } from '@/hooks/mrp/usePurchaseOrders';
 import { mrpApi } from '@/services/mrpApi';
+import { useMrpQuery } from '@/hooks/useMrpQuery';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 
 const statusLabels: Record<string, string> = {
     PENDING: 'Pendiente',
@@ -81,15 +83,27 @@ export default function PurchaseOrderDetailPage() {
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
     const [downloadingPdf, setDownloadingPdf] = useState(false);
+    const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<string | null>(null);
 
     const { data: order, loading, error, execute: reloadOrder } = usePurchaseOrderQuery(id);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
     const { execute: receiveOrder, loading: submitting } = useReceivePurchaseOrderMutation();
     const { execute: cancelOrder } = useCancelPurchaseOrderMutation();
     const warehouses = warehousesData ?? [];
+    const {
+        data: incomingInspections,
+        loading: loadingIncomingInspections,
+        error: incomingInspectionsError,
+    } = useMrpQuery(
+        async () => (id ? mrpApi.listIncomingInspections({ purchaseOrderId: id }) : []),
+        Boolean(id),
+        id ? mrpQueryKeys.qualityIncomingInspectionsByPo(id) : undefined
+    );
+    const inspections = incomingInspections ?? [];
 
     useMrpQueryErrorRedirect(error, 'No se pudo cargar la orden de compra', '/mrp/purchase-orders');
     useMrpQueryErrorToast(warehousesError, 'No se pudieron cargar los almacenes');
+    useMrpQueryErrorToast(incomingInspectionsError, 'No se pudieron cargar las recepciones de la orden');
 
     const handleReceive = async () => {
         if (!id) return;
@@ -153,6 +167,54 @@ export default function PurchaseOrderDetailPage() {
             setDownloadingPdf(false);
         }
     };
+
+    const handleDownloadInvoice = async (inspectionId: string) => {
+        try {
+            setDownloadingInvoiceId(inspectionId);
+            const blob = await mrpApi.downloadIncomingInspectionEvidence(inspectionId, 'invoice');
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = `factura-${inspectionId.slice(0, 8).toUpperCase()}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(objectUrl);
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo descargar la factura'),
+                variant: 'destructive',
+            });
+        } finally {
+            setDownloadingInvoiceId(null);
+        }
+    };
+
+    const normalizedInvoiceKey = (inspection: NonNullable<typeof inspections>[number]) =>
+        [inspection.invoiceNumber?.trim() || '', inspection.invoiceFileName?.trim() || ''].join('|');
+
+    const invoiceGroups = inspections.reduce<Record<string, NonNullable<typeof inspections>[number][]>>((acc, inspection) => {
+        const key = normalizedInvoiceKey(inspection);
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(inspection);
+        return acc;
+    }, {});
+    const distinctInvoices = Object.keys(invoiceGroups).filter((key) => key !== '|');
+    const hasMultipleInvoices = distinctInvoices.length > 1;
+    const singleInvoice = distinctInvoices.length === 1 ? invoiceGroups[distinctInvoices[0]][0] : null;
+    const invoiceSummaries = distinctInvoices.map((key) => {
+        const rows = invoiceGroups[key] ?? [];
+        const sample = rows[0];
+        return {
+            key,
+            count: rows.length,
+            invoiceNumber: sample?.invoiceNumber || 'N/A',
+            invoiceFileName: sample?.invoiceFileName || 'Sin adjunto',
+            inspectionId: sample?.id,
+            hasFile: Boolean(sample?.invoiceFileName),
+        };
+    });
 
     if (loading) {
         return (
@@ -405,6 +467,130 @@ export default function PurchaseOrderDetailPage() {
                             </div>
                         </div>
                     )}
+
+                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <h2 className="text-lg font-bold text-slate-800">Trazabilidad de Facturas (Recepción)</h2>
+                            <span className="text-xs font-medium text-slate-500 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200">
+                                {inspections.length} {inspections.length === 1 ? 'recepción' : 'recepciones'}
+                            </span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            {loadingIncomingInspections ? (
+                                <div className="p-6 text-sm text-slate-500">Cargando recepciones...</div>
+                            ) : inspections.length === 0 ? (
+                                <div className="p-6 text-sm text-slate-500">Sin recepciones registradas.</div>
+                            ) : hasMultipleInvoices ? (
+                                <div className="p-6 space-y-3">
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                                        Se detectaron {distinctInvoices.length} facturas/remisiones distintas: {invoiceSummaries.map((row) => row.invoiceNumber).join(', ')}.
+                                    </div>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-slate-200">
+                                    <thead className="bg-slate-50">
+                                        <tr>
+                                            <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                Recepciones
+                                            </th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                Factura/Remisión N°
+                                            </th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                Archivo
+                                            </th>
+                                            <th className="px-6 py-4 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                Acciones
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-slate-100">
+                                        {invoiceSummaries.map((summary) => {
+                                            return (
+                                                <tr key={summary.key} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                        <div className="text-sm font-medium text-slate-900">
+                                                            {summary.count}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span className="text-sm text-slate-900 font-mono">
+                                                            {summary.invoiceNumber}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        <span className="text-sm text-slate-600">
+                                                            {summary.invoiceFileName}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled={!summary.hasFile || downloadingInvoiceId === summary.inspectionId}
+                                                            onClick={() => summary.inspectionId && handleDownloadInvoice(summary.inspectionId)}
+                                                            className="rounded-lg border-slate-200 text-xs h-8"
+                                                        >
+                                                            {downloadingInvoiceId === summary.inspectionId ? (
+                                                                <>
+                                                                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                                                    Descargando...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Download className="mr-2 h-3 w-3 text-slate-500" />
+                                                                    Descargar
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-6 space-y-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Factura/Remisión N°</div>
+                                            <div className="text-sm font-mono text-slate-900">
+                                                {singleInvoice?.invoiceNumber || 'N/A'}
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 md:col-span-2">
+                                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Archivo</div>
+                                            <div className="text-sm text-slate-700">
+                                                {singleInvoice?.invoiceFileName || 'Sin adjunto'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={!singleInvoice?.invoiceFileName || downloadingInvoiceId === singleInvoice?.id}
+                                            onClick={() => singleInvoice?.id && handleDownloadInvoice(singleInvoice.id)}
+                                            className="rounded-lg border-slate-200 text-xs h-8"
+                                        >
+                                            {downloadingInvoiceId === singleInvoice?.id ? (
+                                                <>
+                                                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                                    Descargando...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Download className="mr-2 h-3 w-3 text-slate-500" />
+                                                    Descargar
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6">

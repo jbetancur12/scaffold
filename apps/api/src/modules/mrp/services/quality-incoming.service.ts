@@ -476,6 +476,40 @@ export class QualityIncomingService {
         return row;
     }
 
+    async updateIncomingInspectionInvoiceNumber(id: string, payload: {
+        invoiceNumber: string;
+        reason: string;
+        actor?: string;
+    }) {
+        const row = await this.incomingInspectionRepo.findOneOrFail({ id });
+        const nextInvoice = payload.invoiceNumber.trim();
+        if (!nextInvoice) {
+            throw new AppError('Debes registrar un número de factura válido', 400);
+        }
+        const previousInvoice = row.invoiceNumber?.trim() || '';
+        if (previousInvoice === nextInvoice) {
+            throw new AppError('El número de factura es igual al actual', 409);
+        }
+
+        row.invoiceNumber = nextInvoice;
+        await this.em.persistAndFlush(row);
+
+        await this.logEvent({
+            entityType: 'incoming_inspection',
+            entityId: row.id,
+            action: 'invoice_number_updated',
+            actor: payload.actor,
+            notes: payload.reason,
+            metadata: {
+                previousInvoiceNumber: previousInvoice || undefined,
+                nextInvoiceNumber: nextInvoice,
+                status: row.status,
+            },
+        });
+
+        return row;
+    }
+
     async uploadIncomingInspectionEvidence(id: string, evidenceType: 'invoice' | 'certificate', payload: {
         fileName: string;
         mimeType: string;

@@ -39,17 +39,23 @@ html(lang="es")
       thead
         tr
           th Producto
-          th Variante
-          th Lote
-          th Serial
+          if showVariant
+            th Variante
+          if showLot
+            th Lote
+          if showSerial
+            th Serial
           th Cantidad
       tbody
         each item in items
           tr
             td= item.productName
-            td= item.variantName
-            td.mono= item.lotCode
-            td.mono= item.serialCode
+            if showVariant
+              td= item.variantName
+            if showLot
+              td.mono= item.lotCode
+            if showSerial
+              td.mono= item.serialCode
             td= item.quantity
     if notes
       .footer Notas: #{notes}
@@ -199,7 +205,16 @@ export class ShipmentPdfService {
     return date.toLocaleString('es-CO');
   }
 
-  async generateShipmentPdf(id: string) {
+  async generateShipmentPdf(
+    id: string,
+    options?: {
+      columns?: {
+        showVariant?: boolean;
+        showLot?: boolean;
+        showSerial?: boolean;
+      };
+    }
+  ) {
     const shipmentRepo = this.em.getRepository(Shipment);
     const shipment = await shipmentRepo.findOne(
       { id },
@@ -235,6 +250,9 @@ export class ShipmentPdfService {
       customerAddress: shipment.customer?.address || 'N/A',
       dispatchedBy: shipment.dispatchedBy || 'N/A',
       notes: shipment.notes || '',
+      showVariant: options?.columns?.showVariant ?? true,
+      showLot: options?.columns?.showLot ?? true,
+      showSerial: options?.columns?.showSerial ?? true,
       items,
     });
 

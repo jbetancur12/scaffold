@@ -1391,6 +1391,7 @@ export interface IncomingInspection {
     id: string;
     purchaseOrderId?: string;
     purchaseOrder?: Pick<PurchaseOrder, 'id'> & {
+        code?: string;
         supplier?: Pick<Supplier, 'id' | 'name'>;
     };
     purchaseOrderItemId?: string;

@@ -63,6 +63,7 @@ export const mrpQueryKeys = {
     qualityEquipmentHistory: (equipmentId: string) => `mrp.quality.equipment.history.${equipmentId}`,
     qualityOperationalAlerts: 'mrp.quality.operational-alerts',
     qualityAuditEvents: 'mrp.quality.audit-events',
+    qualityAuditEventsList: (filtersKey: string) => `mrp.quality.audit-events.${filtersKey}`,
     qualityTechnovigilanceCases: 'mrp.quality.technovigilance-cases',
     qualityRecalls: 'mrp.quality.recalls',
     qualityCustomers: 'mrp.quality.customers',
@@ -74,6 +75,7 @@ export const mrpQueryKeys = {
     qualityRiskControls: 'mrp.quality.risk-controls',
     qualityTrainingEvidence: 'mrp.quality.training-evidence',
     qualityIncomingInspections: 'mrp.quality.incoming-inspections',
+    qualityIncomingInspectionsByPo: (purchaseOrderId: string) => `mrp.quality.incoming-inspections.po.${purchaseOrderId}`,
     qualityBatchReleases: 'mrp.quality.batch-releases',
     qualityDocuments: 'mrp.quality.documents',
     qualityDocumentsList: (process?: string, category?: string, area?: string, status?: string) =>

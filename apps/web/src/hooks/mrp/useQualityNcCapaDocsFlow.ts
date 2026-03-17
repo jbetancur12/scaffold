@@ -44,7 +44,27 @@ export const useQualityNcCapaDocsFlow = () => {
 
     const { data: nonConformitiesData, loading: loadingNc } = useNonConformitiesQuery();
     const { data: capasData, loading: loadingCapas } = useCapasQuery();
-    const { data: auditData, loading: loadingAudit } = useQualityAuditQuery();
+    const [auditFilters, setAuditFilters] = useState<{
+        actions: string[];
+        dateFrom: string;
+        dateTo: string;
+        page: number;
+        limit: number;
+    }>({
+        actions: [],
+        dateFrom: '',
+        dateTo: '',
+        page: 1,
+        limit: 50,
+    });
+
+    const { data: auditData, loading: loadingAudit } = useQualityAuditQuery({
+        actions: auditFilters.actions.length ? auditFilters.actions : undefined,
+        dateFrom: auditFilters.dateFrom || undefined,
+        dateTo: auditFilters.dateTo || undefined,
+        page: auditFilters.page,
+        limit: auditFilters.limit,
+    });
     const { data: documentsData, loading: loadingDocuments } = useControlledDocumentsQuery();
 
     const { execute: createNc, loading: creatingNc } = useCreateNonConformityMutation();
@@ -83,7 +103,10 @@ export const useQualityNcCapaDocsFlow = () => {
 
     const nonConformities = nonConformitiesData ?? [];
     const capas = capasData ?? [];
-    const audits = auditData ?? [];
+    const audits = auditData?.data ?? [];
+    const auditTotal = auditData?.total ?? 0;
+    const auditPage = auditData?.page ?? auditFilters.page;
+    const auditLimit = auditData?.limit ?? auditFilters.limit;
     const documents = documentsData ?? [];
     const requiresInitialControlDocument = documents.length === 0;
     const openNc = nonConformities.filter((n) => n.status !== NonConformityStatus.CERRADA);
@@ -304,8 +327,13 @@ export const useQualityNcCapaDocsFlow = () => {
     return {
         nonConformities,
         capas,
-        audits,
         documents,
+        audits,
+        auditTotal,
+        auditPage,
+        auditLimit,
+        auditFilters,
+        setAuditFilters,
         requiresInitialControlDocument,
         openNc,
         ncForm,

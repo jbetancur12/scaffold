@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Truck, Users, Plus, X, Save, Trash2, Download } from 'lucide-react';
 import type { QualityComplianceModel } from '../types';
 import { mrpApi } from '@/services/mrpApi';
@@ -20,6 +21,14 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
     const [showCustomerForm, setShowCustomerForm] = useState(false);
     const [showShipmentForm, setShowShipmentForm] = useState(false);
     const [targetItemIndex, setTargetItemIndex] = useState(0);
+    const [pdfOptionsOpen, setPdfOptionsOpen] = useState(false);
+    const [pdfTarget, setPdfTarget] = useState<{ id: string; commercialDocument?: string } | null>(null);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
+    const [pdfColumns, setPdfColumns] = useState({
+        variant: true,
+        lot: true,
+        serial: true,
+    });
 
     useEffect(() => {
         if (targetItemIndex >= model.shipmentForm.items.length) {
@@ -36,9 +45,14 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
         setShowShipmentForm(false);
     };
 
-    const handleDownloadShipmentPdf = async (shipmentId: string, commercialDocument?: string) => {
+    const handleDownloadShipmentPdf = async (
+        shipmentId: string,
+        commercialDocument?: string,
+        columns?: string[]
+    ) => {
         try {
-            const blob = await mrpApi.getShipmentPdf(shipmentId);
+            setDownloadingPdf(true);
+            const blob = await mrpApi.getShipmentPdf(shipmentId, columns ? { columns } : undefined);
             const objectUrl = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = objectUrl;
@@ -49,7 +63,24 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
             URL.revokeObjectURL(objectUrl);
         } catch (err) {
             toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo generar la remisión'), variant: 'destructive' });
+        } finally {
+            setDownloadingPdf(false);
         }
+    };
+
+    const openPdfOptions = (shipmentId: string, commercialDocument?: string) => {
+        setPdfTarget({ id: shipmentId, commercialDocument });
+        setPdfOptionsOpen(true);
+    };
+
+    const confirmPdfDownload = async () => {
+        if (!pdfTarget) return;
+        const columns = ['product', 'quantity'];
+        if (pdfColumns.variant) columns.push('variant');
+        if (pdfColumns.lot) columns.push('lot');
+        if (pdfColumns.serial) columns.push('serial');
+        await handleDownloadShipmentPdf(pdfTarget.id, pdfTarget.commercialDocument, columns);
+        setPdfOptionsOpen(false);
     };
 
     const inputClass = 'h-10 rounded-xl border-slate-200 focus-visible:ring-violet-500';
@@ -343,7 +374,7 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleDownloadShipmentPdf(shipment.id, shipment.commercialDocument)}
+                                    onClick={() => openPdfOptions(shipment.id, shipment.commercialDocument)}
                                     className="rounded-xl h-7 text-xs border-slate-200"
                                 >
                                     <Download className="h-3.5 w-3.5 mr-1" />Remisión PDF
@@ -364,6 +395,56 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
                     ))}
                 </div>
             </div>
+
+            <Dialog open={pdfOptionsOpen} onOpenChange={setPdfOptionsOpen}>
+                <DialogContent className="sm:max-w-[520px]">
+                    <DialogHeader>
+                        <DialogTitle>Columnas de la remisión</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        <p className="text-sm text-slate-500">
+                            Selecciona las columnas opcionales. Producto y Cantidad siempre se incluyen.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={pdfColumns.variant}
+                                    onChange={(e) => setPdfColumns((prev) => ({ ...prev, variant: e.target.checked }))}
+                                    className="h-4 w-4 rounded border-slate-300"
+                                />
+                                Variante
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={pdfColumns.lot}
+                                    onChange={(e) => setPdfColumns((prev) => ({ ...prev, lot: e.target.checked }))}
+                                    className="h-4 w-4 rounded border-slate-300"
+                                />
+                                Lote
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={pdfColumns.serial}
+                                    onChange={(e) => setPdfColumns((prev) => ({ ...prev, serial: e.target.checked }))}
+                                    className="h-4 w-4 rounded border-slate-300"
+                                />
+                                Serial
+                            </label>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setPdfOptionsOpen(false)}>
+                            Cancelar
+                        </Button>
+                        <Button type="button" onClick={confirmPdfDownload} disabled={downloadingPdf}>
+                            {downloadingPdf ? 'Generando...' : 'Descargar PDF'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </TabsContent>
     );
 }

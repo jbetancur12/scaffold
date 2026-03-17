@@ -273,11 +273,37 @@ export class QualityService {
         return capa;
     }
 
-    async listAuditEvents(entityType?: string, entityId?: string) {
+    async listAuditEvents(filters: {
+        entityType?: string;
+        entityId?: string;
+        actor?: string;
+        actions?: string[];
+        dateFrom?: Date;
+        dateTo?: Date;
+        page?: number;
+        limit?: number;
+    }) {
         const query: FilterQuery<QualityAuditEvent> = {};
-        if (entityType) query.entityType = entityType;
-        if (entityId) query.entityId = entityId;
-        return this.auditRepo.find(query, { orderBy: { createdAt: 'DESC' }, limit: 200 });
+        if (filters.entityType) query.entityType = filters.entityType;
+        if (filters.entityId) query.entityId = filters.entityId;
+        if (filters.actor) query.actor = filters.actor;
+        if (filters.actions?.length) {
+            query.action = { $in: filters.actions };
+        }
+        if (filters.dateFrom || filters.dateTo) {
+            query.createdAt = {};
+            if (filters.dateFrom) query.createdAt.$gte = filters.dateFrom;
+            if (filters.dateTo) query.createdAt.$lte = filters.dateTo;
+        }
+
+        const page = filters.page || 1;
+        const limit = filters.limit || 50;
+        const [data, total] = await this.auditRepo.findAndCount(query, {
+            orderBy: { createdAt: 'DESC' },
+            limit,
+            offset: (page - 1) * limit,
+        });
+        return { data, total, page, limit };
     }
 
     async createTechnovigilanceCase(payload: {
@@ -723,6 +749,14 @@ export class QualityService {
         actor?: string;
     }) {
         return this.incomingService.correctResolvedIncomingInspectionCost(id, payload);
+    }
+
+    async updateIncomingInspectionInvoiceNumber(id: string, payload: {
+        invoiceNumber: string;
+        reason: string;
+        actor?: string;
+    }) {
+        return this.incomingService.updateIncomingInspectionInvoiceNumber(id, payload);
     }
 
     async uploadIncomingInspectionEvidence(id: string, evidenceType: 'invoice' | 'certificate', payload: {

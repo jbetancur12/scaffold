@@ -18,6 +18,10 @@ const auditEntityLabels: Record<string, string> = {
   quality_training_evidence: 'Capacitación',
   dmr_template: 'Plantilla DMR',
   batch_dhr: 'Expediente DHR',
+  customer: 'Cliente',
+  batch_release: 'Liberación de lote',
+  shipment: 'Despacho',
+  raw_material_lot: 'Lote de materia prima',
 };
 
 const auditActionLabels: Record<string, string> = {
@@ -38,6 +42,11 @@ const auditActionLabels: Record<string, string> = {
   signed: 'Liberación firmada',
   reopened: 'Liberación reabierta',
   generated: 'Generado',
+  invoice_number_updated: 'Factura actualizada',
+  evidence_uploaded: 'Evidencia cargada',
+  raw_material_consumed_by_production: 'Materia prima consumida',
+  finished_inspection_form_updated: 'Inspección final actualizada',
+  packaging_form_updated: 'Formato de empaque actualizado',
 };
 
 const actionColors: Record<string, string> = {
@@ -47,6 +56,12 @@ const actionColors: Record<string, string> = {
   closed: 'bg-slate-100 text-slate-600 border-slate-200',
   signed: 'bg-amber-50 text-amber-700 border-amber-200',
   reported_invima: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+  invoice_number_updated: 'bg-blue-50 text-blue-700 border-blue-200',
+  checklist_updated: 'bg-blue-50 text-blue-700 border-blue-200',
+  reopened: 'bg-rose-50 text-rose-700 border-rose-200',
+  raw_material_consumed_by_production: 'bg-orange-50 text-orange-700 border-orange-200',
+  finished_inspection_form_updated: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  packaging_form_updated: 'bg-sky-50 text-sky-700 border-sky-200',
 };
 
 const shortId = (value?: string) => {
@@ -68,6 +83,8 @@ const formatAuditMetadata = (
     quantityRejected: 'Rechazado', quantity: 'Cantidad',
     coveragePercent: 'Cobertura (%)', reportNumber: 'Nro. reporte',
     reportChannel: 'Canal reporte',
+    previousInvoiceNumber: 'Factura anterior',
+    nextInvoiceNumber: 'Factura nueva',
   };
   const knownKeys = Object.keys(metadataLabels);
   const values = knownKeys
@@ -95,6 +112,21 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
     }
     return acc;
   }, {});
+  const customerLabelsById = (model.customers ?? []).reduce<Record<string, string>>((acc, customer) => {
+    if (customer?.id && customer.name) {
+      const doc = [customer.documentType, customer.documentNumber].filter(Boolean).join(' ');
+      acc[customer.id] = doc ? `${customer.name} (${doc})` : customer.name;
+    }
+    return acc;
+  }, {});
+  const auditFilters = model.auditFilters;
+  const auditTotal = model.auditTotal;
+  const auditPage = model.auditPage;
+  const auditLimit = model.auditLimit;
+  const totalPages = Math.max(1, Math.ceil(auditTotal / auditLimit));
+  const showingFrom = auditTotal === 0 ? 0 : (auditPage - 1) * auditLimit + 1;
+  const showingTo = Math.min(auditPage * auditLimit, auditTotal);
+  const actionOptions = Object.keys(auditActionLabels).sort();
 
   return (
     <TabsContent value="audit" className="space-y-5">
@@ -115,7 +147,7 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
         </div>
         <div className="grid grid-cols-2 divide-x divide-slate-100 border-t border-slate-100">
           <div className="flex flex-col items-center py-3 px-4">
-            <span className="text-2xl font-bold text-slate-700">{model.audits.length}</span>
+            <span className="text-2xl font-bold text-slate-700">{auditTotal}</span>
             <span className="text-xs text-slate-500 font-medium mt-0.5">Eventos registrados</span>
           </div>
           <div className="flex flex-col items-center py-3 px-4">
@@ -127,12 +159,67 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
         </div>
       </div>
 
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <div className="md:col-span-2 space-y-1.5">
+            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Eventos</label>
+            <select
+              multiple
+              value={auditFilters.actions}
+              onChange={(e) => {
+                const selected = Array.from(e.target.selectedOptions).map((option) => option.value);
+                model.setAuditFilters((prev) => ({
+                  ...prev,
+                  actions: selected,
+                  page: 1,
+                }));
+              }}
+              className="h-24 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+            >
+              {actionOptions.map((action) => (
+                <option key={action} value={action}>
+                  {auditActionLabels[action] || action}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-slate-400">Usa Ctrl/Cmd para seleccionar varios eventos.</p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Desde</label>
+            <input
+              type="date"
+              value={auditFilters.dateFrom}
+              onChange={(e) => model.setAuditFilters((prev) => ({ ...prev, dateFrom: e.target.value, page: 1 }))}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-500 uppercase tracking-wide">Hasta</label>
+            <input
+              type="date"
+              value={auditFilters.dateTo}
+              onChange={(e) => model.setAuditFilters((prev) => ({ ...prev, dateTo: e.target.value, page: 1 }))}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500"
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={() => model.setAuditFilters({ actions: [], dateFrom: '', dateTo: '', page: 1, limit: auditLimit })}
+            className="text-xs font-medium text-slate-500 hover:text-slate-700"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
       {/* Audit log */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
           <FileSearch className="h-4 w-4 text-violet-500" />
           <h3 className="font-semibold text-slate-800">Eventos de auditoría</h3>
-          <span className="text-xs font-semibold text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5">{model.audits.length}</span>
+          <span className="text-xs font-semibold text-slate-500 bg-slate-100 rounded-full px-2.5 py-0.5">{auditTotal}</span>
         </div>
         <div className="p-4 space-y-2">
           {model.loadingAudit ? (
@@ -154,7 +241,11 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-sm font-semibold text-slate-800">{auditEntityLabels[a.entityType] || a.entityType}</span>
-                  <span className="text-xs font-mono text-slate-400" title={a.entityId}>{shortId(a.entityId)}</span>
+                  {a.entityType === 'customer' && customerLabelsById[a.entityId] ? (
+                    <span className="text-xs text-slate-500" title={a.entityId}>{customerLabelsById[a.entityId]}</span>
+                  ) : (
+                    <span className="text-xs font-mono text-slate-400" title={a.entityId}>{shortId(a.entityId)}</span>
+                  )}
                   {a.actor && <span className="text-xs text-slate-500">por <span className="font-medium text-slate-700">{a.actor}</span></span>}
                 </div>
                 {a.metadata && (
@@ -162,10 +253,39 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
                     {formatAuditMetadata(a.metadata, rawMaterialLabelsById)}
                   </p>
                 )}
+                {a.notes && (
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed italic">
+                    Motivo: {a.notes}
+                  </p>
+                )}
               </div>
               <span className="shrink-0 text-[11px] text-slate-400 mt-0.5">{new Date(a.createdAt).toLocaleString('es-CO')}</span>
             </div>
           ))}
+          {model.audits.length > 0 && (
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-slate-500">
+              <span>Mostrando {showingFrom}-{showingTo} de {auditTotal}</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => model.setAuditFilters((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                  disabled={auditPage <= 1}
+                  className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Anterior
+                </button>
+                <span>Página {auditPage} de {totalPages}</span>
+                <button
+                  type="button"
+                  onClick={() => model.setAuditFilters((prev) => ({ ...prev, page: Math.min(totalPages, prev.page + 1) }))}
+                  disabled={auditPage >= totalPages}
+                  className="rounded-lg border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </TabsContent>

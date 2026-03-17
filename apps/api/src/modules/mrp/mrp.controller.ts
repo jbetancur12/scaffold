@@ -125,6 +125,7 @@ import {
     CorrectIncomingInspectionCostSchema,
     IncomingInspectionEvidenceTypeSchema,
     UploadIncomingInspectionEvidenceSchema,
+    UpdateIncomingInspectionInvoiceSchema,
     UpsertBatchReleaseChecklistSchema,
     SignBatchReleaseSchema,
     ListBatchReleasesQuerySchema,
@@ -1438,8 +1439,25 @@ export class MrpController {
     async listQualityAudit(req: Request, res: Response, next: NextFunction) {
         try {
             const q = ListQualityAuditQuerySchema.parse(req.query);
-            const rows = await this.qualityService.listAuditEvents(q.entityType, q.entityId);
-            return ApiResponse.success(res, rows);
+            const dateFrom = q.dateFrom ? new Date(q.dateFrom) : undefined;
+            const dateTo = q.dateTo ? new Date(q.dateTo) : undefined;
+            if (dateFrom) {
+                dateFrom.setHours(0, 0, 0, 0);
+            }
+            if (dateTo) {
+                dateTo.setHours(23, 59, 59, 999);
+            }
+            const result = await this.qualityService.listAuditEvents({
+                entityType: q.entityType,
+                entityId: q.entityId,
+                actor: q.actor,
+                actions: q.actions,
+                dateFrom,
+                dateTo,
+                page: q.page || 1,
+                limit: q.limit || 50,
+            });
+            return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
         }
@@ -1643,7 +1661,19 @@ export class MrpController {
     async downloadShipmentPdf(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const pdf = await this.shipmentPdfService.generateShipmentPdf(id);
+            const rawColumns = typeof req.query.columns === 'string' ? req.query.columns.trim() : '';
+            const columnSet = rawColumns
+                ? new Set(rawColumns.split(',').map((value) => value.trim()).filter(Boolean))
+                : null;
+            const pdf = await this.shipmentPdfService.generateShipmentPdf(id, columnSet
+                ? {
+                    columns: {
+                        showVariant: columnSet.has('variant'),
+                        showLot: columnSet.has('lot'),
+                        showSerial: columnSet.has('serial'),
+                    },
+                }
+                : undefined);
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
             return res.send(pdf.buffer);
@@ -1909,6 +1939,17 @@ export class MrpController {
             const payload = CorrectIncomingInspectionCostSchema.parse(req.body);
             const row = await this.qualityService.correctResolvedIncomingInspectionCost(id, payload);
             return ApiResponse.success(res, row, 'Costo de recepción corregido');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateIncomingInspectionInvoiceNumber(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateIncomingInspectionInvoiceSchema.parse(req.body);
+            const row = await this.qualityService.updateIncomingInspectionInvoiceNumber(id, payload);
+            return ApiResponse.success(res, row, 'Factura de recepción actualizada');
         } catch (error) {
             next(error);
         }

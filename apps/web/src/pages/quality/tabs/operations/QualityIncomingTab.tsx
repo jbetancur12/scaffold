@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ControlledDocument, DocumentCategory, IncomingInspectionResult, IncomingInspectionStatus, NonConformityStatus, OperationalConfig, QualitySeverity, UserRole } from '@scaffold/types';
 import { TabsContent } from '@/components/ui/tabs';
@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/use-toast';
 import { IncomingInspectionEvidenceType, mrpApi } from '@/services/mrpApi';
-import { useControlledDocumentsQuery } from '@/hooks/mrp/useQuality';
+import { useControlledDocumentsQuery, useUpdateIncomingInspectionInvoiceMutation } from '@/hooks/mrp/useQuality';
 import { useOperationalConfigQuery, useSaveOperationalConfigMutation } from '@/hooks/mrp/useOperationalConfig';
-import { Settings } from 'lucide-react';
+import { Pencil, Settings } from 'lucide-react';
 import { getErrorMessage } from '@/lib/api-error';
 import { useHasRole } from '@/components/auth/RoleGuard';
 import type { QualityComplianceModel } from '../types';
@@ -40,6 +42,9 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
   const [showCostAdjustment, setShowCostAdjustment] = useState(false);
   const [auditFilter, setAuditFilter] = useState<'all' | 'pending' | 'blocked' | 'complete'>('all');
   const [auditSearch, setAuditSearch] = useState('');
+  const [invoiceEditOpen, setInvoiceEditOpen] = useState(false);
+  const [invoiceEditTarget, setInvoiceEditTarget] = useState<QualityComplianceModel['incomingInspections'][number] | null>(null);
+  const [invoiceEditForm, setInvoiceEditForm] = useState({ invoiceNumber: '', reason: '' });
   const [resolverForm, setResolverForm] = useState<{
     inspectionResult: IncomingInspectionResult;
     quantityAccepted: string;
@@ -85,6 +90,7 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
   });
   const { data: operationalConfig } = useOperationalConfigQuery();
   const { execute: saveOperationalConfig, loading: savingReceptionDocSetting } = useSaveOperationalConfigMutation();
+  const { execute: updateInvoiceNumber, loading: updatingInvoiceNumber } = useUpdateIncomingInspectionInvoiceMutation();
   const latestDocByCode = useMemo(
     () =>
       (controlledDocumentsAll ?? []).reduce<Record<string, ControlledDocument>>((acc, doc) => {
@@ -183,6 +189,42 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
   const isConditionalPending = (inspection: NonNullable<typeof model.incomingInspections>[number]) =>
     inspection.status === IncomingInspectionStatus.PENDIENTE &&
     inspection.inspectionResult === IncomingInspectionResult.CONDICIONAL;
+
+  const openInvoiceEdit = (inspection: NonNullable<typeof model.incomingInspections>[number]) => {
+    setInvoiceEditTarget(inspection);
+    setInvoiceEditForm({
+      invoiceNumber: inspection.invoiceNumber || '',
+      reason: '',
+    });
+    setInvoiceEditOpen(true);
+  };
+
+  const confirmInvoiceEdit = async () => {
+    if (!invoiceEditTarget) return;
+    const invoiceNumber = invoiceEditForm.invoiceNumber.trim();
+    const reason = invoiceEditForm.reason.trim();
+    if (!invoiceNumber) {
+      toast({ title: 'Error', description: 'Debes registrar un número de factura válido', variant: 'destructive' });
+      return;
+    }
+    if (reason.length < 5) {
+      toast({ title: 'Error', description: 'Debes registrar un motivo de al menos 5 caracteres', variant: 'destructive' });
+      return;
+    }
+    try {
+      await updateInvoiceNumber({
+        id: invoiceEditTarget.id,
+        invoiceNumber,
+        reason,
+        actor: 'sistema-web',
+      });
+      await model.refetchIncomingInspections();
+      setInvoiceEditOpen(false);
+      toast({ title: 'Factura actualizada', description: 'El número de factura fue corregido.' });
+    } catch (error) {
+      toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo actualizar la factura'), variant: 'destructive' });
+    }
+  };
 
   const downloadFor28Pdf = async (inspectionId: string) => {
     try {
@@ -580,7 +622,7 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                           <button type="button" className="underline text-violet-600 hover:text-violet-800 font-medium"
                             onClick={() => navigate(`/mrp/purchase-orders/${inspection.purchaseOrderId}`)}
                             title={inspection.purchaseOrderId}>
-                            OC-{inspection.purchaseOrderId.slice(0, 8).toUpperCase()}
+                            {inspection.purchaseOrder?.code || `OC-${inspection.purchaseOrderId.slice(0, 8).toUpperCase()}`}
                           </button>
                         ) : 'N/A'}
                         &nbsp;·&nbsp;Proveedor:{' '}
@@ -678,7 +720,6 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                         { label: 'Formato', value: `${inspection.documentControlCode || 'N/A'} v${inspection.documentControlVersion || 1}` },
                         { label: 'Costo unitario', value: inspection.acceptedUnitCost ?? 'N/A' },
                         { label: 'Lote proveedor', value: inspection.supplierLotCode || 'N/A', mono: true },
-                        { label: 'Factura N°', value: inspection.invoiceNumber || 'N/A', mono: true },
                         { label: 'Archivo factura', value: inspection.invoiceFileName || 'Sin adjunto' },
                         { label: 'Archivo certificado', value: inspection.certificateFileName || 'Sin adjunto' },
                         { label: 'Notas', value: inspection.notes || 'Sin notas' },
@@ -692,6 +733,24 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
                           <p className={`text-slate-700 font-semibold truncate mt-0.5 ${mono ? 'font-mono' : ''}`}>{String(value)}</p>
                         </div>
                       ))}
+                      <div>
+                        <span className="text-slate-400 font-medium">Factura N°</span>
+                        <div className="mt-0.5 flex items-center gap-2">
+                          <span className="text-slate-700 font-semibold font-mono truncate">{inspection.invoiceNumber || 'N/A'}</span>
+                          {canManageIncoming ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openInvoiceEdit(inspection)}
+                              title="Editar factura"
+                              className="h-6 w-6 text-slate-500 hover:text-slate-700"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
                     {inspection.purchaseOrderItemId && (
                       <div className="mt-3 text-xs text-slate-500 font-mono">
@@ -856,6 +915,43 @@ export function QualityIncomingTab({ model }: { model: QualityComplianceModel })
           })}
         </div>
       )}
+
+      <Dialog open={invoiceEditOpen} onOpenChange={setInvoiceEditOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Editar número de factura</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600 uppercase tracking-wide">Factura / remisión N°</Label>
+              <Input
+                value={invoiceEditForm.invoiceNumber}
+                onChange={(e) => setInvoiceEditForm((prev) => ({ ...prev, invoiceNumber: e.target.value }))}
+                className="h-10 rounded-xl border-slate-200 focus-visible:ring-violet-500"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-600 uppercase tracking-wide">Motivo de corrección</Label>
+              <Textarea
+                rows={3}
+                value={invoiceEditForm.reason}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
+                  setInvoiceEditForm((prev) => ({ ...prev, reason: e.target.value }))
+                }
+                className="rounded-xl border-slate-200 focus-visible:ring-violet-500"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setInvoiceEditOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={confirmInvoiceEdit} disabled={updatingInvoiceNumber}>
+              {updatingInvoiceNumber ? 'Guardando...' : 'Actualizar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TabsContent>
   );
 }

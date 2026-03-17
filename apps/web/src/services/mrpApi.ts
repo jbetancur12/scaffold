@@ -1094,8 +1094,20 @@ export const mrpApi = {
         const response = await api.get<EquipmentAlert[]>('/mrp/quality/equipment-alerts', { params: { daysAhead } });
         return response.data;
     },
-    listQualityAuditEvents: async (filters?: { entityType?: string; entityId?: string }): Promise<AuditEvent[]> => {
-        const response = await api.get<AuditEvent[]>('/mrp/quality/audit-events', { params: filters });
+    listQualityAuditEvents: async (filters?: {
+        entityType?: string;
+        entityId?: string;
+        actor?: string;
+        actions?: string[];
+        dateFrom?: string;
+        dateTo?: string;
+        page?: number;
+        limit?: number;
+    }): Promise<{ data: AuditEvent[]; total: number; page: number; limit: number }> => {
+        const response = await api.get<{ data: AuditEvent[]; total: number; page: number; limit: number }>(
+            '/mrp/quality/audit-events',
+            { params: filters }
+        );
         return response.data;
     },
     createTechnovigilanceCase: async (data: CreateTechnovigilanceCasePayload): Promise<TechnovigilanceCase> => {
@@ -1193,8 +1205,11 @@ export const mrpApi = {
         const response = await api.get<Shipment[]>('/mrp/quality/shipments', { params: filters });
         return response.data;
     },
-    getShipmentPdf: async (id: string): Promise<Blob> => {
-        const response = await api.get(`/mrp/quality/shipments/${id}/pdf`, { responseType: 'blob' });
+    getShipmentPdf: async (id: string, options?: { columns?: string[] }): Promise<Blob> => {
+        const response = await api.get(`/mrp/quality/shipments/${id}/pdf`, {
+            responseType: 'blob',
+            params: options?.columns?.length ? { columns: options.columns.join(',') } : undefined,
+        });
         return response.data as Blob;
     },
     listRecallAffectedCustomers: async (recallCaseId: string): Promise<RecallAffectedCustomer[]> => {
@@ -1331,6 +1346,13 @@ export const mrpApi = {
     },
     correctIncomingInspectionCost: async (id: string, data: CorrectIncomingInspectionCostPayload): Promise<IncomingInspection> => {
         const response = await api.patch<IncomingInspection>(`/mrp/quality/incoming-inspections/${id}/correct-cost`, data);
+        return response.data;
+    },
+    updateIncomingInspectionInvoiceNumber: async (
+        id: string,
+        data: { invoiceNumber: string; reason: string; actor?: string }
+    ): Promise<IncomingInspection> => {
+        const response = await api.patch<IncomingInspection>(`/mrp/quality/incoming-inspections/${id}/invoice-number`, data);
         return response.data;
     },
     upsertBatchReleaseChecklist: async (data: UpsertBatchReleaseChecklistPayload): Promise<BatchRelease> => {

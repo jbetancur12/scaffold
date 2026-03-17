@@ -841,9 +841,28 @@ export const CreateChangeControlApprovalSchema = z.object({
     actor: z.string().optional(),
 });
 
-export const ListQualityAuditQuerySchema = z.object({
+const AuditActionsQuerySchema = z.preprocess((value) => {
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return undefined;
+        return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+    }
+    return undefined;
+}, z.array(z.string().min(1)).optional());
+
+const OptionalDateQuerySchema = z.preprocess((value) => {
+    if (value === '' || value === null || value === undefined) return undefined;
+    return value;
+}, z.coerce.date().optional());
+
+export const ListQualityAuditQuerySchema = PaginationQuerySchema.extend({
     entityType: z.string().optional(),
     entityId: z.string().optional(),
+    actor: z.string().optional(),
+    actions: AuditActionsQuerySchema,
+    dateFrom: OptionalDateQuerySchema,
+    dateTo: OptionalDateQuerySchema,
 });
 
 export const CreateTechnovigilanceCaseSchema = z.object({
@@ -1229,6 +1248,12 @@ export const UploadIncomingInspectionEvidenceSchema = z.object({
     actor: z.string().optional(),
 });
 
+export const UpdateIncomingInspectionInvoiceSchema = z.object({
+    invoiceNumber: z.string().min(1),
+    reason: z.string().min(5),
+    actor: z.string().optional(),
+});
+
 export const UpsertBatchReleaseChecklistSchema = z.object({
     productionBatchId: z.string().uuid(),
     qcApproved: z.boolean(),
@@ -1605,6 +1630,7 @@ export type CreateQualityTrainingEvidencePayload = DateInputValue<z.input<typeof
 export type ResolveIncomingInspectionPayload = DateInputValue<z.input<typeof ResolveIncomingInspectionSchema>>;
 export type CorrectIncomingInspectionCostPayload = DateInputValue<z.input<typeof CorrectIncomingInspectionCostSchema>>;
 export type UploadIncomingInspectionEvidencePayload = DateInputValue<z.input<typeof UploadIncomingInspectionEvidenceSchema>>;
+export type UpdateIncomingInspectionInvoicePayload = DateInputValue<z.input<typeof UpdateIncomingInspectionInvoiceSchema>>;
 export type UploadProductImagePayload = DateInputValue<z.input<typeof UploadProductImageSchema>>;
 export type UpdatePriceListConfigPayload = DateInputValue<z.input<typeof UpdatePriceListConfigSchema>>;
 export type UpsertBatchReleaseChecklistPayload = DateInputValue<z.input<typeof UpsertBatchReleaseChecklistSchema>>;
