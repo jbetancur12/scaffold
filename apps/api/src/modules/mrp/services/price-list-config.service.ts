@@ -64,7 +64,7 @@ export class PriceListConfigService {
         });
         await this.em.persistAndFlush(row);
         const after = this.buildSnapshot(row);
-        await this.logAudit(row.id, 'updated', { before, after }, actor);
+        await this.logAudit(row.id, 'updated', { before, after, label: row.headerTitle || 'Lista de precios' }, actor);
         return row;
     }
 }

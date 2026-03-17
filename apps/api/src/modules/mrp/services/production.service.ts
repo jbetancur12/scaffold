@@ -1695,7 +1695,7 @@ export class ProductionService {
             }
 
             await tx.flush();
-            await this.logAudit('production_order', order.id, 'status_updated', { status }, actor);
+            await this.logAudit('production_order', order.id, 'status_updated', { status, code: order.code }, actor);
             return order;
         });
     }

@@ -338,7 +338,7 @@ export class SalesOrderService {
 
             await tx.persistAndFlush(order);
             const after = this.buildAuditSnapshot(order);
-            await this.logAudit(tx, order.id, 'updated', { before, after }, actor);
+            await this.logAudit(tx, order.id, 'updated', { code: order.code, before, after }, actor);
             return order;
         });
     }

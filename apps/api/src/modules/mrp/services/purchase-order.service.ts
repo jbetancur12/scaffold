@@ -272,7 +272,7 @@ export class PurchaseOrderService {
 
             await tx.persistAndFlush(purchaseOrder);
             const after = this.buildAuditSnapshot(purchaseOrder);
-            await this.logAudit(tx, purchaseOrder.id, 'updated', { before, after }, actor);
+            await this.logAudit(tx, purchaseOrder.id, 'updated', { code: purchaseOrder.code, before, after }, actor);
             return purchaseOrder;
         });
     }

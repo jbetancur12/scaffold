@@ -589,7 +589,11 @@ export class MrpService {
         await this.em.persistAndFlush(bomItem);
         await this.logAudit(bomItem.id, 'bom_item_created', {
             variantId: variant.id,
+            variantName: variant.name,
+            variantSku: variant.sku,
             rawMaterialId: rawMaterial.id,
+            rawMaterialName: rawMaterial.name,
+            rawMaterialSku: rawMaterial.sku,
             rawMaterialSpecificationId: specification?.id,
             quantity: bomItem.quantity,
             usageNote: bomItem.usageNote,
@@ -612,7 +616,11 @@ export class MrpService {
         const item = await this.bomItemRepo.findOneOrFail({ id });
         const before = {
             variantId: item.variantId,
+            variantName: item.variant?.name,
+            variantSku: item.variant?.sku,
             rawMaterialId: item.rawMaterial?.id,
+            rawMaterialName: item.rawMaterial?.name,
+            rawMaterialSku: item.rawMaterial?.sku,
             rawMaterialSpecificationId: item.rawMaterialSpecification?.id,
             quantity: item.quantity,
             usageNote: item.usageNote,
@@ -638,7 +646,11 @@ export class MrpService {
         await this.em.persistAndFlush(item);
         const after = {
             variantId: item.variantId,
+            variantName: item.variant?.name,
+            variantSku: item.variant?.sku,
             rawMaterialId: item.rawMaterial?.id,
+            rawMaterialName: item.rawMaterial?.name,
+            rawMaterialSku: item.rawMaterial?.sku,
             rawMaterialSpecificationId: item.rawMaterialSpecification?.id,
             quantity: item.quantity,
             usageNote: item.usageNote,
@@ -657,7 +669,11 @@ export class MrpService {
 
         await this.logAudit(item.id, 'bom_item_deleted', {
             variantId: item.variantId,
+            variantName: item.variant?.name,
+            variantSku: item.variant?.sku,
             rawMaterialId: item.rawMaterial?.id,
+            rawMaterialName: item.rawMaterial?.name,
+            rawMaterialSku: item.rawMaterial?.sku,
             rawMaterialSpecificationId: item.rawMaterialSpecification?.id,
             quantity: item.quantity,
             usageNote: item.usageNote,

@@ -682,7 +682,7 @@ export class QuotationService {
             this.recalculateHeader(quotation);
             await tx.flush();
             const after = this.buildAuditSnapshot(quotation);
-            await this.logAudit(tx, quotation.id, 'updated', { before, after }, actor);
+            await this.logAudit(tx, quotation.id, 'updated', { code: quotation.code, before, after }, actor);
             return this.getById(quotation.id);
         });
     }

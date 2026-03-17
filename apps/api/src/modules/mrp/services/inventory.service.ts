@@ -9,6 +9,7 @@ import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 import { WarehouseSchema, InventoryItemSchema } from '@scaffold/schemas';
 import { WarehouseType } from '@scaffold/types';
 import { z } from 'zod';
+import { ProductVariant } from '../entities/product-variant.entity';
 
 export class InventoryService {
     private readonly em: EntityManager;
@@ -16,6 +17,8 @@ export class InventoryService {
     private readonly warehouseRepo: EntityRepository<Warehouse>;
     private readonly rawMaterialLotRepo: EntityRepository<RawMaterialLot>;
     private readonly rawMaterialKardexRepo: EntityRepository<RawMaterialKardex>;
+    private readonly rawMaterialRepo: EntityRepository<RawMaterial>;
+    private readonly variantRepo: EntityRepository<ProductVariant>;
     private readonly auditRepo: EntityRepository<QualityAuditEvent>;
 
     constructor(em: EntityManager) {
@@ -24,6 +27,8 @@ export class InventoryService {
         this.warehouseRepo = em.getRepository(Warehouse);
         this.rawMaterialLotRepo = em.getRepository(RawMaterialLot);
         this.rawMaterialKardexRepo = em.getRepository(RawMaterialKardex);
+        this.rawMaterialRepo = em.getRepository(RawMaterial);
+        this.variantRepo = em.getRepository(ProductVariant);
         this.auditRepo = em.getRepository(QualityAuditEvent);
     }
 
@@ -95,13 +100,25 @@ export class InventoryService {
         }
 
         await this.em.persistAndFlush(inventoryItem);
+        const [warehouse, rawMaterial, variant] = await Promise.all([
+            data.warehouseId ? this.warehouseRepo.findOne({ id: data.warehouseId }) : Promise.resolve(null),
+            data.rawMaterialId ? this.rawMaterialRepo.findOne({ id: data.rawMaterialId }) : Promise.resolve(null),
+            data.variantId ? this.variantRepo.findOne({ id: data.variantId }) : Promise.resolve(null),
+        ]);
+        const label = rawMaterial?.name || variant?.name || warehouse?.name;
         await this.logAudit('inventory', inventoryItem.id, 'stock_updated', {
             warehouseId: data.warehouseId,
+            warehouseName: warehouse?.name,
             rawMaterialId: data.rawMaterialId,
+            rawMaterialName: rawMaterial?.name,
+            rawMaterialSku: rawMaterial?.sku,
             rawMaterialSpecificationId: data.rawMaterialSpecificationId,
             variantId: data.variantId,
+            variantName: variant?.name,
+            variantSku: variant?.sku,
             previousQuantity,
             quantity: inventoryItem.quantity,
+            label,
         }, actor);
         return inventoryItem;
     }
@@ -223,15 +240,20 @@ export class InventoryService {
 
         // 6. Save
         await this.em.persistAndFlush([inventory, rawMaterial, lot, kardex]);
+        const label = rawMaterial.name || warehouse.name;
         await this.logAudit('inventory', inventory.id, 'manual_stock_added', {
             warehouseId: warehouse.id,
+            warehouseName: warehouse.name,
             rawMaterialId: rawMaterial.id,
+            rawMaterialName: rawMaterial.name,
+            rawMaterialSku: rawMaterial.sku,
             previousQuantity: currentStock,
             quantity: inventory.quantity,
             addedQuantity: addedQty,
             unitCost: addedCost,
             averageCost: rawMaterial.averageCost,
             lotId: lot.id,
+            label,
         }, actor);
         return inventory;
     }

@@ -6,6 +6,8 @@ import { PurchaseRequisitionItem } from '../entities/purchase-requisition-item.e
 import { RawMaterial } from '../entities/raw-material.entity';
 import { Supplier } from '../entities/supplier.entity';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
+import { PurchaseOrder } from '../entities/purchase-order.entity';
+import { ProductionOrder } from '../entities/production-order.entity';
 
 export class PurchaseRequisitionService {
     private auditRepo: EntityRepository<QualityAuditEvent>;
@@ -75,10 +77,16 @@ export class PurchaseRequisitionService {
         }
 
         await this.em.persistAndFlush(requisition);
+        let productionOrderCode: string | undefined;
+        if (requisition.productionOrderId) {
+            const order = await this.em.findOne(ProductionOrder, { id: requisition.productionOrderId }, { fields: ['code'] as never });
+            productionOrderCode = order?.code;
+        }
         await this.logAudit(requisition.id, 'created', {
             status: requisition.status,
             requestedBy: requisition.requestedBy,
             productionOrderId: requisition.productionOrderId,
+            productionOrderCode,
             itemsCount: requisition.items.length,
         }, actor);
         return this.getById(requisition.id);
@@ -126,10 +134,12 @@ export class PurchaseRequisitionService {
         row.status = PurchaseRequisitionStatus.CONVERTIDA;
         row.convertedPurchaseOrderId = purchaseOrderId;
         await this.em.persistAndFlush(row);
+        const purchaseOrder = await this.em.findOne(PurchaseOrder, { id: purchaseOrderId }, { fields: ['code'] as never });
         await this.logAudit(row.id, 'converted', {
             previousStatus,
             status: row.status,
             purchaseOrderId,
+            purchaseOrderCode: purchaseOrder?.code,
         }, actor);
         return this.getById(id);
     }

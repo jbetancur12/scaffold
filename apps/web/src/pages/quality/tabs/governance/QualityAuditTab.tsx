@@ -157,6 +157,20 @@ const formatAuditMetadata = (
     unitCost: 'Costo unitario',
     averageCost: 'Costo promedio',
     lotId: 'Lote',
+    purchaseOrderCode: 'Orden compra',
+    purchaseRequisitionLabel: 'Requisición',
+    salesOrderCode: 'Pedido cliente',
+    productionOrderCode: 'Orden producción',
+    quotationCode: 'Cotización',
+    customerName: 'Cliente',
+    supplierName: 'Proveedor',
+    warehouseName: 'Bodega',
+    rawMaterialName: 'Materia prima',
+    rawMaterialSku: 'SKU materia prima',
+    variantName: 'Variante',
+    variantSku: 'SKU variante',
+    productName: 'Producto',
+    productSku: 'SKU producto',
   };
   const knownKeys = Object.keys(metadataLabels);
   const values = knownKeys
@@ -265,6 +279,12 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
     ...salesOrderLabelsById,
     ...productionOrderLabelsById,
     ...purchaseRequisitionLabelsById,
+  };
+  const resolveEntityLabel = (audit: { entityId: string; metadata?: Record<string, unknown> }) => {
+    if (labelsById[audit.entityId]) return labelsById[audit.entityId];
+    const meta = audit.metadata || {};
+    const fallback = meta.code || meta.name || meta.title || meta.label || meta.purchaseOrderCode || meta.salesOrderCode || meta.productionOrderCode || meta.quotationCode || meta.customerName || meta.supplierName;
+    return typeof fallback === 'string' && fallback.trim() ? fallback : null;
   };
   const auditFilters = model.auditFilters;
   const auditTotal = model.auditTotal;
@@ -421,8 +441,8 @@ export function QualityAuditTab({ model }: { model: QualityComplianceModel }) {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-sm font-semibold text-slate-800">{auditEntityLabels[a.entityType] || a.entityType}</span>
-                  {labelsById[a.entityId] ? (
-                    <span className="text-xs text-slate-500" title={a.entityId}>{labelsById[a.entityId]}</span>
+                  {resolveEntityLabel(a) ? (
+                    <span className="text-xs text-slate-500" title={a.entityId}>{resolveEntityLabel(a)}</span>
                   ) : (
                     <span className="text-xs text-slate-400">Sin referencia</span>
                   )}
