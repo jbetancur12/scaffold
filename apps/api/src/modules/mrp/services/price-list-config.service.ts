@@ -22,11 +22,12 @@ export class PriceListConfigService {
         };
     }
 
-    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>) {
+    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>, actor?: string) {
         const event = this.auditRepo.create({
             entityType: 'price_list_config',
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await this.em.persistAndFlush(event);
@@ -50,7 +51,7 @@ export class PriceListConfigService {
         return created;
     }
 
-    async updateConfig(data: Partial<PriceListConfig>): Promise<PriceListConfig> {
+    async updateConfig(data: Partial<PriceListConfig>, actor?: string): Promise<PriceListConfig> {
         const row = await this.getConfig();
         const before = this.buildSnapshot(row);
         this.repo.assign(row, {
@@ -63,7 +64,7 @@ export class PriceListConfigService {
         });
         await this.em.persistAndFlush(row);
         const after = this.buildSnapshot(row);
-        await this.logAudit(row.id, 'updated', { before, after });
+        await this.logAudit(row.id, 'updated', { before, after }, actor);
         return row;
     }
 }

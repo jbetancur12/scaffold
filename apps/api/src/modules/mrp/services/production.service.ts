@@ -275,7 +275,11 @@ export class ProductionService {
         };
     }
 
-    async createOrder(data: z.infer<typeof ProductionOrderSchema>, itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[]): Promise<ProductionOrder> {
+    async createOrder(
+        data: z.infer<typeof ProductionOrderSchema>,
+        itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[],
+        actor?: string
+    ): Promise<ProductionOrder> {
         // Ensure dates are properly instantiated as Date objects and handle potential string inputs
         const orderData = { ...data };
         if (!orderData.code?.trim()) {
@@ -322,11 +326,11 @@ export class ProductionService {
             status: order.status,
             salesOrderId: order.salesOrder?.id,
             itemsCount: order.items.length,
-        });
+        }, actor);
         return order;
     }
 
-    async linkSalesOrder(productionOrderId: string, salesOrderId: string | null): Promise<ProductionOrder> {
+    async linkSalesOrder(productionOrderId: string, salesOrderId: string | null, actor?: string): Promise<ProductionOrder> {
         return this.em.transactional(async (tx) => {
             const order = await tx.getRepository(ProductionOrder).findOneOrFail({ id: productionOrderId }, { populate: ['salesOrder'] });
             const oldSalesOrderId = order.salesOrder?.id;
@@ -350,7 +354,7 @@ export class ProductionService {
                     previousSalesOrderId: oldSalesOrderId,
                     salesOrderId,
                     code: order.code,
-                }, tx);
+                }, actor, tx);
             }
 
             return order;
@@ -423,7 +427,7 @@ export class ProductionService {
         );
     }
 
-    async createBatch(orderId: string, payload: { variantId: string; plannedQty: number; code?: string; notes?: string }) {
+    async createBatch(orderId: string, payload: { variantId: string; plannedQty: number; code?: string; notes?: string }, actor?: string) {
         await this.assertProcessDocument(DocumentProcess.PRODUCCION);
         await this.assertNoBlockingCriticalChanges(orderId);
         const order = await this.productionOrderRepo.findOneOrFail(
@@ -476,7 +480,7 @@ export class ProductionService {
             orderId: orderId,
             code: batch.code,
             plannedQty: batch.plannedQty,
-        });
+        }, actor);
         return this.batchRepo.findOneOrFail(
             { id: batch.id },
             { populate: ['variant', 'variant.product', 'units'] }
@@ -511,7 +515,7 @@ export class ProductionService {
         );
     }
 
-    async addBatchUnits(batchId: string, quantity: number) {
+    async addBatchUnits(batchId: string, quantity: number, actor?: string) {
         const mode = await this.getTraceabilityMode();
         if (mode === 'lote') {
             throw new AppError('La generación de unidades seriales está deshabilitada en modo lote', 400);
@@ -536,11 +540,11 @@ export class ProductionService {
 
         batch.producedQty = this.calculateProducedQtyFromUnits(batch);
         await this.em.persistAndFlush(batch);
-        await this.logAudit('production_batch', batch.id, 'units_added', { quantity });
+        await this.logAudit('production_batch', batch.id, 'units_added', { quantity }, actor);
         return this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['variant', 'units'] });
     }
 
-    async setBatchQc(batchId: string, passed: boolean) {
+    async setBatchQc(batchId: string, passed: boolean, actor?: string) {
         const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units', 'productionOrder'] });
         this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'aprobar QC de lote');
         batch.qcStatus = passed ? ProductionBatchQcStatus.PASSED : ProductionBatchQcStatus.FAILED;
@@ -554,11 +558,11 @@ export class ProductionService {
         if (!passed) {
             await this.reopenBatchReleaseIfNeeded(batch.id, 'Cambio de QC del lote');
         }
-        await this.logAudit('production_batch', batch.id, 'qc_updated', { passed });
+        await this.logAudit('production_batch', batch.id, 'qc_updated', { passed }, actor);
         return batch;
     }
 
-    async setBatchPackaging(batchId: string, packed: boolean) {
+    async setBatchPackaging(batchId: string, packed: boolean, actor?: string) {
         const mode = await this.getTraceabilityMode();
         const batch = await this.batchRepo.findOneOrFail({ id: batchId }, { populate: ['units', 'productionOrder'] });
         this.assertOrderInProgressForBatchActions(batch.productionOrder.status, 'empacar lote');
@@ -603,7 +607,7 @@ export class ProductionService {
         if (!packed) {
             await this.reopenBatchReleaseIfNeeded(batch.id, 'Cambio de estado de empaque del lote');
         }
-        await this.logAudit('production_batch', batch.id, 'packaging_updated', { packed });
+        await this.logAudit('production_batch', batch.id, 'packaging_updated', { packed }, actor);
         return batch;
     }
 
@@ -693,7 +697,7 @@ export class ProductionService {
             controlledDocumentCode: batch.finishedInspectionFormDocumentCode,
             controlledDocumentVersion: batch.finishedInspectionFormDocumentVersion,
             actor: payload.actor || payload.inspectorName,
-        });
+        }, payload.actor || payload.inspectorName);
         return batch;
     }
 
@@ -752,7 +756,7 @@ export class ProductionService {
         }
     }
 
-    async setBatchUnitQc(unitId: string, passed: boolean) {
+    async setBatchUnitQc(unitId: string, passed: boolean, actor?: string) {
         const mode = await this.getTraceabilityMode();
         if (mode === 'lote') {
             throw new AppError('El QC por unidad serial está deshabilitado en modo lote', 400);
@@ -767,11 +771,11 @@ export class ProductionService {
         if (!passed) {
             await this.reopenBatchReleaseIfNeeded(unit.batch.id, 'Cambio de QC en unidad serial');
         }
-        await this.logAudit('production_batch_unit', unit.id, 'qc_updated', { passed });
+        await this.logAudit('production_batch_unit', unit.id, 'qc_updated', { passed }, actor);
         return unit;
     }
 
-    async setBatchUnitPackaging(unitId: string, packaged: boolean) {
+    async setBatchUnitPackaging(unitId: string, packaged: boolean, actor?: string) {
         const mode = await this.getTraceabilityMode();
         if (mode === 'lote') {
             throw new AppError('El empaque por unidad serial está deshabilitado en modo lote', 400);
@@ -787,7 +791,7 @@ export class ProductionService {
         if (!packaged) {
             await this.reopenBatchReleaseIfNeeded(unit.batch.id, 'Cambio de empaque en unidad serial');
         }
-        await this.logAudit('production_batch_unit', unit.id, 'packaging_updated', { packaged });
+        await this.logAudit('production_batch_unit', unit.id, 'packaging_updated', { packaged }, actor);
         return unit;
     }
 
@@ -864,7 +868,7 @@ export class ProductionService {
             controlledDocumentCode: batch.packagingFormDocumentCode,
             controlledDocumentVersion: batch.packagingFormDocumentVersion,
             actor: payload.actor || payload.operatorName,
-        });
+        }, payload.actor || payload.operatorName);
         return batch;
     }
 
@@ -1245,7 +1249,7 @@ export class ProductionService {
                 lotId: lot.id,
                 quantity: Number(payload.quantity),
                 actor: payload.actor,
-            });
+            }, payload.actor);
 
             return {
                 productionOrderId: order.id,
@@ -1258,7 +1262,7 @@ export class ProductionService {
         });
     }
 
-    async updateStatus(id: string, status: ProductionOrderStatus, warehouseId?: string): Promise<ProductionOrder> {
+    async updateStatus(id: string, status: ProductionOrderStatus, warehouseId?: string, actor?: string): Promise<ProductionOrder> {
         return this.em.transactional(async (tx) => {
             const productionOrderRepo = tx.getRepository(ProductionOrder);
             const inventoryRepo = tx.getRepository(InventoryItem);
@@ -1614,7 +1618,7 @@ export class ProductionService {
                             productionOrderCode: order.code,
                             rawMaterialId: materialId,
                             required: Number(requirement.required),
-                        });
+                        }, actor);
                     }
                 }
 
@@ -1691,7 +1695,7 @@ export class ProductionService {
             }
 
             await tx.flush();
-            await this.logAudit('production_order', order.id, 'status_updated', { status });
+            await this.logAudit('production_order', order.id, 'status_updated', { status }, actor);
             return order;
         });
     }
@@ -1738,12 +1742,20 @@ export class ProductionService {
         }
     }
 
-    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>, manager?: EntityManager) {
+    private async logAudit(
+        entityType: string,
+        entityId: string,
+        action: string,
+        metadata?: Record<string, unknown>,
+        actor?: string,
+        manager?: EntityManager
+    ) {
         const repo = (manager ?? this.em).getRepository(QualityAuditEvent);
         const event = repo.create({
             entityType,
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await (manager ?? this.em).persistAndFlush(event);

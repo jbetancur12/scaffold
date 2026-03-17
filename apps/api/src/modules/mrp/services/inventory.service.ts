@@ -27,25 +27,26 @@ export class InventoryService {
         this.auditRepo = em.getRepository(QualityAuditEvent);
     }
 
-    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>) {
+    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>, actor?: string) {
         const event = this.auditRepo.create({
             entityType,
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await this.em.persistAndFlush(event);
     }
 
 
-    async createWarehouse(data: z.infer<typeof WarehouseSchema>): Promise<Warehouse> {
+    async createWarehouse(data: z.infer<typeof WarehouseSchema>, actor?: string): Promise<Warehouse> {
         const warehouse = this.warehouseRepo.create(data as unknown as Warehouse);
         await this.em.persistAndFlush(warehouse);
         await this.logAudit('warehouse', warehouse.id, 'created', {
             name: warehouse.name,
             type: warehouse.type,
             location: warehouse.location,
-        });
+        }, actor);
         return warehouse;
     }
 
@@ -57,27 +58,27 @@ export class InventoryService {
         return this.warehouseRepo.findOneOrFail({ id });
     }
 
-    async updateWarehouse(id: string, data: Partial<z.infer<typeof WarehouseSchema>>): Promise<Warehouse> {
+    async updateWarehouse(id: string, data: Partial<z.infer<typeof WarehouseSchema>>, actor?: string): Promise<Warehouse> {
         const warehouse = await this.getWarehouse(id);
         const before = { name: warehouse.name, type: warehouse.type, location: warehouse.location };
         Object.assign(warehouse, data);
         await this.em.persistAndFlush(warehouse);
         const after = { name: warehouse.name, type: warehouse.type, location: warehouse.location };
-        await this.logAudit('warehouse', warehouse.id, 'updated', { before, after });
+        await this.logAudit('warehouse', warehouse.id, 'updated', { before, after }, actor);
         return warehouse;
     }
 
-    async deleteWarehouse(id: string): Promise<void> {
+    async deleteWarehouse(id: string, actor?: string): Promise<void> {
         const warehouse = await this.getWarehouse(id);
         await this.em.removeAndFlush(warehouse);
         await this.logAudit('warehouse', id, 'deleted', {
             name: warehouse.name,
             type: warehouse.type,
             location: warehouse.location,
-        });
+        }, actor);
     }
 
-    async updateStock(data: z.infer<typeof InventoryItemSchema>): Promise<InventoryItem> {
+    async updateStock(data: z.infer<typeof InventoryItemSchema>, actor?: string): Promise<InventoryItem> {
         // Build query based on whether it's raw material or variant
         const query: FilterQuery<InventoryItem> = { warehouse: data.warehouseId };
         if (data.rawMaterialId) query.rawMaterial = data.rawMaterialId;
@@ -101,7 +102,7 @@ export class InventoryService {
             variantId: data.variantId,
             previousQuantity,
             quantity: inventoryItem.quantity,
-        });
+        }, actor);
         return inventoryItem;
     }
 
@@ -137,7 +138,7 @@ export class InventoryService {
         return { items, total };
     }
 
-    async addManualStock(data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }): Promise<InventoryItem> {
+    async addManualStock(data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }, actor?: string): Promise<InventoryItem> {
         // 1. Get or create warehouse
         let warehouse: Warehouse | null = null;
         if (data.warehouseId) {
@@ -231,7 +232,7 @@ export class InventoryService {
             unitCost: addedCost,
             averageCost: rawMaterial.averageCost,
             lotId: lot.id,
-        });
+        }, actor);
         return inventory;
     }
 

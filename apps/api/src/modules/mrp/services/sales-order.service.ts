@@ -42,13 +42,15 @@ export class SalesOrderService {
         manager: EntityManager,
         entityId: string,
         action: string,
-        metadata?: Record<string, unknown>
+        metadata?: Record<string, unknown>,
+        actor?: string
     ) {
         const repo = manager.getRepository(QualityAuditEvent);
         const event = repo.create({
             entityType: 'sales_order',
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await manager.persistAndFlush(event);
@@ -169,7 +171,7 @@ export class SalesOrderService {
         return this.attachSourceQuotation(order, this.em);
     }
 
-    async createSalesOrder(data: CreateSalesOrderPayload): Promise<SalesOrder> {
+    async createSalesOrder(data: CreateSalesOrderPayload, actor?: string): Promise<SalesOrder> {
         return this.em.transactional(async (tx) => {
             const customer = await tx.getRepository(Customer).findOneOrFail({ id: data.customerId });
 
@@ -261,12 +263,12 @@ export class SalesOrderService {
                 totalAmount: salesOrder.totalAmount,
                 netTotalAmount: salesOrder.netTotalAmount,
                 itemsCount: salesOrder.items?.length ?? 0,
-            });
+            }, actor);
             return salesOrder;
         });
     }
 
-    async updateSalesOrder(id: string, data: CreateSalesOrderPayload): Promise<SalesOrder> {
+    async updateSalesOrder(id: string, data: CreateSalesOrderPayload, actor?: string): Promise<SalesOrder> {
         return this.em.transactional(async (tx) => {
             const salesOrderRepo = tx.getRepository(SalesOrder);
             const customerRepo = tx.getRepository(Customer);
@@ -336,12 +338,12 @@ export class SalesOrderService {
 
             await tx.persistAndFlush(order);
             const after = this.buildAuditSnapshot(order);
-            await this.logAudit(tx, order.id, 'updated', { before, after });
+            await this.logAudit(tx, order.id, 'updated', { before, after }, actor);
             return order;
         });
     }
 
-    async updateSalesOrderStatus(id: string, status: SalesOrderStatus): Promise<SalesOrder> {
+    async updateSalesOrderStatus(id: string, status: SalesOrderStatus, actor?: string): Promise<SalesOrder> {
         return this.em.transactional(async (tx) => {
             const order = await tx.getRepository(SalesOrder).findOneOrFail(
                 { id },
@@ -373,12 +375,12 @@ export class SalesOrderService {
                 status: order.status,
                 customerId: order.customer?.id,
                 createdProductionOrderId,
-            });
+            }, actor);
             return order;
         });
     }
 
-    async cancelSalesOrderWithSettlement(id: string, payload: CancelSalesOrderWithSettlementPayload): Promise<SalesOrder> {
+    async cancelSalesOrderWithSettlement(id: string, payload: CancelSalesOrderWithSettlementPayload, actor?: string): Promise<SalesOrder> {
         return this.em.transactional(async (tx) => {
             const order = await tx.getRepository(SalesOrder).findOneOrFail(
                 { id },
@@ -561,7 +563,7 @@ export class SalesOrderService {
                 totalRejected,
                 totalCancelled,
                 warehouseId: warehouse.id,
-            });
+            }, actor);
             return this.getSalesOrderById(order.id);
         });
     }

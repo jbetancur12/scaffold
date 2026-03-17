@@ -14,11 +14,12 @@ export class PurchaseRequisitionService {
         this.auditRepo = em.getRepository(QualityAuditEvent);
     }
 
-    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>) {
+    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>, actor?: string) {
         const event = this.auditRepo.create({
             entityType: 'purchase_requisition',
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await this.em.persistAndFlush(event);
@@ -41,7 +42,7 @@ export class PurchaseRequisitionService {
                 quantity: number;
             }>;
         }>;
-    }) {
+    }, actor?: string) {
         const normalizedProductionOrderIds = Array.from(
             new Set((data.productionOrderIds ?? []).filter((row) => row?.trim()).map((row) => row.trim()))
         );
@@ -79,7 +80,7 @@ export class PurchaseRequisitionService {
             requestedBy: requisition.requestedBy,
             productionOrderId: requisition.productionOrderId,
             itemsCount: requisition.items.length,
-        });
+        }, actor);
         return this.getById(requisition.id);
     }
 
@@ -104,7 +105,7 @@ export class PurchaseRequisitionService {
         });
     }
 
-    async updateStatus(id: string, status: PurchaseRequisitionStatus) {
+    async updateStatus(id: string, status: PurchaseRequisitionStatus, actor?: string) {
         const row = await this.em.findOneOrFail(PurchaseRequisition, { id });
         const previousStatus = row.status;
         if (row.status === PurchaseRequisitionStatus.CONVERTIDA && status !== PurchaseRequisitionStatus.CONVERTIDA) {
@@ -115,11 +116,11 @@ export class PurchaseRequisitionService {
         await this.logAudit(row.id, 'status_updated', {
             previousStatus,
             status: row.status,
-        });
+        }, actor);
         return this.getById(id);
     }
 
-    async markConverted(id: string, purchaseOrderId: string) {
+    async markConverted(id: string, purchaseOrderId: string, actor?: string) {
         const row = await this.em.findOneOrFail(PurchaseRequisition, { id });
         const previousStatus = row.status;
         row.status = PurchaseRequisitionStatus.CONVERTIDA;
@@ -129,7 +130,7 @@ export class PurchaseRequisitionService {
             previousStatus,
             status: row.status,
             purchaseOrderId,
-        });
+        }, actor);
         return this.getById(id);
     }
 }

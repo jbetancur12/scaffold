@@ -45,13 +45,15 @@ export class PurchaseOrderService {
         manager: EntityManager,
         entityId: string,
         action: string,
-        metadata?: Record<string, unknown>
+        metadata?: Record<string, unknown>,
+        actor?: string
     ) {
         const repo = manager.getRepository(QualityAuditEvent);
         const event = repo.create({
             entityType: 'purchase_order',
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await manager.persistAndFlush(event);
@@ -165,7 +167,7 @@ export class PurchaseOrderService {
         purchaseOrder.netTotalAmount = netTotalAmount;
     }
 
-    async createPurchaseOrder(data: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
+    async createPurchaseOrder(data: CreatePurchaseOrderDto, actor?: string): Promise<PurchaseOrder> {
         const controlDocument = await this.resolvePurchaseOrderControlDocument(data.controlledDocumentId);
 
         return this.em.transactional(async (tx) => {
@@ -229,12 +231,12 @@ export class PurchaseOrderService {
                 totalAmount: purchaseOrder.totalAmount,
                 netTotalAmount: purchaseOrder.netTotalAmount,
                 currency: purchaseOrder.currency,
-            });
+            }, actor);
             return purchaseOrder;
         });
     }
 
-    async updatePurchaseOrder(id: string, data: CreatePurchaseOrderDto): Promise<PurchaseOrder> {
+    async updatePurchaseOrder(id: string, data: CreatePurchaseOrderDto, actor?: string): Promise<PurchaseOrder> {
         const controlDocument = await this.resolvePurchaseOrderControlDocument(data.controlledDocumentId);
 
         return this.em.transactional(async (tx) => {
@@ -270,7 +272,7 @@ export class PurchaseOrderService {
 
             await tx.persistAndFlush(purchaseOrder);
             const after = this.buildAuditSnapshot(purchaseOrder);
-            await this.logAudit(tx, purchaseOrder.id, 'updated', { before, after });
+            await this.logAudit(tx, purchaseOrder.id, 'updated', { before, after }, actor);
             return purchaseOrder;
         });
     }
@@ -366,7 +368,7 @@ export class PurchaseOrderService {
         return { data, total, page, limit };
     }
 
-    async updateStatus(id: string, status: PurchaseOrderStatus): Promise<PurchaseOrder> {
+    async updateStatus(id: string, status: PurchaseOrderStatus, actor?: string): Promise<PurchaseOrder> {
         const purchaseOrder = await this.purchaseOrderRepo.findOneOrFail({ id });
         const previousStatus = purchaseOrder.status;
         purchaseOrder.status = status;
@@ -380,11 +382,11 @@ export class PurchaseOrderService {
             previousStatus,
             status: purchaseOrder.status,
             code: purchaseOrder.code,
-        });
+        }, actor);
         return purchaseOrder;
     }
 
-    async receivePurchaseOrder(id: string, warehouseId?: string): Promise<PurchaseOrder> {
+    async receivePurchaseOrder(id: string, warehouseId?: string, actor?: string): Promise<PurchaseOrder> {
         return this.em.transactional(async (tx) => {
             const purchaseOrderRepo = tx.getRepository(PurchaseOrder);
             const purchaseOrder = await purchaseOrderRepo.findOneOrFail(
@@ -417,7 +419,7 @@ export class PurchaseOrderService {
                 code: purchaseOrder.code,
                 status: purchaseOrder.status,
                 receivedDate: purchaseOrder.receivedDate,
-            });
+            }, actor);
             return purchaseOrder;
         });
     }
@@ -559,7 +561,7 @@ export class PurchaseOrderService {
         });
     }
 
-    async cancelPurchaseOrder(id: string): Promise<void> {
+    async cancelPurchaseOrder(id: string, actor?: string): Promise<void> {
         const purchaseOrder = await this.purchaseOrderRepo.findOneOrFail({ id });
         const previousStatus = purchaseOrder.status;
 
@@ -573,6 +575,6 @@ export class PurchaseOrderService {
             code: purchaseOrder.code,
             previousStatus,
             status: purchaseOrder.status,
-        });
+        }, actor);
     }
 }

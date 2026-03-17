@@ -61,11 +61,12 @@ export class ProductService {
         };
     }
 
-    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>) {
+    private async logAudit(entityType: string, entityId: string, action: string, metadata?: Record<string, unknown>, actor?: string) {
         const event = this.auditRepo.create({
             entityType,
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await this.em.persistAndFlush(event);
@@ -445,7 +446,7 @@ export class ProductService {
         await this.em.persistAndFlush(variant);
     }
 
-    async createProduct(data: z.infer<typeof ProductSchema>): Promise<Product> {
+    async createProduct(data: z.infer<typeof ProductSchema>, actor?: string): Promise<Product> {
         const { invimaRegistrationId, categoryId, ...productData } = data;
         let invimaRegistration: InvimaRegistration | undefined;
         let category: ProductGroup | undefined;
@@ -469,11 +470,11 @@ export class ProductService {
             invimaRegistration,
         } as unknown as Product);
         await this.em.persistAndFlush(product);
-        await this.logAudit('product', product.id, 'created', this.buildProductSnapshot(product));
+        await this.logAudit('product', product.id, 'created', this.buildProductSnapshot(product), actor);
         return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category', 'images'] });
     }
 
-    async createProductGroup(data: z.infer<typeof ProductGroupSchema>): Promise<ProductGroup> {
+    async createProductGroup(data: z.infer<typeof ProductGroupSchema>, actor?: string): Promise<ProductGroup> {
         const parent = data.parentId
             ? await this.productGroupRepo.findOneOrFail({ id: data.parentId })
             : undefined;
@@ -492,7 +493,7 @@ export class ProductService {
             slug: row.slug,
             parentId: row.parent?.id,
             active: row.active,
-        });
+        }, actor);
         return this.productGroupRepo.findOneOrFail({ id: row.id }, { populate: ['parent'] });
     }
 
@@ -507,7 +508,7 @@ export class ProductService {
         });
     }
 
-    async updateProductGroup(id: string, data: z.infer<typeof UpdateProductGroupSchema>): Promise<ProductGroup> {
+    async updateProductGroup(id: string, data: z.infer<typeof UpdateProductGroupSchema>, actor?: string): Promise<ProductGroup> {
         const row = await this.productGroupRepo.findOneOrFail({ id }, { populate: ['parent'] });
         let parent = row.parent;
         if ('parentId' in data) {
@@ -532,11 +533,11 @@ export class ProductService {
             slug: row.slug,
             parentId: row.parent?.id,
             active: row.active,
-        });
+        }, actor);
         return this.productGroupRepo.findOneOrFail({ id: row.id }, { populate: ['parent'] });
     }
 
-    async deleteProductGroup(id: string): Promise<void> {
+    async deleteProductGroup(id: string, actor?: string): Promise<void> {
         const row = await this.productGroupRepo.findOneOrFail({ id }, { populate: ['children', 'products'] });
         if (row.children.length > 0) {
             throw new AppError('No puedes eliminar un grupo que tiene subgrupos', 409);
@@ -547,11 +548,11 @@ export class ProductService {
         await this.logAudit('product_group', row.id, 'deleted', {
             name: row.name,
             slug: row.slug,
-        });
+        }, actor);
         await this.em.removeAndFlush(row);
     }
 
-    async updateProduct(id: string, data: z.infer<typeof UpdateProductSchema>): Promise<Product> {
+    async updateProduct(id: string, data: z.infer<typeof UpdateProductSchema>, actor?: string): Promise<Product> {
         const product = await this.productRepo.findOneOrFail({ id }, { populate: ['invimaRegistration', 'category'] });
         let invimaRegistration = product.invimaRegistration;
         let category = product.category;
@@ -592,11 +593,11 @@ export class ProductService {
         });
         await this.em.persistAndFlush(product);
         const after = this.buildProductSnapshot(product);
-        await this.logAudit('product', product.id, 'updated', { before, after });
+        await this.logAudit('product', product.id, 'updated', { before, after }, actor);
         return this.productRepo.findOneOrFail({ id: product.id }, { populate: ['invimaRegistration', 'variants', 'category', 'images'] });
     }
 
-    async deleteProduct(id: string): Promise<void> {
+    async deleteProduct(id: string, actor?: string): Promise<void> {
         const product = await this.productRepo.findOneOrFail({ id }, { populate: ['variants', 'variants.bomItems', 'images'] });
         const images = product.images?.getItems() ?? [];
         for (const image of images) {
@@ -605,20 +606,20 @@ export class ProductService {
         await this.logAudit('product', product.id, 'deleted', {
             sku: product.sku,
             name: product.name,
-        });
+        }, actor);
         await this.em.removeAndFlush(product);
     }
 
-    async createVariant(productId: string, data: Partial<ProductVariant>): Promise<ProductVariant> {
+    async createVariant(productId: string, data: Partial<ProductVariant>, actor?: string): Promise<ProductVariant> {
         const product = await this.productRepo.findOneOrFail({ id: productId });
         const variant = this.variantRepo.create({ ...this.enrichVariantPricing(data), product } as unknown as ProductVariant);
         await this.em.persistAndFlush(variant);
         await this.calculateVariantCost(variant.id);
-        await this.logAudit('product_variant', variant.id, 'created', this.buildVariantSnapshot(variant));
+        await this.logAudit('product_variant', variant.id, 'created', this.buildVariantSnapshot(variant), actor);
         return variant;
     }
 
-    async updateVariant(variantId: string, data: Partial<ProductVariant>): Promise<ProductVariant> {
+    async updateVariant(variantId: string, data: Partial<ProductVariant>, actor?: string): Promise<ProductVariant> {
         const variant = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['product'] });
         const before = this.buildVariantSnapshot(variant);
         this.variantRepo.assign(variant, this.enrichVariantPricing(data, variant));
@@ -626,25 +627,25 @@ export class ProductService {
         await this.calculateVariantCost(variant.id);
         const refreshed = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['product'] });
         const after = this.buildVariantSnapshot(refreshed);
-        await this.logAudit('product_variant', variantId, 'updated', { before, after });
+        await this.logAudit('product_variant', variantId, 'updated', { before, after }, actor);
         if (Number(before.price) !== Number(after.price)) {
             await this.logAudit('product_variant', variantId, 'price_updated', {
                 sku: after.sku,
                 productId: after.productId,
                 previousPrice: before.price,
                 price: after.price,
-            });
+            }, actor);
         }
         return variant;
     }
 
-    async deleteVariant(variantId: string): Promise<void> {
+    async deleteVariant(variantId: string, actor?: string): Promise<void> {
         const variant = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['bomItems', 'product'] });
         await this.logAudit('product_variant', variant.id, 'deleted', {
             sku: variant.sku,
             name: variant.name,
             productId: (variant.product as Product | undefined)?.id,
-        });
+        }, actor);
         await this.em.removeAndFlush(variant);
     }
 
@@ -677,7 +678,7 @@ export class ProductService {
         return { products, total };
     }
 
-    async uploadProductImage(productId: string, payload: z.infer<typeof UploadProductImageSchema>): Promise<ProductImage> {
+    async uploadProductImage(productId: string, payload: z.infer<typeof UploadProductImageSchema>, actor?: string): Promise<ProductImage> {
         const product = await this.productRepo.findOneOrFail({ id: productId });
         const buffer = this.decodeBase64Data(payload.base64Data);
         const maxBytes = 8 * 1024 * 1024; // 8 MB
@@ -707,7 +708,7 @@ export class ProductService {
         await this.logAudit('product', product.id, 'image_uploaded', {
             fileName: image.fileName,
             sortOrder: image.sortOrder,
-        });
+        }, actor);
         return image;
     }
 
@@ -724,14 +725,14 @@ export class ProductService {
         };
     }
 
-    async deleteProductImage(productId: string, imageId: string): Promise<void> {
+    async deleteProductImage(productId: string, imageId: string, actor?: string): Promise<void> {
         const image = await this.productImageRepo.findOneOrFail({ id: imageId }, { populate: ['product'] });
         if (image.product.id !== productId) {
             throw new AppError('Imagen no encontrada para este producto', 404);
         }
         await this.logAudit('product', image.product.id, 'image_deleted', {
             fileName: image.fileName,
-        });
+        }, actor);
         await this.storageService.deleteObject(image.filePath);
         await this.em.removeAndFlush(image);
     }
@@ -977,7 +978,7 @@ export class ProductService {
             variantsToCreate: response.variantsToCreate,
             variantsToUpdate: response.variantsToUpdate,
             totalRows: response.totalRows,
-        });
+        }, actor);
         return response;
     }
 

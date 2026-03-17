@@ -157,20 +157,21 @@ export class SupplierService {
         };
     }
 
-    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>) {
+    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>, actor?: string) {
         const event = this.auditRepo.create({
             entityType: 'supplier',
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await this.em.persistAndFlush(event);
     }
 
-    async createSupplier(data: z.infer<typeof SupplierSchema>): Promise<Supplier> {
+    async createSupplier(data: z.infer<typeof SupplierSchema>, actor?: string): Promise<Supplier> {
         const supplier = this.supplierRepo.create(data as unknown as Supplier);
         await this.em.persistAndFlush(supplier);
-        await this.logAudit(supplier.id, 'created', { name: supplier.name });
+        await this.logAudit(supplier.id, 'created', { name: supplier.name }, actor);
         return supplier;
     }
 
@@ -178,13 +179,13 @@ export class SupplierService {
         return this.supplierRepo.findOne({ id });
     }
 
-    async updateSupplier(id: string, data: Partial<Supplier>): Promise<Supplier> {
+    async updateSupplier(id: string, data: Partial<Supplier>, actor?: string): Promise<Supplier> {
         const supplier = await this.supplierRepo.findOneOrFail({ id });
         const before = this.buildAuditSnapshot(supplier);
         this.supplierRepo.assign(supplier, data);
         await this.em.persistAndFlush(supplier);
         const after = this.buildAuditSnapshot(supplier);
-        await this.logAudit(supplier.id, 'updated', { before, after });
+        await this.logAudit(supplier.id, 'updated', { before, after }, actor);
         return supplier;
     }
 
@@ -340,7 +341,7 @@ export class SupplierService {
             suppliersToCreate: toCreate,
             suppliersToUpdate: toUpdate,
             actor,
-        });
+        }, actor);
 
         return {
             actor,

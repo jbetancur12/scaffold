@@ -32,11 +32,12 @@ export class MrpService {
         this.auditRepo = em.getRepository(QualityAuditEvent);
     }
 
-    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>) {
+    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>, actor?: string) {
         const event = this.auditRepo.create({
             entityType: 'bom_item',
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await this.em.persistAndFlush(event);
@@ -567,7 +568,7 @@ export class MrpService {
         };
     }
 
-    async addBOMItem(data: z.infer<typeof BOMItemSchema>): Promise<BOMItem> {
+    async addBOMItem(data: z.infer<typeof BOMItemSchema>, actor?: string): Promise<BOMItem> {
         // Fetch the variant and raw material entities
         const variant = await this.variantRepo.findOneOrFail({ id: data.variantId });
         const rawMaterial = await this.rawMaterialRepo.findOneOrFail({ id: data.rawMaterialId });
@@ -592,7 +593,7 @@ export class MrpService {
             rawMaterialSpecificationId: specification?.id,
             quantity: bomItem.quantity,
             usageNote: bomItem.usageNote,
-        });
+        }, actor);
 
         // Recalculate variant cost
         await this.calculateVariantCost(data.variantId);
@@ -607,7 +608,7 @@ export class MrpService {
         );
     }
 
-    async updateBOMItem(id: string, data: Partial<z.infer<typeof BOMItemSchema>>): Promise<BOMItem> {
+    async updateBOMItem(id: string, data: Partial<z.infer<typeof BOMItemSchema>>, actor?: string): Promise<BOMItem> {
         const item = await this.bomItemRepo.findOneOrFail({ id });
         const before = {
             variantId: item.variantId,
@@ -642,7 +643,7 @@ export class MrpService {
             quantity: item.quantity,
             usageNote: item.usageNote,
         };
-        await this.logAudit(item.id, 'bom_item_updated', { before, after });
+        await this.logAudit(item.id, 'bom_item_updated', { before, after }, actor);
 
         // Recalculate variant cost
         await this.calculateVariantCost(item.variantId);
@@ -650,7 +651,7 @@ export class MrpService {
         return item;
     }
 
-    async deleteBOMItem(id: string): Promise<void> {
+    async deleteBOMItem(id: string, actor?: string): Promise<void> {
         const item = await this.bomItemRepo.findOneOrFail({ id });
         const variantId = item.variantId;
 
@@ -660,7 +661,7 @@ export class MrpService {
             rawMaterialSpecificationId: item.rawMaterialSpecification?.id,
             quantity: item.quantity,
             usageNote: item.usageNote,
-        });
+        }, actor);
         await this.em.removeAndFlush(item);
 
         // Recalculate variant cost

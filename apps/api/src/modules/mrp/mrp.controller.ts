@@ -28,6 +28,7 @@ import { ProductCatalogPdfService } from './services/product-catalog-pdf.service
 import { PriceListConfigService } from './services/price-list-config.service';
 import { PriceListSnapshotService } from './services/price-list-snapshot.service';
 import { ShipmentPdfService } from './services/shipment-pdf.service';
+import { AuthRequest } from '../../middleware/auth.middleware';
 import {
     ProductSchema,
     ProductGroupSchema,
@@ -204,6 +205,11 @@ export class MrpController {
     private get shipmentPdfService() { return new ShipmentPdfService(this.em); }
     private get priceListConfigService() { return new PriceListConfigService(this.em); }
     private get priceListSnapshotService() { return new PriceListSnapshotService(this.em); }
+
+    private resolveActor(req: Request) {
+        const user = (req as AuthRequest).user;
+        return user?.email || user?.id;
+    }
     private get salesOrderService() { return new SalesOrderService(this.em); }
     private get quotationService() { return new QuotationService(this.em); }
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
@@ -224,7 +230,8 @@ export class MrpController {
     async createProduct(req: Request, res: Response, next: NextFunction) {
         try {
             const data = ProductSchema.parse(req.body);
-            const product = await this.productService.createProduct(data);
+            const actor = this.resolveActor(req);
+            const product = await this.productService.createProduct(data, actor);
             return ApiResponse.success(res, product, 'Producto creado', 201);
         } catch (error) {
             next(error);
@@ -253,7 +260,8 @@ export class MrpController {
     async updatePriceListConfig(req: Request, res: Response, next: NextFunction) {
         try {
             const data = UpdatePriceListConfigSchema.parse(req.body);
-            const config = await this.priceListConfigService.updateConfig(data);
+            const actor = this.resolveActor(req);
+            const config = await this.priceListConfigService.updateConfig(data, actor);
             await this.priceListSnapshotService.regenerateSnapshot();
             return ApiResponse.success(res, config, 'Configuración de portada actualizada');
         } catch (error) {
@@ -313,7 +321,8 @@ export class MrpController {
     async createProductGroup(req: Request, res: Response, next: NextFunction) {
         try {
             const data = ProductGroupSchema.parse(req.body);
-            const row = await this.productService.createProductGroup(data);
+            const actor = this.resolveActor(req);
+            const row = await this.productService.createProductGroup(data, actor);
             return ApiResponse.success(res, row, 'Grupo de producto creado', 201);
         } catch (error) {
             next(error);
@@ -334,7 +343,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const data = UpdateProductGroupSchema.parse(req.body);
-            const row = await this.productService.updateProductGroup(id, data);
+            const actor = this.resolveActor(req);
+            const row = await this.productService.updateProductGroup(id, data, actor);
             return ApiResponse.success(res, row, 'Grupo de producto actualizado');
         } catch (error) {
             next(error);
@@ -344,7 +354,8 @@ export class MrpController {
     async deleteProductGroup(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            await this.productService.deleteProductGroup(id);
+            const actor = this.resolveActor(req);
+            await this.productService.deleteProductGroup(id, actor);
             return ApiResponse.success(res, null, 'Grupo de producto eliminado');
         } catch (error) {
             next(error);
@@ -386,7 +397,8 @@ export class MrpController {
     async importProductsCsv(req: Request, res: Response, next: NextFunction) {
         try {
             const payload = ProductCsvImportSchema.parse(req.body);
-            const result = await this.productService.importProductCsv(payload.csvText, payload.actor);
+            const actor = this.resolveActor(req) ?? payload.actor;
+            const result = await this.productService.importProductCsv(payload.csvText, actor);
             return ApiResponse.success(res, result, 'Catálogo importado');
         } catch (error) {
             next(error);
@@ -410,7 +422,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const data = UpdateProductSchema.parse(req.body);
-            const product = await this.productService.updateProduct(id, data);
+            const actor = this.resolveActor(req);
+            const product = await this.productService.updateProduct(id, data, actor);
             return ApiResponse.success(res, product, 'Producto actualizado');
         } catch (error) {
             next(error);
@@ -420,7 +433,8 @@ export class MrpController {
     async deleteProduct(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            await this.productService.deleteProduct(id);
+            const actor = this.resolveActor(req);
+            await this.productService.deleteProduct(id, actor);
             return ApiResponse.success(res, null, 'Producto eliminado');
         } catch (error) {
             next(error);
@@ -431,7 +445,8 @@ export class MrpController {
         try {
             const { productId } = req.params;
             const payload = UploadProductImageSchema.parse(req.body);
-            const image = await this.productService.uploadProductImage(productId, payload);
+            const actor = this.resolveActor(req);
+            const image = await this.productService.uploadProductImage(productId, payload, actor);
             return ApiResponse.success(res, image, 'Imagen cargada', 201);
         } catch (error) {
             next(error);
@@ -453,7 +468,8 @@ export class MrpController {
     async deleteProductImage(req: Request, res: Response, next: NextFunction) {
         try {
             const { productId, imageId } = req.params;
-            await this.productService.deleteProductImage(productId, imageId);
+            const actor = this.resolveActor(req);
+            await this.productService.deleteProductImage(productId, imageId, actor);
             return ApiResponse.success(res, null, 'Imagen eliminada');
         } catch (error) {
             next(error);
@@ -465,7 +481,8 @@ export class MrpController {
         try {
             const { productId } = req.params;
             const data = CreateProductVariantSchema.parse(req.body);
-            const variant = await this.productService.createVariant(productId, data);
+            const actor = this.resolveActor(req);
+            const variant = await this.productService.createVariant(productId, data, actor);
             return ApiResponse.success(res, variant, 'Variante creada', 201);
         } catch (error) {
             next(error);
@@ -476,7 +493,8 @@ export class MrpController {
         try {
             const { variantId } = req.params;
             const data = UpdateProductVariantSchema.parse(req.body);
-            const variant = await this.productService.updateVariant(variantId, data);
+            const actor = this.resolveActor(req);
+            const variant = await this.productService.updateVariant(variantId, data, actor);
             return ApiResponse.success(res, variant, 'Variante actualizada');
         } catch (error) {
             next(error);
@@ -486,7 +504,8 @@ export class MrpController {
     async deleteVariant(req: Request, res: Response, next: NextFunction) {
         try {
             const { variantId } = req.params;
-            await this.productService.deleteVariant(variantId);
+            const actor = this.resolveActor(req);
+            await this.productService.deleteVariant(variantId, actor);
             return ApiResponse.success(res, null, 'Variante eliminada');
         } catch (error) {
             next(error);
@@ -528,7 +547,8 @@ export class MrpController {
     async createSupplier(req: Request, res: Response, next: NextFunction) {
         try {
             const data = SupplierSchema.parse(req.body);
-            const supplier = await this.supplierService.createSupplier(data);
+            const actor = this.resolveActor(req);
+            const supplier = await this.supplierService.createSupplier(data, actor);
             return ApiResponse.success(res, supplier, 'Proveedor creado', 201);
         } catch (error) {
             next(error);
@@ -570,7 +590,8 @@ export class MrpController {
     async importSuppliersCsv(req: Request, res: Response, next: NextFunction) {
         try {
             const payload = SupplierCsvImportSchema.parse(req.body);
-            const result = await this.supplierService.importSuppliersCsv(payload.csvText, payload.actor);
+            const actor = this.resolveActor(req) ?? payload.actor;
+            const result = await this.supplierService.importSuppliersCsv(payload.csvText, actor);
             return ApiResponse.success(res, result, 'Proveedores importados');
         } catch (error) {
             next(error);
@@ -604,7 +625,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const data = SupplierSchema.partial().parse(req.body);
-            const supplier = await this.supplierService.updateSupplier(id, data);
+            const actor = this.resolveActor(req);
+            const supplier = await this.supplierService.updateSupplier(id, data, actor);
             return ApiResponse.success(res, supplier, 'Proveedor actualizado');
         } catch (error) {
             next(error);
@@ -739,7 +761,8 @@ export class MrpController {
     async addBOMItem(req: Request, res: Response, next: NextFunction) {
         try {
             const data = BOMItemSchema.parse(req.body);
-            const bomItem = await this.mrpService.addBOMItem(data);
+            const actor = this.resolveActor(req);
+            const bomItem = await this.mrpService.addBOMItem(data, actor);
             return ApiResponse.success(res, bomItem, 'Material agregado al BOM', 201);
         } catch (error) {
             next(error);
@@ -750,7 +773,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const data = BOMItemSchema.partial().parse(req.body);
-            const bomItem = await this.mrpService.updateBOMItem(id, data);
+            const actor = this.resolveActor(req);
+            const bomItem = await this.mrpService.updateBOMItem(id, data, actor);
             return ApiResponse.success(res, bomItem, 'Ítem BOM actualizado');
         } catch (error) {
             next(error);
@@ -770,7 +794,8 @@ export class MrpController {
     async deleteBOMItem(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            await this.mrpService.deleteBOMItem(id);
+            const actor = this.resolveActor(req);
+            await this.mrpService.deleteBOMItem(id, actor);
             return ApiResponse.success(res, null, 'Ítem BOM eliminado');
         } catch (error) {
             next(error);
@@ -815,7 +840,8 @@ export class MrpController {
             }
 
             const validatedOrder = ProductionOrderSchema.parse(orderData);
-            const order = await this.productionService.createOrder(validatedOrder, items);
+            const actor = this.resolveActor(req);
+            const order = await this.productionService.createOrder(validatedOrder, items, actor);
             return ApiResponse.success(res, order, 'Orden de producción creada', 201);
         } catch (error) {
             next(error);
@@ -826,7 +852,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const { salesOrderId } = req.body as { salesOrderId: string | null };
-            const order = await this.productionService.linkSalesOrder(id, salesOrderId ?? null);
+            const actor = this.resolveActor(req);
+            const order = await this.productionService.linkSalesOrder(id, salesOrderId ?? null, actor);
             return ApiResponse.success(res, order, 'Vínculo actualizado');
         } catch (error) {
             next(error);
@@ -838,7 +865,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const { status, warehouseId } = UpdateProductionOrderStatusSchema.parse(req.body);
-            const order = await this.productionService.updateStatus(id, status, warehouseId);
+            const actor = this.resolveActor(req);
+            const order = await this.productionService.updateStatus(id, status, warehouseId, actor);
             return ApiResponse.success(res, order, 'Estado de orden actualizado');
         } catch (error) {
             next(error);
@@ -921,7 +949,11 @@ export class MrpController {
         try {
             const { id } = req.params;
             const payload = ReturnProductionMaterialSchema.parse(req.body);
-            const row = await this.productionService.returnMaterialToWarehouse(id, payload);
+            const actor = this.resolveActor(req);
+            const row = await this.productionService.returnMaterialToWarehouse(id, {
+                ...payload,
+                actor: payload.actor ?? actor,
+            });
             return ApiResponse.success(res, row, 'Devolución de materia prima registrada');
         } catch (error) {
             next(error);
@@ -1049,7 +1081,8 @@ export class MrpController {
             const { id } = req.params;
             const payload = CreateProductionBatchSchema.parse(req.body);
 
-            const batch = await this.productionService.createBatch(id, payload);
+            const actor = this.resolveActor(req);
+            const batch = await this.productionService.createBatch(id, payload, actor);
             return ApiResponse.success(res, batch, 'Lote creado', 201);
         } catch (error) {
             next(error);
@@ -1060,7 +1093,8 @@ export class MrpController {
         try {
             const { batchId } = req.params;
             const payload = AddProductionBatchUnitsSchema.parse(req.body);
-            const batch = await this.productionService.addBatchUnits(batchId, payload.quantity);
+            const actor = this.resolveActor(req);
+            const batch = await this.productionService.addBatchUnits(batchId, payload.quantity, actor);
             return ApiResponse.success(res, batch, 'Unidades generadas');
         } catch (error) {
             next(error);
@@ -1071,7 +1105,8 @@ export class MrpController {
         try {
             const { batchId } = req.params;
             const payload = UpdateProductionBatchQcSchema.parse(req.body);
-            const batch = await this.productionService.setBatchQc(batchId, payload.passed);
+            const actor = this.resolveActor(req);
+            const batch = await this.productionService.setBatchQc(batchId, payload.passed, actor);
             return ApiResponse.success(res, batch, 'QC de lote actualizado');
         } catch (error) {
             next(error);
@@ -1082,7 +1117,8 @@ export class MrpController {
         try {
             const { batchId } = req.params;
             const payload = UpdateProductionBatchPackagingSchema.parse(req.body);
-            const batch = await this.productionService.setBatchPackaging(batchId, payload.packed);
+            const actor = this.resolveActor(req);
+            const batch = await this.productionService.setBatchPackaging(batchId, payload.packed, actor);
             return ApiResponse.success(res, batch, 'Empaque de lote actualizado');
         } catch (error) {
             next(error);
@@ -1093,7 +1129,8 @@ export class MrpController {
         try {
             const { unitId } = req.params;
             const payload = UpdateProductionBatchUnitQcSchema.parse(req.body);
-            const unit = await this.productionService.setBatchUnitQc(unitId, payload.passed);
+            const actor = this.resolveActor(req);
+            const unit = await this.productionService.setBatchUnitQc(unitId, payload.passed, actor);
             return ApiResponse.success(res, unit, 'QC de unidad actualizado');
         } catch (error) {
             next(error);
@@ -1104,7 +1141,8 @@ export class MrpController {
         try {
             const { unitId } = req.params;
             const payload = UpdateProductionBatchUnitPackagingSchema.parse(req.body);
-            const unit = await this.productionService.setBatchUnitPackaging(unitId, payload.packaged);
+            const actor = this.resolveActor(req);
+            const unit = await this.productionService.setBatchUnitPackaging(unitId, payload.packaged, actor);
             return ApiResponse.success(res, unit, 'Empaque de unidad actualizado');
         } catch (error) {
             next(error);
@@ -1115,7 +1153,11 @@ export class MrpController {
         try {
             const { batchId } = req.params;
             const payload = UpsertProductionBatchPackagingFormSchema.parse(req.body);
-            const batch = await this.productionService.upsertBatchPackagingForm(batchId, payload);
+            const actor = this.resolveActor(req);
+            const batch = await this.productionService.upsertBatchPackagingForm(batchId, {
+                ...payload,
+                actor: payload.actor ?? actor,
+            });
             return ApiResponse.success(res, batch, 'FOR de empaque guardado');
         } catch (error) {
             next(error);
@@ -1136,7 +1178,11 @@ export class MrpController {
         try {
             const { batchId } = req.params;
             const payload = UpsertProductionBatchFinishedInspectionFormSchema.parse(req.body);
-            const batch = await this.productionService.upsertBatchFinishedInspectionForm(batchId, payload);
+            const actor = this.resolveActor(req);
+            const batch = await this.productionService.upsertBatchFinishedInspectionForm(batchId, {
+                ...payload,
+                actor: payload.actor ?? actor,
+            });
             return ApiResponse.success(res, batch, 'FOR de inspección final guardado');
         } catch (error) {
             next(error);
@@ -2163,7 +2209,8 @@ export class MrpController {
     async addManualStock(req: Request, res: Response, next: NextFunction) {
         try {
             const data = ManualStockSchema.parse(req.body);
-            const result = await this.inventoryService.addManualStock(data);
+            const actor = this.resolveActor(req);
+            const result = await this.inventoryService.addManualStock(data, actor);
             return ApiResponse.success(res, result, 'Stock agregado');
         } catch (error) {
             next(error);
@@ -2174,7 +2221,8 @@ export class MrpController {
     async createPurchaseOrder(req: Request, res: Response, next: NextFunction) {
         try {
             const data = CreatePurchaseOrderSchema.parse(req.body);
-            const purchaseOrder = await this.purchaseOrderService.createPurchaseOrder(data);
+            const actor = this.resolveActor(req);
+            const purchaseOrder = await this.purchaseOrderService.createPurchaseOrder(data, actor);
             return ApiResponse.success(res, purchaseOrder, 'Orden de compra creada', 201);
         } catch (error) {
             next(error);
@@ -2198,7 +2246,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const data = CreatePurchaseOrderSchema.parse(req.body);
-            const purchaseOrder = await this.purchaseOrderService.updatePurchaseOrder(id, data);
+            const actor = this.resolveActor(req);
+            const purchaseOrder = await this.purchaseOrderService.updatePurchaseOrder(id, data, actor);
             return ApiResponse.success(res, purchaseOrder, 'Orden de compra actualizada');
         } catch (error) {
             next(error);
@@ -2235,7 +2284,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const { status } = UpdatePurchaseOrderStatusSchema.parse(req.body);
-            const purchaseOrder = await this.purchaseOrderService.updateStatus(id, status);
+            const actor = this.resolveActor(req);
+            const purchaseOrder = await this.purchaseOrderService.updateStatus(id, status, actor);
             return ApiResponse.success(res, purchaseOrder, 'Estado de orden de compra actualizado');
         } catch (error) {
             next(error);
@@ -2246,7 +2296,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const { warehouseId } = ReceivePurchaseOrderSchema.parse(req.body ?? {});
-            const purchaseOrder = await this.purchaseOrderService.receivePurchaseOrder(id, warehouseId);
+            const actor = this.resolveActor(req);
+            const purchaseOrder = await this.purchaseOrderService.receivePurchaseOrder(id, warehouseId, actor);
             return ApiResponse.success(res, purchaseOrder, 'Orden de compra recibida');
         } catch (error) {
             next(error);
@@ -2257,7 +2308,8 @@ export class MrpController {
     async createWarehouse(req: Request, res: Response, next: NextFunction) {
         try {
             const data = WarehouseSchema.parse(req.body);
-            const warehouse = await this.inventoryService.createWarehouse(data);
+            const actor = this.resolveActor(req);
+            const warehouse = await this.inventoryService.createWarehouse(data, actor);
             return ApiResponse.success(res, warehouse, 'Almacén creado', 201);
         } catch (error) {
             next(error);
@@ -2287,7 +2339,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const data = WarehouseSchema.partial().parse(req.body);
-            const warehouse = await this.inventoryService.updateWarehouse(id, data);
+            const actor = this.resolveActor(req);
+            const warehouse = await this.inventoryService.updateWarehouse(id, data, actor);
             return ApiResponse.success(res, warehouse, 'Almacén actualizado');
         } catch (error) {
             next(error);
@@ -2297,7 +2350,8 @@ export class MrpController {
     async deleteWarehouse(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            await this.inventoryService.deleteWarehouse(id);
+            const actor = this.resolveActor(req);
+            await this.inventoryService.deleteWarehouse(id, actor);
             return ApiResponse.success(res, null, 'Almacén eliminado');
         } catch (error) {
             next(error);
@@ -2307,7 +2361,8 @@ export class MrpController {
     async cancelPurchaseOrder(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            await this.purchaseOrderService.cancelPurchaseOrder(id);
+            const actor = this.resolveActor(req);
+            await this.purchaseOrderService.cancelPurchaseOrder(id, actor);
             return ApiResponse.success(res, null, 'Orden de compra cancelada');
         } catch (error) {
             next(error);
@@ -2318,7 +2373,8 @@ export class MrpController {
     async createPurchaseRequisition(req: Request, res: Response, next: NextFunction) {
         try {
             const payload = CreatePurchaseRequisitionSchema.parse(req.body);
-            const row = await this.purchaseRequisitionService.create(payload);
+            const actor = this.resolveActor(req);
+            const row = await this.purchaseRequisitionService.create(payload, actor);
             return ApiResponse.success(res, row, 'Requisición de compra creada', 201);
         } catch (error) {
             next(error);
@@ -2350,6 +2406,7 @@ export class MrpController {
                 throw new AppError('La orden no tiene faltantes de materias primas para requisición', 409);
             }
 
+            const actor = this.resolveActor(req);
             const row = await this.purchaseRequisitionService.create({
                 requestedBy: payload.requestedBy,
                 productionOrderId,
@@ -2357,7 +2414,7 @@ export class MrpController {
                 neededBy: payload.neededBy,
                 notes: payload.notes,
                 items: shortageItems,
-            });
+            }, actor);
             return ApiResponse.success(res, row, 'Requisición generada desde la orden de producción', 201);
         } catch (error) {
             next(error);
@@ -2406,7 +2463,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const { status } = UpdatePurchaseRequisitionStatusSchema.parse(req.body);
-            const row = await this.purchaseRequisitionService.updateStatus(id, status);
+            const actor = this.resolveActor(req);
+            const row = await this.purchaseRequisitionService.updateStatus(id, status, actor);
             return ApiResponse.success(res, row, 'Estado de requisición actualizado');
         } catch (error) {
             next(error);
@@ -2417,7 +2475,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const { purchaseOrderId } = MarkPurchaseRequisitionConvertedSchema.parse(req.body);
-            const row = await this.purchaseRequisitionService.markConverted(id, purchaseOrderId);
+            const actor = this.resolveActor(req);
+            const row = await this.purchaseRequisitionService.markConverted(id, purchaseOrderId, actor);
             return ApiResponse.success(res, row, 'Requisición marcada como convertida');
         } catch (error) {
             next(error);
@@ -2428,7 +2487,8 @@ export class MrpController {
     async createSalesOrder(req: Request, res: Response, next: NextFunction) {
         try {
             const payload = CreateSalesOrderSchema.parse(req.body);
-            const order = await this.salesOrderService.createSalesOrder(payload);
+            const actor = this.resolveActor(req);
+            const order = await this.salesOrderService.createSalesOrder(payload, actor);
             return ApiResponse.success(res, order, 'Pedido de cliente creado', 201);
         } catch (error) {
             next(error);
@@ -2439,7 +2499,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const payload = UpdateSalesOrderSchema.parse(req.body);
-            const order = await this.salesOrderService.updateSalesOrder(id, payload);
+            const actor = this.resolveActor(req);
+            const order = await this.salesOrderService.updateSalesOrder(id, payload, actor);
             return ApiResponse.success(res, order, 'Pedido de cliente actualizado');
         } catch (error) {
             next(error);
@@ -2473,7 +2534,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const { status } = UpdateSalesOrderStatusSchema.parse(req.body);
-            const order = await this.salesOrderService.updateSalesOrderStatus(id, status);
+            const actor = this.resolveActor(req);
+            const order = await this.salesOrderService.updateSalesOrderStatus(id, status, actor);
             return ApiResponse.success(res, order, 'Estado del pedido actualizado');
         } catch (error) {
             next(error);
@@ -2484,7 +2546,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const payload = CancelSalesOrderWithSettlementSchema.parse(req.body);
-            const order = await this.salesOrderService.cancelSalesOrderWithSettlement(id, payload);
+            const actor = this.resolveActor(req);
+            const order = await this.salesOrderService.cancelSalesOrderWithSettlement(id, payload, actor);
             return ApiResponse.success(res, order, 'Pedido cancelado con liquidación parcial');
         } catch (error) {
             next(error);
@@ -2519,7 +2582,8 @@ export class MrpController {
     async createQuotation(req: Request, res: Response, next: NextFunction) {
         try {
             const payload = CreateQuotationSchema.parse(req.body);
-            const row = await this.quotationService.create(payload);
+            const actor = this.resolveActor(req);
+            const row = await this.quotationService.create(payload, actor);
             return ApiResponse.success(res, row, 'Cotización creada', 201);
         } catch (error) {
             next(error);
@@ -2530,7 +2594,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const payload = UpdateQuotationSchema.parse(req.body);
-            const row = await this.quotationService.update(id, payload);
+            const actor = this.resolveActor(req);
+            const row = await this.quotationService.update(id, payload, actor);
             return ApiResponse.success(res, row, 'Cotización actualizada');
         } catch (error) {
             next(error);
@@ -2601,7 +2666,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const { status } = UpdateQuotationStatusSchema.parse(req.body);
-            const row = await this.quotationService.updateStatus(id, status);
+            const actor = this.resolveActor(req);
+            const row = await this.quotationService.updateStatus(id, status, actor);
             return ApiResponse.success(res, row, 'Estado de cotización actualizado');
         } catch (error) {
             next(error);
@@ -2612,7 +2678,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const payload = ApproveQuotationSchema.parse(req.body);
-            const row = await this.quotationService.approve(id, payload);
+            const actor = this.resolveActor(req);
+            const row = await this.quotationService.approve(id, payload, actor);
             return ApiResponse.success(res, row, 'Cotización aprobada');
         } catch (error) {
             next(error);
@@ -2623,7 +2690,8 @@ export class MrpController {
         try {
             const { id } = req.params;
             const payload = ConvertQuotationSchema.parse(req.body);
-            const row = await this.quotationService.convertToSalesOrder(id, payload);
+            const actor = this.resolveActor(req);
+            const row = await this.quotationService.convertToSalesOrder(id, payload, actor);
             return ApiResponse.success(res, row, 'Cotización convertida a pedido');
         } catch (error) {
             next(error);

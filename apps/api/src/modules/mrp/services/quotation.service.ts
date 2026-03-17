@@ -60,13 +60,15 @@ export class QuotationService {
         manager: EntityManager,
         entityId: string,
         action: string,
-        metadata?: Record<string, unknown>
+        metadata?: Record<string, unknown>,
+        actor?: string
     ) {
         const repo = manager.getRepository(QualityAuditEvent);
         const event = repo.create({
             entityType: 'quotation',
             entityId,
             action,
+            actor,
             metadata,
         } as unknown as QualityAuditEvent);
         await manager.persistAndFlush(event);
@@ -592,7 +594,7 @@ export class QuotationService {
         });
     }
 
-    async create(payload: CreateQuotationInput) {
+    async create(payload: CreateQuotationInput, actor?: string) {
         return this.em.transactional(async (tx) => {
             const customer = await tx.getRepository(Customer).findOneOrFail({ id: payload.customerId, deletedAt: null as never });
             const [config] = await tx.getRepository(OperationalConfig).find({}, { orderBy: { createdAt: 'DESC' }, limit: 1 });
@@ -631,12 +633,12 @@ export class QuotationService {
                 customerId: quotation.customer.id,
                 totalAmount: quotation.totalAmount,
                 netTotalAmount: quotation.netTotalAmount,
-            });
+            }, actor);
             return this.getById(quotation.id);
         });
     }
 
-    async update(id: string, payload: CreateQuotationInput) {
+    async update(id: string, payload: CreateQuotationInput, actor?: string) {
         return this.em.transactional(async (tx) => {
             const quotation = await tx.getRepository(Quotation).findOneOrFail(
                 { id, deletedAt: null as never },
@@ -680,12 +682,12 @@ export class QuotationService {
             this.recalculateHeader(quotation);
             await tx.flush();
             const after = this.buildAuditSnapshot(quotation);
-            await this.logAudit(tx, quotation.id, 'updated', { before, after });
+            await this.logAudit(tx, quotation.id, 'updated', { before, after }, actor);
             return this.getById(quotation.id);
         });
     }
 
-    async updateStatus(id: string, status: QuotationStatus) {
+    async updateStatus(id: string, status: QuotationStatus, actor?: string) {
         const quotation = await this.getById(id);
         const previousStatus = quotation.status;
         quotation.status = status;
@@ -694,11 +696,11 @@ export class QuotationService {
             previousStatus,
             status: quotation.status,
             code: quotation.code,
-        });
+        }, actor);
         return quotation;
     }
 
-    async approve(id: string, payload: { items?: Array<{ quotationItemId: string; approved?: boolean; approvedQuantity?: number }> }) {
+    async approve(id: string, payload: { items?: Array<{ quotationItemId: string; approved?: boolean; approvedQuantity?: number }> }, actor?: string) {
         return this.em.transactional(async (tx) => {
             const quotation = await tx.getRepository(Quotation).findOneOrFail({ id, deletedAt: null as never }, { populate: ['items'] });
 
@@ -732,12 +734,12 @@ export class QuotationService {
             await this.logAudit(tx, quotation.id, 'approved', {
                 status: quotation.status,
                 code: quotation.code,
-            });
+            }, actor);
             return this.getById(id);
         });
     }
 
-    async convertToSalesOrder(id: string, payload?: { quotationItemIds?: string[] }) {
+    async convertToSalesOrder(id: string, payload?: { quotationItemIds?: string[] }, actor?: string) {
         return this.em.transactional(async (tx) => {
             const quotation = await tx.getRepository(Quotation).findOneOrFail(
                 { id, deletedAt: null as never },
@@ -775,7 +777,7 @@ export class QuotationService {
             };
 
             const soService = new SalesOrderService(tx);
-            const order = await soService.createSalesOrder(salesOrderPayload);
+            const order = await soService.createSalesOrder(salesOrderPayload, actor);
 
             for (const item of selected) {
                 const pendingQty = Number(item.approvedQuantity || 0) - Number(item.convertedQuantity || 0);
@@ -800,7 +802,7 @@ export class QuotationService {
                 salesOrderId: order.id,
                 status: quotation.status,
                 code: quotation.code,
-            });
+            }, actor);
             return {
                 quotationId: quotation.id,
                 quotationCode: quotation.code,
