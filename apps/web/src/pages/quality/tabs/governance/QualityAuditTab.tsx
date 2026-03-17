@@ -18,6 +18,7 @@ const auditEntityLabels: Record<string, string> = {
   purchase_order: 'Orden de compra',
   purchase_requisition: 'Requisición de compra',
   quotation: 'Cotización',
+  sales_order: 'Pedido de cliente',
   product: 'Producto',
   product_variant: 'Variante',
   product_group: 'Grupo de productos',
@@ -32,6 +33,7 @@ const auditEntityLabels: Record<string, string> = {
   batch_release: 'Liberación de lote',
   shipment: 'Despacho',
   raw_material_lot: 'Lote de materia prima',
+  supplier: 'Proveedor',
 };
 
 const auditActionLabels: Record<string, string> = {
@@ -64,6 +66,7 @@ const auditActionLabels: Record<string, string> = {
   sales_order_linked: 'Pedido vinculado',
   sales_order_unlinked: 'Pedido desvinculado',
   deleted: 'Eliminado',
+  imported: 'Importado',
   price_updated: 'Precio actualizado',
   image_uploaded: 'Imagen cargada',
   image_deleted: 'Imagen eliminada',
@@ -93,6 +96,7 @@ const actionColors: Record<string, string> = {
   sales_order_linked: 'bg-blue-50 text-blue-700 border-blue-200',
   sales_order_unlinked: 'bg-slate-100 text-slate-600 border-slate-200',
   deleted: 'bg-rose-50 text-rose-700 border-rose-200',
+  imported: 'bg-indigo-50 text-indigo-700 border-indigo-200',
   price_updated: 'bg-amber-50 text-amber-700 border-amber-200',
   image_uploaded: 'bg-sky-50 text-sky-700 border-sky-200',
   image_deleted: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -137,6 +141,15 @@ const formatAuditMetadata = (
     price: 'Precio',
     usageNote: 'Nota de uso',
     fileName: 'Archivo',
+    createdProductionOrderId: 'OP creada',
+    totalCompleted: 'Terminado',
+    totalRejected: 'Rechazado',
+    totalCancelled: 'Cancelado',
+    warehouseId: 'Bodega',
+    customersToCreate: 'Clientes a crear',
+    customersToUpdate: 'Clientes a actualizar',
+    suppliersToCreate: 'Proveedores a crear',
+    suppliersToUpdate: 'Proveedores a actualizar',
   };
   const knownKeys = Object.keys(metadataLabels);
   const values = knownKeys

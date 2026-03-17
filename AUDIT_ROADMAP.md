@@ -15,7 +15,7 @@ Al final de cada fase se marca como completada.
 ## Estado General
 - [x] **Fase 1 (MRP núcleo)**: órdenes de producción, órdenes de compra, requisiciones, cotizaciones.
 - [x] **Fase 2 (Catálogo)**: productos, variantes, BOM, listas de precios.
-- [ ] **Fase 3 (Comercial)**: pedidos de cliente, clientes, proveedores.
+- [x] **Fase 3 (Comercial)**: pedidos de cliente, clientes, proveedores.
 - [ ] **Fase 4 (Acciones especiales)**: eliminaciones, cambios masivos, ajustes de inventario.
 
 ## Detalle por Fase
@@ -62,16 +62,18 @@ Al final de cada fase se marca como completada.
   - [x] Configuración de lista de precios
   - [x] Ediciones manuales (por variante)
 
-### Fase 3 - Comercial
+### Fase 3 - Comercial (Completada)
 - Objetivo: trazabilidad de ventas y datos maestros de clientes/proveedores.
 - Eventos principales: creación, edición, cancelación, cambios de estado.
-- [ ] **Pedidos de cliente**
-  - [ ] Crear / editar / cancelar
-  - [ ] Cambio de estado
-- [ ] **Clientes**
-  - [ ] Crear / editar / eliminar
-- [ ] **Proveedores**
-  - [ ] Crear / editar / eliminar
+- [x] **Pedidos de cliente**
+  - [x] Crear / editar / cancelar
+  - [x] Cambio de estado
+- [x] **Clientes**
+  - [x] Crear / editar / eliminar
+  - [x] Importación masiva
+- [x] **Proveedores**
+  - [x] Crear / editar
+  - [x] Importación masiva
 
 ### Fase 4 - Acciones especiales
 - Objetivo: cubrir acciones de alto riesgo o impacto masivo.

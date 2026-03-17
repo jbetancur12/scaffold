@@ -5,14 +5,17 @@ import { RawMaterial } from '../entities/raw-material.entity';
 import { SupplierSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { AppError } from '../../../shared/utils/response';
+import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 
 export class SupplierService {
     private readonly em: EntityManager;
     private readonly supplierRepo: EntityRepository<Supplier>;
+    private readonly auditRepo: EntityRepository<QualityAuditEvent>;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.supplierRepo = em.getRepository(Supplier);
+        this.auditRepo = em.getRepository(QualityAuditEvent);
     }
 
     private readonly supplierImportHeaders = [
@@ -139,9 +142,35 @@ export class SupplierService {
         return { rows, errors, totalRows: lines.length - 1 };
     }
 
+    private buildAuditSnapshot(row: Supplier) {
+        return {
+            name: row.name,
+            contactName: row.contactName,
+            email: row.email,
+            phone: row.phone,
+            address: row.address,
+            city: row.city,
+            department: row.department,
+            bankDetails: row.bankDetails,
+            paymentConditions: row.paymentConditions,
+            notes: row.notes,
+        };
+    }
+
+    private async logAudit(entityId: string, action: string, metadata?: Record<string, unknown>) {
+        const event = this.auditRepo.create({
+            entityType: 'supplier',
+            entityId,
+            action,
+            metadata,
+        } as unknown as QualityAuditEvent);
+        await this.em.persistAndFlush(event);
+    }
+
     async createSupplier(data: z.infer<typeof SupplierSchema>): Promise<Supplier> {
         const supplier = this.supplierRepo.create(data as unknown as Supplier);
         await this.em.persistAndFlush(supplier);
+        await this.logAudit(supplier.id, 'created', { name: supplier.name });
         return supplier;
     }
 
@@ -151,8 +180,11 @@ export class SupplierService {
 
     async updateSupplier(id: string, data: Partial<Supplier>): Promise<Supplier> {
         const supplier = await this.supplierRepo.findOneOrFail({ id });
+        const before = this.buildAuditSnapshot(supplier);
         this.supplierRepo.assign(supplier, data);
         await this.em.persistAndFlush(supplier);
+        const after = this.buildAuditSnapshot(supplier);
+        await this.logAudit(supplier.id, 'updated', { before, after });
         return supplier;
     }
 
@@ -302,6 +334,12 @@ export class SupplierService {
             }
 
             await tx.flush();
+        });
+
+        await this.logAudit('bulk-import', 'imported', {
+            suppliersToCreate: toCreate,
+            suppliersToUpdate: toUpdate,
+            actor,
         });
 
         return {

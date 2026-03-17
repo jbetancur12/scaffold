@@ -13,6 +13,7 @@ import { InventoryItem } from '../entities/inventory-item.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { AppError } from '../../../shared/utils/response';
 import type { CancelSalesOrderWithSettlementPayload } from '@scaffold/schemas';
+import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
 
 export class SalesOrderService {
     private salesOrderRepo: EntityRepository<SalesOrder>;
@@ -21,6 +22,36 @@ export class SalesOrderService {
         private em: EntityManager
     ) {
         this.salesOrderRepo = em.getRepository(SalesOrder);
+    }
+
+    private buildAuditSnapshot(order: SalesOrder) {
+        return {
+            code: order.code,
+            status: order.status,
+            customerId: order.customer?.id,
+            expectedDeliveryDate: order.expectedDeliveryDate,
+            subtotalBase: order.subtotalBase,
+            taxTotal: order.taxTotal,
+            totalAmount: order.totalAmount,
+            netTotalAmount: order.netTotalAmount,
+            itemsCount: order.items?.length ?? 0,
+        };
+    }
+
+    private async logAudit(
+        manager: EntityManager,
+        entityId: string,
+        action: string,
+        metadata?: Record<string, unknown>
+    ) {
+        const repo = manager.getRepository(QualityAuditEvent);
+        const event = repo.create({
+            entityType: 'sales_order',
+            entityId,
+            action,
+            metadata,
+        } as unknown as QualityAuditEvent);
+        await manager.persistAndFlush(event);
     }
 
     private getQuotationStatusFromItems(quotation: Quotation) {
@@ -223,6 +254,14 @@ export class SalesOrderService {
             salesOrder.netTotalAmount = totalAmount - salesOrder.discountAmount;
 
             await tx.persistAndFlush(salesOrder);
+            await this.logAudit(tx, salesOrder.id, 'created', {
+                code: salesOrder.code,
+                status: salesOrder.status,
+                customerId: customer.id,
+                totalAmount: salesOrder.totalAmount,
+                netTotalAmount: salesOrder.netTotalAmount,
+                itemsCount: salesOrder.items?.length ?? 0,
+            });
             return salesOrder;
         });
     }
@@ -248,6 +287,7 @@ export class SalesOrderService {
                 throw new AppError('No se puede editar: el pedido ya tiene orden(es) de producción vinculadas', 400);
             }
 
+            const before = this.buildAuditSnapshot(order);
             const customer = await customerRepo.findOneOrFail({ id: data.customerId });
             order.customer = customer;
             order.expectedDeliveryDate = data.expectedDeliveryDate ? new Date(data.expectedDeliveryDate) : undefined;
@@ -295,6 +335,8 @@ export class SalesOrderService {
             order.netTotalAmount = totalAmount - Number(order.discountAmount || 0);
 
             await tx.persistAndFlush(order);
+            const after = this.buildAuditSnapshot(order);
+            await this.logAudit(tx, order.id, 'updated', { before, after });
             return order;
         });
     }
@@ -305,6 +347,8 @@ export class SalesOrderService {
                 { id },
                 { populate: ['items', 'items.variant', 'items.product', 'productionOrders', 'productionOrders.items', 'productionOrders.items.variant'] }
             );
+            const previousStatus = order.status;
+            let createdProductionOrderId: string | undefined;
 
             if (status === SalesOrderStatus.CANCELLED && order.status === SalesOrderStatus.SHIPPED) {
                 throw new AppError('No se puede cancelar un pedido ya despachado', 400);
@@ -313,6 +357,7 @@ export class SalesOrderService {
             if (status === SalesOrderStatus.IN_PRODUCTION) {
                 const automation = await this.ensureProductionCoverage(order, tx);
                 order.status = automation.nextStatus;
+                createdProductionOrderId = automation.createdProductionOrderId;
             } else if (status === SalesOrderStatus.CANCELLED) {
                 await this.cancelPendingProductionOrders(order, tx);
                 await this.revertQuotationConversion(order, tx);
@@ -322,6 +367,13 @@ export class SalesOrderService {
             }
 
             await tx.persistAndFlush(order);
+            await this.logAudit(tx, order.id, 'status_updated', {
+                code: order.code,
+                previousStatus,
+                status: order.status,
+                customerId: order.customer?.id,
+                createdProductionOrderId,
+            });
             return order;
         });
     }
@@ -491,6 +543,7 @@ export class SalesOrderService {
                 tx.persist(productionOrder);
             }
 
+            const previousStatus = order.status;
             order.status = SalesOrderStatus.CANCELLED;
             order.cancellationSettlement = settlementRecord;
             order.notes = [order.notes, `Pedido cancelado con liquidación parcial.`, settlementSummary]
@@ -499,6 +552,16 @@ export class SalesOrderService {
             tx.persist(order);
 
             await tx.flush();
+            await this.logAudit(tx, order.id, 'cancelled', {
+                code: order.code,
+                previousStatus,
+                status: order.status,
+                customerId: order.customer?.id,
+                totalCompleted,
+                totalRejected,
+                totalCancelled,
+                warehouseId: warehouse.id,
+            });
             return this.getSalesOrderById(order.id);
         });
     }
