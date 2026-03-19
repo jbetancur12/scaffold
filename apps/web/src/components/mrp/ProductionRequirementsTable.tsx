@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Copy, Star, Download } from "lucide-react";
+import { Copy, Star, Download, Eye, EyeOff } from "lucide-react";
 import { formatCurrency, formatQuantity } from "@/lib/utils";
 
 interface SupplierInfo {
@@ -31,6 +31,8 @@ interface Requirement {
         unit: string;
         sku: string;
     };
+    suggestedUnitPrice?: number;
+    estimatedRequiredCost?: number;
     rawMaterialSpecification?: {
         id: string;
         name: string;
@@ -68,6 +70,7 @@ interface ProductionRequirementsTableProps {
 
 export function ProductionRequirementsTable({ requirements, onAssignLot, savingAllocation }: ProductionRequirementsTableProps) {
     const [draftByMaterial, setDraftByMaterial] = useState<Record<string, { lotId: string; quantityRequested: string }>>({});
+    const [showCostColumns, setShowCostColumns] = useState(false);
 
     useEffect(() => {
         const next: Record<string, { lotId: string; quantityRequested: string }> = {};
@@ -88,6 +91,7 @@ export function ProductionRequirementsTable({ requirements, onAssignLot, savingA
     const handleExport = () => {
         const headers = [
             "Material", "SKU", "Requerido", "Unidad", "Disponible", "Faltante",
+            ...(showCostColumns ? ["Precio Sugerido", "Costo Estimado"] : []),
             "Lotes PEPS sugeridos", "Mejor Proveedor", "Precio Ultima Compra", "Fecha Ultima Compra"
         ];
 
@@ -102,6 +106,7 @@ export function ProductionRequirementsTable({ requirements, onAssignLot, savingA
                 req.material.unit,
                 req.available,
                 missing,
+                ...(showCostColumns ? [req.suggestedUnitPrice ?? "", req.estimatedRequiredCost ?? ""] : []),
                 (req.pepsLots || [])
                     .filter((lot) => lot.suggestedUse > 0)
                     .map((lot) => `${lot.lotCode} (${lot.suggestedUse})`)
@@ -130,7 +135,20 @@ export function ProductionRequirementsTable({ requirements, onAssignLot, savingA
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowCostColumns((prev) => !prev)}>
+                    {showCostColumns ? (
+                        <>
+                            <EyeOff className="mr-2 h-4 w-4" />
+                            Ocultar costos
+                        </>
+                    ) : (
+                        <>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Ver costos
+                        </>
+                    )}
+                </Button>
                 <Button variant="outline" onClick={handleExport} disabled={requirements.length === 0}>
                     <Download className="mr-2 h-4 w-4" />
                     Exportar Excel
@@ -145,6 +163,8 @@ export function ProductionRequirementsTable({ requirements, onAssignLot, savingA
                             <TableHead className="text-right">Requerido</TableHead>
                             <TableHead className="text-right">Disponible</TableHead>
                             <TableHead className="text-right">Faltante</TableHead>
+                            {showCostColumns ? <TableHead className="text-right">Precio Sugerido</TableHead> : null}
+                            {showCostColumns ? <TableHead className="text-right">Costo Estimado</TableHead> : null}
                             <TableHead>Lotes PEPS sugeridos</TableHead>
                             <TableHead>Asignación manual</TableHead>
                             <TableHead>Proveedores Conocidos</TableHead>
@@ -185,6 +205,24 @@ export function ProductionRequirementsTable({ requirements, onAssignLot, savingA
                                             {isMissing ? `-${formatQuantity(missing)}` : "OK"}
                                         </Badge>
                                     </TableCell>
+                                    {showCostColumns ? (
+                                        <TableCell className="text-right">
+                                            {req.suggestedUnitPrice && req.suggestedUnitPrice > 0 ? (
+                                                <span className="font-medium text-slate-700">{formatCurrency(req.suggestedUnitPrice)}</span>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground italic">Sin precio</span>
+                                            )}
+                                        </TableCell>
+                                    ) : null}
+                                    {showCostColumns ? (
+                                        <TableCell className="text-right">
+                                            {req.estimatedRequiredCost && req.estimatedRequiredCost > 0 ? (
+                                                <span className="font-semibold text-slate-900">{formatCurrency(req.estimatedRequiredCost)}</span>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground italic">No calculado</span>
+                                            )}
+                                        </TableCell>
+                                    ) : null}
                                     <TableCell className="max-w-[320px]">
                                         {(req.pepsLots || []).length > 0 ? (
                                             <div className="flex flex-col gap-1">

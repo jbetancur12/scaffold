@@ -115,6 +115,8 @@ export class ProductionService {
         material: RawMaterial,
         required: number,
         available: number,
+        suggestedUnitPrice?: number,
+        estimatedRequiredCost?: number,
         rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku' | 'widthCm'>,
         effectiveRollWidth?: number,
         bomRollWidth?: number,
@@ -126,6 +128,8 @@ export class ProductionService {
             material: RawMaterial,
             required: number,
             available: number,
+            suggestedUnitPrice?: number,
+            estimatedRequiredCost?: number,
             rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku' | 'widthCm'>,
             effectiveRollWidth?: number,
             bomRollWidth?: number,
@@ -184,6 +188,8 @@ export class ProductionService {
                         material: bomItem.rawMaterial,
                         required: requiredQty,
                         available: 0,
+                        suggestedUnitPrice: undefined,
+                        estimatedRequiredCost: undefined,
                         rawMaterialSpecification: bomItem.rawMaterialSpecification ? {
                             id: bomItem.rawMaterialSpecification.id,
                             name: bomItem.rawMaterialSpecification.name,
@@ -285,6 +291,8 @@ export class ProductionService {
             if (req.potentialSuppliers.length > 0) {
                 req.potentialSuppliers.sort((a, b) => a.lastPrice - b.lastPrice);
                 req.potentialSuppliers[0].isCheapest = true;
+                req.suggestedUnitPrice = Number(req.potentialSuppliers[0].lastPrice);
+                req.estimatedRequiredCost = Number((Number(req.required) * req.suggestedUnitPrice).toFixed(2));
             }
             const allocation = allocationByMaterial.get(req.material.id);
             if (allocation?.lot) {
@@ -1117,6 +1125,8 @@ export class ProductionService {
         material: RawMaterial,
         required: number,
         available: number,
+        suggestedUnitPrice?: number,
+        estimatedRequiredCost?: number,
         rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku' | 'widthCm'>,
         effectiveRollWidth?: number,
         bomRollWidth?: number,

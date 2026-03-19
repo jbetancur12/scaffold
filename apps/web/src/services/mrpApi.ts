@@ -186,6 +186,8 @@ export interface MaterialRequirement {
         sku: string;
         unit: string;
     };
+    suggestedUnitPrice?: number;
+    estimatedRequiredCost?: number;
     rawMaterialSpecification?: {
         id: string;
         name: string;
