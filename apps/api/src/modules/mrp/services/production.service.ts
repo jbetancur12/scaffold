@@ -271,9 +271,11 @@ export class ProductionService {
 
         for (const sm of supplierMaterials) {
             if (!requirements.has(sm.rawMaterial.id)) continue;
+            const lastPrice = Number(sm.lastPurchasePrice);
+            if (!(lastPrice > 0)) continue;
             requirements.get(sm.rawMaterial.id)!.potentialSuppliers.push({
                 supplier: sm.supplier,
-                lastPrice: Number(sm.lastPurchasePrice),
+                lastPrice,
                 lastDate: sm.lastPurchaseDate,
                 isCheapest: false,
             });

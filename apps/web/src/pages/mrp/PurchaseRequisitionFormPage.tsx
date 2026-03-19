@@ -141,10 +141,13 @@ export default function PurchaseRequisitionFormPage() {
                     const available = Number(requirement.available || 0);
 
                     if (!consolidated.has(materialId)) {
+                        const suggestedSupplier = requirement.potentialSuppliers.find(
+                            (supplierRow) => Number(supplierRow.lastPrice || 0) > 0
+                        );
                         consolidated.set(materialId, {
                             rawMaterialId: materialId,
                             quantity: 0,
-                            suggestedSupplierId: requirement.potentialSuppliers[0]?.supplier?.id || '',
+                            suggestedSupplierId: suggestedSupplier?.supplier?.id || '',
                             notes: selectedProductionOrderIds.length === 1
                                 ? `Faltante OP ${orderRequirements.productionOrderCode}`
                                 : `Faltante consolidado de ${selectedProductionOrderIds.length} OP`,

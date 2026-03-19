@@ -2401,10 +2401,13 @@ export class MrpController {
                 .filter((reqRow) => Number(reqRow.required) > Number(reqRow.available))
                 .map((reqRow) => {
                     const deficit = Number((Number(reqRow.required) - Number(reqRow.available)).toFixed(4));
+                    const suggestedSupplier = reqRow.potentialSuppliers.find(
+                        (supplierRow) => Number(supplierRow.lastPrice || 0) > 0
+                    );
                     return {
                         rawMaterialId: reqRow.material.id,
                         quantity: deficit,
-                        suggestedSupplierId: reqRow.potentialSuppliers[0]?.supplier?.id,
+                        suggestedSupplierId: suggestedSupplier?.supplier?.id,
                         notes: `Autogenerado desde OP ${productionOrderId}`,
                         sourceProductionOrders: [{
                             productionOrderId,
