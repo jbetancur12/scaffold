@@ -41,7 +41,7 @@ import { SalesOrder } from '../entities/sales-order.entity';
 import { BOMItem } from '../entities/bom-item.entity';
 import { RawMaterialSpecification } from '../entities/raw-material-specification.entity';
 import { DocumentControlService } from './document-control.service';
-import { ProductionOrderSchema, ProductionOrderItemCreateSchema, ReturnProductionMaterialSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
+import { ProductionOrderSchema, ProductionOrderItemCreateSchema, ReturnProductionMaterialSchema, SimulateProductionRequirementsSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { AppError } from '../../../shared/utils/response';
 
@@ -106,6 +106,215 @@ export class ProductionService {
 
         const next = maxSequence + 1;
         return `${dateToken}-${variantMarker}-${String(next).padStart(2, '0')}`;
+    }
+
+    private async buildMaterialRequirements(
+        itemsData: z.infer<typeof ProductionOrderItemCreateSchema>[],
+        options?: { orderId?: string }
+    ): Promise<{
+        material: RawMaterial,
+        required: number,
+        available: number,
+        rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku' | 'widthCm'>,
+        effectiveRollWidth?: number,
+        bomRollWidth?: number,
+        potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[],
+        pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[],
+        selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
+    }[]> {
+        const requirements = new Map<string, {
+            material: RawMaterial,
+            required: number,
+            available: number,
+            rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku' | 'widthCm'>,
+            effectiveRollWidth?: number,
+            bomRollWidth?: number,
+            potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[],
+            pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[],
+            selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
+        }>();
+
+        const variantIds = Array.from(new Set(itemsData.map((row) => row.variantId)));
+        const variants = variantIds.length > 0
+            ? await this.em.find(ProductVariant, { id: { $in: variantIds } })
+            : [];
+        const variantById = new Map(variants.map((variant) => [variant.id, variant]));
+
+        const bomRows = variantIds.length > 0
+            ? await this.em.find(BOMItem, { variant: { $in: variantIds } }, { populate: ['variant', 'rawMaterial', 'rawMaterialSpecification'] })
+            : [];
+        const bomByVariant = new Map<string, BOMItem[]>();
+        for (const bomRow of bomRows) {
+            const key = bomRow.variant.id;
+            const list = bomByVariant.get(key) || [];
+            list.push(bomRow);
+            bomByVariant.set(key, list);
+        }
+
+        for (const item of itemsData) {
+            const variant = variantById.get(item.variantId);
+            if (!variant) continue;
+
+            const productionQty = Number(item.quantity || 0);
+            const variantBomItems = bomByVariant.get(variant.id) || [];
+
+            for (const bomItem of variantBomItems) {
+                const rawMaterialId = bomItem.rawMaterial.id;
+                const effectiveFabricationParams = this.resolveEffectiveFabricationParams(
+                    bomItem.fabricationParams as {
+                        calculationType?: 'area' | 'linear';
+                        quantityPerUnit?: number;
+                        rollWidth: number;
+                        pieceWidth: number;
+                        pieceLength: number;
+                        orientation: 'normal' | 'rotated';
+                    } | undefined,
+                    bomItem.rawMaterialSpecification,
+                );
+                const requiredQty = this.calculateRequiredMaterialFromFabrication(
+                    Number(bomItem.quantity),
+                    productionQty,
+                    effectiveFabricationParams,
+                );
+
+                if (requirements.has(rawMaterialId)) {
+                    requirements.get(rawMaterialId)!.required += requiredQty;
+                } else {
+                    requirements.set(rawMaterialId, {
+                        material: bomItem.rawMaterial,
+                        required: requiredQty,
+                        available: 0,
+                        rawMaterialSpecification: bomItem.rawMaterialSpecification ? {
+                            id: bomItem.rawMaterialSpecification.id,
+                            name: bomItem.rawMaterialSpecification.name,
+                            sku: bomItem.rawMaterialSpecification.sku,
+                            widthCm: Number(bomItem.rawMaterialSpecification.widthCm || 0) || undefined,
+                        } : undefined,
+                        effectiveRollWidth: effectiveFabricationParams?.rollWidth,
+                        bomRollWidth: bomItem.fabricationParams?.rollWidth,
+                        potentialSuppliers: [],
+                        pepsLots: [],
+                    });
+                }
+            }
+        }
+
+        const materialIds = Array.from(requirements.keys());
+        if (materialIds.length === 0) {
+            return [];
+        }
+
+        await this.ensureLegacyLots(materialIds);
+        const inventoryItems = await this.inventoryRepo.find({
+            rawMaterial: { $in: materialIds },
+            warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
+        }, {
+            populate: ['rawMaterial', 'rawMaterialSpecification'],
+        });
+
+        for (const invItem of inventoryItems) {
+            if (invItem.rawMaterial && requirements.has(invItem.rawMaterial.id)) {
+                const req = requirements.get(invItem.rawMaterial.id)!;
+                const requiredSpecId = req.rawMaterialSpecification?.id;
+                const inventorySpecId = invItem.rawMaterialSpecification?.id;
+                if (requiredSpecId && inventorySpecId !== requiredSpecId) continue;
+                req.available += Number(invItem.quantity);
+            }
+        }
+
+        const lots = await this.rawMaterialLotRepo.find(
+            {
+                rawMaterial: { $in: materialIds },
+                quantityAvailable: { $gt: 0 },
+                warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
+            },
+            {
+                populate: ['warehouse', 'rawMaterial', 'rawMaterialSpecification'],
+                orderBy: [{ receivedAt: 'ASC' }, { createdAt: 'ASC' }],
+            }
+        );
+
+        for (const lot of lots) {
+            const materialId = lot.rawMaterial?.id;
+            if (!materialId || !requirements.has(materialId)) continue;
+            const req = requirements.get(materialId)!;
+            const requiredSpecId = req.rawMaterialSpecification?.id;
+            const lotSpecId = lot.rawMaterialSpecification?.id;
+            if (requiredSpecId && lotSpecId !== requiredSpecId) continue;
+            req.pepsLots.push({
+                lotId: lot.id,
+                lotCode: lot.supplierLotCode,
+                warehouseId: lot.warehouse.id,
+                warehouseName: lot.warehouse.name,
+                available: Number(lot.quantityAvailable),
+                receivedAt: lot.receivedAt,
+                suggestedUse: 0,
+            });
+        }
+
+        const supplierMaterials = await this.em.find(
+            SupplierMaterial,
+            { rawMaterial: { $in: materialIds } },
+            { populate: ['supplier'], orderBy: { lastPurchasePrice: 'ASC', lastPurchaseDate: 'DESC' } }
+        );
+
+        const allocationByMaterial = new Map<string, ProductionMaterialAllocation>();
+        if (options?.orderId) {
+            const allocations = await this.materialAllocationRepo.find(
+                { productionOrder: options.orderId, rawMaterial: { $in: materialIds }, lot: { $ne: null } },
+                {}
+            );
+            for (const row of allocations) {
+                allocationByMaterial.set(row.rawMaterial.id, row);
+            }
+        }
+
+        for (const sm of supplierMaterials) {
+            if (!requirements.has(sm.rawMaterial.id)) continue;
+            requirements.get(sm.rawMaterial.id)!.potentialSuppliers.push({
+                supplier: sm.supplier,
+                lastPrice: Number(sm.lastPurchasePrice),
+                lastDate: sm.lastPurchaseDate,
+                isCheapest: false,
+            });
+        }
+
+        for (const req of requirements.values()) {
+            if (req.potentialSuppliers.length > 0) {
+                req.potentialSuppliers.sort((a, b) => a.lastPrice - b.lastPrice);
+                req.potentialSuppliers[0].isCheapest = true;
+            }
+            const allocation = allocationByMaterial.get(req.material.id);
+            if (allocation?.lot) {
+                const selectedLot = req.pepsLots.find((lot) => lot.lotId === allocation.lot?.id);
+                req.selectedAllocation = {
+                    lotId: allocation.lot.id,
+                    lotCode: selectedLot?.lotCode || 'Lote asignado',
+                    warehouseId: selectedLot?.warehouseId || '',
+                    warehouseName: selectedLot?.warehouseName || 'No disponible',
+                    quantityRequested: allocation.quantityRequested ? Number(allocation.quantityRequested) : undefined,
+                };
+            }
+            let pending = Number(req.required);
+            if (allocation?.lot) {
+                const selectedLot = req.pepsLots.find((lot) => lot.lotId === allocation.lot?.id);
+                if (selectedLot) {
+                    const desired = Number(allocation.quantityRequested || req.required);
+                    const suggested = Math.min(desired, Number(selectedLot.available), pending);
+                    selectedLot.suggestedUse = suggested;
+                    pending -= suggested;
+                }
+            }
+            for (const lot of req.pepsLots) {
+                if (pending <= 0) break;
+                if (allocation?.lot && lot.lotId === allocation.lot.id) continue;
+                const use = Math.min(pending, Number(lot.available));
+                lot.suggestedUse = use;
+                pending -= use;
+            }
+        }
+
+        return Array.from(requirements.values());
     }
 
     private resolveEffectiveFabricationParams(
@@ -914,200 +1123,17 @@ export class ProductionService {
         selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
     }[]> {
         const order = await this.productionOrderRepo.findOneOrFail({ id: orderId }, { populate: ['items', 'items.variant'] });
+        return this.buildMaterialRequirements(
+            order.items.getItems().map((item) => ({
+                variantId: item.variant.id,
+                quantity: Number(item.quantity),
+            })),
+            { orderId }
+        );
+    }
 
-        const requirements = new Map<string, {
-            material: RawMaterial,
-            required: number,
-            available: number,
-            rawMaterialSpecification?: Pick<RawMaterialSpecification, 'id' | 'name' | 'sku' | 'widthCm'>,
-            effectiveRollWidth?: number,
-            bomRollWidth?: number,
-            potentialSuppliers: { supplier: Supplier, lastPrice: number, lastDate: Date, isCheapest: boolean }[],
-            pepsLots: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; available: number; receivedAt: Date; suggestedUse: number }[],
-            selectedAllocation?: { lotId: string; lotCode: string; warehouseId: string; warehouseName: string; quantityRequested?: number }
-        }>();
-
-        const variantIds = order.items.getItems().map((row) => row.variant.id);
-        const bomRows = variantIds.length > 0
-            ? await this.em.find(BOMItem, { variant: { $in: variantIds } }, { populate: ['variant', 'rawMaterial', 'rawMaterialSpecification'] })
-            : [];
-        const bomByVariant = new Map<string, BOMItem[]>();
-        for (const bomRow of bomRows) {
-            const key = bomRow.variant.id;
-            const list = bomByVariant.get(key) || [];
-            list.push(bomRow);
-            bomByVariant.set(key, list);
-        }
-
-        // 1. Calculate Required
-        for (const item of order.items) {
-            const variant = item.variant;
-            const productionQty = item.quantity;
-            const variantBomItems = bomByVariant.get(variant.id) || [];
-
-            for (const bomItem of variantBomItems) {
-                const rawMaterialId = bomItem.rawMaterial.id;
-                const effectiveFabricationParams = this.resolveEffectiveFabricationParams(
-                    bomItem.fabricationParams as {
-                        calculationType?: 'area' | 'linear';
-                        quantityPerUnit?: number;
-                        rollWidth: number;
-                        pieceWidth: number;
-                        pieceLength: number;
-                        orientation: 'normal' | 'rotated';
-                    } | undefined,
-                    bomItem.rawMaterialSpecification,
-                );
-                const requiredQty = this.calculateRequiredMaterialFromFabrication(
-                    Number(bomItem.quantity),
-                    Number(productionQty),
-                    effectiveFabricationParams,
-                );
-
-                if (requirements.has(rawMaterialId)) {
-                    requirements.get(rawMaterialId)!.required += requiredQty;
-                } else {
-                    requirements.set(rawMaterialId, {
-                        material: bomItem.rawMaterial,
-                        required: requiredQty,
-                        available: 0, // Will populate next
-                        rawMaterialSpecification: bomItem.rawMaterialSpecification ? {
-                            id: bomItem.rawMaterialSpecification.id,
-                            name: bomItem.rawMaterialSpecification.name,
-                            sku: bomItem.rawMaterialSpecification.sku,
-                            widthCm: Number(bomItem.rawMaterialSpecification.widthCm || 0) || undefined,
-                        } : undefined,
-                        effectiveRollWidth: effectiveFabricationParams?.rollWidth,
-                        bomRollWidth: bomItem.fabricationParams?.rollWidth,
-                        potentialSuppliers: [], // Will populate next
-                        pepsLots: [], // Will populate next
-                    });
-                }
-            }
-        }
-
-        // 2. Check Available Stock
-        const materialIds = Array.from(requirements.keys());
-        if (materialIds.length > 0) {
-            await this.ensureLegacyLots(materialIds);
-            const inventoryItems = await this.inventoryRepo.find({
-                rawMaterial: { $in: materialIds },
-                warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
-            }, {
-                populate: ['rawMaterial', 'rawMaterialSpecification'],
-            });
-
-            for (const invItem of inventoryItems) {
-                if (invItem.rawMaterial && requirements.has(invItem.rawMaterial.id)) {
-                    const req = requirements.get(invItem.rawMaterial.id)!;
-                    const requiredSpecId = req.rawMaterialSpecification?.id;
-                    const inventorySpecId = invItem.rawMaterialSpecification?.id;
-                    if (requiredSpecId && inventorySpecId !== requiredSpecId) continue;
-                    req.available += Number(invItem.quantity);
-                }
-            }
-
-            const lots = await this.rawMaterialLotRepo.find(
-                {
-                    rawMaterial: { $in: materialIds },
-                    quantityAvailable: { $gt: 0 },
-                    warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
-                },
-                {
-                    populate: ['warehouse', 'rawMaterial', 'rawMaterialSpecification'],
-                    orderBy: [{ receivedAt: 'ASC' }, { createdAt: 'ASC' }],
-                }
-            );
-
-            for (const lot of lots) {
-                const materialId = lot.rawMaterial?.id;
-                if (!materialId || !requirements.has(materialId)) continue;
-                const req = requirements.get(materialId)!;
-                const requiredSpecId = req.rawMaterialSpecification?.id;
-                const lotSpecId = lot.rawMaterialSpecification?.id;
-                if (requiredSpecId && lotSpecId !== requiredSpecId) continue;
-                req.pepsLots.push({
-                    lotId: lot.id,
-                    lotCode: lot.supplierLotCode,
-                    warehouseId: lot.warehouse.id,
-                    warehouseName: lot.warehouse.name,
-                    available: Number(lot.quantityAvailable),
-                    receivedAt: lot.receivedAt,
-                    suggestedUse: 0,
-                });
-            }
-
-            // 3. Check Potential Suppliers (SupplierMaterial)
-            const supplierMaterials = await this.em.find(SupplierMaterial, { rawMaterial: { $in: materialIds } }, { populate: ['supplier'], orderBy: { lastPurchasePrice: 'ASC', lastPurchaseDate: 'DESC' } });
-            const allocations = await this.materialAllocationRepo.find(
-                { productionOrder: orderId, rawMaterial: { $in: materialIds }, lot: { $ne: null } },
-                {}
-            );
-            const allocationByMaterial = new Map<string, ProductionMaterialAllocation>();
-            for (const row of allocations) {
-                allocationByMaterial.set(row.rawMaterial.id, row);
-            }
-
-            for (const sm of supplierMaterials) {
-                if (requirements.has(sm.rawMaterial.id)) {
-                    const req = requirements.get(sm.rawMaterial.id)!;
-
-                    // Check if this is the cheapest (since list is sorted by ASC price, first one per material is cheapest)
-                    // But we might have multiple suppliers for same material.
-                    // We can mark the first encountered as cheapest or handle logic in frontend.
-                    // Since it's sorted by price ASC, the first one added to the array will be the cheapest.
-
-                    // Actually, if we just push all, the frontend can highlight. 
-                    // Let's rely on the sort from DB: cheapest checks across all supplier records.
-
-                    req.potentialSuppliers.push({
-                        supplier: sm.supplier,
-                        lastPrice: Number(sm.lastPurchasePrice),
-                        lastDate: sm.lastPurchaseDate,
-                        isCheapest: false // Will calculate after population
-                    });
-                }
-            }
-
-            // Post-process to mark cheapest
-            for (const req of requirements.values()) {
-                if (req.potentialSuppliers.length > 0) {
-                    // Sort again just to be sure
-                    req.potentialSuppliers.sort((a, b) => a.lastPrice - b.lastPrice);
-                    req.potentialSuppliers[0].isCheapest = true;
-                }
-                const allocation = allocationByMaterial.get(req.material.id);
-                if (allocation?.lot) {
-                    const selectedLot = req.pepsLots.find((lot) => lot.lotId === allocation.lot?.id);
-                    req.selectedAllocation = {
-                        lotId: allocation.lot.id,
-                        lotCode: selectedLot?.lotCode || 'Lote asignado',
-                        warehouseId: selectedLot?.warehouseId || '',
-                        warehouseName: selectedLot?.warehouseName || 'No disponible',
-                        quantityRequested: allocation.quantityRequested ? Number(allocation.quantityRequested) : undefined,
-                    };
-                }
-                let pending = Number(req.required);
-                if (allocation?.lot) {
-                    const selectedLot = req.pepsLots.find((lot) => lot.lotId === allocation.lot?.id);
-                    if (selectedLot) {
-                        const desired = Number(allocation.quantityRequested || req.required);
-                        const suggested = Math.min(desired, Number(selectedLot.available), pending);
-                        selectedLot.suggestedUse = suggested;
-                        pending -= suggested;
-                    }
-                }
-                for (const lot of req.pepsLots) {
-                    if (pending <= 0) break;
-                    if (allocation?.lot && lot.lotId === allocation.lot.id) continue;
-                    const use = Math.min(pending, Number(lot.available));
-                    lot.suggestedUse = use;
-                    pending -= use;
-                }
-            }
-        }
-
-        return Array.from(requirements.values());
+    async simulateMaterialRequirements(payload: z.infer<typeof SimulateProductionRequirementsSchema>) {
+        return this.buildMaterialRequirements(payload.items);
     }
 
     async upsertMaterialAllocation(orderId: string, payload: z.infer<typeof UpsertProductionMaterialAllocationSchema>) {

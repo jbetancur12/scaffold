@@ -457,6 +457,10 @@ export const CreateProductionOrderSchema = z.object({
     items: z.array(ProductionOrderItemCreateSchema).min(1, 'Debe agregar al menos un item'),
 });
 
+export const SimulateProductionRequirementsSchema = z.object({
+    items: z.array(ProductionOrderItemCreateSchema).min(1, 'Debe agregar al menos un item para simular'),
+});
+
 export const CreateProductionBatchSchema = z.object({
     variantId: z.string().uuid(),
     plannedQty: z.number().int().positive(),
@@ -1571,6 +1575,7 @@ export type CreateUserDto = z.infer<typeof CreateUserSchema>;
 export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;
 export type CreatePurchaseOrderDto = z.infer<typeof CreatePurchaseOrderSchema>;
 export type CreateProductionOrderDto = z.infer<typeof CreateProductionOrderSchema>;
+export type SimulateProductionRequirementsPayload = z.infer<typeof SimulateProductionRequirementsSchema>;
 export type LoginDto = z.infer<typeof LoginSchema>;
 export type RegisterDto = z.infer<typeof RegisterSchema>;
 export type CreateProductVariantDto = z.infer<typeof CreateProductVariantSchema>;

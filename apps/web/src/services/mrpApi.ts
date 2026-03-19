@@ -173,6 +173,7 @@ import type {
     CustomerShippingLabelPayload,
     RawMaterialCsvImportPayload,
     CalculateThreadConsumptionPayload,
+    SimulateProductionRequirementsPayload,
     CreateProductThreadProcessPayload,
     UpdateProductThreadProcessPayload,
     ProductionAnalyticsFilters,
@@ -827,6 +828,10 @@ export const mrpApi = {
     },
     getMaterialRequirements: async (orderId: string): Promise<MaterialRequirement[]> => {
         const response = await api.get<MaterialRequirement[]>(`/mrp/production-orders/${orderId}/requirements`);
+        return response.data;
+    },
+    simulateMaterialRequirements: async (payload: SimulateProductionRequirementsPayload): Promise<MaterialRequirement[]> => {
+        const response = await api.post<MaterialRequirement[]>('/mrp/production-orders/simulate-requirements', payload);
         return response.data;
     },
     calculateThreadConsumption: async (payload: CalculateThreadConsumptionPayload): Promise<ThreadConsumptionResult> => {

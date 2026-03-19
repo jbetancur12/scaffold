@@ -43,6 +43,7 @@ import {
     CreatePurchaseOrderSchema,
     ManualStockSchema,
     CreateProductionOrderSchema,
+    SimulateProductionRequirementsSchema,
     CreateProductVariantSchema,
     UpdateProductVariantSchema,
     CreateInvimaRegistrationSchema,
@@ -877,6 +878,16 @@ export class MrpController {
         try {
             const { id } = req.params;
             const requirements = await this.productionService.calculateMaterialRequirements(id);
+            return ApiResponse.success(res, requirements);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async simulateMaterialRequirements(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = SimulateProductionRequirementsSchema.parse(req.body);
+            const requirements = await this.productionService.simulateMaterialRequirements(payload);
             return ApiResponse.success(res, requirements);
         } catch (error) {
             next(error);

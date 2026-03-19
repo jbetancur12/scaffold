@@ -25,6 +25,7 @@ const RawMaterialFormPage = lazy(() => import('@/pages/mrp/RawMaterialFormPage')
 const RawMaterialDetailPage = lazy(() => import('@/pages/mrp/RawMaterialDetailPage'));
 const ProductionOrderListPage = lazy(() => import('@/pages/mrp/ProductionOrderListPage'));
 const ProductionOrderFormPage = lazy(() => import('@/pages/mrp/ProductionOrderFormPage'));
+const ProductionRequirementsSimulatorPage = lazy(() => import('@/pages/mrp/ProductionRequirementsSimulatorPage'));
 const InventoryDashboardPage = lazy(() => import('@/pages/mrp/InventoryDashboardPage'));
 const PurchaseOrderListPage = lazy(() => import('@/pages/mrp/PurchaseOrderListPage'));
 const PurchaseOrderFormPage = lazy(() => import('@/pages/mrp/PurchaseOrderFormPage'));
@@ -170,6 +171,7 @@ export default function App() {
                             <Route path="/mrp/raw-materials/:id/edit" element={<RawMaterialFormPage />} />
 
                             <Route path="/mrp/production-orders" element={<ProductionOrderListPage />} />
+                            <Route path="/mrp/production-orders/simulator" element={<ProductionRequirementsSimulatorPage />} />
                             <Route path="/mrp/production-orders/new" element={<ProductionOrderFormPage />} />
                             <Route path="/mrp/production-orders/:id" element={<ProductionOrderDetailPage />} />
                             <Route path="/mrp/production-orders/:id/edit" element={<ProductionOrderFormPage />} />

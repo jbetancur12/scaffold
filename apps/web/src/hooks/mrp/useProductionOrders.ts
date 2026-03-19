@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { ProductionBatch, ProductionBatchUnit, ProductionOrder, UpsertProductionBatchFinishedInspectionFormPayload, UpsertProductionBatchPackagingFormPayload } from '@scaffold/types';
 import { MaterialRequirement, mrpApi } from '@/services/mrpApi';
-import { CreateProductionOrderDto, ReturnProductionMaterialPayload, UpsertProductionMaterialAllocationPayload } from '@scaffold/schemas';
+import { CreateProductionOrderDto, ReturnProductionMaterialPayload, SimulateProductionRequirementsPayload, UpsertProductionMaterialAllocationPayload } from '@scaffold/schemas';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 import { invalidateMrpQueriesByPrefix, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
@@ -29,6 +29,15 @@ export const useProductionRequirementsQuery = (id?: string) => {
     }, [id]);
 
     return useMrpQuery(fetchRequirements, Boolean(id), id ? mrpQueryKeys.productionRequirements(id) : undefined);
+};
+
+export const useSimulateProductionRequirementsMutation = () => {
+    return useMrpMutation<SimulateProductionRequirementsPayload, MaterialRequirement[]>(
+        async (payload) => mrpApi.simulateMaterialRequirements(payload),
+        {
+            invalidateKeys: [mrpQueryKeys.productionRequirementsSimulation],
+        }
+    );
 };
 
 export const useProductionBatchesQuery = (orderId?: string) => {

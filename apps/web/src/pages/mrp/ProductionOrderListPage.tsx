@@ -13,7 +13,7 @@ import {
 import {
     Plus, Eye, Settings, Factory, Clock, CheckCircle2,
     Loader2, XCircle, FileText, ChevronDown, ChevronUp,
-    AlertCircle, Save
+    AlertCircle, Save, FlaskConical
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useProductionOrdersQuery } from '@/hooks/mrp/useProductionOrders';
@@ -129,6 +129,14 @@ export default function ProductionOrderListPage() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => navigate('/mrp/production-orders/simulator')}
+                                    className="rounded-xl border-cyan-200 text-cyan-700 hover:bg-cyan-50 font-medium h-10 px-4"
+                                >
+                                    <FlaskConical className="mr-2 h-4 w-4" />
+                                    Simulador
+                                </Button>
                                 <Button
                                     variant="outline"
                                     onClick={() => setShowPackagingSettings((prev) => !prev)}
