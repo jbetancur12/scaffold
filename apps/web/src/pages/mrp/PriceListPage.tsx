@@ -10,7 +10,7 @@ import { formatCurrency } from '@/lib/utils';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useProductGroupsQuery, useProductsQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
 import { mrpApi } from '@/services/mrpApi';
-import { Download, Package, Search, Settings, Plus, Trash2 } from 'lucide-react';
+import { Download, Package, Search, Columns, FileText, Plus, Trash2, Layers, TrendingDown, TrendingUp, Tag, ShoppingCart } from 'lucide-react';
 import { Product } from '@scaffold/types';
 import {
     Dialog,
@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type PriceRow = {
     productId: string;
@@ -529,7 +530,7 @@ export default function PriceListPage() {
                             className="h-9 px-3 border-slate-200 text-slate-600 hover:bg-slate-50 text-xs"
                             onClick={() => setColumnsModalOpen(true)}
                         >
-                            <Settings className="mr-1.5 h-3.5 w-3.5" />
+                            <Columns className="mr-1.5 h-3.5 w-3.5" />
                             Columnas
                         </Button>
                         <Button
@@ -539,7 +540,7 @@ export default function PriceListPage() {
                             onClick={openConfigModal}
                             disabled={loadingConfig}
                         >
-                            <Settings className="mr-1.5 h-3.5 w-3.5" />
+                            <FileText className="mr-1.5 h-3.5 w-3.5" />
                             Portada PDF
                         </Button>
                         <Button
@@ -565,28 +566,58 @@ export default function PriceListPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-500">Productos</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : summary.uniqueProducts}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="flex h-7 w-7 rounded-lg bg-emerald-50 items-center justify-center shrink-0">
+                            <Package className="h-3.5 w-3.5 text-emerald-600" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-500">Productos</p>
+                    </div>
+                    <p className="text-2xl font-bold text-slate-900">{loading ? '-' : summary.uniqueProducts}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-500">Variantes listadas</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : summary.variantCount}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="flex h-7 w-7 rounded-lg bg-blue-50 items-center justify-center shrink-0">
+                            <Layers className="h-3.5 w-3.5 text-blue-600" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-500">Variantes listadas</p>
+                    </div>
+                    <p className="text-2xl font-bold text-slate-900">{loading ? '-' : summary.variantCount}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-500">Costo prom.</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageProductionCost)}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="flex h-7 w-7 rounded-lg bg-orange-50 items-center justify-center shrink-0">
+                            <TrendingDown className="h-3.5 w-3.5 text-orange-500" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-500">Costo prom.</p>
+                    </div>
+                    <p className="text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageProductionCost)}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-500">Precio distribuidor prom.</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageDistributorPrice)}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="flex h-7 w-7 rounded-lg bg-violet-50 items-center justify-center shrink-0">
+                            <TrendingUp className="h-3.5 w-3.5 text-violet-600" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-500">Precio distribuidor prom.</p>
+                    </div>
+                    <p className="text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageDistributorPrice)}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-500">Precio manual prom.</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageManualPrice)}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="flex h-7 w-7 rounded-lg bg-slate-100 items-center justify-center shrink-0">
+                            <Tag className="h-3.5 w-3.5 text-slate-600" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-500">Precio manual prom.</p>
+                    </div>
+                    <p className="text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageManualPrice)}</p>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <p className="text-sm text-slate-500">PVP manual prom.</p>
-                    <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageManualPvpPrice)}</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="flex h-7 w-7 rounded-lg bg-pink-50 items-center justify-center shrink-0">
+                            <ShoppingCart className="h-3.5 w-3.5 text-pink-500" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-500">PVP manual prom.</p>
+                    </div>
+                    <p className="text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageManualPvpPrice)}</p>
                 </div>
             </div>
 
@@ -681,7 +712,7 @@ export default function PriceListPage() {
                                                             type="button"
                                                             size="sm"
                                                             variant="outline"
-                                                            className="h-9 shrink-0"
+                                                            className="h-9 shrink-0 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                                                             onClick={() => handleSaveManualPrice(row)}
                                                             disabled={savingManualPriceId === row.productId}
                                                         >
@@ -713,11 +744,9 @@ export default function PriceListPage() {
                                 <p className="text-sm font-semibold text-slate-800">Mostrar portada</p>
                                 <p className="text-xs text-slate-500">Incluye una primera hoja con políticas comerciales.</p>
                             </div>
-                            <input
-                                type="checkbox"
-                                className="h-4 w-4"
+                            <Checkbox
                                 checked={configForm.showCover}
-                                onChange={(e) => setConfigForm((prev) => ({ ...prev, showCover: e.target.checked }))}
+                                onCheckedChange={(checked) => setConfigForm((prev) => ({ ...prev, showCover: checked === true }))}
                             />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -739,14 +768,15 @@ export default function PriceListPage() {
                             </div>
                             <div className="space-y-2">
                                 <Label>Orientación del PDF</Label>
-                                <select
-                                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"
-                                    value={configForm.orientation}
-                                    onChange={(e) => setConfigForm((prev) => ({ ...prev, orientation: e.target.value as 'landscape' | 'portrait' }))}
-                                >
-                                    <option value="landscape">Horizontal (Landscape)</option>
-                                    <option value="portrait">Vertical (Portrait)</option>
-                                </select>
+                                <Select value={configForm.orientation} onValueChange={(value) => setConfigForm((prev) => ({ ...prev, orientation: value as 'landscape' | 'portrait' }))}>
+                                    <SelectTrigger className="h-10">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="landscape">Horizontal (Landscape)</SelectItem>
+                                        <SelectItem value="portrait">Vertical (Portrait)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="space-y-2">
@@ -844,14 +874,12 @@ export default function PriceListPage() {
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3">
                             {TABLE_COLUMN_LABELS.map((column) => (
-                                <label key={column.key} className="flex items-center gap-2 text-sm text-slate-700">
-                                    <input
-                                        type="checkbox"
-                                        className="h-4 w-4"
+                                <label key={column.key} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                    <Checkbox
                                         checked={visibleColumns[column.key]}
-                                        onChange={(e) => setVisibleColumns((prev) => ({
+                                        onCheckedChange={(checked) => setVisibleColumns((prev) => ({
                                             ...prev,
-                                            [column.key]: e.target.checked,
+                                            [column.key]: checked === true,
                                         }))}
                                     />
                                     <span>{column.label}</span>
@@ -931,7 +959,7 @@ export default function PriceListPage() {
                                 </SelectContent>
                             </Select>
                             <p className="text-xs text-slate-500">
-                                Cada descarga usa un snapshot trazable por mes y fuente: `A` automático, `M` manual.
+                                Cada descarga usa un snapshot trazable por mes y fuente: A (automático) o M (manual).
                             </p>
                         </div>
 
@@ -940,14 +968,12 @@ export default function PriceListPage() {
                                 <Label>Columnas del PDF</Label>
                                 <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3">
                                     {PDF_COLUMN_LABELS.map((column) => (
-                                        <label key={column.key} className="flex items-center gap-2 text-sm text-slate-700">
-                                            <input
-                                                type="checkbox"
-                                                className="h-4 w-4"
+                                        <label key={column.key} className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                                            <Checkbox
                                                 checked={downloadPdfColumns[column.key]}
-                                                onChange={(e) => setDownloadPdfColumns((prev) => ({
+                                                onCheckedChange={(checked) => setDownloadPdfColumns((prev) => ({
                                                     ...prev,
-                                                    [column.key]: e.target.checked,
+                                                    [column.key]: checked === true,
                                                 }))}
                                             />
                                             <span>{column.label}</span>
