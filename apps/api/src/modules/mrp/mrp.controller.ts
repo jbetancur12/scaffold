@@ -227,6 +227,16 @@ export class MrpController {
         return parsed.length > 0 ? parsed : undefined;
     }
 
+    private parsePriceListColumns(raw?: string) {
+        const allowed = new Set(['sku', 'name', 'sizes', 'colors', 'image', 'description', 'subtotal', 'iva', 'total']);
+        if (!raw) return undefined;
+        const parsed = raw
+            .split(',')
+            .map((token) => token.trim())
+            .filter((token) => allowed.has(token));
+        return parsed.length > 0 ? parsed as Array<'sku' | 'name' | 'sizes' | 'colors' | 'image' | 'description' | 'subtotal' | 'iva' | 'total'> : undefined;
+    }
+
     // --- Products ---
     async createProduct(req: Request, res: Response, next: NextFunction) {
         try {
@@ -263,7 +273,8 @@ export class MrpController {
             const data = UpdatePriceListConfigSchema.parse(req.body);
             const actor = this.resolveActor(req);
             const config = await this.priceListConfigService.updateConfig(data, actor);
-            await this.priceListSnapshotService.regenerateSnapshot();
+            await this.priceListSnapshotService.regenerateSnapshot(undefined, 'auto');
+            await this.priceListSnapshotService.regenerateSnapshot(undefined, 'manual');
             return ApiResponse.success(res, config, 'Configuración de portada actualizada');
         } catch (error) {
             next(error);
@@ -287,10 +298,15 @@ export class MrpController {
 
     async downloadPriceListPdf(req: Request, res: Response, next: NextFunction) {
         try {
-            const { month, version } = PriceListSnapshotsQuerySchema.parse(req.query);
-            const snapshot = await this.priceListSnapshotService.ensureSnapshot(month);
-            const selected = version ? await this.priceListSnapshotService.getSnapshot(snapshot.month, version) : snapshot;
-            const pdf = await this.productCatalogPdfService.generateProductCatalogPdfFromSnapshot(selected || snapshot);
+            const { month, version, priceSource, columns } = PriceListSnapshotsQuerySchema.parse(req.query);
+            const resolvedPriceSource = priceSource || 'auto';
+            const snapshot = await this.priceListSnapshotService.ensureSnapshot(month, resolvedPriceSource);
+            const selected = version
+                ? await this.priceListSnapshotService.getSnapshot(snapshot.month, version, resolvedPriceSource)
+                : snapshot;
+            const pdf = await this.productCatalogPdfService.generateProductCatalogPdfFromSnapshot(selected || snapshot, {
+                columns: this.parsePriceListColumns(columns),
+            });
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
             return res.send(pdf.buffer);
@@ -299,10 +315,27 @@ export class MrpController {
         }
     }
 
+    async downloadPriceListCsv(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { month, version, priceSource } = PriceListSnapshotsQuerySchema.parse(req.query);
+            const resolvedPriceSource = priceSource || 'auto';
+            const snapshot = await this.priceListSnapshotService.ensureSnapshot(month, resolvedPriceSource);
+            const selected = version
+                ? await this.priceListSnapshotService.getSnapshot(snapshot.month, version, resolvedPriceSource)
+                : snapshot;
+            const file = this.priceListSnapshotService.exportSnapshotCsv(selected || snapshot);
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+            return res.send(file.content);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async listPriceListSnapshots(req: Request, res: Response, next: NextFunction) {
         try {
-            const { month } = PriceListSnapshotsQuerySchema.parse(req.query);
-            const rows = await this.priceListSnapshotService.listSnapshots(month);
+            const { month, priceSource } = PriceListSnapshotsQuerySchema.parse(req.query);
+            const rows = await this.priceListSnapshotService.listSnapshots(month, priceSource);
             return ApiResponse.success(res, rows);
         } catch (error) {
             next(error);
@@ -311,8 +344,8 @@ export class MrpController {
 
     async regeneratePriceListSnapshot(req: Request, res: Response, next: NextFunction) {
         try {
-            const { month } = PriceListSnapshotsQuerySchema.parse(req.query);
-            const row = await this.priceListSnapshotService.regenerateSnapshot(month);
+            const { month, priceSource } = PriceListSnapshotsQuerySchema.parse(req.query);
+            const row = await this.priceListSnapshotService.regenerateSnapshot(month, priceSource || 'auto');
             return ApiResponse.success(res, row, 'Snapshot regenerado');
         } catch (error) {
             next(error);

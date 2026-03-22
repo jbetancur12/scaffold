@@ -39,6 +39,7 @@ export class ProductService {
             name: product.name,
             categoryId: product.category?.id,
             requiresInvima: product.requiresInvima,
+            manualPrice: product.manualPrice,
             productReference: product.productReference,
             invimaRegistrationId: product.invimaRegistration?.id,
         };
@@ -466,6 +467,7 @@ export class ProductService {
 
         const product = this.productRepo.create({
             ...productData,
+            manualPrice: productData.manualPrice ?? undefined,
             category,
             invimaRegistration,
         } as unknown as Product);
@@ -588,6 +590,7 @@ export class ProductService {
         const before = this.buildProductSnapshot(product);
         this.productRepo.assign(product, {
             ...productData,
+            manualPrice: productData.manualPrice ?? undefined,
             category,
             invimaRegistration,
         });

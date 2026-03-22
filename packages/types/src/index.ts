@@ -761,10 +761,14 @@ export interface PriceListSnapshotItem {
     sku: string;
     name: string;
     description: string;
+    sizes: string;
+    colors: string;
     categoryId?: string;
     groupName: string;
     groupSortOrder: number;
     price: number;
+    manualPrice?: number | null;
+    selectedPrice: number;
     taxStatus: ProductTaxStatus;
     taxRate: number;
     imageFilePath?: string;
@@ -776,6 +780,7 @@ export interface PriceListSnapshot {
     id: string;
     month: string; // YYYY-MM
     version: number;
+    priceSource: 'auto' | 'manual';
     configSnapshot: PriceListConfigSnapshot;
     items: PriceListSnapshotItem[];
     source?: 'auto' | 'manual';
@@ -808,6 +813,7 @@ export interface Product {
     category?: Pick<ProductGroup, 'id' | 'name' | 'slug' | 'parentId' | 'sortOrder'>;
     requiresInvima: boolean;
     showInCatalogPdf: boolean;
+    manualPrice?: number;
     productReference?: string;
     invimaRegistrationId?: string;
     invimaRegistration?: Pick<InvimaRegistration, 'id' | 'code' | 'status' | 'holderName' | 'manufacturerName' | 'validFrom' | 'validUntil'>;

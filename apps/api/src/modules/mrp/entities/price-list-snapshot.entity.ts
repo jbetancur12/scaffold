@@ -10,6 +10,9 @@ export class PriceListSnapshot extends BaseEntity implements IPriceListSnapshot 
     @Property({ type: 'integer' })
     version!: number;
 
+    @Property({ default: 'auto' })
+    priceSource!: 'auto' | 'manual';
+
     @Property({ type: 'json' })
     configSnapshot!: IPriceListSnapshot['configSnapshot'];
 

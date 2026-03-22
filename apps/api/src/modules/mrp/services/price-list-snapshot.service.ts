@@ -22,14 +22,16 @@ export class PriceListSnapshotService {
         return `${year}-${month}`;
     }
 
-    async listSnapshots(month?: string) {
+    async listSnapshots(month?: string, priceSource?: 'auto' | 'manual') {
         const where: FilterQuery<PriceListSnapshot> = month ? { month } : {};
-        return this.snapshotRepo.find(where, { orderBy: { month: 'DESC', version: 'DESC' } });
+        if (priceSource) where.priceSource = priceSource;
+        return this.snapshotRepo.find(where, { orderBy: { month: 'DESC', priceSource: 'ASC', version: 'DESC' } });
     }
 
-    async getSnapshot(month: string, version?: number) {
+    async getSnapshot(month: string, version?: number, priceSource?: 'auto' | 'manual') {
         const where: FilterQuery<PriceListSnapshot> = { month };
         if (version) where.version = version;
+        if (priceSource) where.priceSource = priceSource;
         return this.snapshotRepo.findOne(where, { orderBy: { version: 'DESC', createdAt: 'DESC' } });
     }
 
@@ -48,7 +50,30 @@ export class PriceListSnapshotService {
         return sorted[0];
     }
 
-    private async buildSnapshotItems() {
+    private collectVariantAttributes(product: Product) {
+        const variants = product.variants?.getItems?.() ?? [];
+        const uniqueSizes = Array.from(
+            new Set(
+                variants
+                    .map((variant) => variant.size || variant.sizeCode || '')
+                    .filter((value) => value.trim().length > 0)
+            )
+        );
+        const uniqueColors = Array.from(
+            new Set(
+                variants
+                    .map((variant) => variant.color || variant.colorCode || '')
+                    .filter((value) => value.trim().length > 0)
+            )
+        );
+
+        return {
+            sizes: uniqueSizes.join(', '),
+            colors: uniqueColors.join(', '),
+        };
+    }
+
+    private async buildSnapshotItems(priceSource: 'auto' | 'manual') {
         const products = await this.productRepo.find(
             { showInCatalogPdf: true },
             { populate: ['variants', 'category', 'images'], orderBy: { name: 'ASC' } }
@@ -57,15 +82,22 @@ export class PriceListSnapshotService {
         return products.map((product) => {
             const variant = this.pickVariant(product);
             const image = this.pickImage(product.images?.getItems?.() ?? []);
+            const attributes = this.collectVariantAttributes(product);
             return {
                 productId: product.id,
                 sku: product.sku,
                 name: product.name,
                 description: product.description || 'Sin descripción',
+                sizes: attributes.sizes,
+                colors: attributes.colors,
                 categoryId: product.category?.id,
                 groupName: product.category?.name || 'Sin grupo',
                 groupSortOrder: Number(product.category?.sortOrder ?? 9999),
                 price: Number(variant?.price || 0),
+                manualPrice: product.manualPrice != null ? Number(product.manualPrice) : undefined,
+                selectedPrice: priceSource === 'manual'
+                    ? Number(product.manualPrice ?? 0)
+                    : Number(variant?.price || 0),
                 taxStatus: variant?.taxStatus || ProductTaxStatus.EXCLUIDO,
                 taxRate: Number(variant?.taxRate || 0),
                 imageFilePath: image?.filePath,
@@ -75,22 +107,23 @@ export class PriceListSnapshotService {
         });
     }
 
-    async ensureSnapshot(month?: string) {
+    async ensureSnapshot(month?: string, priceSource: 'auto' | 'manual' = 'auto') {
         const key = month || this.resolveMonthKey();
-        const existing = await this.getSnapshot(key);
+        const existing = await this.getSnapshot(key, undefined, priceSource);
         if (existing) return existing;
-        return this.createSnapshot(key, 'auto');
+        return this.createSnapshot(key, priceSource, 'auto');
     }
 
-    async createSnapshot(month: string, source: 'auto' | 'manual') {
-        const latest = await this.getSnapshot(month);
+    async createSnapshot(month: string, priceSource: 'auto' | 'manual', source: 'auto' | 'manual') {
+        const latest = await this.getSnapshot(month, undefined, priceSource);
         const nextVersion = latest ? latest.version + 1 : 1;
         const config = await this.configService.getConfig();
-        const items = await this.buildSnapshotItems();
+        const items = await this.buildSnapshotItems(priceSource);
         const now = new Date();
         const row = this.snapshotRepo.create({
             month,
             version: nextVersion,
+            priceSource,
             configSnapshot: {
                 showCover: config.showCover,
                 orientation: config.orientation,
@@ -108,8 +141,38 @@ export class PriceListSnapshotService {
         return row;
     }
 
-    async regenerateSnapshot(month?: string) {
+    async regenerateSnapshot(month?: string, priceSource: 'auto' | 'manual' = 'auto') {
         const key = month || this.resolveMonthKey();
-        return this.createSnapshot(key, 'manual');
+        return this.createSnapshot(key, priceSource, 'manual');
+    }
+
+    exportSnapshotCsv(snapshot: PriceListSnapshot) {
+        const csvCell = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+        const rows: Array<Array<string | number>> = [
+            ['CODIGO', 'ARTICULO', 'GRUPO', 'PRECIO AUTOMATICO', 'PRECIO MANUAL', 'PRECIO SNAPSHOT', 'VERSION'],
+        ];
+
+        const items = [...(snapshot.items || [])].sort((a, b) => {
+            const groupCompare = a.groupName.localeCompare(b.groupName);
+            if (groupCompare !== 0) return groupCompare;
+            return a.sku.localeCompare(b.sku);
+        });
+
+        for (const item of items) {
+            rows.push([
+                item.sku,
+                item.name,
+                item.groupName,
+                Number(item.price || 0).toFixed(2),
+                Number(item.manualPrice ?? 0).toFixed(2),
+                Number(item.selectedPrice || 0).toFixed(2),
+                `v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}`,
+            ]);
+        }
+
+        return {
+            fileName: `lista_precios_${snapshot.month}_v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}.csv`,
+            content: `\ufeff${rows.map((row) => row.map(csvCell).join(',')).join('\n')}`,
+        };
     }
 }

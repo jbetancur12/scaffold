@@ -233,6 +233,7 @@ const ProductBaseSchema = z.object({
     categoryId: z.string().uuid().optional(),
     requiresInvima: z.boolean().default(false),
     showInCatalogPdf: z.boolean().default(true),
+    manualPrice: z.number().min(0).nullable().optional(),
     productReference: z.string().min(2).optional(),
     invimaRegistrationId: z.string().uuid().optional(),
 });
@@ -594,6 +595,8 @@ export const ListProductGroupsQuerySchema = z.object({
 export const PriceListSnapshotsQuerySchema = z.object({
     month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
     version: z.coerce.number().int().positive().optional(),
+    priceSource: z.enum(['auto', 'manual']).optional(),
+    columns: z.string().optional(),
 });
 
 export const PriceListConfigSchema = z.object({

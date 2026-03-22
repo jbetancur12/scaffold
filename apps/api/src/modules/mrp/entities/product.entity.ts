@@ -45,6 +45,9 @@ export class Product extends BaseEntity {
     @Property({ fieldName: 'show_in_catalog_pdf', default: true })
     showInCatalogPdf: boolean = true;
 
+    @Property({ type: 'decimal', precision: 12, scale: 2, nullable: true, fieldName: 'manual_price' })
+    manualPrice?: number;
+
     @Property({ nullable: true })
     productReference?: string;
 

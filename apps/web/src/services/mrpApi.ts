@@ -388,25 +388,43 @@ export const mrpApi = {
         });
         return response.data as Blob;
     },
-    downloadPriceListPdf: async (month?: string, version?: number): Promise<Blob> => {
+    downloadPriceListPdf: async (
+        month?: string,
+        version?: number,
+        priceSource?: 'auto' | 'manual',
+        columns?: string[]
+    ): Promise<Blob> => {
         const response = await api.get('/mrp/price-list/pdf', {
             responseType: 'blob',
             params: {
                 month: month || undefined,
                 version: version || undefined,
+                priceSource: priceSource || undefined,
+                columns: columns && columns.length > 0 ? columns.join(',') : undefined,
             },
         });
         return response.data as Blob;
     },
-    getPriceListSnapshots: async (month?: string): Promise<PriceListSnapshot[]> => {
+    downloadPriceListCsv: async (month?: string, version?: number, priceSource?: 'auto' | 'manual'): Promise<Blob> => {
+        const response = await api.get('/mrp/price-list/csv', {
+            responseType: 'blob',
+            params: {
+                month: month || undefined,
+                version: version || undefined,
+                priceSource: priceSource || undefined,
+            },
+        });
+        return response.data as Blob;
+    },
+    getPriceListSnapshots: async (month?: string, priceSource?: 'auto' | 'manual'): Promise<PriceListSnapshot[]> => {
         const response = await api.get('/mrp/price-list/snapshots', {
-            params: { month: month || undefined },
+            params: { month: month || undefined, priceSource: priceSource || undefined },
         });
         return response.data;
     },
-    regeneratePriceListSnapshot: async (month?: string): Promise<PriceListSnapshot> => {
+    regeneratePriceListSnapshot: async (month?: string, priceSource?: 'auto' | 'manual'): Promise<PriceListSnapshot> => {
         const response = await api.post('/mrp/price-list/snapshots/regenerate', null, {
-            params: { month: month || undefined },
+            params: { month: month || undefined, priceSource: priceSource || undefined },
         });
         return response.data;
     },

@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { formatCurrency } from '@/lib/utils';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
-import { useProductGroupsQuery, useProductsQuery } from '@/hooks/mrp/useProducts';
+import { useProductGroupsQuery, useProductsQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
 import { mrpApi } from '@/services/mrpApi';
 import { Download, Package, Search, Settings, Plus, Trash2 } from 'lucide-react';
 import { Product } from '@scaffold/types';
@@ -33,6 +34,7 @@ type PriceRow = {
     productionCost: number;
     costPlus40: number;
     distributorPrice: number;
+    manualPrice?: number;
     pvpPrice: number;
 };
 
@@ -42,10 +44,33 @@ type GroupedPriceRows = {
     rows: PriceRow[];
 };
 
-const EXPORT_LIMIT = 5000;
-const LIST_LIMIT = 1000;
+type PdfColumnKey = 'sku' | 'name' | 'sizes' | 'colors' | 'image' | 'description' | 'subtotal' | 'iva' | 'total';
 
-const csvCell = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+const DEFAULT_PDF_COLUMNS: Record<PdfColumnKey, boolean> = {
+    sku: true,
+    name: true,
+    sizes: true,
+    colors: true,
+    image: false,
+    description: false,
+    subtotal: true,
+    iva: true,
+    total: true,
+};
+
+const PDF_COLUMN_LABELS: Array<{ key: PdfColumnKey; label: string }> = [
+    { key: 'sku', label: 'SKU' },
+    { key: 'name', label: 'Producto' },
+    { key: 'sizes', label: 'Tallas' },
+    { key: 'colors', label: 'Colores' },
+    { key: 'image', label: 'Imagen' },
+    { key: 'description', label: 'Descripcion' },
+    { key: 'subtotal', label: 'Subtotal' },
+    { key: 'iva', label: 'IVA' },
+    { key: 'total', label: 'Total' },
+];
+
+const LIST_LIMIT = 1000;
 
 const buildRows = (products: Product[]): PriceRow[] => {
     return (products || []).map((product) => {
@@ -81,6 +106,7 @@ const buildRows = (products: Product[]): PriceRow[] => {
             productionCost: maxCost,
             costPlus40: maxCost * 1.4,
             distributorPrice: maxDistributorPrice,
+            manualPrice: product.manualPrice != null ? Number(product.manualPrice) : undefined,
             pvpPrice: maxPvpPrice,
         };
     }).sort((a, b) => {
@@ -92,9 +118,17 @@ const buildRows = (products: Product[]): PriceRow[] => {
 
 export default function PriceListPage() {
     const { toast } = useToast();
+    const saveProductMutation = useSaveProductMutation();
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [categoryId, setCategoryId] = useState('');
+    const [manualPriceDrafts, setManualPriceDrafts] = useState<Record<string, number | undefined>>({});
+    const [savingManualPriceId, setSavingManualPriceId] = useState<string | null>(null);
+    const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+    const [downloadFormat, setDownloadFormat] = useState<'pdf' | 'csv'>('pdf');
+    const [downloadPriceSource, setDownloadPriceSource] = useState<'auto' | 'manual'>('auto');
+    const [downloadPdfColumns, setDownloadPdfColumns] = useState<Record<PdfColumnKey, boolean>>(DEFAULT_PDF_COLUMNS);
+    const [downloadingFile, setDownloadingFile] = useState(false);
     const [configOpen, setConfigOpen] = useState(false);
     const [loadingConfig, setLoadingConfig] = useState(false);
     const [savingConfig, setSavingConfig] = useState(false);
@@ -115,8 +149,8 @@ export default function PriceListPage() {
         sections: [] as Array<{ title: string; body: string }>,
     });
     const [snapshotMonth, setSnapshotMonth] = useState(() => new Date().toISOString().slice(0, 7));
-    const [snapshotVersion, setSnapshotVersion] = useState<number | null>(null);
-    const [snapshots, setSnapshots] = useState<Array<{ version: number; createdAt: string | Date }>>([]);
+    const [downloadSnapshotVersion, setDownloadSnapshotVersion] = useState<number | null>(null);
+    const [snapshots, setSnapshots] = useState<Array<{ version: number; createdAt: string | Date; priceSource: 'auto' | 'manual' }>>([]);
     const [loadingSnapshots, setLoadingSnapshots] = useState(false);
     const [regeneratingSnapshot, setRegeneratingSnapshot] = useState(false);
 
@@ -170,10 +204,13 @@ export default function PriceListPage() {
             try {
                 const rows = await mrpApi.getPriceListSnapshots(snapshotMonth);
                 const normalized = rows
-                    .map((row) => ({ version: row.version, createdAt: row.createdAt }))
-                    .sort((a, b) => b.version - a.version);
+                    .map((row) => ({ version: row.version, createdAt: row.createdAt, priceSource: row.priceSource }))
+                    .sort((a, b) => {
+                        if (a.priceSource !== b.priceSource) return a.priceSource.localeCompare(b.priceSource);
+                        return b.version - a.version;
+                    });
                 setSnapshots(normalized);
-                setSnapshotVersion(null);
+                setDownloadSnapshotVersion(null);
             } catch (snapshotError) {
                 toast({
                     title: 'Error',
@@ -188,6 +225,14 @@ export default function PriceListPage() {
     }, [snapshotMonth]);
 
     const rows = useMemo(() => buildRows(productsResponse?.products || []), [productsResponse?.products]);
+
+    useEffect(() => {
+        setManualPriceDrafts(
+            Object.fromEntries(
+                rows.map((row) => [row.productId, row.manualPrice])
+            )
+        );
+    }, [rows]);
 
     const filteredRows = useMemo(() => {
         const normalized = debouncedSearch.toLowerCase();
@@ -205,11 +250,13 @@ export default function PriceListPage() {
         const totalProductionCost = filteredRows.reduce((sum, row) => sum + row.productionCost, 0);
         const totalDistributorPrice = filteredRows.reduce((sum, row) => sum + row.distributorPrice, 0);
         const uniqueProducts = new Set(filteredRows.map((row) => row.productId)).size;
+        const totalManualPrice = filteredRows.reduce((sum, row) => sum + Number(row.manualPrice || 0), 0);
         return {
             uniqueProducts,
             variantCount: (productsResponse?.products || []).reduce((sum, product) => sum + (product.variants?.length || 0), 0),
             averageProductionCost: filteredRows.length > 0 ? totalProductionCost / filteredRows.length : 0,
             averageDistributorPrice: filteredRows.length > 0 ? totalDistributorPrice / filteredRows.length : 0,
+            averageManualPrice: filteredRows.length > 0 ? totalManualPrice / filteredRows.length : 0,
         };
     }, [filteredRows, productsResponse?.products]);
 
@@ -241,6 +288,26 @@ export default function PriceListPage() {
             }));
     }, [filteredRows]);
 
+    const handleSaveManualPrice = async (row: PriceRow) => {
+        const manualPrice = manualPriceDrafts[row.productId];
+        setSavingManualPriceId(row.productId);
+        try {
+            await saveProductMutation.execute({
+                id: row.productId,
+                payload: { manualPrice: manualPrice ?? null } as Partial<Product>,
+            });
+            toast({ title: 'Listo', description: `Precio manual actualizado para ${row.productName}.` });
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo guardar el precio manual'),
+                variant: 'destructive',
+            });
+        } finally {
+            setSavingManualPriceId(null);
+        }
+    };
+
     const downloadBlob = (blob: Blob, fileName: string) => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -252,97 +319,55 @@ export default function PriceListPage() {
         URL.revokeObjectURL(url);
     };
 
-    const handleExport = async () => {
-        try {
-            const { products } = await mrpApi.getProducts(1, EXPORT_LIMIT, debouncedSearch, categoryId);
-            const exportRows = buildRows(products);
-            const csvRows = [
-                ['CODIGO', 'ARTICULO', 'GRUPO', 'TALLAS', 'COLORES', 'COSTO PRODUCCION', 'COSTO + 40%', 'PRECIO DISTRIBUIDOR', 'PVP SUGERIDO'],
-            ];
-
-            const groupedExportRows = exportRows.reduce<Map<string, { groupName: string; groupSortOrder: number; rows: PriceRow[] }>>((acc, row) => {
-                const current = acc.get(row.groupName) || { groupName: row.groupName, groupSortOrder: row.groupSortOrder, rows: [] };
-                current.groupSortOrder = Math.min(current.groupSortOrder, row.groupSortOrder);
-                current.rows.push(row);
-                acc.set(row.groupName, current);
-                return acc;
-            }, new Map());
-
-            Array.from(groupedExportRows.values())
-                .sort((a, b) => {
-                    const normalize = (value: string) => value.trim().toLowerCase();
-                    const aKey = normalize(a.groupName);
-                    const bKey = normalize(b.groupName);
-                    const aIsOther = aKey === 'otros' || aKey === 'sin grupo';
-                    const bIsOther = bKey === 'otros' || bKey === 'sin grupo';
-                    if (aIsOther && !bIsOther) return 1;
-                    if (bIsOther && !aIsOther) return -1;
-                    if (a.groupSortOrder !== b.groupSortOrder) return a.groupSortOrder - b.groupSortOrder;
-                    return a.groupName.localeCompare(b.groupName);
-                })
-                .forEach((group) => {
-                    csvRows.push(['', '', group.groupName.toUpperCase(), '', '', '', '', '', '']);
-                    group.rows
-                        .sort((a, b) => a.productSku.localeCompare(b.productSku))
-                        .forEach((row) => {
-                            csvRows.push([
-                                row.productSku,
-                                row.productName,
-                                row.groupName,
-                                row.sizes,
-                                row.colors,
-                                row.productionCost.toFixed(2),
-                                row.costPlus40.toFixed(2),
-                                row.distributorPrice.toFixed(2),
-                                row.pvpPrice.toFixed(2),
-                            ]);
-                        });
-                });
-
-            const csvContent = `\ufeff${csvRows.map((row) => row.map(csvCell).join(',')).join('\n')}`;
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `lista_precios_${new Date().toISOString().slice(0, 10)}.csv`;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
-        } catch (exportError) {
-            toast({
-                title: 'Error',
-                description: getErrorMessage(exportError, 'No se pudo exportar la lista de precios'),
-                variant: 'destructive',
-            });
-        }
+    const openDownloadModal = (format: 'pdf' | 'csv') => {
+        setDownloadFormat(format);
+        setDownloadPriceSource('auto');
+        setDownloadSnapshotVersion(null);
+        setDownloadPdfColumns(DEFAULT_PDF_COLUMNS);
+        setDownloadModalOpen(true);
     };
 
-    const handleExportPdf = async () => {
+    const handleDownload = async () => {
+        setDownloadingFile(true);
         try {
-            const blob = await mrpApi.downloadPriceListPdf(snapshotMonth, snapshotVersion || undefined);
-            const versionLabel = snapshotVersion ? `_v${snapshotVersion}` : '';
-            downloadBlob(blob, `lista_precios_${snapshotMonth}${versionLabel}.pdf`);
+            const selectedPdfColumns = PDF_COLUMN_LABELS
+                .filter((column) => downloadPdfColumns[column.key])
+                .map((column) => column.key);
+            const blob = downloadFormat === 'pdf'
+                ? await mrpApi.downloadPriceListPdf(snapshotMonth, downloadSnapshotVersion || undefined, downloadPriceSource, selectedPdfColumns)
+                : await mrpApi.downloadPriceListCsv(snapshotMonth, downloadSnapshotVersion || undefined, downloadPriceSource);
+            const extension = downloadFormat === 'pdf' ? 'pdf' : 'csv';
+            downloadBlob(
+                blob,
+                `lista_precios_${snapshotMonth}_${downloadSnapshotVersion ? `v${downloadSnapshotVersion}` : 'ultima'}-${downloadPriceSource === 'manual' ? 'M' : 'A'}.${extension}`
+            );
+            setDownloadModalOpen(false);
         } catch (exportError) {
             toast({
                 title: 'Error',
-                description: getErrorMessage(exportError, 'No se pudo exportar el catálogo PDF'),
+                description: getErrorMessage(exportError, `No se pudo exportar la lista en ${downloadFormat.toUpperCase()}`),
                 variant: 'destructive',
             });
+        } finally {
+            setDownloadingFile(false);
         }
     };
 
     const handleRegenerateSnapshot = async () => {
         setRegeneratingSnapshot(true);
         try {
-            await mrpApi.regeneratePriceListSnapshot(snapshotMonth);
+            await mrpApi.regeneratePriceListSnapshot(snapshotMonth, 'auto');
+            await mrpApi.regeneratePriceListSnapshot(snapshotMonth, 'manual');
             const rows = await mrpApi.getPriceListSnapshots(snapshotMonth);
             const normalized = rows
-                .map((row) => ({ version: row.version, createdAt: row.createdAt }))
-                .sort((a, b) => b.version - a.version);
+                .map((row) => ({ version: row.version, createdAt: row.createdAt, priceSource: row.priceSource }))
+                .sort((a, b) => {
+                    if (a.priceSource !== b.priceSource) return a.priceSource.localeCompare(b.priceSource);
+                    return b.version - a.version;
+                });
             setSnapshots(normalized);
-            setSnapshotVersion(normalized[0]?.version || null);
-            toast({ title: 'Listo', description: 'Se creó una nueva versión del mes.' });
+            setDownloadSnapshotVersion(null);
+            toast({ title: 'Listo', description: 'Se crearon nuevas versiones A y M del mes.' });
         } catch (snapshotError) {
             toast({
                 title: 'Error',
@@ -436,22 +461,6 @@ export default function PriceListPage() {
                                 onChange={(e) => setSnapshotMonth(e.target.value)}
                             />
                         </div>
-                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 h-9">
-                            <label className="text-xs font-medium text-slate-400">Versión</label>
-                            <select
-                                className="text-sm text-slate-700 bg-transparent outline-none"
-                                value={snapshotVersion ?? ''}
-                                onChange={(e) => setSnapshotVersion(e.target.value ? Number(e.target.value) : null)}
-                                disabled={loadingSnapshots}
-                            >
-                                <option value="">Última</option>
-                                {snapshots.map((snap) => (
-                                    <option key={`v-${snap.version}`} value={snap.version}>
-                                        v{snap.version}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
                         <Button
                             variant="outline"
                             size="sm"
@@ -476,7 +485,7 @@ export default function PriceListPage() {
                             Portada PDF
                         </Button>
                         <Button
-                            onClick={handleExportPdf}
+                            onClick={() => openDownloadModal('pdf')}
                             variant="outline"
                             size="sm"
                             className="h-9 px-3 border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs"
@@ -485,7 +494,7 @@ export default function PriceListPage() {
                             Descargar PDF
                         </Button>
                         <Button
-                            onClick={handleExport}
+                            onClick={() => openDownloadModal('csv')}
                             size="sm"
                             className="h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
                         >
@@ -496,7 +505,7 @@ export default function PriceListPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-500">Productos</p>
                     <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : summary.uniqueProducts}</p>
@@ -512,6 +521,10 @@ export default function PriceListPage() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-500">Precio distribuidor prom.</p>
                     <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageDistributorPrice)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-sm text-slate-500">Precio manual prom.</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageManualPrice)}</p>
                 </div>
             </div>
 
@@ -557,27 +570,28 @@ export default function PriceListPage() {
                                 <TableHead className="text-white font-semibold whitespace-nowrap">Colores</TableHead>
                                 <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo produccion</TableHead>
                                 <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo + 40%</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">Precio distribuidor</TableHead>
+                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">Precio automatico</TableHead>
+                                <TableHead className="text-white font-semibold whitespace-nowrap">Precio manual</TableHead>
                                 <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP sugerido</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="h-32 text-center text-slate-500">
+                                    <TableCell colSpan={10} className="h-32 text-center text-slate-500">
                                         Cargando lista de precios...
                                     </TableCell>
                                 </TableRow>
                             ) : groupedRows.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={9} className="h-32 text-center text-slate-500">
+                                    <TableCell colSpan={10} className="h-32 text-center text-slate-500">
                                         No hay productos que coincidan con los filtros actuales.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 groupedRows.flatMap((group) => ([
                                     <TableRow key={`group-${group.groupName}`} className="bg-emerald-800 hover:bg-emerald-800">
-                                        <TableCell colSpan={9} className="py-2 text-center font-bold uppercase tracking-[0.2em] text-white">
+                                        <TableCell colSpan={10} className="py-2 text-center font-bold uppercase tracking-[0.2em] text-white">
                                             {group.groupName}
                                         </TableCell>
                                     </TableRow>,
@@ -591,6 +605,25 @@ export default function PriceListPage() {
                                             <TableCell className="text-right">{formatCurrency(row.productionCost)}</TableCell>
                                             <TableCell className="text-right font-semibold text-slate-900">{formatCurrency(row.costPlus40)}</TableCell>
                                             <TableCell className="text-right">{formatCurrency(row.distributorPrice)}</TableCell>
+                                            <TableCell>
+                                                <div className="flex min-w-[220px] items-center gap-2">
+                                                    <CurrencyInput
+                                                        value={manualPriceDrafts[row.productId]}
+                                                        onValueChange={(value) => setManualPriceDrafts((prev) => ({ ...prev, [row.productId]: value }))}
+                                                        className="h-9"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-9 shrink-0"
+                                                        onClick={() => handleSaveManualPrice(row)}
+                                                        disabled={savingManualPriceId === row.productId}
+                                                    >
+                                                        {savingManualPriceId === row.productId ? 'Guardando...' : 'Guardar'}
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
                                             <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>
                                         </TableRow>
                                     )),
@@ -727,6 +760,107 @@ export default function PriceListPage() {
                         </Button>
                         <Button onClick={handleSaveConfig} disabled={savingConfig}>
                             {savingConfig ? 'Guardando...' : 'Guardar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={downloadModalOpen} onOpenChange={setDownloadModalOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Descargar Lista</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Formato</Label>
+                            <Select value={downloadFormat} onValueChange={(value) => setDownloadFormat(value as 'pdf' | 'csv')}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="pdf">PDF</SelectItem>
+                                    <SelectItem value="csv">CSV</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Fuente de precio</Label>
+                            <Select value={downloadPriceSource} onValueChange={(value) => {
+                                setDownloadPriceSource(value as 'auto' | 'manual');
+                                setDownloadSnapshotVersion(null);
+                            }}>
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="auto">Automático (A)</SelectItem>
+                                    <SelectItem value="manual">Manual (M)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Versión snapshot</Label>
+                            <Select
+                                value={downloadSnapshotVersion ? String(downloadSnapshotVersion) : '__latest__'}
+                                onValueChange={(value) => setDownloadSnapshotVersion(value === '__latest__' ? null : Number(value))}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Última versión" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__latest__">
+                                        Última {downloadPriceSource === 'manual' ? '(M)' : '(A)'}
+                                    </SelectItem>
+                                    {snapshots
+                                        .filter((snap) => snap.priceSource === downloadPriceSource)
+                                        .map((snap) => (
+                                            <SelectItem key={`${snap.priceSource}-${snap.version}`} value={String(snap.version)}>
+                                                {`v${snap.version}-${snap.priceSource === 'manual' ? 'M' : 'A'}`}
+                                            </SelectItem>
+                                        ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-slate-500">
+                                Cada descarga usa un snapshot trazable por mes y fuente: `A` automático, `M` manual.
+                            </p>
+                        </div>
+
+                        {downloadFormat === 'pdf' && (
+                            <div className="space-y-2">
+                                <Label>Columnas del PDF</Label>
+                                <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3">
+                                    {PDF_COLUMN_LABELS.map((column) => (
+                                        <label key={column.key} className="flex items-center gap-2 text-sm text-slate-700">
+                                            <input
+                                                type="checkbox"
+                                                className="h-4 w-4"
+                                                checked={downloadPdfColumns[column.key]}
+                                                onChange={(e) => setDownloadPdfColumns((prev) => ({
+                                                    ...prev,
+                                                    [column.key]: e.target.checked,
+                                                }))}
+                                            />
+                                            <span>{column.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-slate-500">
+                                    Por defecto, `Imagen` y `Descripcion` vienen deshabilitadas.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDownloadModalOpen(false)} disabled={downloadingFile}>
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleDownload}
+                            disabled={downloadingFile || loadingSnapshots || (downloadFormat === 'pdf' && !Object.values(downloadPdfColumns).some(Boolean))}
+                        >
+                            {downloadingFile ? 'Descargando...' : 'Descargar'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

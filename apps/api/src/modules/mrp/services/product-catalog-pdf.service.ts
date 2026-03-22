@@ -8,6 +8,8 @@ import { AppError } from '../../../shared/utils/response';
 import { PriceListSnapshot, PriceListSnapshotItem, ProductTaxStatus } from '@scaffold/types';
 import { PriceListConfigService } from './price-list-config.service';
 
+type PriceListPdfColumn = 'sku' | 'name' | 'sizes' | 'colors' | 'image' | 'description' | 'subtotal' | 'iva' | 'total';
+
 type PugModule = {
   compile: (template: string, options?: { pretty?: boolean }) => (locals: Record<string, unknown>) => string;
 };
@@ -68,11 +70,13 @@ html(lang="es")
       th { background: #f8fafc; text-transform: uppercase; font-size: 9px; letter-spacing: .05em; color: #475569; }
       .col-sku { width: 9%; }
       .col-name { width: 16%; }
+      .col-sizes { width: 11%; }
+      .col-colors { width: 11%; }
       .col-image { width: 12%; }
-      .col-desc { width: 30%; }
+      .col-desc { width: 24%; }
       .col-subtotal { width: 10%; }
-      .col-iva { width: 11%; }
-      .col-total { width: 10%; }
+      .col-iva { width: 8%; }
+      .col-total { width: 9%; }
       .thumb { width: 64px; height: 64px; object-fit: contain; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; display: block; margin: 0 auto; }
       .muted { color: #64748b; font-size: 10px; }
       .right { text-align: right; }
@@ -108,36 +112,62 @@ html(lang="es")
         table
           thead
             tr
-              th.col-sku SKU
-              th.col-name Producto
-              th.col-image Imagen
-              th.col-desc Descripción
-              th.col-subtotal Subtotal
-              th.col-iva IVA
-              th.col-total Total
+              if columns.sku
+                th.col-sku SKU
+              if columns.name
+                th.col-name Producto
+              if columns.sizes
+                th.col-sizes Tallas
+              if columns.colors
+                th.col-colors Colores
+              if columns.image
+                th.col-image Imagen
+              if columns.description
+                th.col-desc Descripción
+              if columns.subtotal
+                th.col-subtotal Subtotal
+              if columns.iva
+                th.col-iva IVA
+              if columns.total
+                th.col-total Total
           tbody
             each row in group.rows
               tr
-                td.col-sku
-                  div= row.sku
-                td.col-name
-                  div(style='font-weight:600')= row.name
-                td.col-image
-                  if row.imageUrl
-                    img.thumb(src=row.imageUrl)
-                td.col-desc
-                  div= row.description
-                td.col-subtotal.right
-                  div.nowrap= row.subtotal
-                td.col-iva.right
-                  div.nowrap= row.ivaLabel
-                td.col-total.right
-                  div.nowrap(style='font-weight:600')= row.total
+                if columns.sku
+                  td.col-sku
+                    div= row.sku
+                if columns.name
+                  td.col-name
+                    div(style='font-weight:600')= row.name
+                if columns.sizes
+                  td.col-sizes
+                    div= row.sizes
+                if columns.colors
+                  td.col-colors
+                    div= row.colors
+                if columns.image
+                  td.col-image
+                    if row.imageUrl
+                      img.thumb(src=row.imageUrl)
+                if columns.description
+                  td.col-desc
+                    div= row.description
+                if columns.subtotal
+                  td.col-subtotal.right
+                    div.nowrap= row.subtotal
+                if columns.iva
+                  td.col-iva.right
+                    div.nowrap= row.ivaLabel
+                if columns.total
+                  td.col-total.right
+                    div.nowrap(style='font-weight:600')= row.total
 `;
 
 type CatalogRow = {
   sku: string;
   name: string;
+  sizes: string;
+  colors: string;
   description: string;
   imageUrl?: string;
   subtotal: string;
@@ -347,10 +377,61 @@ export class ProductCatalogPdfService {
     }
   }
 
+  private normalizeColumns(columns?: PriceListPdfColumn[]) {
+    const defaults: Record<PriceListPdfColumn, boolean> = {
+      sku: true,
+      name: true,
+      sizes: true,
+      colors: true,
+      image: false,
+      description: false,
+      subtotal: true,
+      iva: true,
+      total: true,
+    };
+
+    if (!columns || columns.length === 0) {
+      return defaults;
+    }
+
+    const active = new Set(columns);
+    return {
+      sku: active.has('sku'),
+      name: active.has('name'),
+      sizes: active.has('sizes'),
+      colors: active.has('colors'),
+      image: active.has('image'),
+      description: active.has('description'),
+      subtotal: active.has('subtotal'),
+      iva: active.has('iva'),
+      total: active.has('total'),
+    };
+  }
+
   private pickPricingVariant(product: Product) {
     const variants = product.variants?.getItems?.() ?? [];
     if (!variants || variants.length === 0) return null;
     return [...variants].sort((a, b) => Number(b.price || 0) - Number(a.price || 0))[0];
+  }
+
+  private collectProductAttributes(product: Product) {
+    const variants = product.variants?.getItems?.() ?? [];
+    const sizes = Array.from(
+      new Set(
+        variants
+          .map((variant) => variant.size || variant.sizeCode || '')
+          .filter((value) => value.trim().length > 0)
+      )
+    ).join(', ');
+    const colors = Array.from(
+      new Set(
+        variants
+          .map((variant) => variant.color || variant.colorCode || '')
+          .filter((value) => value.trim().length > 0)
+      )
+    ).join(', ');
+
+    return { sizes, colors };
   }
 
   async generateProductCatalogPdf(input: { search?: string; categoryId?: string }) {
@@ -391,10 +472,13 @@ export class ProductCatalogPdfService {
         : 'Excluido';
       const images = product.images?.getItems?.() ?? [];
       const imageUrl = await this.resolveImageUrl(images);
+      const attributes = this.collectProductAttributes(product);
 
       const row: CatalogRow = {
         sku: product.sku,
         name: product.name,
+        sizes: attributes.sizes || 'N/A',
+        colors: attributes.colors || 'N/A',
         description: product.description || 'Sin descripción',
         imageUrl,
         subtotal: this.formatCurrency(price),
@@ -483,7 +567,10 @@ export class ProductCatalogPdfService {
     }
   }
 
-  async generateProductCatalogPdfFromSnapshot(snapshot: PriceListSnapshot, filters?: { search?: string; categoryId?: string }) {
+  async generateProductCatalogPdfFromSnapshot(
+    snapshot: PriceListSnapshot,
+    filters?: { search?: string; categoryId?: string; columns?: PriceListPdfColumn[] }
+  ) {
     const search = filters?.search?.trim().toLowerCase() || '';
     const categoryId = filters?.categoryId;
 
@@ -499,9 +586,10 @@ export class ProductCatalogPdfService {
 
     const grouped = new Map<string, { sortOrder: number; rows: CatalogRow[] }>();
     for (const item of items) {
+      const basePrice = Number(item.selectedPrice || 0);
       const taxRate = item.taxStatus === ProductTaxStatus.GRAVADO ? Number(item.taxRate || 0) : 0;
-      const taxAmount = Number(item.price || 0) * (taxRate / 100);
-      const total = Number(item.price || 0) + taxAmount;
+      const taxAmount = basePrice * (taxRate / 100);
+      const total = basePrice + taxAmount;
       const ivaLabel = item.taxStatus === ProductTaxStatus.GRAVADO
         ? `${taxRate}%`
         : (item.taxStatus === ProductTaxStatus.EXENTO ? 'Exento' : 'Excluido');
@@ -510,9 +598,11 @@ export class ProductCatalogPdfService {
       const row: CatalogRow = {
         sku: item.sku,
         name: item.name,
+        sizes: item.sizes || 'N/A',
+        colors: item.colors || 'N/A',
         description: item.description || 'Sin descripción',
         imageUrl,
-        subtotal: this.formatCurrency(item.price),
+        subtotal: this.formatCurrency(basePrice),
         ivaLabel,
         total: this.formatCurrency(total),
       };
@@ -564,11 +654,13 @@ export class ProductCatalogPdfService {
     const now = new Date();
     const monthLabel = snapshot.month;
     const versionLabel = snapshot.version > 1 ? ` v${snapshot.version}` : '';
+    const columns = this.normalizeColumns(filters?.columns);
     const html = compile({
       title: `Lista de precios ${monthLabel}${versionLabel}`,
-      subtitle: `Generado el ${now.toLocaleDateString('es-CO')}`,
+      subtitle: `Generado el ${now.toLocaleDateString('es-CO')} · v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}`,
       logoDataUrl,
       cover,
+      columns,
       groups,
     });
 
@@ -592,7 +684,7 @@ export class ProductCatalogPdfService {
         },
       });
       return {
-        fileName: `lista_precios_${monthLabel}${versionLabel.replace(' ', '_')}.pdf`,
+        fileName: `lista_precios_${monthLabel}${versionLabel.replace(' ', '_')}_v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}.pdf`,
         buffer: pdfBuffer,
       };
     } finally {
