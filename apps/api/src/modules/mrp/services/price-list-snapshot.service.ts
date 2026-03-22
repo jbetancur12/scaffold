@@ -22,6 +22,12 @@ export class PriceListSnapshotService {
         return `${year}-${month}`;
     }
 
+    private calculateManualPvpPrice(value?: number | null) {
+        const price = Number(value || 0);
+        if (!Number.isFinite(price) || price <= 0) return 0;
+        return Number((price / 0.75).toFixed(2));
+    }
+
     async listSnapshots(month?: string, priceSource?: 'auto' | 'manual') {
         const where: FilterQuery<PriceListSnapshot> = month ? { month } : {};
         if (priceSource) where.priceSource = priceSource;
@@ -94,7 +100,9 @@ export class PriceListSnapshotService {
                 groupName: product.category?.name || 'Sin grupo',
                 groupSortOrder: Number(product.category?.sortOrder ?? 9999),
                 price: Number(variant?.price || 0),
+                pvpPrice: Number(variant?.pvpPrice || 0),
                 manualPrice: product.manualPrice != null ? Number(product.manualPrice) : undefined,
+                manualPvpPrice: this.calculateManualPvpPrice(product.manualPrice),
                 selectedPrice: priceSource === 'manual'
                     ? Number(product.manualPrice ?? 0)
                     : Number(variant?.price || 0),
@@ -149,7 +157,7 @@ export class PriceListSnapshotService {
     exportSnapshotCsv(snapshot: PriceListSnapshot) {
         const csvCell = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
         const rows: Array<Array<string | number>> = [
-            ['CODIGO', 'ARTICULO', 'GRUPO', 'PRECIO AUTOMATICO', 'PRECIO MANUAL', 'PRECIO SNAPSHOT', 'VERSION'],
+            ['CODIGO', 'ARTICULO', 'GRUPO', 'PRECIO AUTOMATICO', 'PVP AUTOMATICO', 'PRECIO MANUAL', 'PVP MANUAL', 'PRECIO SNAPSHOT', 'VERSION'],
         ];
 
         const items = [...(snapshot.items || [])].sort((a, b) => {
@@ -164,7 +172,9 @@ export class PriceListSnapshotService {
                 item.name,
                 item.groupName,
                 Number(item.price || 0).toFixed(2),
+                Number(item.pvpPrice || 0).toFixed(2),
                 Number(item.manualPrice ?? 0).toFixed(2),
+                Number(item.manualPvpPrice || 0).toFixed(2),
                 Number(item.selectedPrice || 0).toFixed(2),
                 `v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}`,
             ]);

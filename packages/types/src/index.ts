@@ -767,7 +767,9 @@ export interface PriceListSnapshotItem {
     groupName: string;
     groupSortOrder: number;
     price: number;
+    pvpPrice: number;
     manualPrice?: number | null;
+    manualPvpPrice: number;
     selectedPrice: number;
     taxStatus: ProductTaxStatus;
     taxRate: number;

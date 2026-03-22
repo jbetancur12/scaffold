@@ -36,6 +36,7 @@ type PriceRow = {
     distributorPrice: number;
     manualPrice?: number;
     pvpPrice: number;
+    manualPvpPrice: number;
 };
 
 type GroupedPriceRows = {
@@ -71,6 +72,12 @@ const PDF_COLUMN_LABELS: Array<{ key: PdfColumnKey; label: string }> = [
 ];
 
 const LIST_LIMIT = 1000;
+
+const calculateManualPvpPrice = (value?: number) => {
+    const price = Number(value || 0);
+    if (!Number.isFinite(price) || price <= 0) return 0;
+    return Number((price / 0.75).toFixed(2));
+};
 
 const buildRows = (products: Product[]): PriceRow[] => {
     return (products || []).map((product) => {
@@ -108,6 +115,7 @@ const buildRows = (products: Product[]): PriceRow[] => {
             distributorPrice: maxDistributorPrice,
             manualPrice: product.manualPrice != null ? Number(product.manualPrice) : undefined,
             pvpPrice: maxPvpPrice,
+            manualPvpPrice: calculateManualPvpPrice(product.manualPrice != null ? Number(product.manualPrice) : undefined),
         };
     }).sort((a, b) => {
         const groupCompare = a.groupName.localeCompare(b.groupName);
@@ -251,12 +259,14 @@ export default function PriceListPage() {
         const totalDistributorPrice = filteredRows.reduce((sum, row) => sum + row.distributorPrice, 0);
         const uniqueProducts = new Set(filteredRows.map((row) => row.productId)).size;
         const totalManualPrice = filteredRows.reduce((sum, row) => sum + Number(row.manualPrice || 0), 0);
+        const totalManualPvpPrice = filteredRows.reduce((sum, row) => sum + Number(row.manualPvpPrice || 0), 0);
         return {
             uniqueProducts,
             variantCount: (productsResponse?.products || []).reduce((sum, product) => sum + (product.variants?.length || 0), 0),
             averageProductionCost: filteredRows.length > 0 ? totalProductionCost / filteredRows.length : 0,
             averageDistributorPrice: filteredRows.length > 0 ? totalDistributorPrice / filteredRows.length : 0,
             averageManualPrice: filteredRows.length > 0 ? totalManualPrice / filteredRows.length : 0,
+            averageManualPvpPrice: filteredRows.length > 0 ? totalManualPvpPrice / filteredRows.length : 0,
         };
     }, [filteredRows, productsResponse?.products]);
 
@@ -296,7 +306,7 @@ export default function PriceListPage() {
                 id: row.productId,
                 payload: { manualPrice: manualPrice ?? null } as Partial<Product>,
             });
-            toast({ title: 'Listo', description: `Precio manual actualizado para ${row.productName}.` });
+            toast({ title: 'Listo', description: `Precio manual y PVP manual actualizados para ${row.productName}.` });
         } catch (error) {
             toast({
                 title: 'Error',
@@ -505,7 +515,7 @@ export default function PriceListPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-500">Productos</p>
                     <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : summary.uniqueProducts}</p>
@@ -525,6 +535,10 @@ export default function PriceListPage() {
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <p className="text-sm text-slate-500">Precio manual prom.</p>
                     <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageManualPrice)}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p className="text-sm text-slate-500">PVP manual prom.</p>
+                    <p className="mt-1 text-2xl font-bold text-slate-900">{loading ? '-' : formatCurrency(summary.averageManualPvpPrice)}</p>
                 </div>
             </div>
 
@@ -571,27 +585,28 @@ export default function PriceListPage() {
                                 <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo produccion</TableHead>
                                 <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo + 40%</TableHead>
                                 <TableHead className="text-white font-semibold whitespace-nowrap text-right">Precio automatico</TableHead>
+                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP automatico</TableHead>
                                 <TableHead className="text-white font-semibold whitespace-nowrap">Precio manual</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP sugerido</TableHead>
+                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP manual</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="h-32 text-center text-slate-500">
+                                    <TableCell colSpan={11} className="h-32 text-center text-slate-500">
                                         Cargando lista de precios...
                                     </TableCell>
                                 </TableRow>
                             ) : groupedRows.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={10} className="h-32 text-center text-slate-500">
+                                    <TableCell colSpan={11} className="h-32 text-center text-slate-500">
                                         No hay productos que coincidan con los filtros actuales.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 groupedRows.flatMap((group) => ([
                                     <TableRow key={`group-${group.groupName}`} className="bg-emerald-800 hover:bg-emerald-800">
-                                        <TableCell colSpan={10} className="py-2 text-center font-bold uppercase tracking-[0.2em] text-white">
+                                        <TableCell colSpan={11} className="py-2 text-center font-bold uppercase tracking-[0.2em] text-white">
                                             {group.groupName}
                                         </TableCell>
                                     </TableRow>,
@@ -605,6 +620,7 @@ export default function PriceListPage() {
                                             <TableCell className="text-right">{formatCurrency(row.productionCost)}</TableCell>
                                             <TableCell className="text-right font-semibold text-slate-900">{formatCurrency(row.costPlus40)}</TableCell>
                                             <TableCell className="text-right">{formatCurrency(row.distributorPrice)}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>
                                             <TableCell>
                                                 <div className="flex min-w-[220px] items-center gap-2">
                                                     <CurrencyInput
@@ -624,7 +640,7 @@ export default function PriceListPage() {
                                                     </Button>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>
+                                            <TableCell className="text-right">{formatCurrency(calculateManualPvpPrice(manualPriceDrafts[row.productId]))}</TableCell>
                                         </TableRow>
                                     )),
                                 ]))
