@@ -26,6 +26,19 @@ type PlaywrightModule = {
   };
 };
 
+type PdfLibModule = {
+  PDFDocument: {
+    create: () => Promise<{
+      copyPages: (source: unknown, indices: number[]) => Promise<unknown[]>;
+      addPage: (page: unknown) => void;
+      save: () => Promise<Uint8Array>;
+    }>;
+    load: (buffer: Uint8Array | Buffer) => Promise<{
+      getPageIndices: () => number[];
+    }>;
+  };
+};
+
 const productCatalogPdfTemplate = `
 doctype html
 html(lang="es")
@@ -98,69 +111,70 @@ html(lang="es")
               .policy-title= section.title
               .policy-body !{section.bodyHtml}
       .page-break
-    .header
-      if logoDataUrl
-        img.logo(src=logoDataUrl)
-      else
-        div(style='font-weight:700;font-size:16px') Portafolio
-      div
-        div.title= title
-        div.subtitle= subtitle
-    each group in groups
-      .group
-        .group-title= group.name
-        table
-          thead
-            tr
-              if columns.sku
-                th.col-sku SKU
-              if columns.name
-                th.col-name Producto
-              if columns.sizes
-                th.col-sizes Tallas
-              if columns.colors
-                th.col-colors Colores
-              if columns.image
-                th.col-image Imagen
-              if columns.description
-                th.col-desc Descripción
-              if columns.subtotal
-                th.col-subtotal Subtotal
-              if columns.iva
-                th.col-iva IVA
-              if columns.total
-                th.col-total Total
-          tbody
-            each row in group.rows
+    if includeContent
+      .header
+        if logoDataUrl
+          img.logo(src=logoDataUrl)
+        else
+          div(style='font-weight:700;font-size:16px') Portafolio
+        div
+          div.title= title
+          div.subtitle= subtitle
+      each group in groups
+        .group
+          .group-title= group.name
+          table
+            thead
               tr
                 if columns.sku
-                  td.col-sku
-                    div= row.sku
+                  th.col-sku SKU
                 if columns.name
-                  td.col-name
-                    div(style='font-weight:600')= row.name
+                  th.col-name Producto
                 if columns.sizes
-                  td.col-sizes
-                    div= row.sizes
+                  th.col-sizes Tallas
                 if columns.colors
-                  td.col-colors
-                    div= row.colors
+                  th.col-colors Colores
                 if columns.image
-                  td.col-image
-                    if row.imageUrl
-                      img.thumb(src=row.imageUrl)
+                  th.col-image Imagen
                 if columns.description
-                  td.col-desc
-                    div= row.description
+                  th.col-desc Descripción
                 if columns.subtotal
-                  td.col-subtotal.right
-                    div.nowrap= row.subtotal
+                  th.col-subtotal Subtotal
                 if columns.iva
-                  td.col-iva.right
-                    div.nowrap= row.ivaLabel
+                  th.col-iva IVA
                 if columns.total
-                  td.col-total.right
-                    div.nowrap(style='font-weight:600')= row.total
+                  th.col-total Total
+            tbody
+              each row in group.rows
+                tr
+                  if columns.sku
+                    td.col-sku
+                      div= row.sku
+                  if columns.name
+                    td.col-name
+                      div(style='font-weight:600')= row.name
+                  if columns.sizes
+                    td.col-sizes
+                      div= row.sizes
+                  if columns.colors
+                    td.col-colors
+                      div= row.colors
+                  if columns.image
+                    td.col-image
+                      if row.imageUrl
+                        img.thumb(src=row.imageUrl)
+                  if columns.description
+                    td.col-desc
+                      div= row.description
+                  if columns.subtotal
+                    td.col-subtotal.right
+                      div.nowrap= row.subtotal
+                  if columns.iva
+                    td.col-iva.right
+                      div.nowrap= row.ivaLabel
+                  if columns.total
+                    td.col-total.right
+                      div.nowrap(style='font-weight:600')= row.total
 `;
 
 type CatalogRow = {
@@ -205,6 +219,15 @@ export class ProductCatalogPdfService {
       return (eval('require') as NodeRequire)('playwright') as PlaywrightModule;
     } catch {
       throw new AppError('Dependencia "playwright" no instalada. Ejecuta: npm install --workspace=api playwright', 500);
+    }
+  }
+
+  private loadPdfLib(): PdfLibModule {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      return (eval('require') as NodeRequire)('pdf-lib') as PdfLibModule;
+    } catch {
+      throw new AppError('Dependencia "pdf-lib" no instalada. Ejecuta: npm install --workspace=api pdf-lib', 500);
     }
   }
 
@@ -408,6 +431,50 @@ export class ProductCatalogPdfService {
     };
   }
 
+  private async renderHtmlToPdf(
+    playwright: PlaywrightModule,
+    html: string,
+    landscape: boolean
+  ) {
+    const browser = await playwright.chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle' });
+      return await page.pdf({
+        format: 'A4',
+        landscape,
+        printBackground: true,
+        margin: {
+          top: '20px',
+          bottom: '24px',
+          left: '16px',
+          right: '16px',
+        },
+      });
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async mergePdfBuffers(buffers: Buffer[]) {
+    const { PDFDocument } = this.loadPdfLib();
+    const merged = await PDFDocument.create();
+
+    for (const buffer of buffers) {
+      const source = await PDFDocument.load(buffer);
+      const pages = await merged.copyPages(source, source.getPageIndices());
+      for (const page of pages) {
+        merged.addPage(page);
+      }
+    }
+
+    return Buffer.from(await merged.save());
+  }
+
   private pickPricingVariant(product: Product) {
     const variants = product.variants?.getItems?.() ?? [];
     if (!variants || variants.length === 0) return null;
@@ -539,32 +606,11 @@ export class ProductCatalogPdfService {
       groups,
     });
 
-    const browser = await playwright.chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-
-    try {
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle' });
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        landscape: orientation === 'landscape',
-        printBackground: true,
-        margin: {
-          top: '20px',
-          bottom: '24px',
-          left: '16px',
-          right: '16px',
-        },
-      });
-      return {
-        fileName: `catalogo_precios_${now.toISOString().slice(0, 10)}.pdf`,
-        buffer: pdfBuffer,
-      };
-    } finally {
-      await browser.close();
-    }
+    const pdfBuffer = await this.renderHtmlToPdf(playwright, html, orientation === 'landscape');
+    return {
+      fileName: `catalogo_precios_${now.toISOString().slice(0, 10)}.pdf`,
+      buffer: pdfBuffer,
+    };
   }
 
   async generateProductCatalogPdfFromSnapshot(
@@ -646,7 +692,6 @@ export class ProductCatalogPdfService {
       }
       : undefined;
 
-    const orientation = coverConfig?.orientation === 'portrait' ? 'portrait' : 'landscape';
     const pug = this.loadPug();
     const playwright = this.loadPlaywright();
     const compile = pug.compile(productCatalogPdfTemplate);
@@ -655,40 +700,33 @@ export class ProductCatalogPdfService {
     const monthLabel = snapshot.month;
     const versionLabel = snapshot.version > 1 ? ` v${snapshot.version}` : '';
     const columns = this.normalizeColumns(filters?.columns);
-    const html = compile({
+    const coverHtml = cover ? compile({
       title: `Lista de precios ${monthLabel}${versionLabel}`,
       subtitle: `Generado el ${now.toLocaleDateString('es-CO')} · v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}`,
       logoDataUrl,
       cover,
+      includeContent: false,
+      columns,
+      groups: [],
+    }) : '';
+    const contentHtml = compile({
+      title: `Lista de precios ${monthLabel}${versionLabel}`,
+      subtitle: `Generado el ${now.toLocaleDateString('es-CO')} · v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}`,
+      logoDataUrl,
+      cover: undefined,
+      includeContent: true,
       columns,
       groups,
     });
-
-    const browser = await playwright.chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-
-    try {
-      const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle' });
-      const pdfBuffer = await page.pdf({
-        format: 'A4',
-        landscape: orientation === 'landscape',
-        printBackground: true,
-        margin: {
-          top: '20px',
-          bottom: '24px',
-          left: '16px',
-          right: '16px',
-        },
-      });
-      return {
-        fileName: `lista_precios_${monthLabel}${versionLabel.replace(' ', '_')}_v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}.pdf`,
-        buffer: pdfBuffer,
-      };
-    } finally {
-      await browser.close();
-    }
+    const finalBuffer = cover
+      ? await this.mergePdfBuffers([
+        await this.renderHtmlToPdf(playwright, coverHtml, false),
+        await this.renderHtmlToPdf(playwright, contentHtml, true),
+      ])
+      : await this.renderHtmlToPdf(playwright, contentHtml, true);
+    return {
+      fileName: `lista_precios_${monthLabel}${versionLabel.replace(' ', '_')}_v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}.pdf`,
+      buffer: finalBuffer,
+    };
   }
 }

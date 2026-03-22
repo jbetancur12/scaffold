@@ -45,6 +45,17 @@ type GroupedPriceRows = {
     rows: PriceRow[];
 };
 
+type TableColumnKey =
+    | 'group'
+    | 'sizes'
+    | 'colors'
+    | 'productionCost'
+    | 'costPlus40'
+    | 'distributorPrice'
+    | 'pvpPrice'
+    | 'manualPrice'
+    | 'manualPvpPrice';
+
 type PdfColumnKey = 'sku' | 'name' | 'sizes' | 'colors' | 'image' | 'description' | 'subtotal' | 'iva' | 'total';
 
 const DEFAULT_PDF_COLUMNS: Record<PdfColumnKey, boolean> = {
@@ -69,6 +80,30 @@ const PDF_COLUMN_LABELS: Array<{ key: PdfColumnKey; label: string }> = [
     { key: 'subtotal', label: 'Subtotal' },
     { key: 'iva', label: 'IVA' },
     { key: 'total', label: 'Total' },
+];
+
+const DEFAULT_TABLE_COLUMNS: Record<TableColumnKey, boolean> = {
+    group: true,
+    sizes: true,
+    colors: true,
+    productionCost: true,
+    costPlus40: true,
+    distributorPrice: true,
+    pvpPrice: true,
+    manualPrice: true,
+    manualPvpPrice: true,
+};
+
+const TABLE_COLUMN_LABELS: Array<{ key: TableColumnKey; label: string }> = [
+    { key: 'group', label: 'Grupo' },
+    { key: 'sizes', label: 'Tallas' },
+    { key: 'colors', label: 'Colores' },
+    { key: 'productionCost', label: 'Costo produccion' },
+    { key: 'costPlus40', label: 'Costo + 40%' },
+    { key: 'distributorPrice', label: 'Precio automatico' },
+    { key: 'pvpPrice', label: 'PVP automatico' },
+    { key: 'manualPrice', label: 'Precio manual' },
+    { key: 'manualPvpPrice', label: 'PVP manual' },
 ];
 
 const LIST_LIMIT = 1000;
@@ -132,6 +167,8 @@ export default function PriceListPage() {
     const [categoryId, setCategoryId] = useState('');
     const [manualPriceDrafts, setManualPriceDrafts] = useState<Record<string, number | undefined>>({});
     const [savingManualPriceId, setSavingManualPriceId] = useState<string | null>(null);
+    const [columnsModalOpen, setColumnsModalOpen] = useState(false);
+    const [visibleColumns, setVisibleColumns] = useState<Record<TableColumnKey, boolean>>(DEFAULT_TABLE_COLUMNS);
     const [downloadModalOpen, setDownloadModalOpen] = useState(false);
     const [downloadFormat, setDownloadFormat] = useState<'pdf' | 'csv'>('pdf');
     const [downloadPriceSource, setDownloadPriceSource] = useState<'auto' | 'manual'>('auto');
@@ -297,6 +334,8 @@ export default function PriceListPage() {
                 rows: group.rows.sort((a, b) => a.productSku.localeCompare(b.productSku)),
             }));
     }, [filteredRows]);
+
+    const visibleColumnCount = 2 + Object.values(visibleColumns).filter(Boolean).length;
 
     const handleSaveManualPrice = async (row: PriceRow) => {
         const manualPrice = manualPriceDrafts[row.productId];
@@ -488,6 +527,15 @@ export default function PriceListPage() {
                             variant="outline"
                             size="sm"
                             className="h-9 px-3 border-slate-200 text-slate-600 hover:bg-slate-50 text-xs"
+                            onClick={() => setColumnsModalOpen(true)}
+                        >
+                            <Settings className="mr-1.5 h-3.5 w-3.5" />
+                            Columnas
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-9 px-3 border-slate-200 text-slate-600 hover:bg-slate-50 text-xs"
                             onClick={openConfigModal}
                             disabled={loadingConfig}
                         >
@@ -579,34 +627,34 @@ export default function PriceListPage() {
                             <TableRow className="bg-emerald-700 hover:bg-emerald-700">
                                 <TableHead className="text-white font-semibold whitespace-nowrap">Codigo</TableHead>
                                 <TableHead className="text-white font-semibold whitespace-nowrap">Articulo</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap">Grupo</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap">Tallas</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap">Colores</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo produccion</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo + 40%</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">Precio automatico</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP automatico</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap">Precio manual</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP manual</TableHead>
+                                {visibleColumns.group && <TableHead className="text-white font-semibold whitespace-nowrap">Grupo</TableHead>}
+                                {visibleColumns.sizes && <TableHead className="text-white font-semibold whitespace-nowrap">Tallas</TableHead>}
+                                {visibleColumns.colors && <TableHead className="text-white font-semibold whitespace-nowrap">Colores</TableHead>}
+                                {visibleColumns.productionCost && <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo produccion</TableHead>}
+                                {visibleColumns.costPlus40 && <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo + 40%</TableHead>}
+                                {visibleColumns.distributorPrice && <TableHead className="text-white font-semibold whitespace-nowrap text-right">Precio automatico</TableHead>}
+                                {visibleColumns.pvpPrice && <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP automatico</TableHead>}
+                                {visibleColumns.manualPrice && <TableHead className="text-white font-semibold whitespace-nowrap">Precio manual</TableHead>}
+                                {visibleColumns.manualPvpPrice && <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP manual</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="h-32 text-center text-slate-500">
+                                    <TableCell colSpan={visibleColumnCount} className="h-32 text-center text-slate-500">
                                         Cargando lista de precios...
                                     </TableCell>
                                 </TableRow>
                             ) : groupedRows.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={11} className="h-32 text-center text-slate-500">
+                                    <TableCell colSpan={visibleColumnCount} className="h-32 text-center text-slate-500">
                                         No hay productos que coincidan con los filtros actuales.
                                     </TableCell>
                                 </TableRow>
                             ) : (
                                 groupedRows.flatMap((group) => ([
                                     <TableRow key={`group-${group.groupName}`} className="bg-emerald-800 hover:bg-emerald-800">
-                                        <TableCell colSpan={11} className="py-2 text-center font-bold uppercase tracking-[0.2em] text-white">
+                                        <TableCell colSpan={visibleColumnCount} className="py-2 text-center font-bold uppercase tracking-[0.2em] text-white">
                                             {group.groupName}
                                         </TableCell>
                                     </TableRow>,
@@ -614,33 +662,37 @@ export default function PriceListPage() {
                                         <TableRow key={row.productId} className="hover:bg-emerald-50/30">
                                             <TableCell className="font-medium text-slate-900">{row.productSku}</TableCell>
                                             <TableCell className="min-w-[280px]">{row.productName}</TableCell>
-                                            <TableCell>{row.groupName}</TableCell>
-                                            <TableCell className="max-w-[220px] whitespace-normal">{row.sizes || 'N/A'}</TableCell>
-                                            <TableCell className="max-w-[220px] whitespace-normal">{row.colors || 'N/A'}</TableCell>
-                                            <TableCell className="text-right">{formatCurrency(row.productionCost)}</TableCell>
-                                            <TableCell className="text-right font-semibold text-slate-900">{formatCurrency(row.costPlus40)}</TableCell>
-                                            <TableCell className="text-right">{formatCurrency(row.distributorPrice)}</TableCell>
-                                            <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>
-                                            <TableCell>
-                                                <div className="flex min-w-[220px] items-center gap-2">
-                                                    <CurrencyInput
-                                                        value={manualPriceDrafts[row.productId]}
-                                                        onValueChange={(value) => setManualPriceDrafts((prev) => ({ ...prev, [row.productId]: value }))}
-                                                        className="h-9"
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        className="h-9 shrink-0"
-                                                        onClick={() => handleSaveManualPrice(row)}
-                                                        disabled={savingManualPriceId === row.productId}
-                                                    >
-                                                        {savingManualPriceId === row.productId ? 'Guardando...' : 'Guardar'}
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-right">{formatCurrency(calculateManualPvpPrice(manualPriceDrafts[row.productId]))}</TableCell>
+                                            {visibleColumns.group && <TableCell>{row.groupName}</TableCell>}
+                                            {visibleColumns.sizes && <TableCell className="max-w-[220px] whitespace-normal">{row.sizes || 'N/A'}</TableCell>}
+                                            {visibleColumns.colors && <TableCell className="max-w-[220px] whitespace-normal">{row.colors || 'N/A'}</TableCell>}
+                                            {visibleColumns.productionCost && <TableCell className="text-right">{formatCurrency(row.productionCost)}</TableCell>}
+                                            {visibleColumns.costPlus40 && <TableCell className="text-right font-semibold text-slate-900">{formatCurrency(row.costPlus40)}</TableCell>}
+                                            {visibleColumns.distributorPrice && <TableCell className="text-right">{formatCurrency(row.distributorPrice)}</TableCell>}
+                                            {visibleColumns.pvpPrice && <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>}
+                                            {visibleColumns.manualPrice && (
+                                                <TableCell>
+                                                    <div className="flex min-w-[220px] items-center gap-2">
+                                                        <CurrencyInput
+                                                            value={manualPriceDrafts[row.productId]}
+                                                            onValueChange={(value) => setManualPriceDrafts((prev) => ({ ...prev, [row.productId]: value }))}
+                                                            className="h-9"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-9 shrink-0"
+                                                            onClick={() => handleSaveManualPrice(row)}
+                                                            disabled={savingManualPriceId === row.productId}
+                                                        >
+                                                            {savingManualPriceId === row.productId ? 'Guardando...' : 'Guardar'}
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            )}
+                                            {visibleColumns.manualPvpPrice && (
+                                                <TableCell className="text-right">{formatCurrency(calculateManualPvpPrice(manualPriceDrafts[row.productId]))}</TableCell>
+                                            )}
                                         </TableRow>
                                     )),
                                 ]))
@@ -776,6 +828,46 @@ export default function PriceListPage() {
                         </Button>
                         <Button onClick={handleSaveConfig} disabled={savingConfig}>
                             {savingConfig ? 'Guardando...' : 'Guardar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={columnsModalOpen} onOpenChange={setColumnsModalOpen}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Columnas de la Tabla</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <p className="text-sm text-slate-500">
+                            Por defecto la tabla inicia compacta. Activa solo las columnas que necesites ver.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3">
+                            {TABLE_COLUMN_LABELS.map((column) => (
+                                <label key={column.key} className="flex items-center gap-2 text-sm text-slate-700">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4"
+                                        checked={visibleColumns[column.key]}
+                                        onChange={(e) => setVisibleColumns((prev) => ({
+                                            ...prev,
+                                            [column.key]: e.target.checked,
+                                        }))}
+                                    />
+                                    <span>{column.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setVisibleColumns(DEFAULT_TABLE_COLUMNS)}
+                        >
+                            Restaurar por defecto
+                        </Button>
+                        <Button onClick={() => setColumnsModalOpen(false)}>
+                            Listo
                         </Button>
                     </DialogFooter>
                 </DialogContent>
