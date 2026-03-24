@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -104,7 +104,6 @@ const TABLE_COLUMN_LABELS: Array<{ key: TableColumnKey; label: string }> = [
 ];
 
 const LIST_LIMIT = 1000;
-
 const calculateManualPvpPrice = (value?: number) => {
     const price = Number(value || 0);
     if (!Number.isFinite(price) || price <= 0) return 0;
@@ -197,6 +196,7 @@ const buildRows = (products: Product[]): PriceRow[] => {
 export default function PriceListPage() {
     const { toast } = useToast();
     const saveProductMutation = useSaveProductMutation();
+    const tableScrollbarRef = useRef<HTMLDivElement | null>(null);
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [categoryId, setCategoryId] = useState('');
@@ -233,6 +233,7 @@ export default function PriceListPage() {
     const [snapshots, setSnapshots] = useState<Array<{ version: number; createdAt: string | Date; priceSource: 'auto' | 'manual' }>>([]);
     const [loadingSnapshots, setLoadingSnapshots] = useState(false);
     const [regeneratingSnapshot, setRegeneratingSnapshot] = useState(false);
+    const [tableScrollMetrics, setTableScrollMetrics] = useState({ scrollWidth: 0, clientWidth: 0, scrollLeft: 0 });
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -369,6 +370,38 @@ export default function PriceListPage() {
                 rows: group.rows.sort((a, b) => a.productSku.localeCompare(b.productSku)),
             }));
     }, [filteredRows]);
+
+    const maxHorizontalScroll = Math.max(0, tableScrollMetrics.scrollWidth - tableScrollMetrics.clientWidth);
+
+    useEffect(() => {
+        const tableScrollbar = tableScrollbarRef.current;
+        if (!tableScrollbar) return;
+
+        const updateMetrics = () => {
+            setTableScrollMetrics({
+                scrollWidth: tableScrollbar.scrollWidth,
+                clientWidth: tableScrollbar.clientWidth,
+                scrollLeft: tableScrollbar.scrollLeft,
+            });
+        };
+
+        updateMetrics();
+        tableScrollbar.addEventListener('scroll', updateMetrics);
+
+        const observer = new ResizeObserver(() => updateMetrics());
+        observer.observe(tableScrollbar);
+        const tableElement = tableScrollbar.querySelector('table');
+        if (tableElement) {
+            observer.observe(tableElement);
+        }
+        window.addEventListener('resize', updateMetrics);
+
+        return () => {
+            tableScrollbar.removeEventListener('scroll', updateMetrics);
+            observer.disconnect();
+            window.removeEventListener('resize', updateMetrics);
+        };
+    }, [loading, visibleColumns, filteredRows.length, productsResponse?.products?.length]);
 
     const visibleColumnCount = 2 + Object.values(visibleColumns).filter(Boolean).length;
 
@@ -656,50 +689,81 @@ export default function PriceListPage() {
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <div className="p-5 border-b border-slate-100 bg-slate-50/60">
-                    <div className="flex flex-col xl:flex-row gap-3 xl:items-center xl:justify-between">
-                        <div className="flex flex-col md:flex-row gap-3 w-full">
-                            <div className="relative w-full md:max-w-lg">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                                <Input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    placeholder="Buscar por código, producto, talla o color..."
-                                    className="pl-9 h-10 border-slate-200 bg-white"
-                                />
+                <div className="border-b border-slate-100 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
+                    <div className="p-5 border-b border-slate-100 bg-slate-50/60">
+                        <div className="flex flex-col xl:flex-row gap-3 xl:items-center xl:justify-between">
+                            <div className="flex flex-col md:flex-row gap-3 w-full">
+                                <div className="relative w-full md:max-w-lg">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                                    <Input
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        placeholder="Buscar por código, producto, talla o color..."
+                                        className="pl-9 h-10 border-slate-200 bg-white"
+                                    />
+                                </div>
+                                <Select value={categoryId || '__all__'} onValueChange={(value) => setCategoryId(value === '__all__' ? '' : value)}>
+                                    <SelectTrigger className="w-full md:w-[280px] h-10 border-slate-200 bg-white">
+                                        <SelectValue placeholder="Todos los grupos" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__all__">Todos los grupos</SelectItem>
+                                        {(productGroups ?? []).map((group) => (
+                                            <SelectItem key={group.id} value={group.id}>
+                                                {group.parent ? `${group.parent.name} / ${group.name}` : group.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
-                            <Select value={categoryId || '__all__'} onValueChange={(value) => setCategoryId(value === '__all__' ? '' : value)}>
-                                <SelectTrigger className="w-full md:w-[280px] h-10 border-slate-200 bg-white">
-                                    <SelectValue placeholder="Todos los grupos" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="__all__">Todos los grupos</SelectItem>
-                                    {(productGroups ?? []).map((group) => (
-                                        <SelectItem key={group.id} value={group.id}>
-                                            {group.parent ? `${group.parent.name} / ${group.name}` : group.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <p className="text-sm text-slate-500">{loading ? 'Cargando...' : `${filteredRows.length} productos en ${groupedRows.length} grupos`}</p>
                         </div>
-                        <p className="text-sm text-slate-500">{loading ? 'Cargando...' : `${filteredRows.length} productos en ${groupedRows.length} grupos`}</p>
+                    </div>
+
+                    <div
+                        className={cn(
+                            'border-b border-slate-100 bg-white/90 px-5 py-2',
+                            maxHorizontalScroll <= 0 && 'hidden',
+                        )}
+                    >
+                        <div className="flex items-center gap-3">
+                            <p className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                                Desplazar columnas
+                            </p>
+                            <input
+                                type="range"
+                                min={0}
+                                max={maxHorizontalScroll}
+                                value={Math.min(tableScrollMetrics.scrollLeft, maxHorizontalScroll)}
+                                onChange={(e) => {
+                                    const nextValue = Number(e.target.value);
+                                    if (!tableScrollbarRef.current) return;
+                                    tableScrollbarRef.current.scrollLeft = nextValue;
+                                    setTableScrollMetrics((prev) => ({ ...prev, scrollLeft: nextValue }));
+                                }}
+                                className="h-2 flex-1 accent-emerald-600 cursor-pointer"
+                            />
+                            <p className="shrink-0 text-[11px] font-medium text-slate-400">
+                                {Math.round((Math.min(tableScrollMetrics.scrollLeft, maxHorizontalScroll) / Math.max(1, maxHorizontalScroll)) * 100)}%
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <Table>
+                <div ref={tableScrollbarRef} className="overflow-x-auto">
+                    <table className="min-w-full w-max caption-bottom text-sm">
                         <TableHeader>
                             <TableRow className="bg-emerald-700 hover:bg-emerald-700">
-                                <TableHead className="text-white font-semibold whitespace-nowrap">Codigo</TableHead>
-                                <TableHead className="text-white font-semibold whitespace-nowrap">Articulo</TableHead>
-                                {visibleColumns.group && <TableHead className="text-white font-semibold whitespace-nowrap">Grupo</TableHead>}
-                                {visibleColumns.sizes && <TableHead className="text-white font-semibold whitespace-nowrap">Tallas</TableHead>}
-                                {visibleColumns.colors && <TableHead className="text-white font-semibold whitespace-nowrap">Colores</TableHead>}
-                                {visibleColumns.productionCost && <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo produccion</TableHead>}
-                                {visibleColumns.distributorPrice && <TableHead className="text-white font-semibold whitespace-nowrap text-right">Precio automatico</TableHead>}
-                                {visibleColumns.pvpPrice && <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP automatico</TableHead>}
-                                {visibleColumns.manualPrice && <TableHead className="text-white font-semibold whitespace-nowrap">Precio manual</TableHead>}
-                                {visibleColumns.manualPvpPrice && <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP manual</TableHead>}
+                                <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Codigo</TableHead>
+                                <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Articulo</TableHead>
+                                {visibleColumns.group && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Grupo</TableHead>}
+                                {visibleColumns.sizes && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Tallas</TableHead>}
+                                {visibleColumns.colors && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Colores</TableHead>}
+                                {visibleColumns.productionCost && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold text-right">Costo produccion</TableHead>}
+                                {visibleColumns.distributorPrice && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold text-right">Precio automatico</TableHead>}
+                                {visibleColumns.pvpPrice && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold text-right">PVP automatico</TableHead>}
+                                {visibleColumns.manualPrice && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Precio manual</TableHead>}
+                                {visibleColumns.manualPvpPrice && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold text-right">PVP manual</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -798,7 +862,7 @@ export default function PriceListPage() {
                                 ]))
                             )}
                         </TableBody>
-                    </Table>
+                    </table>
                 </div>
             </div>
 
