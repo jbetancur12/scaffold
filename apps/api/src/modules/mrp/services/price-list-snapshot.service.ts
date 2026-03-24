@@ -99,6 +99,7 @@ export class PriceListSnapshotService {
                 categoryId: product.category?.id,
                 groupName: product.category?.name || 'Sin grupo',
                 groupSortOrder: Number(product.category?.sortOrder ?? 9999),
+                cost: Number(variant?.cost || 0),
                 price: Number(variant?.price || 0),
                 pvpPrice: Number(variant?.pvpPrice || 0),
                 manualPrice: product.manualPrice != null ? Number(product.manualPrice) : undefined,
@@ -157,28 +158,51 @@ export class PriceListSnapshotService {
     exportSnapshotCsv(snapshot: PriceListSnapshot) {
         const csvCell = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
         const rows: Array<Array<string | number>> = [
-            ['CODIGO', 'ARTICULO', 'GRUPO', 'PRECIO AUTOMATICO', 'PVP AUTOMATICO', 'PRECIO MANUAL', 'PVP MANUAL', 'PRECIO SNAPSHOT', 'VERSION'],
+            ['CODIGO', 'ARTICULO', 'GRUPO', 'COSTO PRODUCCION', 'PRECIO AUTOMATICO', 'PVP AUTOMATICO', 'PRECIO MANUAL', 'PVP MANUAL', 'PRECIO SNAPSHOT', 'VERSION'],
         ];
 
-        const items = [...(snapshot.items || [])].sort((a, b) => {
-            const groupCompare = a.groupName.localeCompare(b.groupName);
-            if (groupCompare !== 0) return groupCompare;
-            return a.sku.localeCompare(b.sku);
-        });
+        const groupedItems = (snapshot.items || []).reduce<Map<string, typeof snapshot.items>>((acc, item) => {
+            const current = acc.get(item.groupName) || [];
+            current.push(item);
+            acc.set(item.groupName, current);
+            return acc;
+        }, new Map());
 
-        for (const item of items) {
-            rows.push([
-                item.sku,
-                item.name,
-                item.groupName,
-                Number(item.price || 0).toFixed(2),
-                Number(item.pvpPrice || 0).toFixed(2),
-                Number(item.manualPrice ?? 0).toFixed(2),
-                Number(item.manualPvpPrice || 0).toFixed(2),
-                Number(item.selectedPrice || 0).toFixed(2),
-                `v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}`,
-            ]);
-        }
+        Array.from(groupedItems.entries())
+            .sort(([groupNameA, itemsA], [groupNameB, itemsB]) => {
+                const sortOrderA = Number(itemsA[0]?.groupSortOrder ?? 9999);
+                const sortOrderB = Number(itemsB[0]?.groupSortOrder ?? 9999);
+                if (sortOrderA !== sortOrderB) return sortOrderA - sortOrderB;
+
+                const normalizedA = groupNameA.trim().toLowerCase();
+                const normalizedB = groupNameB.trim().toLowerCase();
+                const aIsOther = normalizedA === 'otros' || normalizedA === 'sin grupo';
+                const bIsOther = normalizedB === 'otros' || normalizedB === 'sin grupo';
+                if (aIsOther && !bIsOther) return 1;
+                if (bIsOther && !aIsOther) return -1;
+
+                return groupNameA.localeCompare(groupNameB);
+            })
+            .forEach(([groupName, items]) => {
+                rows.push(['', '', groupName.toUpperCase(), '', '', '', '', '', '', '']);
+
+                items
+                    .sort((a, b) => a.sku.localeCompare(b.sku))
+                    .forEach((item) => {
+                        rows.push([
+                            item.sku,
+                            item.name,
+                            item.groupName,
+                            Number(item.cost || 0).toFixed(2),
+                            Number(item.price || 0).toFixed(2),
+                            Number(item.pvpPrice || 0).toFixed(2),
+                            Number(item.manualPrice ?? 0).toFixed(2),
+                            Number(item.manualPvpPrice || 0).toFixed(2),
+                            Number(item.selectedPrice || 0).toFixed(2),
+                            `v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}`,
+                        ]);
+                    });
+            });
 
         return {
             fileName: `lista_precios_${snapshot.month}_v${snapshot.version}-${snapshot.priceSource === 'manual' ? 'M' : 'A'}.csv`,

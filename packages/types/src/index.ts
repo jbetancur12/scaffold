@@ -766,6 +766,7 @@ export interface PriceListSnapshotItem {
     categoryId?: string;
     groupName: string;
     groupSortOrder: number;
+    cost?: number;
     price: number;
     pvpPrice: number;
     manualPrice?: number | null;
