@@ -10,7 +10,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useProductGroupsQuery, useProductsQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
 import { mrpApi } from '@/services/mrpApi';
-import { Download, Package, Search, Columns, FileText, Plus, Trash2, Layers, TrendingDown, TrendingUp, Tag, ShoppingCart, AlertTriangle } from 'lucide-react';
+import { Download, Package, Search, Columns, FileText, Plus, Trash2, Layers, TrendingDown, TrendingUp, Tag, ShoppingCart, AlertTriangle, Save } from 'lucide-react';
 import { Product } from '@scaffold/types';
 import {
     Dialog,
@@ -802,9 +802,9 @@ export default function PriceListPage() {
                                                     {visibleColumns.pvpPrice && <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>}
                                                     {visibleColumns.manualPrice && (
                                                         <TableCell>
-                                                            <div className="min-w-[260px]">
+                                                            <div className="min-w-[180px]">
                                                                 <div className="flex items-center gap-2">
-                                                                    <div className="relative flex-1">
+                                                                    <div className="relative w-[150px] shrink-0">
                                                                         <CurrencyInput
                                                                             value={manualPriceDrafts[row.productId]}
                                                                             onValueChange={(value) => setManualPriceDrafts((prev) => ({ ...prev, [row.productId]: value }))}
@@ -842,11 +842,12 @@ export default function PriceListPage() {
                                                                         type="button"
                                                                         size="sm"
                                                                         variant="outline"
-                                                                        className="h-9 shrink-0 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                                                        className="h-10 w-10 shrink-0 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                                                                         onClick={() => handleSaveManualPrice(row)}
                                                                         disabled={savingManualPriceId === row.productId}
+                                                                        title={savingManualPriceId === row.productId ? 'Guardando...' : 'Guardar precio manual'}
                                                                     >
-                                                                        {savingManualPriceId === row.productId ? 'Guardando...' : 'Guardar'}
+                                                                        <Save className={cn('h-[22px] w-[22px]', savingManualPriceId === row.productId && 'animate-pulse')} />
                                                                     </Button>
                                                                 </div>
                                                             </div>
