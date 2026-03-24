@@ -127,13 +127,14 @@ const getManualPriceAlert = (cost?: number, price?: number) => {
 
     const minPriceFor20Margin = Number(cost || 0) / (1 - 0.2);
     const minPriceFor30Margin = Number(cost || 0) / (1 - 0.3);
+    const minPriceFor40Margin = Number(cost || 0) / (1 - 0.4);
 
-    if (marginPercent <= 20) {
+    if (marginPercent < 20) {
         return {
             tone: 'danger' as const,
             marginPercent,
             referencePrice: minPriceFor20Margin,
-            message: `Margen estimado ${marginPercent.toFixed(1)}%. Debe ser mayor a 20%.`,
+            message: `Margen estimado ${marginPercent.toFixed(1)}%. Está por debajo de 20%.`,
         };
     }
 
@@ -143,6 +144,15 @@ const getManualPriceAlert = (cost?: number, price?: number) => {
             marginPercent,
             referencePrice: minPriceFor30Margin,
             message: `Margen estimado ${marginPercent.toFixed(1)}%. Está entre 20% y 30%.`,
+        };
+    }
+
+    if (marginPercent < 40) {
+        return {
+            tone: 'caution' as const,
+            marginPercent,
+            referencePrice: minPriceFor40Margin,
+            message: `Margen estimado ${marginPercent.toFixed(1)}%. Está entre 30% y 40%.`,
         };
     }
 
@@ -790,6 +800,7 @@ export default function PriceListPage() {
                                         (() => {
                                             const manualPriceAlert = getManualPriceAlert(row.productionCost, manualPriceDrafts[row.productId]);
                                             const automaticMarginPercent = calculateMarginPercent(row.productionCost, row.distributorPrice);
+                                            const automaticPriceAlert = getManualPriceAlert(row.productionCost, row.distributorPrice);
 
                                             return (
                                                 <TableRow key={row.productId} className="hover:bg-emerald-50/30">
@@ -805,13 +816,37 @@ export default function PriceListPage() {
                                                                 <span>{formatCurrency(row.distributorPrice)}</span>
                                                                 {automaticMarginPercent != null && (
                                                                     <div className="relative group">
-                                                                        <div className="flex h-4 w-4 items-center justify-center rounded-full text-slate-400 cursor-help">
+                                                                        <div
+                                                                            className={cn(
+                                                                                'flex h-4 w-4 items-center justify-center rounded-full cursor-help',
+                                                                                automaticPriceAlert?.tone === 'danger' && 'text-red-600',
+                                                                                automaticPriceAlert?.tone === 'warning' && 'text-orange-600',
+                                                                                automaticPriceAlert?.tone === 'caution' && 'text-yellow-600',
+                                                                                !automaticPriceAlert && 'text-slate-400',
+                                                                            )}
+                                                                        >
                                                                             <Info className="h-3.5 w-3.5" />
                                                                         </div>
-                                                                        <div className="pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-56 rounded-md border border-slate-200 bg-white p-2.5 text-left text-[11px] leading-tight text-slate-600 shadow-lg group-hover:block">
-                                                                            Margen estimado: {automaticMarginPercent.toFixed(1)}%.
-                                                                            <br />
-                                                                            Costo base: {formatCurrency(row.productionCost)}.
+                                                                        <div
+                                                                            className={cn(
+                                                                                'pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-64 rounded-md border bg-white p-2.5 text-left text-[11px] leading-tight shadow-lg group-hover:block',
+                                                                                automaticPriceAlert?.tone === 'danger' && 'border-red-200 text-red-700',
+                                                                                automaticPriceAlert?.tone === 'warning' && 'border-orange-200 text-orange-700',
+                                                                                automaticPriceAlert?.tone === 'caution' && 'border-yellow-200 text-yellow-700',
+                                                                                !automaticPriceAlert && 'border-slate-200 text-slate-600',
+                                                                            )}
+                                                                        >
+                                                                            {automaticPriceAlert ? (
+                                                                                <>
+                                                                                    {automaticPriceAlert.message} Referencia: {formatCurrency(automaticPriceAlert.referencePrice)}.
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    Margen estimado: {automaticMarginPercent.toFixed(1)}%.
+                                                                                    <br />
+                                                                                    Costo base: {formatCurrency(row.productionCost)}.
+                                                                                </>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 )}
@@ -831,7 +866,8 @@ export default function PriceListPage() {
                                                                                 'h-9',
                                                                                 manualPriceAlert && 'pr-10',
                                                                                 manualPriceAlert?.tone === 'danger' && 'border-red-300 bg-red-50/60 focus-visible:ring-red-400',
-                                                                                manualPriceAlert?.tone === 'warning' && 'border-amber-300 bg-amber-50/60 focus-visible:ring-amber-400',
+                                                                                manualPriceAlert?.tone === 'warning' && 'border-orange-300 bg-orange-50/60 focus-visible:ring-orange-400',
+                                                                                manualPriceAlert?.tone === 'caution' && 'border-yellow-300 bg-yellow-50/60 focus-visible:ring-yellow-400',
                                                                             )}
                                                                         />
                                                                         {manualPriceAlert && (
@@ -840,7 +876,8 @@ export default function PriceListPage() {
                                                                                     className={cn(
                                                                                         'flex h-5 w-5 items-center justify-center rounded-full cursor-help',
                                                                                         manualPriceAlert.tone === 'danger' && 'text-red-600',
-                                                                                        manualPriceAlert.tone === 'warning' && 'text-amber-600',
+                                                                                        manualPriceAlert.tone === 'warning' && 'text-orange-600',
+                                                                                        manualPriceAlert.tone === 'caution' && 'text-yellow-600',
                                                                                     )}
                                                                                 >
                                                                                     <AlertTriangle className="h-4 w-4" />
@@ -849,7 +886,8 @@ export default function PriceListPage() {
                                                                                     className={cn(
                                                                                         'pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-64 rounded-md border bg-white p-2.5 text-[11px] leading-tight shadow-lg group-hover:block',
                                                                                         manualPriceAlert.tone === 'danger' && 'border-red-200 text-red-700',
-                                                                                        manualPriceAlert.tone === 'warning' && 'border-amber-200 text-amber-700',
+                                                                                        manualPriceAlert.tone === 'warning' && 'border-orange-200 text-orange-700',
+                                                                                        manualPriceAlert.tone === 'caution' && 'border-yellow-200 text-yellow-700',
                                                                                     )}
                                                                                 >
                                                                                     {manualPriceAlert.message} Referencia: {formatCurrency(manualPriceAlert.referencePrice)}.
