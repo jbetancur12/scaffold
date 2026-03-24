@@ -127,7 +127,7 @@ export default function ProductBOMPage() {
                     <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => navigate('/mrp/products')}
+                        onClick={() => navigate(`/mrp/products/${id}`)}
                         className="h-10 w-10 mt-1 rounded-xl border-slate-200 hover:bg-slate-100 shrink-0"
                     >
                         <ArrowLeft className="h-4 w-4 text-slate-600" />
