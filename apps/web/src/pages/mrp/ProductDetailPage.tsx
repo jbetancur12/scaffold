@@ -51,6 +51,11 @@ interface VariantFormData {
     taxRate: number;
 }
 
+interface PendingVariantPropagation {
+    distributorPriceChanged: boolean;
+    productionMinutesChanged: boolean;
+}
+
 export default function ProductDetailPage() {
     const { id } = useParams();
     const navigate = useNavigate();
@@ -75,6 +80,8 @@ export default function ProductDetailPage() {
     const [variantNameManuallyEdited, setVariantNameManuallyEdited] = useState(false);
     const [variantSkuManuallyEdited, setVariantSkuManuallyEdited] = useState(false);
     const [variantIdentityOpen, setVariantIdentityOpen] = useState(true);
+    const [showVariantPropagationDialog, setShowVariantPropagationDialog] = useState(false);
+    const [pendingVariantPropagation, setPendingVariantPropagation] = useState<PendingVariantPropagation | null>(null);
     const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
     const [uploadingImage, setUploadingImage] = useState(false);
     const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
@@ -287,6 +294,55 @@ export default function ProductDetailPage() {
         return `${day}/${month}/${year}`;
     };
 
+    const toComparableNumber = (value?: number | null) => Number(value || 0);
+
+    const clearPendingVariantPropagation = () => {
+        setPendingVariantPropagation(null);
+        setShowVariantPropagationDialog(false);
+    };
+
+    const getVariantPropagationLabels = (pending: PendingVariantPropagation | null) => {
+        if (!pending) return '';
+        return [
+            pending.distributorPriceChanged ? 'precio a distribuidor' : null,
+            pending.productionMinutesChanged ? 'tiempo de producción' : null,
+        ].filter(Boolean).join(' y ');
+    };
+
+    const persistVariant = async (options?: {
+        applyDistributorPriceToAllVariants?: boolean;
+        applyProductionMinutesToAllVariants?: boolean;
+    }) => {
+        if (!id) return;
+
+        if (editingVariant?.id) {
+            const validatedData = UpdateProductVariantSchema.parse({
+                ...variantFormData,
+                applyDistributorPriceToAllVariants: options?.applyDistributorPriceToAllVariants ?? false,
+                applyProductionMinutesToAllVariants: options?.applyProductionMinutesToAllVariants ?? false,
+            });
+            await saveVariant({ productId: id, variantId: editingVariant.id, payload: validatedData });
+            const appliedFields = [
+                options?.applyDistributorPriceToAllVariants ? 'precio a distribuidor' : null,
+                options?.applyProductionMinutesToAllVariants ? 'tiempo de producción' : null,
+            ].filter(Boolean).join(' y ');
+            toast({
+                title: 'Éxito',
+                description: appliedFields
+                    ? `Variante actualizada y ${appliedFields} aplicado(s) a todas las variantes`
+                    : 'Variante actualizada exitosamente',
+            });
+        } else {
+            const validatedData = CreateProductVariantSchema.parse(variantFormData);
+            await saveVariant({ productId: id, payload: validatedData });
+            toast({ title: 'Éxito', description: 'Variante creada exitosamente' });
+        }
+
+        clearPendingVariantPropagation();
+        setShowVariantDialog(false);
+        await reloadProduct({ force: true });
+    };
+
     const handleDeleteProduct = async () => {
         if (!confirm('¿Estás seguro de eliminar este producto y todas sus variantes? Esta acción no se puede deshacer.')) return;
         try {
@@ -301,19 +357,20 @@ export default function ProductDetailPage() {
 
     const handleSaveVariant = async () => {
         try {
-            if (!id) return;
             if (editingVariant?.id) {
-                const validatedData = UpdateProductVariantSchema.parse(variantFormData);
-                await saveVariant({ productId: id, variantId: editingVariant.id, payload: validatedData });
-                toast({ title: 'Éxito', description: 'Variante actualizada exitosamente' });
-            } else {
-                const validatedData = CreateProductVariantSchema.parse(variantFormData);
-                await saveVariant({ productId: id, payload: validatedData });
-                toast({ title: 'Éxito', description: 'Variante creada exitosamente' });
-            }
+                const distributorPriceChanged = toComparableNumber(variantFormData.price) !== toComparableNumber(editingVariant.price);
+                const productionMinutesChanged = toComparableNumber(variantFormData.productionMinutes) !== toComparableNumber(editingVariant.productionMinutes);
 
-            setShowVariantDialog(false);
-            await reloadProduct({ force: true });
+                if ((product?.variants?.length || 0) > 1 && (distributorPriceChanged || productionMinutesChanged)) {
+                    setPendingVariantPropagation({
+                        distributorPriceChanged,
+                        productionMinutesChanged,
+                    });
+                    setShowVariantPropagationDialog(true);
+                    return;
+                }
+            }
+            await persistVariant();
         } catch (error) {
             toast({
                 title: 'Error',
@@ -767,7 +824,12 @@ export default function ProductDetailPage() {
             </Tabs>
 
             {/* Variant Dialog */}
-            <Dialog open={showVariantDialog} onOpenChange={setShowVariantDialog}>
+            <Dialog open={showVariantDialog} onOpenChange={(open) => {
+                setShowVariantDialog(open);
+                if (!open) {
+                    clearPendingVariantPropagation();
+                }
+            }}>
                 <DialogContent className="sm:max-w-[550px] w-[95vw] max-h-[90vh] p-0 overflow-hidden border-0 shadow-2xl rounded-2xl flex flex-col">
                     <DialogHeader className="p-6 pb-0 border-b-0 space-y-1 bg-slate-50/50 rounded-t-2xl shrink-0">
                         <div className="flex items-center gap-3 mb-2">
@@ -1180,6 +1242,48 @@ export default function ProductDetailPage() {
                         <Button type="button" onClick={handleSaveVariant} className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white min-w-[120px] shadow-md shadow-fuchsia-600/20">
                             <Save className="h-4 w-4 mr-2" />
                             {editingVariant ? 'Guardar Cambios' : 'Generar Variante'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showVariantPropagationDialog} onOpenChange={(open) => {
+                setShowVariantPropagationDialog(open);
+                if (!open) {
+                    setPendingVariantPropagation(null);
+                }
+            }}>
+                <DialogContent className="sm:max-w-md border-0 shadow-2xl rounded-2xl">
+                    <DialogHeader className="space-y-2">
+                        <DialogTitle className="text-xl font-bold text-slate-900">
+                            Aplicar cambio a variantes
+                        </DialogTitle>
+                        <DialogDescription className="text-slate-500">
+                            Cambiaste {getVariantPropagationLabels(pendingVariantPropagation)}. Elige si quieres aplicar ese cambio a todas las variantes del producto o solo a la que estás editando.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="bg-white border-slate-200 hover:bg-slate-100"
+                            onClick={async () => {
+                                await persistVariant();
+                            }}
+                        >
+                            Solo esta variante
+                        </Button>
+                        <Button
+                            type="button"
+                            className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white"
+                            onClick={async () => {
+                                await persistVariant({
+                                    applyDistributorPriceToAllVariants: pendingVariantPropagation?.distributorPriceChanged ?? false,
+                                    applyProductionMinutesToAllVariants: pendingVariantPropagation?.productionMinutesChanged ?? false,
+                                });
+                            }}
+                        >
+                            Aplicar a todas
                         </Button>
                     </DialogFooter>
                 </DialogContent>

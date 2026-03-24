@@ -249,6 +249,29 @@ export class ProductService {
         };
     }
 
+    private async updateSingleVariant(
+        variant: ProductVariant,
+        data: Partial<ProductVariant>,
+        actor?: string
+    ): Promise<{ before: ReturnType<ProductService['buildVariantSnapshot']>; after: ReturnType<ProductService['buildVariantSnapshot']> }> {
+        const before = this.buildVariantSnapshot(variant);
+        this.variantRepo.assign(variant, this.enrichVariantPricing(data, variant));
+        await this.em.persistAndFlush(variant);
+        await this.calculateVariantCost(variant.id);
+        const refreshed = await this.variantRepo.findOneOrFail({ id: variant.id }, { populate: ['product'] });
+        const after = this.buildVariantSnapshot(refreshed);
+        await this.logAudit('product_variant', variant.id, 'updated', { before, after }, actor);
+        if (Number(before.price) !== Number(after.price)) {
+            await this.logAudit('product_variant', variant.id, 'price_updated', {
+                sku: after.sku,
+                productId: after.productId,
+                previousPrice: before.price,
+                price: after.price,
+            }, actor);
+        }
+        return { before, after };
+    }
+
     private parseProductImportCsv(csvText: string) {
         const lines = csvText
             .replace(/\r/g, '')
@@ -622,24 +645,46 @@ export class ProductService {
         return variant;
     }
 
-    async updateVariant(variantId: string, data: Partial<ProductVariant>, actor?: string): Promise<ProductVariant> {
+    async updateVariant(
+        variantId: string,
+        data: Partial<ProductVariant> & {
+            applyDistributorPriceToAllVariants?: boolean;
+            applyProductionMinutesToAllVariants?: boolean;
+        },
+        actor?: string
+    ): Promise<ProductVariant> {
         const variant = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['product'] });
-        const before = this.buildVariantSnapshot(variant);
-        this.variantRepo.assign(variant, this.enrichVariantPricing(data, variant));
-        await this.em.persistAndFlush(variant);
-        await this.calculateVariantCost(variant.id);
-        const refreshed = await this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['product'] });
-        const after = this.buildVariantSnapshot(refreshed);
-        await this.logAudit('product_variant', variantId, 'updated', { before, after }, actor);
-        if (Number(before.price) !== Number(after.price)) {
-            await this.logAudit('product_variant', variantId, 'price_updated', {
-                sku: after.sku,
-                productId: after.productId,
-                previousPrice: before.price,
-                price: after.price,
-            }, actor);
+        const {
+            applyDistributorPriceToAllVariants,
+            applyProductionMinutesToAllVariants,
+            ...variantData
+        } = data;
+
+        const sharedFields: Partial<ProductVariant> = {};
+        if (applyDistributorPriceToAllVariants && 'price' in variantData) {
+            sharedFields.price = variantData.price;
         }
-        return variant;
+        if (applyProductionMinutesToAllVariants && 'productionMinutes' in variantData) {
+            sharedFields.productionMinutes = variantData.productionMinutes;
+        }
+
+        await this.updateSingleVariant(variant, variantData, actor);
+
+        if (Object.keys(sharedFields).length > 0) {
+            const siblingVariants = await this.variantRepo.find(
+                {
+                    product: variant.product.id,
+                    id: { $ne: variant.id },
+                },
+                { populate: ['product'] }
+            );
+
+            for (const siblingVariant of siblingVariants) {
+                await this.updateSingleVariant(siblingVariant, sharedFields, actor);
+            }
+        }
+
+        return this.variantRepo.findOneOrFail({ id: variantId }, { populate: ['product'] });
     }
 
     async deleteVariant(variantId: string, actor?: string): Promise<void> {

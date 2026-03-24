@@ -315,7 +315,10 @@ export const CreateProductVariantSchema = z.object({
     taxRate: z.number().min(0).max(100).default(0),
 });
 
-export const UpdateProductVariantSchema = CreateProductVariantSchema.partial();
+export const UpdateProductVariantSchema = CreateProductVariantSchema.partial().extend({
+    applyDistributorPriceToAllVariants: z.boolean().optional(),
+    applyProductionMinutesToAllVariants: z.boolean().optional(),
+});
 
 export const BOMItemSchema = z.object({
     variantId: z.string().uuid(),
