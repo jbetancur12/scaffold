@@ -318,6 +318,9 @@ export const CreateProductVariantSchema = z.object({
 export const UpdateProductVariantSchema = CreateProductVariantSchema.partial().extend({
     applyDistributorPriceToAllVariants: z.boolean().optional(),
     applyProductionMinutesToAllVariants: z.boolean().optional(),
+    applyPvpMarginToAllVariants: z.boolean().optional(),
+    applyTargetMarginToAllVariants: z.boolean().optional(),
+    applyTaxTreatmentToAllVariants: z.boolean().optional(),
 });
 
 export const BOMItemSchema = z.object({

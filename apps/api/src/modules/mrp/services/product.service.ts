@@ -650,6 +650,9 @@ export class ProductService {
         data: Partial<ProductVariant> & {
             applyDistributorPriceToAllVariants?: boolean;
             applyProductionMinutesToAllVariants?: boolean;
+            applyPvpMarginToAllVariants?: boolean;
+            applyTargetMarginToAllVariants?: boolean;
+            applyTaxTreatmentToAllVariants?: boolean;
         },
         actor?: string
     ): Promise<ProductVariant> {
@@ -657,6 +660,9 @@ export class ProductService {
         const {
             applyDistributorPriceToAllVariants,
             applyProductionMinutesToAllVariants,
+            applyPvpMarginToAllVariants,
+            applyTargetMarginToAllVariants,
+            applyTaxTreatmentToAllVariants,
             ...variantData
         } = data;
 
@@ -666,6 +672,20 @@ export class ProductService {
         }
         if (applyProductionMinutesToAllVariants && 'productionMinutes' in variantData) {
             sharedFields.productionMinutes = variantData.productionMinutes;
+        }
+        if (applyPvpMarginToAllVariants && 'pvpMargin' in variantData) {
+            sharedFields.pvpMargin = variantData.pvpMargin;
+        }
+        if (applyTargetMarginToAllVariants && 'targetMargin' in variantData) {
+            sharedFields.targetMargin = variantData.targetMargin;
+        }
+        if (applyTaxTreatmentToAllVariants) {
+            if ('taxStatus' in variantData) {
+                sharedFields.taxStatus = variantData.taxStatus;
+            }
+            if ('taxRate' in variantData) {
+                sharedFields.taxRate = variantData.taxRate;
+            }
         }
 
         await this.updateSingleVariant(variant, variantData, actor);

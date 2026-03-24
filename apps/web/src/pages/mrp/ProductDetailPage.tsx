@@ -54,6 +54,9 @@ interface VariantFormData {
 interface PendingVariantPropagation {
     distributorPriceChanged: boolean;
     productionMinutesChanged: boolean;
+    pvpMarginChanged: boolean;
+    targetMarginChanged: boolean;
+    taxTreatmentChanged: boolean;
 }
 
 export default function ProductDetailPage() {
@@ -306,12 +309,18 @@ export default function ProductDetailPage() {
         return [
             pending.distributorPriceChanged ? 'precio a distribuidor' : null,
             pending.productionMinutesChanged ? 'tiempo de producción' : null,
+            pending.pvpMarginChanged ? 'margen PVP' : null,
+            pending.targetMarginChanged ? 'margen esperado' : null,
+            pending.taxTreatmentChanged ? 'tratamiento de IVA' : null,
         ].filter(Boolean).join(' y ');
     };
 
     const persistVariant = async (options?: {
         applyDistributorPriceToAllVariants?: boolean;
         applyProductionMinutesToAllVariants?: boolean;
+        applyPvpMarginToAllVariants?: boolean;
+        applyTargetMarginToAllVariants?: boolean;
+        applyTaxTreatmentToAllVariants?: boolean;
     }) => {
         if (!id) return;
 
@@ -320,11 +329,17 @@ export default function ProductDetailPage() {
                 ...variantFormData,
                 applyDistributorPriceToAllVariants: options?.applyDistributorPriceToAllVariants ?? false,
                 applyProductionMinutesToAllVariants: options?.applyProductionMinutesToAllVariants ?? false,
+                applyPvpMarginToAllVariants: options?.applyPvpMarginToAllVariants ?? false,
+                applyTargetMarginToAllVariants: options?.applyTargetMarginToAllVariants ?? false,
+                applyTaxTreatmentToAllVariants: options?.applyTaxTreatmentToAllVariants ?? false,
             });
             await saveVariant({ productId: id, variantId: editingVariant.id, payload: validatedData });
             const appliedFields = [
                 options?.applyDistributorPriceToAllVariants ? 'precio a distribuidor' : null,
                 options?.applyProductionMinutesToAllVariants ? 'tiempo de producción' : null,
+                options?.applyPvpMarginToAllVariants ? 'margen PVP' : null,
+                options?.applyTargetMarginToAllVariants ? 'margen esperado' : null,
+                options?.applyTaxTreatmentToAllVariants ? 'tratamiento de IVA' : null,
             ].filter(Boolean).join(' y ');
             toast({
                 title: 'Éxito',
@@ -360,11 +375,25 @@ export default function ProductDetailPage() {
             if (editingVariant?.id) {
                 const distributorPriceChanged = toComparableNumber(variantFormData.price) !== toComparableNumber(editingVariant.price);
                 const productionMinutesChanged = toComparableNumber(variantFormData.productionMinutes) !== toComparableNumber(editingVariant.productionMinutes);
+                const pvpMarginChanged = toComparableNumber(variantFormData.pvpMargin) !== toComparableNumber(editingVariant.pvpMargin);
+                const targetMarginChanged = toComparableNumber(variantFormData.targetMargin) !== toComparableNumber(editingVariant.targetMargin);
+                const taxTreatmentChanged =
+                    variantFormData.taxStatus !== (editingVariant.taxStatus ?? ProductTaxStatus.EXCLUIDO)
+                    || toComparableNumber(variantFormData.taxRate) !== toComparableNumber(editingVariant.taxRate);
 
-                if ((product?.variants?.length || 0) > 1 && (distributorPriceChanged || productionMinutesChanged)) {
+                if ((product?.variants?.length || 0) > 1 && (
+                    distributorPriceChanged
+                    || productionMinutesChanged
+                    || pvpMarginChanged
+                    || targetMarginChanged
+                    || taxTreatmentChanged
+                )) {
                     setPendingVariantPropagation({
                         distributorPriceChanged,
                         productionMinutesChanged,
+                        pvpMarginChanged,
+                        targetMarginChanged,
+                        taxTreatmentChanged,
                     });
                     setShowVariantPropagationDialog(true);
                     return;
@@ -1280,6 +1309,9 @@ export default function ProductDetailPage() {
                                 await persistVariant({
                                     applyDistributorPriceToAllVariants: pendingVariantPropagation?.distributorPriceChanged ?? false,
                                     applyProductionMinutesToAllVariants: pendingVariantPropagation?.productionMinutesChanged ?? false,
+                                    applyPvpMarginToAllVariants: pendingVariantPropagation?.pvpMarginChanged ?? false,
+                                    applyTargetMarginToAllVariants: pendingVariantPropagation?.targetMarginChanged ?? false,
+                                    applyTaxTreatmentToAllVariants: pendingVariantPropagation?.taxTreatmentChanged ?? false,
                                 });
                             }}
                         >
