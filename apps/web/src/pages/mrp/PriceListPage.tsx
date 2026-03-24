@@ -10,7 +10,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useProductGroupsQuery, useProductsQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
 import { mrpApi } from '@/services/mrpApi';
-import { Download, Package, Search, Columns, FileText, Plus, Trash2, Layers, TrendingDown, TrendingUp, Tag, ShoppingCart, AlertTriangle, Save } from 'lucide-react';
+import { Download, Package, Search, Columns, FileText, Plus, Trash2, Layers, TrendingDown, TrendingUp, Tag, ShoppingCart, AlertTriangle, Save, Info } from 'lucide-react';
 import { Product } from '@scaffold/types';
 import {
     Dialog,
@@ -789,6 +789,7 @@ export default function PriceListPage() {
                                     ...group.rows.map((row) => (
                                         (() => {
                                             const manualPriceAlert = getManualPriceAlert(row.productionCost, manualPriceDrafts[row.productId]);
+                                            const automaticMarginPercent = calculateMarginPercent(row.productionCost, row.distributorPrice);
 
                                             return (
                                                 <TableRow key={row.productId} className="hover:bg-emerald-50/30">
@@ -798,7 +799,25 @@ export default function PriceListPage() {
                                                     {visibleColumns.sizes && <TableCell className="max-w-[220px] whitespace-normal">{row.sizes || 'N/A'}</TableCell>}
                                                     {visibleColumns.colors && <TableCell className="max-w-[220px] whitespace-normal">{row.colors || 'N/A'}</TableCell>}
                                                     {visibleColumns.productionCost && <TableCell className="text-right">{formatCurrency(row.productionCost)}</TableCell>}
-                                                    {visibleColumns.distributorPrice && <TableCell className="text-right">{formatCurrency(row.distributorPrice)}</TableCell>}
+                                                    {visibleColumns.distributorPrice && (
+                                                        <TableCell className="text-right">
+                                                            <div className="flex items-center justify-end gap-1.5">
+                                                                <span>{formatCurrency(row.distributorPrice)}</span>
+                                                                {automaticMarginPercent != null && (
+                                                                    <div className="relative group">
+                                                                        <div className="flex h-4 w-4 items-center justify-center rounded-full text-slate-400 cursor-help">
+                                                                            <Info className="h-3.5 w-3.5" />
+                                                                        </div>
+                                                                        <div className="pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-56 rounded-md border border-slate-200 bg-white p-2.5 text-left text-[11px] leading-tight text-slate-600 shadow-lg group-hover:block">
+                                                                            Margen estimado: {automaticMarginPercent.toFixed(1)}%.
+                                                                            <br />
+                                                                            Costo base: {formatCurrency(row.productionCost)}.
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                    )}
                                                     {visibleColumns.pvpPrice && <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>}
                                                     {visibleColumns.manualPrice && (
                                                         <TableCell>
