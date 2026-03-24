@@ -6,11 +6,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { useProductGroupsQuery, useProductsQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
 import { mrpApi } from '@/services/mrpApi';
-import { Download, Package, Search, Columns, FileText, Plus, Trash2, Layers, TrendingDown, TrendingUp, Tag, ShoppingCart } from 'lucide-react';
+import { Download, Package, Search, Columns, FileText, Plus, Trash2, Layers, TrendingDown, TrendingUp, Tag, ShoppingCart, AlertTriangle } from 'lucide-react';
 import { Product } from '@scaffold/types';
 import {
     Dialog,
@@ -33,7 +33,6 @@ type PriceRow = {
     sizes: string;
     colors: string;
     productionCost: number;
-    costPlus40: number;
     distributorPrice: number;
     manualPrice?: number;
     pvpPrice: number;
@@ -51,7 +50,6 @@ type TableColumnKey =
     | 'sizes'
     | 'colors'
     | 'productionCost'
-    | 'costPlus40'
     | 'distributorPrice'
     | 'pvpPrice'
     | 'manualPrice'
@@ -88,7 +86,6 @@ const DEFAULT_TABLE_COLUMNS: Record<TableColumnKey, boolean> = {
     sizes: true,
     colors: true,
     productionCost: true,
-    costPlus40: true,
     distributorPrice: true,
     pvpPrice: true,
     manualPrice: true,
@@ -100,7 +97,6 @@ const TABLE_COLUMN_LABELS: Array<{ key: TableColumnKey; label: string }> = [
     { key: 'sizes', label: 'Tallas' },
     { key: 'colors', label: 'Colores' },
     { key: 'productionCost', label: 'Costo produccion' },
-    { key: 'costPlus40', label: 'Costo + 40%' },
     { key: 'distributorPrice', label: 'Precio automatico' },
     { key: 'pvpPrice', label: 'PVP automatico' },
     { key: 'manualPrice', label: 'Precio manual' },
@@ -113,6 +109,45 @@ const calculateManualPvpPrice = (value?: number) => {
     const price = Number(value || 0);
     if (!Number.isFinite(price) || price <= 0) return 0;
     return Number((price / 0.75).toFixed(2));
+};
+
+const calculateMarginPercent = (cost?: number, price?: number) => {
+    const normalizedCost = Number(cost || 0);
+    const normalizedPrice = Number(price || 0);
+    if (!Number.isFinite(normalizedCost) || !Number.isFinite(normalizedPrice) || normalizedCost <= 0 || normalizedPrice <= 0) {
+        return null;
+    }
+    return ((normalizedPrice - normalizedCost) / normalizedPrice) * 100;
+};
+
+const getManualPriceAlert = (cost?: number, price?: number) => {
+    if (price == null) return null;
+
+    const marginPercent = calculateMarginPercent(cost, price);
+    if (marginPercent == null) return null;
+
+    const minPriceFor20Margin = Number(cost || 0) / (1 - 0.2);
+    const minPriceFor30Margin = Number(cost || 0) / (1 - 0.3);
+
+    if (marginPercent <= 20) {
+        return {
+            tone: 'danger' as const,
+            marginPercent,
+            referencePrice: minPriceFor20Margin,
+            message: `Margen estimado ${marginPercent.toFixed(1)}%. Debe ser mayor a 20%.`,
+        };
+    }
+
+    if (marginPercent < 30) {
+        return {
+            tone: 'warning' as const,
+            marginPercent,
+            referencePrice: minPriceFor30Margin,
+            message: `Margen estimado ${marginPercent.toFixed(1)}%. Está entre 20% y 30%.`,
+        };
+    }
+
+    return null;
 };
 
 const buildRows = (products: Product[]): PriceRow[] => {
@@ -147,7 +182,6 @@ const buildRows = (products: Product[]): PriceRow[] => {
             sizes: uniqueSizes.join(', '),
             colors: uniqueColors.join(', '),
             productionCost: maxCost,
-            costPlus40: maxCost * 1.4,
             distributorPrice: maxDistributorPrice,
             manualPrice: product.manualPrice != null ? Number(product.manualPrice) : undefined,
             pvpPrice: maxPvpPrice,
@@ -662,7 +696,6 @@ export default function PriceListPage() {
                                 {visibleColumns.sizes && <TableHead className="text-white font-semibold whitespace-nowrap">Tallas</TableHead>}
                                 {visibleColumns.colors && <TableHead className="text-white font-semibold whitespace-nowrap">Colores</TableHead>}
                                 {visibleColumns.productionCost && <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo produccion</TableHead>}
-                                {visibleColumns.costPlus40 && <TableHead className="text-white font-semibold whitespace-nowrap text-right">Costo + 40%</TableHead>}
                                 {visibleColumns.distributorPrice && <TableHead className="text-white font-semibold whitespace-nowrap text-right">Precio automatico</TableHead>}
                                 {visibleColumns.pvpPrice && <TableHead className="text-white font-semibold whitespace-nowrap text-right">PVP automatico</TableHead>}
                                 {visibleColumns.manualPrice && <TableHead className="text-white font-semibold whitespace-nowrap">Precio manual</TableHead>}
@@ -690,41 +723,77 @@ export default function PriceListPage() {
                                         </TableCell>
                                     </TableRow>,
                                     ...group.rows.map((row) => (
-                                        <TableRow key={row.productId} className="hover:bg-emerald-50/30">
-                                            <TableCell className="font-medium text-slate-900">{row.productSku}</TableCell>
-                                            <TableCell className="min-w-[280px]">{row.productName}</TableCell>
-                                            {visibleColumns.group && <TableCell>{row.groupName}</TableCell>}
-                                            {visibleColumns.sizes && <TableCell className="max-w-[220px] whitespace-normal">{row.sizes || 'N/A'}</TableCell>}
-                                            {visibleColumns.colors && <TableCell className="max-w-[220px] whitespace-normal">{row.colors || 'N/A'}</TableCell>}
-                                            {visibleColumns.productionCost && <TableCell className="text-right">{formatCurrency(row.productionCost)}</TableCell>}
-                                            {visibleColumns.costPlus40 && <TableCell className="text-right font-semibold text-slate-900">{formatCurrency(row.costPlus40)}</TableCell>}
-                                            {visibleColumns.distributorPrice && <TableCell className="text-right">{formatCurrency(row.distributorPrice)}</TableCell>}
-                                            {visibleColumns.pvpPrice && <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>}
-                                            {visibleColumns.manualPrice && (
-                                                <TableCell>
-                                                    <div className="flex min-w-[220px] items-center gap-2">
-                                                        <CurrencyInput
-                                                            value={manualPriceDrafts[row.productId]}
-                                                            onValueChange={(value) => setManualPriceDrafts((prev) => ({ ...prev, [row.productId]: value }))}
-                                                            className="h-9"
-                                                        />
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="h-9 shrink-0 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                                                            onClick={() => handleSaveManualPrice(row)}
-                                                            disabled={savingManualPriceId === row.productId}
-                                                        >
-                                                            {savingManualPriceId === row.productId ? 'Guardando...' : 'Guardar'}
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            )}
-                                            {visibleColumns.manualPvpPrice && (
-                                                <TableCell className="text-right">{formatCurrency(calculateManualPvpPrice(manualPriceDrafts[row.productId]))}</TableCell>
-                                            )}
-                                        </TableRow>
+                                        (() => {
+                                            const manualPriceAlert = getManualPriceAlert(row.productionCost, manualPriceDrafts[row.productId]);
+
+                                            return (
+                                                <TableRow key={row.productId} className="hover:bg-emerald-50/30">
+                                                    <TableCell className="font-medium text-slate-900">{row.productSku}</TableCell>
+                                                    <TableCell className="min-w-[280px]">{row.productName}</TableCell>
+                                                    {visibleColumns.group && <TableCell>{row.groupName}</TableCell>}
+                                                    {visibleColumns.sizes && <TableCell className="max-w-[220px] whitespace-normal">{row.sizes || 'N/A'}</TableCell>}
+                                                    {visibleColumns.colors && <TableCell className="max-w-[220px] whitespace-normal">{row.colors || 'N/A'}</TableCell>}
+                                                    {visibleColumns.productionCost && <TableCell className="text-right">{formatCurrency(row.productionCost)}</TableCell>}
+                                                    {visibleColumns.distributorPrice && <TableCell className="text-right">{formatCurrency(row.distributorPrice)}</TableCell>}
+                                                    {visibleColumns.pvpPrice && <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>}
+                                                    {visibleColumns.manualPrice && (
+                                                        <TableCell>
+                                                            <div className="min-w-[260px]">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="relative flex-1">
+                                                                        <CurrencyInput
+                                                                            value={manualPriceDrafts[row.productId]}
+                                                                            onValueChange={(value) => setManualPriceDrafts((prev) => ({ ...prev, [row.productId]: value }))}
+                                                                            className={cn(
+                                                                                'h-9',
+                                                                                manualPriceAlert && 'pr-10',
+                                                                                manualPriceAlert?.tone === 'danger' && 'border-red-300 bg-red-50/60 focus-visible:ring-red-400',
+                                                                                manualPriceAlert?.tone === 'warning' && 'border-amber-300 bg-amber-50/60 focus-visible:ring-amber-400',
+                                                                            )}
+                                                                        />
+                                                                        {manualPriceAlert && (
+                                                                            <div className="absolute inset-y-0 right-2 flex items-center group">
+                                                                                <div
+                                                                                    className={cn(
+                                                                                        'flex h-5 w-5 items-center justify-center rounded-full cursor-help',
+                                                                                        manualPriceAlert.tone === 'danger' && 'text-red-600',
+                                                                                        manualPriceAlert.tone === 'warning' && 'text-amber-600',
+                                                                                    )}
+                                                                                >
+                                                                                    <AlertTriangle className="h-4 w-4" />
+                                                                                </div>
+                                                                                <div
+                                                                                    className={cn(
+                                                                                        'pointer-events-none absolute right-0 top-full z-20 mt-2 hidden w-64 rounded-md border bg-white p-2.5 text-[11px] leading-tight shadow-lg group-hover:block',
+                                                                                        manualPriceAlert.tone === 'danger' && 'border-red-200 text-red-700',
+                                                                                        manualPriceAlert.tone === 'warning' && 'border-amber-200 text-amber-700',
+                                                                                    )}
+                                                                                >
+                                                                                    {manualPriceAlert.message} Referencia: {formatCurrency(manualPriceAlert.referencePrice)}.
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        className="h-9 shrink-0 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                                                        onClick={() => handleSaveManualPrice(row)}
+                                                                        disabled={savingManualPriceId === row.productId}
+                                                                    >
+                                                                        {savingManualPriceId === row.productId ? 'Guardando...' : 'Guardar'}
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                    )}
+                                                    {visibleColumns.manualPvpPrice && (
+                                                        <TableCell className="text-right">{formatCurrency(calculateManualPvpPrice(manualPriceDrafts[row.productId]))}</TableCell>
+                                                    )}
+                                                </TableRow>
+                                            );
+                                        })()
                                     )),
                                 ]))
                             )}
