@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
 import { cn, formatCurrency } from '@/lib/utils';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
-import { useProductGroupsQuery, useProductsQuery, useSaveProductMutation } from '@/hooks/mrp/useProducts';
+import { useProductGroupsQuery, useProductsQuery } from '@/hooks/mrp/useProducts';
 import { mrpApi } from '@/services/mrpApi';
 import { Download, Package, Search, Columns, FileText, Plus, Trash2, Layers, TrendingDown, TrendingUp, Tag, ShoppingCart, AlertTriangle, Save, Info } from 'lucide-react';
 import { Product } from '@scaffold/types';
@@ -27,6 +28,7 @@ type PriceRow = {
     productId: string;
     productSku: string;
     productName: string;
+    showInCatalogPdf: boolean;
     groupId: string;
     groupName: string;
     groupSortOrder: number;
@@ -46,6 +48,7 @@ type GroupedPriceRows = {
 };
 
 type TableColumnKey =
+    | 'pdfVisibility'
     | 'group'
     | 'sizes'
     | 'colors'
@@ -82,6 +85,7 @@ const PDF_COLUMN_LABELS: Array<{ key: PdfColumnKey; label: string }> = [
 ];
 
 const DEFAULT_TABLE_COLUMNS: Record<TableColumnKey, boolean> = {
+    pdfVisibility: true,
     group: true,
     sizes: true,
     colors: true,
@@ -93,6 +97,7 @@ const DEFAULT_TABLE_COLUMNS: Record<TableColumnKey, boolean> = {
 };
 
 const TABLE_COLUMN_LABELS: Array<{ key: TableColumnKey; label: string }> = [
+    { key: 'pdfVisibility', label: 'PDF' },
     { key: 'group', label: 'Grupo' },
     { key: 'sizes', label: 'Tallas' },
     { key: 'colors', label: 'Colores' },
@@ -104,6 +109,15 @@ const TABLE_COLUMN_LABELS: Array<{ key: TableColumnKey; label: string }> = [
 ];
 
 const LIST_LIMIT = 1000;
+
+const areManualPriceValuesEqual = (left?: number, right?: number) => {
+    if (left == null && right == null) return true;
+    if (left == null || right == null) return false;
+    return Number(left) === Number(right);
+};
+
+const hasPendingManualPriceChange = (row: PriceRow, draftValue?: number) => !areManualPriceValuesEqual(draftValue, row.manualPrice);
+
 const calculateManualPvpPrice = (value?: number) => {
     const price = Number(value || 0);
     if (!Number.isFinite(price) || price <= 0) return 0;
@@ -185,6 +199,7 @@ const buildRows = (products: Product[]): PriceRow[] => {
             productId: product.id,
             productSku: product.sku,
             productName: product.name,
+            showInCatalogPdf: product.showInCatalogPdf !== false,
             groupId: product.category?.id || 'none',
             groupName: product.category?.name || 'Sin grupo',
             groupSortOrder: Number(product.category?.sortOrder ?? 9999),
@@ -205,13 +220,16 @@ const buildRows = (products: Product[]): PriceRow[] => {
 
 export default function PriceListPage() {
     const { toast } = useToast();
-    const saveProductMutation = useSaveProductMutation();
     const tableScrollbarRef = useRef<HTMLDivElement | null>(null);
     const [search, setSearch] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [categoryId, setCategoryId] = useState('');
+    const [catalogPdfVisibilityOverrides, setCatalogPdfVisibilityOverrides] = useState<Record<string, boolean>>({});
     const [manualPriceDrafts, setManualPriceDrafts] = useState<Record<string, number | undefined>>({});
+    const [savedManualPriceOverrides, setSavedManualPriceOverrides] = useState<Record<string, number | null>>({});
+    const [savingCatalogPdfVisibilityId, setSavingCatalogPdfVisibilityId] = useState<string | null>(null);
     const [savingManualPriceId, setSavingManualPriceId] = useState<string | null>(null);
+    const [savingAllManualPrices, setSavingAllManualPrices] = useState(false);
     const [columnsModalOpen, setColumnsModalOpen] = useState(false);
     const [visibleColumns, setVisibleColumns] = useState<Record<TableColumnKey, boolean>>(DEFAULT_TABLE_COLUMNS);
     const [downloadModalOpen, setDownloadModalOpen] = useState(false);
@@ -315,14 +333,74 @@ export default function PriceListPage() {
         loadSnapshots();
     }, [snapshotMonth]);
 
-    const rows = useMemo(() => buildRows(productsResponse?.products || []), [productsResponse?.products]);
+    const baseRows = useMemo(() => buildRows(productsResponse?.products || []), [productsResponse?.products]);
 
     useEffect(() => {
-        setManualPriceDrafts(
-            Object.fromEntries(
-                rows.map((row) => [row.productId, row.manualPrice])
-            )
-        );
+        setCatalogPdfVisibilityOverrides((currentOverrides) => {
+            const nextOverrides: Record<string, boolean> = {};
+
+            for (const row of baseRows) {
+                if (!Object.prototype.hasOwnProperty.call(currentOverrides, row.productId)) continue;
+                if (currentOverrides[row.productId] !== row.showInCatalogPdf) {
+                    nextOverrides[row.productId] = currentOverrides[row.productId];
+                }
+            }
+
+            return nextOverrides;
+        });
+    }, [baseRows]);
+
+    useEffect(() => {
+        setSavedManualPriceOverrides((currentOverrides) => {
+            const nextOverrides: Record<string, number | null> = {};
+
+            for (const row of baseRows) {
+                if (!Object.prototype.hasOwnProperty.call(currentOverrides, row.productId)) continue;
+
+                const overrideValue = currentOverrides[row.productId];
+                const normalizedOverride = overrideValue ?? undefined;
+                if (!areManualPriceValuesEqual(normalizedOverride, row.manualPrice)) {
+                    nextOverrides[row.productId] = overrideValue;
+                }
+            }
+
+            return nextOverrides;
+        });
+    }, [baseRows]);
+
+    const rows = useMemo(
+        () => baseRows.map((row) => {
+            const nextRow = { ...row };
+
+            if (Object.prototype.hasOwnProperty.call(catalogPdfVisibilityOverrides, row.productId)) {
+                nextRow.showInCatalogPdf = catalogPdfVisibilityOverrides[row.productId];
+            }
+
+            if (Object.prototype.hasOwnProperty.call(savedManualPriceOverrides, row.productId)) {
+                const overrideValue = savedManualPriceOverrides[row.productId] ?? undefined;
+                nextRow.manualPrice = overrideValue;
+                nextRow.manualPvpPrice = calculateManualPvpPrice(overrideValue);
+            }
+
+            return nextRow;
+        }),
+        [baseRows, catalogPdfVisibilityOverrides, savedManualPriceOverrides]
+    );
+
+    useEffect(() => {
+        setManualPriceDrafts((currentDrafts) => {
+            const nextDrafts: Record<string, number | undefined> = {};
+
+            for (const row of rows) {
+                const hasCurrentDraft = Object.prototype.hasOwnProperty.call(currentDrafts, row.productId);
+                const currentDraft = currentDrafts[row.productId];
+                const hasPendingChanges = hasCurrentDraft && !areManualPriceValuesEqual(currentDraft, row.manualPrice);
+
+                nextDrafts[row.productId] = hasPendingChanges ? currentDraft : row.manualPrice;
+            }
+
+            return nextDrafts;
+        });
     }, [rows]);
 
     const filteredRows = useMemo(() => {
@@ -336,6 +414,11 @@ export default function PriceListPage() {
             row.colors.toLowerCase().includes(normalized)
         );
     }, [debouncedSearch, rows]);
+
+    const pendingManualPriceRows = useMemo(
+        () => rows.filter((row) => hasPendingManualPriceChange(row, manualPriceDrafts[row.productId])),
+        [rows, manualPriceDrafts]
+    );
 
     const summary = useMemo(() => {
         const totalProductionCost = filteredRows.reduce((sum, row) => sum + row.productionCost, 0);
@@ -419,10 +502,13 @@ export default function PriceListPage() {
         const manualPrice = manualPriceDrafts[row.productId];
         setSavingManualPriceId(row.productId);
         try {
-            await saveProductMutation.execute({
-                id: row.productId,
-                payload: { manualPrice: manualPrice ?? null } as Partial<Product>,
-            });
+            await mrpApi.updateProduct(row.productId, {
+                manualPrice: manualPrice ?? null,
+            } as Partial<Product>);
+            setSavedManualPriceOverrides((prev) => ({
+                ...prev,
+                [row.productId]: manualPrice ?? null,
+            }));
             toast({ title: 'Listo', description: `Precio manual y PVP manual actualizados para ${row.productName}.` });
         } catch (error) {
             toast({
@@ -432,6 +518,103 @@ export default function PriceListPage() {
             });
         } finally {
             setSavingManualPriceId(null);
+        }
+    };
+
+    const handleToggleCatalogPdfVisibility = async (row: PriceRow, checked: boolean) => {
+        setSavingCatalogPdfVisibilityId(row.productId);
+        setCatalogPdfVisibilityOverrides((prev) => ({
+            ...prev,
+            [row.productId]: checked,
+        }));
+
+        try {
+            await mrpApi.updateProduct(row.productId, {
+                showInCatalogPdf: checked,
+            } as Partial<Product>);
+
+            let snapshotSyncError: unknown = null;
+            try {
+                await mrpApi.regeneratePriceListSnapshot(snapshotMonth, 'auto');
+                await mrpApi.regeneratePriceListSnapshot(snapshotMonth, 'manual');
+            } catch (snapshotError) {
+                snapshotSyncError = snapshotError;
+            }
+
+            toast({
+                title: snapshotSyncError ? 'Guardado con aviso' : 'Listo',
+                description: snapshotSyncError
+                    ? getErrorMessage(snapshotSyncError, 'El producto se actualizó, pero no se pudo refrescar el PDF del mes automáticamente.')
+                    : checked
+                        ? `${row.productName} aparecerá en el PDF.`
+                        : `${row.productName} ya no aparecerá en el PDF.`,
+                variant: snapshotSyncError ? 'destructive' : undefined,
+            });
+        } catch (error) {
+            setCatalogPdfVisibilityOverrides((prev) => ({
+                ...prev,
+                [row.productId]: row.showInCatalogPdf,
+            }));
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo actualizar la visibilidad del PDF'),
+                variant: 'destructive',
+            });
+        } finally {
+            setSavingCatalogPdfVisibilityId(null);
+        }
+    };
+
+    const handleSaveAllManualPrices = async () => {
+        if (pendingManualPriceRows.length === 0) {
+            toast({ title: 'Sin cambios', description: 'No hay precios manuales pendientes por guardar.' });
+            return;
+        }
+
+        setSavingAllManualPrices(true);
+        const savedProductIds: string[] = [];
+        const savedManualPrices: Record<string, number | null> = {};
+        const failedProductNames: string[] = [];
+
+        try {
+            for (const row of pendingManualPriceRows) {
+                try {
+                    const manualPrice = manualPriceDrafts[row.productId];
+                    await mrpApi.updateProduct(row.productId, {
+                        manualPrice: manualPrice ?? null,
+                    } as Partial<Product>);
+                    savedProductIds.push(row.productId);
+                    savedManualPrices[row.productId] = manualPrice ?? null;
+                } catch {
+                    failedProductNames.push(row.productName);
+                }
+            }
+
+            if (savedProductIds.length > 0) {
+                setSavedManualPriceOverrides((prev) => ({
+                    ...prev,
+                    ...savedManualPrices,
+                }));
+            }
+
+            if (failedProductNames.length === 0) {
+                toast({
+                    title: 'Listo',
+                    description: `Se guardaron ${savedProductIds.length} precios manuales.`,
+                });
+                return;
+            }
+
+            const failedPreview = failedProductNames.slice(0, 3).join(', ');
+            toast({
+                title: savedProductIds.length > 0 ? 'Guardado parcial' : 'Error',
+                description: savedProductIds.length > 0
+                    ? `Se guardaron ${savedProductIds.length} precios. Faltaron ${failedProductNames.length}: ${failedPreview}${failedProductNames.length > 3 ? '...' : ''}.`
+                    : `No se pudo guardar ningún precio. Revisa: ${failedPreview}${failedProductNames.length > 3 ? '...' : ''}.`,
+                variant: 'destructive',
+            });
+        } finally {
+            setSavingAllManualPrices(false);
         }
     };
 
@@ -621,6 +804,17 @@ export default function PriceListPage() {
                             Portada PDF
                         </Button>
                         <Button
+                            onClick={handleSaveAllManualPrices}
+                            size="sm"
+                            className="h-9 px-3 bg-slate-900 hover:bg-slate-800 text-white text-xs"
+                            disabled={savingAllManualPrices || pendingManualPriceRows.length === 0}
+                        >
+                            <Save className="mr-1.5 h-3.5 w-3.5" />
+                            {savingAllManualPrices
+                                ? `Guardando ${pendingManualPriceRows.length}...`
+                                : `Guardar cambios (${pendingManualPriceRows.length})`}
+                        </Button>
+                        <Button
                             onClick={() => openDownloadModal('pdf')}
                             variant="outline"
                             size="sm"
@@ -726,7 +920,21 @@ export default function PriceListPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <p className="text-sm text-slate-500">{loading ? 'Cargando...' : `${filteredRows.length} productos en ${groupedRows.length} grupos`}</p>
+                            <div className="flex flex-col items-start gap-1 text-sm">
+                                <p className="text-slate-500">{loading ? 'Cargando...' : `${filteredRows.length} productos en ${groupedRows.length} grupos`}</p>
+                                {!loading && (
+                                    <p
+                                        className={cn(
+                                            'text-xs',
+                                            pendingManualPriceRows.length > 0 ? 'text-amber-600' : 'text-emerald-600',
+                                        )}
+                                    >
+                                        {pendingManualPriceRows.length > 0
+                                            ? `${pendingManualPriceRows.length} cambio(s) sin guardar`
+                                            : 'Sin cambios pendientes'}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -766,6 +974,7 @@ export default function PriceListPage() {
                             <TableRow className="bg-emerald-700 hover:bg-emerald-700">
                                 <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Codigo</TableHead>
                                 <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Articulo</TableHead>
+                                {visibleColumns.pdfVisibility && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold text-center">PDF</TableHead>}
                                 {visibleColumns.group && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Grupo</TableHead>}
                                 {visibleColumns.sizes && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Tallas</TableHead>}
                                 {visibleColumns.colors && <TableHead className="whitespace-nowrap bg-emerald-700 text-white font-semibold">Colores</TableHead>}
@@ -801,11 +1010,46 @@ export default function PriceListPage() {
                                             const manualPriceAlert = getManualPriceAlert(row.productionCost, manualPriceDrafts[row.productId]);
                                             const automaticMarginPercent = calculateMarginPercent(row.productionCost, row.distributorPrice);
                                             const automaticPriceAlert = getManualPriceAlert(row.productionCost, row.distributorPrice);
+                                            const hasPendingManualPrice = hasPendingManualPriceChange(row, manualPriceDrafts[row.productId]);
+                                            const isSavingManualPrice = savingManualPriceId === row.productId || (savingAllManualPrices && hasPendingManualPrice);
 
                                             return (
-                                                <TableRow key={row.productId} className="hover:bg-emerald-50/30">
+                                                <TableRow
+                                                    key={row.productId}
+                                                    className={cn(
+                                                        'transition-colors',
+                                                        isSavingManualPrice && 'bg-blue-50/70 hover:bg-blue-100/70',
+                                                        !isSavingManualPrice && hasPendingManualPrice && 'bg-amber-50/70 hover:bg-amber-100/70',
+                                                        !isSavingManualPrice && !hasPendingManualPrice && 'hover:bg-emerald-50/30',
+                                                    )}
+                                                >
                                                     <TableCell className="font-medium text-slate-900">{row.productSku}</TableCell>
                                                     <TableCell className="min-w-[280px]">{row.productName}</TableCell>
+                                                    {visibleColumns.pdfVisibility && (
+                                                        <TableCell className="text-center">
+                                                            <div className="flex min-w-[120px] items-center justify-center gap-2">
+                                                                <Checkbox
+                                                                    checked={row.showInCatalogPdf}
+                                                                    disabled={savingCatalogPdfVisibilityId === row.productId || savingAllManualPrices}
+                                                                    onCheckedChange={(checked) => handleToggleCatalogPdfVisibility(row, checked === true)}
+                                                                />
+                                                                <span
+                                                                    className={cn(
+                                                                        'text-xs font-medium',
+                                                                        savingCatalogPdfVisibilityId === row.productId && 'text-blue-600',
+                                                                        savingCatalogPdfVisibilityId !== row.productId && row.showInCatalogPdf && 'text-emerald-700',
+                                                                        savingCatalogPdfVisibilityId !== row.productId && !row.showInCatalogPdf && 'text-slate-400',
+                                                                    )}
+                                                                >
+                                                                    {savingCatalogPdfVisibilityId === row.productId
+                                                                        ? 'Actualizando...'
+                                                                        : row.showInCatalogPdf
+                                                                            ? 'Visible'
+                                                                            : 'Oculto'}
+                                                                </span>
+                                                            </div>
+                                                        </TableCell>
+                                                    )}
                                                     {visibleColumns.group && <TableCell>{row.groupName}</TableCell>}
                                                     {visibleColumns.sizes && <TableCell className="max-w-[220px] whitespace-normal">{row.sizes || 'N/A'}</TableCell>}
                                                     {visibleColumns.colors && <TableCell className="max-w-[220px] whitespace-normal">{row.colors || 'N/A'}</TableCell>}
@@ -856,12 +1100,13 @@ export default function PriceListPage() {
                                                     {visibleColumns.pvpPrice && <TableCell className="text-right">{formatCurrency(row.pvpPrice)}</TableCell>}
                                                     {visibleColumns.manualPrice && (
                                                         <TableCell>
-                                                            <div className="min-w-[180px]">
+                                                            <div className="min-w-[180px] space-y-2">
                                                                 <div className="flex items-center gap-2">
                                                                     <div className="relative w-[150px] shrink-0">
                                                                         <CurrencyInput
                                                                             value={manualPriceDrafts[row.productId]}
                                                                             onValueChange={(value) => setManualPriceDrafts((prev) => ({ ...prev, [row.productId]: value }))}
+                                                                            disabled={savingAllManualPrices}
                                                                             className={cn(
                                                                                 'h-9',
                                                                                 manualPriceAlert && 'pr-10',
@@ -901,12 +1146,23 @@ export default function PriceListPage() {
                                                                         variant="outline"
                                                                         className="h-10 w-10 shrink-0 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                                                                         onClick={() => handleSaveManualPrice(row)}
-                                                                        disabled={savingManualPriceId === row.productId}
-                                                                        title={savingManualPriceId === row.productId ? 'Guardando...' : 'Guardar precio manual'}
+                                                                        disabled={savingAllManualPrices || savingManualPriceId === row.productId}
+                                                                        title={savingAllManualPrices ? 'Guardado masivo en curso' : savingManualPriceId === row.productId ? 'Guardando...' : 'Guardar precio manual'}
                                                                     >
-                                                                        <Save className={cn('h-[22px] w-[22px]', savingManualPriceId === row.productId && 'animate-pulse')} />
+                                                                        <Save className={cn('h-[22px] w-[22px]', isSavingManualPrice && 'animate-pulse')} />
                                                                     </Button>
                                                                 </div>
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={cn(
+                                                                        'w-fit text-[10px] uppercase tracking-wide',
+                                                                        isSavingManualPrice && 'border-blue-200 bg-blue-50 text-blue-700',
+                                                                        !isSavingManualPrice && hasPendingManualPrice && 'border-amber-200 bg-amber-50 text-amber-700',
+                                                                        !isSavingManualPrice && !hasPendingManualPrice && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+                                                                    )}
+                                                                >
+                                                                    {isSavingManualPrice ? 'Guardando' : hasPendingManualPrice ? 'Pendiente' : 'Guardado'}
+                                                                </Badge>
                                                             </div>
                                                         </TableCell>
                                                     )}
