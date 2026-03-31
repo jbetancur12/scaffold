@@ -1012,6 +1012,7 @@ export default function PriceListPage() {
                                             const automaticPriceAlert = getManualPriceAlert(row.productionCost, row.distributorPrice);
                                             const hasPendingManualPrice = hasPendingManualPriceChange(row, manualPriceDrafts[row.productId]);
                                             const isSavingManualPrice = savingManualPriceId === row.productId || (savingAllManualPrices && hasPendingManualPrice);
+                                            const pdfVisibilityInputId = `pdf-visible-${row.productId}`;
 
                                             return (
                                                 <TableRow
@@ -1027,8 +1028,17 @@ export default function PriceListPage() {
                                                     <TableCell className="min-w-[280px]">{row.productName}</TableCell>
                                                     {visibleColumns.pdfVisibility && (
                                                         <TableCell className="text-center">
-                                                            <div className="flex min-w-[120px] items-center justify-center gap-2">
+                                                            <label
+                                                                htmlFor={pdfVisibilityInputId}
+                                                                className={cn(
+                                                                    'flex min-w-[120px] items-center justify-center gap-2',
+                                                                    savingCatalogPdfVisibilityId === row.productId || savingAllManualPrices
+                                                                        ? 'cursor-not-allowed'
+                                                                        : 'cursor-pointer',
+                                                                )}
+                                                            >
                                                                 <Checkbox
+                                                                    id={pdfVisibilityInputId}
                                                                     checked={row.showInCatalogPdf}
                                                                     disabled={savingCatalogPdfVisibilityId === row.productId || savingAllManualPrices}
                                                                     onCheckedChange={(checked) => handleToggleCatalogPdfVisibility(row, checked === true)}
@@ -1047,7 +1057,7 @@ export default function PriceListPage() {
                                                                             ? 'Visible'
                                                                             : 'Oculto'}
                                                                 </span>
-                                                            </div>
+                                                            </label>
                                                         </TableCell>
                                                     )}
                                                     {visibleColumns.group && <TableCell>{row.groupName}</TableCell>}
