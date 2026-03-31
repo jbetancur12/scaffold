@@ -5,6 +5,22 @@ import { Product } from '../entities/product.entity';
 import { ProductImage } from '../entities/product-image.entity';
 import { ProductTaxStatus } from '@scaffold/types';
 
+const SIZE_ORDER: Record<string, number> = {
+    xxxs: 0,
+    xxs: 1,
+    xs: 2,
+    s: 3,
+    m: 4,
+    l: 5,
+    xl: 6,
+    xxl: 7,
+    xxxl: 8,
+    unica: 9,
+    u: 9,
+    one_size: 9,
+    onesize: 9,
+};
+
 export class PriceListSnapshotService {
     private readonly snapshotRepo;
     private readonly productRepo;
@@ -26,6 +42,55 @@ export class PriceListSnapshotService {
         const price = Number(value || 0);
         if (!Number.isFinite(price) || price <= 0) return 0;
         return Number((price / 0.75).toFixed(2));
+    }
+
+    private normalizeSizeLabel(value: string) {
+        return value
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, '')
+            .replace(/\./g, '_');
+    }
+
+    private getSizeSortKey(value: string) {
+        const normalized = this.normalizeSizeLabel(value);
+        const tokens = normalized
+            .split(/[\/,-]+/)
+            .map((token) => token.trim())
+            .filter(Boolean);
+        const ranks = tokens
+            .map((token) => SIZE_ORDER[token])
+            .filter((rank): rank is number => rank != null);
+
+        if (ranks.length === 0) {
+            return {
+                primary: Number.MAX_SAFE_INTEGER,
+                secondary: Number.MAX_SAFE_INTEGER,
+                tokenCount: tokens.length || 1,
+                normalized,
+            };
+        }
+
+        return {
+            primary: Math.min(...ranks),
+            secondary: Math.max(...ranks),
+            tokenCount: tokens.length,
+            normalized,
+        };
+    }
+
+    private sortSizeLabels(sizes: string[]) {
+        return [...sizes].sort((left, right) => {
+            const leftKey = this.getSizeSortKey(left);
+            const rightKey = this.getSizeSortKey(right);
+
+            if (leftKey.primary !== rightKey.primary) return leftKey.primary - rightKey.primary;
+            if (leftKey.secondary !== rightKey.secondary) return leftKey.secondary - rightKey.secondary;
+            if (leftKey.tokenCount !== rightKey.tokenCount) return leftKey.tokenCount - rightKey.tokenCount;
+            return leftKey.normalized.localeCompare(rightKey.normalized);
+        });
     }
 
     async listSnapshots(month?: string, priceSource?: 'auto' | 'manual') {
@@ -74,7 +139,7 @@ export class PriceListSnapshotService {
         );
 
         return {
-            sizes: uniqueSizes.join(', '),
+            sizes: this.sortSizeLabels(uniqueSizes).join(', '),
             colors: uniqueColors.join(', '),
         };
     }

@@ -109,6 +109,21 @@ const TABLE_COLUMN_LABELS: Array<{ key: TableColumnKey; label: string }> = [
 ];
 
 const LIST_LIMIT = 1000;
+const SIZE_ORDER: Record<string, number> = {
+    xxxs: 0,
+    xxs: 1,
+    xs: 2,
+    s: 3,
+    m: 4,
+    l: 5,
+    xl: 6,
+    xxl: 7,
+    xxxl: 8,
+    unica: 9,
+    u: 9,
+    one_size: 9,
+    onesize: 9,
+};
 
 const areManualPriceValuesEqual = (left?: number, right?: number) => {
     if (left == null && right == null) return true;
@@ -117,6 +132,53 @@ const areManualPriceValuesEqual = (left?: number, right?: number) => {
 };
 
 const hasPendingManualPriceChange = (row: PriceRow, draftValue?: number) => !areManualPriceValuesEqual(draftValue, row.manualPrice);
+
+const normalizeSizeLabel = (value: string) => value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/\./g, '_');
+
+const getSizeSortKey = (value: string) => {
+    const normalized = normalizeSizeLabel(value);
+    const tokens = normalized
+        .split(/[\/,-]+/)
+        .map((token) => token.trim())
+        .filter(Boolean);
+    const ranks = tokens
+        .map((token) => SIZE_ORDER[token])
+        .filter((rank): rank is number => rank != null);
+
+    if (ranks.length === 0) {
+        return {
+            primary: Number.MAX_SAFE_INTEGER,
+            secondary: Number.MAX_SAFE_INTEGER,
+            tokenCount: tokens.length || 1,
+            normalized,
+        };
+    }
+
+    return {
+        primary: Math.min(...ranks),
+        secondary: Math.max(...ranks),
+        tokenCount: tokens.length,
+        normalized,
+    };
+};
+
+const sortSizeLabels = (sizes: string[]) => (
+    [...sizes].sort((left, right) => {
+        const leftKey = getSizeSortKey(left);
+        const rightKey = getSizeSortKey(right);
+
+        if (leftKey.primary !== rightKey.primary) return leftKey.primary - rightKey.primary;
+        if (leftKey.secondary !== rightKey.secondary) return leftKey.secondary - rightKey.secondary;
+        if (leftKey.tokenCount !== rightKey.tokenCount) return leftKey.tokenCount - rightKey.tokenCount;
+        return leftKey.normalized.localeCompare(rightKey.normalized);
+    })
+);
 
 const calculateManualPvpPrice = (value?: number) => {
     const price = Number(value || 0);
@@ -203,7 +265,7 @@ const buildRows = (products: Product[]): PriceRow[] => {
             groupId: product.category?.id || 'none',
             groupName: product.category?.name || 'Sin grupo',
             groupSortOrder: Number(product.category?.sortOrder ?? 9999),
-            sizes: uniqueSizes.join(', '),
+            sizes: sortSizeLabels(uniqueSizes).join(', '),
             colors: uniqueColors.join(', '),
             productionCost: maxCost,
             distributorPrice: maxDistributorPrice,
