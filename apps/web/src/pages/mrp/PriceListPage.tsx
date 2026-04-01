@@ -708,10 +708,17 @@ export default function PriceListPage() {
             const blob = downloadFormat === 'pdf'
                 ? await mrpApi.downloadPriceListPdf(snapshotMonth, downloadSnapshotVersion || undefined, downloadPriceSource, selectedPdfColumns)
                 : await mrpApi.downloadPriceListCsv(snapshotMonth, downloadSnapshotVersion || undefined, downloadPriceSource);
+            let resolvedSnapshotVersion = downloadSnapshotVersion;
+            if (!resolvedSnapshotVersion) {
+                const latestSnapshots = await mrpApi.getPriceListSnapshots(snapshotMonth);
+                resolvedSnapshotVersion = latestSnapshots
+                    .filter((row) => row.priceSource === downloadPriceSource)
+                    .sort((a, b) => b.version - a.version)[0]?.version ?? null;
+            }
             const extension = downloadFormat === 'pdf' ? 'pdf' : 'csv';
             downloadBlob(
                 blob,
-                `lista_precios_${snapshotMonth}_${downloadSnapshotVersion ? `v${downloadSnapshotVersion}` : 'ultima'}-${downloadPriceSource === 'manual' ? 'M' : 'A'}.${extension}`
+                `lista_precios_${snapshotMonth}_${resolvedSnapshotVersion ? `v${resolvedSnapshotVersion}` : 'sin-version'}-${downloadPriceSource === 'manual' ? 'M' : 'A'}.${extension}`
             );
             setDownloadModalOpen(false);
         } catch (exportError) {
