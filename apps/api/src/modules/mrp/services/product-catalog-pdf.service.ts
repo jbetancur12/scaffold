@@ -127,7 +127,7 @@ html(lang="es")
             thead
               tr
                 if columns.sku
-                  th.col-sku SKU
+                  th.col-sku Referencia
                 if columns.name
                   th.col-name Producto
                 if columns.sizes
@@ -542,7 +542,7 @@ export class ProductCatalogPdfService {
       const attributes = this.collectProductAttributes(product);
 
       const row: CatalogRow = {
-        sku: product.sku,
+        sku: product.productReference || product.sku,
         name: product.name,
         sizes: attributes.sizes || 'N/A',
         colors: attributes.colors || 'N/A',
@@ -625,6 +625,7 @@ export class ProductCatalogPdfService {
       if (!search) return true;
       return (
         item.sku.toLowerCase().includes(search) ||
+        (item.productReference || '').toLowerCase().includes(search) ||
         item.name.toLowerCase().includes(search) ||
         item.groupName.toLowerCase().includes(search)
       );
@@ -642,7 +643,7 @@ export class ProductCatalogPdfService {
 
       const imageUrl = await this.resolveSnapshotImage(item);
       const row: CatalogRow = {
-        sku: item.sku,
+        sku: item.productReference || item.sku,
         name: item.name,
         sizes: item.sizes || 'N/A',
         colors: item.colors || 'N/A',

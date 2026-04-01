@@ -157,6 +157,7 @@ export class PriceListSnapshotService {
             return {
                 productId: product.id,
                 sku: product.sku,
+                productReference: product.productReference || undefined,
                 name: product.name,
                 description: product.description || 'Sin descripción',
                 sizes: attributes.sizes,
@@ -223,7 +224,7 @@ export class PriceListSnapshotService {
     exportSnapshotCsv(snapshot: PriceListSnapshot) {
         const csvCell = (value: string | number) => `"${String(value ?? '').replace(/"/g, '""')}"`;
         const rows: Array<Array<string | number>> = [
-            ['CODIGO', 'ARTICULO', 'GRUPO', 'COSTO PRODUCCION', 'PRECIO AUTOMATICO', 'PVP AUTOMATICO', 'PRECIO MANUAL', 'PVP MANUAL', 'PRECIO SNAPSHOT', 'VERSION'],
+            ['REFERENCIA', 'ARTICULO', 'GRUPO', 'COSTO PRODUCCION', 'PRECIO AUTOMATICO', 'PVP AUTOMATICO', 'PRECIO MANUAL', 'PVP MANUAL', 'PRECIO SNAPSHOT', 'VERSION'],
         ];
 
         const groupedItems = (snapshot.items || []).reduce<Map<string, typeof snapshot.items>>((acc, item) => {
@@ -255,7 +256,7 @@ export class PriceListSnapshotService {
                     .sort((a, b) => a.sku.localeCompare(b.sku))
                     .forEach((item) => {
                         rows.push([
-                            item.sku,
+                            item.productReference || item.sku,
                             item.name,
                             item.groupName,
                             Number(item.cost || 0).toFixed(2),

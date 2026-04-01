@@ -759,6 +759,7 @@ export interface PriceListConfigSnapshot {
 export interface PriceListSnapshotItem {
     productId: string;
     sku: string;
+    productReference?: string;
     name: string;
     description: string;
     sizes: string;

@@ -73,7 +73,7 @@ const DEFAULT_PDF_COLUMNS: Record<PdfColumnKey, boolean> = {
 };
 
 const PDF_COLUMN_LABELS: Array<{ key: PdfColumnKey; label: string }> = [
-    { key: 'sku', label: 'SKU' },
+    { key: 'sku', label: 'Referencia' },
     { key: 'name', label: 'Producto' },
     { key: 'sizes', label: 'Tallas' },
     { key: 'colors', label: 'Colores' },

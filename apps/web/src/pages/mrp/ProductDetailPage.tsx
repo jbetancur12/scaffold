@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { generateVariantDisplayName, generateVariantSku, generateVariantSkuFromAttributes } from '@/utils/skuGenerator';
 import { ProductTaxStatus, ProductVariant } from '@scaffold/types';
@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ArrowLeft, Save, Plus, Trash2, Edit2, RefreshCw, Package, Layers, Clock, ShieldCheck, BoxSelect, AreaChart, DollarSign, Activity, Hash, ChevronDown, ChevronRight, ImagePlus, Image } from 'lucide-react';
 import { CreateProductVariantSchema, UpdateProductVariantSchema } from '@scaffold/schemas';
 import { getErrorMessage } from '@/lib/api-error';
+import { sortProductVariantsBySize } from '@/lib/utils';
 import {
     Table,
     TableBody,
@@ -95,6 +96,7 @@ export default function ProductDetailPage() {
     const { execute: deleteProduct } = useDeleteProductMutation();
     const { execute: saveVariant } = useSaveVariantMutation();
     const { execute: deleteVariant } = useDeleteVariantMutation();
+    const sortedVariants = useMemo(() => sortProductVariantsBySize(product?.variants || []), [product?.variants]);
 
     useMrpQueryErrorRedirect(error, 'No se pudo cargar el producto', '/mrp/products');
 
@@ -722,7 +724,7 @@ export default function ProductDetailPage() {
                             </div>
                             <div className="flex gap-2">
                                 {/* Special BOM action when variants exist */}
-                                {product.variants && product.variants.length > 0 && (
+                                {sortedVariants.length > 0 && (
                                     <Button
                                         variant="outline"
                                         className="border-fuchsia-200 text-fuchsia-700 hover:bg-fuchsia-50 bg-white"
@@ -739,7 +741,7 @@ export default function ProductDetailPage() {
                             </div>
                         </div>
 
-                        {product.variants && product.variants.length > 0 ? (
+                        {sortedVariants.length > 0 ? (
                             <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
@@ -754,7 +756,7 @@ export default function ProductDetailPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {product.variants.map((variant) => {
+                                        {sortedVariants.map((variant) => {
                                             const realMargin = variant.price > 0 ? (variant.price - (variant.cost || 0)) / variant.price : 0;
 
                                             const getMarginStyle = (margin: number, target: number) => {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Product } from '@scaffold/types';
 import BOMEditor from '@/components/mrp/BOMEditor';
@@ -13,6 +13,7 @@ import { useCopyBomFromVariantMutation } from '@/hooks/mrp/useBom';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 import { Badge } from '@/components/ui/badge';
+import { sortProductVariantsBySize } from '@/lib/utils';
 import {
     Dialog,
     DialogContent,
@@ -36,6 +37,7 @@ export default function ProductBOMPage() {
     const product = productData as Product | undefined;
     const loading = loadingProduct || loadingMaterials;
     const rawMaterials = materials ?? [];
+    const variants = useMemo(() => sortProductVariantsBySize(product?.variants || []), [product?.variants]);
 
     useMrpQueryErrorRedirect(productError, 'No se pudo cargar la información del producto', '/mrp/products');
     useMrpQueryErrorToast(materialsError, 'No se pudo cargar la información de materias primas');
@@ -58,7 +60,6 @@ export default function ProductBOMPage() {
         );
     }
 
-    const variants = product.variants || [];
     const sourceVariant = pendingCopy ? variants.find((variant) => variant.id === pendingCopy.sourceVariantId) : undefined;
     const targetVariant = pendingCopy ? variants.find((variant) => variant.id === pendingCopy.targetVariantId) : undefined;
 
