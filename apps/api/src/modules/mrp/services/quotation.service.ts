@@ -747,20 +747,25 @@ export class QuotationService {
             );
 
             const selectedIds = new Set(payload?.quotationItemIds || []);
-            const selected = quotation.items.getItems().filter((item) => {
+            const approvedPending = quotation.items.getItems().filter((item) => {
                 if (this.isNoteLine(item)) return false;
                 const idSelected = selectedIds.size === 0 || selectedIds.has(item.id);
                 const pendingQty = Number(item.approvedQuantity || 0) - Number(item.convertedQuantity || 0);
                 return idSelected && item.approved && pendingQty > 0;
             });
 
-            if (selected.length === 0) {
+            if (approvedPending.length === 0) {
                 throw new AppError('No hay ítems aprobados pendientes por convertir', 400);
             }
 
-            const customSelected = selected.filter((item) => !item.isCatalogItem || !item.product);
-            if (customSelected.length > 0) {
-                throw new AppError('Hay ítems libres sin producto de catálogo. Convierte solo ítems de catálogo.', 409);
+            const selected = approvedPending.filter((item) => item.isCatalogItem);
+            if (selected.length === 0) {
+                throw new AppError('No hay ítems de catálogo aprobados pendientes por convertir', 400);
+            }
+
+            const invalidCatalogSelected = selected.filter((item) => !item.product);
+            if (invalidCatalogSelected.length > 0) {
+                throw new AppError('Hay ítems de catálogo sin producto asociado. Revisa la cotización antes de convertir.', 409);
             }
 
             const salesOrderPayload = {
@@ -786,6 +791,7 @@ export class QuotationService {
 
             const pendingAfter = quotation.items.getItems().some((item) => {
                 if (this.isNoteLine(item)) return false;
+                if (!item.isCatalogItem) return false;
                 const pendingQty = Number(item.approvedQuantity || 0) - Number(item.convertedQuantity || 0);
                 return item.approved && pendingQty > 0;
             });
