@@ -219,7 +219,22 @@ export default function QuotationDetailPage() {
         ? (estimatedMarginAmount / Number(row.netTotalAmount || 0)) * 100
         : 0;
 
+    const isEditableStatus = [QuotationStatus.DRAFT, QuotationStatus.SENT].includes(row.status);
+    const canReopenForEdit =
+        !row.convertedSalesOrder &&
+        [QuotationStatus.APPROVED_PARTIAL, QuotationStatus.APPROVED_FULL, QuotationStatus.REJECTED].includes(row.status);
     const canManageApproval = row.status !== QuotationStatus.CONVERTED && row.status !== QuotationStatus.REJECTED;
+
+    const reopenForEdit = async () => {
+        if (!id) return;
+        try {
+            await mrpApi.updateQuotationStatus(id, { status: QuotationStatus.SENT });
+            toast({ title: 'Cotización reabierta', description: 'La cotización volvió a estado enviada y ya se puede editar.' });
+            navigate(`/mrp/quotations/${id}/edit`);
+        } catch (error) {
+            toast({ title: 'Error', description: getErrorMessage(error, 'No se pudo reabrir la cotización'), variant: 'destructive' });
+        }
+    };
 
     return (
         <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -242,7 +257,13 @@ export default function QuotationDetailPage() {
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
                     <Button variant="outline" onClick={load} className="border-slate-200 text-slate-700 hover:bg-slate-50"><RefreshCcw className="h-4 w-4 mr-2" />Recargar</Button>
-                    <Button variant="outline" onClick={() => navigate(`/mrp/quotations/${row.id}/edit`)} className="border-slate-200 text-slate-700 hover:bg-slate-50"><Pencil className="h-4 w-4 mr-2" />Editar</Button>
+                    {isEditableStatus ? (
+                        <Button variant="outline" onClick={() => navigate(`/mrp/quotations/${row.id}/edit`)} className="border-slate-200 text-slate-700 hover:bg-slate-50"><Pencil className="h-4 w-4 mr-2" />Editar</Button>
+                    ) : canReopenForEdit ? (
+                        <Button variant="outline" onClick={reopenForEdit} className="border-slate-200 text-slate-700 hover:bg-slate-50"><Pencil className="h-4 w-4 mr-2" />Reabrir para editar</Button>
+                    ) : (
+                        <Button variant="outline" disabled title="Esta cotización no se puede editar en su estado actual." className="border-slate-200 text-slate-400 hover:bg-transparent"><Pencil className="h-4 w-4 mr-2" />Editar</Button>
+                    )}
                     <Button variant="outline" onClick={downloadPdf} className="border-slate-200 text-slate-700 hover:bg-slate-50"><FileDown className="h-4 w-4 mr-2" />PDF</Button>
                     <Button variant="outline" size="icon" onClick={() => setShowPdfSettings(true)} title="Configurar PDF">
                         <Settings className="h-4 w-4" />

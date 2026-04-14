@@ -245,6 +245,24 @@ export default function SalesOrderDetailPage() {
     const canEditOrder =
         order.status === SalesOrderStatus.PENDING &&
         (!order.productionOrders || order.productionOrders.length === 0);
+    const activeProductionOrders = (order.productionOrders || []).filter(
+        (productionOrder) => productionOrder.status !== ProductionOrderStatus.CANCELLED
+    );
+    const hasProductionStarted = activeProductionOrders.some(
+        (productionOrder) =>
+            productionOrder.status === ProductionOrderStatus.IN_PROGRESS ||
+            productionOrder.status === ProductionOrderStatus.COMPLETED
+    );
+    const hasCompletedProduction = activeProductionOrders.some(
+        (productionOrder) => productionOrder.status === ProductionOrderStatus.COMPLETED
+    );
+    const canCancelOrderNormally =
+        order.status === SalesOrderStatus.PENDING ||
+        (order.status === SalesOrderStatus.IN_PRODUCTION && !hasProductionStarted);
+    const canCancelOrderWithSettlement =
+        order.status === SalesOrderStatus.IN_PRODUCTION &&
+        hasProductionStarted &&
+        !hasCompletedProduction;
 
     const handleUpdateStatus = async (newStatus: SalesOrderStatus) => {
         try {
@@ -386,14 +404,22 @@ export default function SalesOrderDetailPage() {
                                 <Package className="mr-2 h-4 w-4" />Planificar cumplimiento
                             </Button>
                         )}
-                        {order.status === SalesOrderStatus.PENDING ? (
+                        {canCancelOrderNormally ? (
                             <Button variant="destructive"
                                 onClick={() => { if (confirm('¿Estás seguro de cancelar este pedido? Si la producción no ha iniciado, se cancelará automáticamente. Si ya inició, deberás liquidarla manualmente antes.')) handleUpdateStatus(SalesOrderStatus.CANCELLED); }}>
                                 <XCircle className="mr-2 h-4 w-4" />Cancelar Pedido
                             </Button>
-                        ) : (
+                        ) : canCancelOrderWithSettlement ? (
                             <Button variant="destructive" onClick={openSettlementDialog}>
                                 <XCircle className="mr-2 h-4 w-4" />Cancelar con liquidación
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="destructive"
+                                disabled
+                                title="Existe una OP completada. Debes gestionarla manualmente antes de cancelar el pedido."
+                            >
+                                <XCircle className="mr-2 h-4 w-4" />Cancelar Pedido
                             </Button>
                         )}
                     </div>
