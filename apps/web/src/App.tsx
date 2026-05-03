@@ -45,6 +45,10 @@ const ThreadCalculatorPage = lazy(() => import('@/pages/mrp/ThreadCalculatorPage
 const WarehouseListPage = lazy(() => import('@/pages/mrp/WarehouseListPage'));
 const WarehouseFormPage = lazy(() => import('@/pages/mrp/WarehouseFormPage'));
 const ProductionAnalyticsPage = lazy(() => import('@/pages/mrp/ProductionAnalyticsPage'));
+const OperatorListPage = lazy(() => import('@/pages/mrp/OperatorListPage'));
+const OperatorFormPage = lazy(() => import('@/pages/mrp/OperatorFormPage'));
+const ProductionEntryListPage = lazy(() => import('@/pages/mrp/ProductionEntryListPage'));
+const ProductionEntryFormPage = lazy(() => import('@/pages/mrp/ProductionEntryFormPage'));
 
 const QualityNcPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityNcPage })));
 const QualityCapaPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityCapaPage })));
@@ -193,6 +197,13 @@ export default function App() {
                             <Route path="/mrp/quotations/new" element={<QuotationFormPage />} />
                             <Route path="/mrp/quotations/:id/edit" element={<QuotationFormPage />} />
                             <Route path="/mrp/quotations/:id" element={<QuotationDetailPage />} />
+
+                            <Route path="/mrp/operators" element={<OperatorListPage />} />
+                            <Route path="/mrp/operators/new" element={<OperatorFormPage />} />
+                            <Route path="/mrp/operators/:id" element={<OperatorFormPage />} />
+
+                            <Route path="/mrp/production-entries" element={<ProductionEntryListPage />} />
+                            <Route path="/mrp/production-entries/new" element={<ProductionEntryFormPage />} />
 
                             <Route path="/mrp/operational-settings" element={<OperationalSettingsPage />} />
                             <Route path="/mrp/thread-calculator" element={<ThreadCalculatorPage />} />

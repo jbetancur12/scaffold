@@ -97,6 +97,8 @@ import {
     ProductionAnalyticsDetailGroupBy,
     UpsertProductionBatchPackagingFormPayload,
     UpsertProductionBatchFinishedInspectionFormPayload,
+    Operator,
+    ProductionEntry,
 } from '@scaffold/types';
 import type {
     CreatePurchaseOrderDto,
@@ -1482,6 +1484,58 @@ export const mrpApi = {
     updateOperationalConfig: async (data: Partial<OperationalConfig>): Promise<OperationalConfig> => {
         const response = await api.put('/mrp/operational-config', data);
         return response.data;
+    },
+
+    // Operators
+    getOperators: async (page = 1, limit = 20, search?: string, active?: boolean) => {
+        const response = await api.get<{ data: Operator[]; total: number; page: number; limit: number }>('/mrp/operators', { params: { page, limit, search, active } });
+        return response.data;
+    },
+    getOperator: async (id: string): Promise<Operator> => {
+        const response = await api.get<Operator>(`/mrp/operators/${id}`);
+        return response.data;
+    },
+    createOperator: async (data: { name: string; code?: string }): Promise<Operator> => {
+        const response = await api.post('/mrp/operators', data);
+        return response.data;
+    },
+    updateOperator: async (id: string, data: { name?: string; code?: string; active?: boolean }): Promise<Operator> => {
+        const response = await api.put(`/mrp/operators/${id}`, data);
+        return response.data;
+    },
+    deleteOperator: async (id: string): Promise<void> => {
+        await api.delete(`/mrp/operators/${id}`);
+    },
+
+    // Production Entries
+    getProductionEntries: async (page = 1, limit = 20, from?: string, to?: string, operatorId?: string) => {
+        const response = await api.get<{ data: ProductionEntry[]; total: number; page: number; limit: number }>('/mrp/production-entries', { params: { page, limit, from, to, operatorId } });
+        return response.data;
+    },
+    getProductionEntryKpis: async (from?: string, to?: string, operatorId?: string) => {
+        const response = await api.get<{
+            summary: { grandTotal: number; totalEntries: number; operatorCount: number };
+            byOperator: Array<{ id: string; operator: string; code?: string; totalQuantity: number; entryCount: number; topProduct: { product: string; sku: string; total: number } | null }>;
+            globalTopProducts: Array<{ product: string; sku: string; total: number; operator: string }>;
+            productSpecialization: Array<{ product: string; sku: string; total: number; specialists: Array<{ operator: string; quantity: number }> }>;
+            operatorDailyHistory: Array<{ id: string; operator: string; code?: string; total: number; daily: Array<{ date: string; quantity: number }> }>;
+            crossMatrix: Array<{ product: string; sku: string; byOperator: Array<{ operator: string; quantity: number }> }>;
+        }>('/mrp/production-entries/kpis', { params: { from, to, operatorId } });
+        return response.data;
+    },
+    createProductionEntry: async (data: { entryDate: string; operatorId: string; items: Array<{ productionOrderItemId: string; quantity: number }>; notes?: string }) => {
+        const response = await api.post('/mrp/production-entries', data);
+        return response.data;
+    },
+    deleteProductionEntry: async (id: string): Promise<void> => {
+        await api.delete(`/mrp/production-entries/${id}`);
+    },
+    getProductionEntryReportPdf: async (from?: string, to?: string, operatorId?: string): Promise<Blob> => {
+        const response = await api.get('/mrp/production-entries/report/pdf', {
+            responseType: 'blob',
+            params: { from, to, operatorId },
+        });
+        return response.data as Blob;
     },
 
     // Supplier Materials

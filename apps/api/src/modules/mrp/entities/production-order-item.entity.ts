@@ -22,6 +22,13 @@ export class ProductionOrderItem extends BaseEntity implements IProductionOrderI
         return this.variant.id;
     }
 
-    @Property()
+    @Property({ type: 'decimal', precision: 12, scale: 3, default: 0 })
     quantity!: number;
+
+    @Property({ type: 'decimal', precision: 12, scale: 3, default: 0 })
+    producedQuantity: number = 0;
+
+    get remainingQuantity() {
+        return Number(this.quantity) - Number(this.producedQuantity);
+    }
 }

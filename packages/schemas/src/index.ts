@@ -1528,6 +1528,48 @@ export const ConvertQuotationSchema = z.object({
     quotationItemIds: z.array(z.string().uuid()).optional(),
 });
 
+export const CreateOperatorSchema = z.object({
+    name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
+    code: z.string().optional(),
+});
+
+export const UpdateOperatorSchema = z.object({
+    name: z.string().min(2).optional(),
+    code: z.string().optional(),
+    active: z.boolean().optional(),
+});
+
+export const ListOperatorsQuerySchema = z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    search: z.string().optional(),
+    active: z.coerce.boolean().optional(),
+});
+
+export const CreateProductionEntrySchema = z.object({
+    entryDate: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date()),
+    operatorId: z.string().uuid(),
+    items: z.array(z.object({
+        productionOrderItemId: z.string().uuid(),
+        quantity: z.number().int('La cantidad debe ser un número entero').positive(),
+    })).min(1, 'Debe agregar al menos un producto'),
+    notes: z.string().optional(),
+});
+
+export const ListProductionEntriesQuerySchema = z.object({
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    from: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    to: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    operatorId: z.string().uuid().optional(),
+});
+
+export const ProductionEntryPdfQuerySchema = z.object({
+    from: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    to: z.preprocess((val) => (val === '' ? undefined : val), z.coerce.date().optional()),
+    operatorId: z.string().uuid().optional(),
+});
+
 export const ThreadConsumptionOperationSchema = z.object({
     name: z.string().min(1).optional(),
     stitchType: z.enum(['101', '301', '401', '406', '503', '504', '512', '516', '602', '605', 'custom']),

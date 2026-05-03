@@ -28,6 +28,9 @@ import { ProductCatalogPdfService } from './services/product-catalog-pdf.service
 import { PriceListConfigService } from './services/price-list-config.service';
 import { PriceListSnapshotService } from './services/price-list-snapshot.service';
 import { ShipmentPdfService } from './services/shipment-pdf.service';
+import { OperatorService } from './services/operator.service';
+import { ProductionEntryService } from './services/production-entry.service';
+import { ProductionEntryPdfService } from './services/production-entry-pdf.service';
 import { AuthRequest } from '../../middleware/auth.middleware';
 import {
     ProductSchema,
@@ -168,6 +171,12 @@ import {
     ListProductThreadProcessesQuerySchema,
     UpdateProductThreadProcessSchema,
     ProductionAnalyticsQuerySchema,
+    CreateOperatorSchema,
+    UpdateOperatorSchema,
+    ListOperatorsQuerySchema,
+    CreateProductionEntrySchema,
+    ListProductionEntriesQuerySchema,
+    ProductionEntryPdfQuerySchema,
 } from '@scaffold/schemas';
 import { ProductionOrderStatus } from '@scaffold/types';
 import { ApiResponse, AppError } from '../../shared/utils/response';
@@ -213,6 +222,8 @@ export class MrpController {
     }
     private get salesOrderService() { return new SalesOrderService(this.em); }
     private get quotationService() { return new QuotationService(this.em); }
+    private get operatorService() { return new OperatorService(this.em); }
+    private get productionEntryService() { return new ProductionEntryService(this.em); }
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
     private get threadProcessService() { return new ThreadProcessService(this.em); }
     private get productionAnalyticsService() { return new ProductionAnalyticsService(this.em); }
@@ -2763,6 +2774,116 @@ export class MrpController {
                 'Content-Length': buffer.length,
             });
             return res.send(buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listOperators(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { page, limit, search, active } = ListOperatorsQuerySchema.parse(req.query);
+            const result = await this.operatorService.list(page || 1, limit || 20, search, active);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getOperator(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const row = await this.operatorService.getById(id);
+            return ApiResponse.success(res, row);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createOperator(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateOperatorSchema.parse(req.body);
+            const row = await this.operatorService.create(payload);
+            return ApiResponse.success(res, row, 'Operador creado', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateOperator(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UpdateOperatorSchema.parse(req.body);
+            const row = await this.operatorService.update(id, payload);
+            return ApiResponse.success(res, row, 'Operador actualizado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteOperator(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            await this.operatorService.delete(id);
+            return ApiResponse.success(res, null, 'Operador eliminado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async listProductionEntries(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { page, limit, from, to, operatorId } = ListProductionEntriesQuerySchema.parse(req.query);
+            const result = await this.productionEntryService.list(page || 1, limit || 20, from, to, operatorId);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createProductionEntry(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateProductionEntrySchema.parse(req.body);
+            const rows = await this.productionEntryService.create(payload);
+            return ApiResponse.success(res, rows, 'Registros de producción creados', 201);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteProductionEntry(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            await this.productionEntryService.delete(id);
+            return ApiResponse.success(res, null, 'Registro eliminado');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadProductionEntryPdf(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { from, to, operatorId } = ProductionEntryPdfQuerySchema.parse(req.query);
+            const fromDate = from || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+            const toDate = to || new Date();
+            const em = RequestContext.getEntityManager()!;
+            const pdfService = new ProductionEntryPdfService(em);
+            const { fileName, buffer } = await pdfService.generateReport(fromDate, toDate, operatorId);
+            res.set({
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `attachment; filename="${fileName}"`,
+                'Content-Length': buffer.length,
+            });
+            return res.send(buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionEntryKpis(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { from, to, operatorId } = ProductionEntryPdfQuerySchema.parse(req.query);
+            const result = await this.productionEntryService.getKpis(from, to, operatorId);
+            return ApiResponse.success(res, result);
         } catch (error) {
             next(error);
         }

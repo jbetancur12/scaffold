@@ -245,6 +245,20 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/quotations/:id/convert', (req, res, next) => mrpController.convertQuotationToSalesOrder(req, res, next));
     router.get('/quotations/:id/pdf', (req, res, next) => mrpController.downloadQuotationPdf(req, res, next));
 
+    // Operators
+    router.get('/operators', (req, res, next) => mrpController.listOperators(req, res, next));
+    router.get('/operators/:id', (req, res, next) => mrpController.getOperator(req, res, next));
+    router.post('/operators', (req, res, next) => mrpController.createOperator(req, res, next));
+    router.put('/operators/:id', (req, res, next) => mrpController.updateOperator(req, res, next));
+    router.delete('/operators/:id', (req, res, next) => mrpController.deleteOperator(req, res, next));
+
+    // Production Entries (Daily production tracking)
+    router.get('/production-entries', (req, res, next) => mrpController.listProductionEntries(req, res, next));
+    router.get('/production-entries/kpis', (req, res, next) => mrpController.getProductionEntryKpis(req, res, next));
+    router.post('/production-entries', (req, res, next) => mrpController.createProductionEntry(req, res, next));
+    router.delete('/production-entries/:id', (req, res, next) => mrpController.deleteProductionEntry(req, res, next));
+    router.get('/production-entries/report/pdf', (req, res, next) => mrpController.downloadProductionEntryPdf(req, res, next));
+
     // Inventory
     router.get('/inventory', (req, res, next) => mrpController.getInventory(req, res, next));
     router.get('/inventory/kardex', (req, res, next) => mrpController.getInventoryKardex(req, res, next));

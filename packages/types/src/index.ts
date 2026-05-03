@@ -931,6 +931,8 @@ export interface ProductionOrderItem {
     productionOrderId: string;
     variantId: string;
     quantity: number;
+    producedQuantity: number;
+    variant?: Pick<ProductVariant, 'id' | 'name' | 'sku'> & { product?: Pick<Product, 'id' | 'name' | 'sku'> };
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -1179,6 +1181,27 @@ export interface OperationalAlert {
     createdAt?: string | Date;
     roleTargets: OperationalAlertRole[];
     routePath?: string;
+}
+
+export interface Operator {
+    id: string;
+    name: string;
+    code?: string;
+    active: boolean;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+export interface ProductionEntry {
+    id: string;
+    entryDate: string | Date;
+    operator: Pick<Operator, 'id' | 'name' | 'code'>;
+    productionOrderItem: Pick<ProductionOrderItem, 'id' | 'quantity' | 'producedQuantity' | 'productionOrderId'>;
+    variant: Pick<ProductVariant, 'id' | 'name' | 'sku'> & { product?: Pick<Product, 'id' | 'name' | 'sku'> };
+    quantity: number;
+    notes?: string;
+    createdAt: string | Date;
+    updatedAt: string | Date;
 }
 
 export interface WeeklyComplianceReport {
@@ -2364,6 +2387,27 @@ export interface CreateQuotationPayload {
     notes?: string;
     globalDiscountPercent?: number;
     items: CreateQuotationItemPayload[];
+}
+
+export interface CreateOperatorPayload {
+    name: string;
+    code?: string;
+}
+
+export interface UpdateOperatorPayload {
+    name?: string;
+    code?: string;
+    active?: boolean;
+}
+
+export interface CreateProductionEntryPayload {
+    entryDate: string | Date;
+    operatorId: string;
+    items: Array<{
+        variantId: string;
+        quantity: number;
+    }>;
+    notes?: string;
 }
 
 export type ThreadStitchType =
