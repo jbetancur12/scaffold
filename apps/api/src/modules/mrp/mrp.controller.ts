@@ -2662,8 +2662,8 @@ export class MrpController {
 
     async listQuotations(req: Request, res: Response, next: NextFunction) {
         try {
-            const { page, limit, search, status } = ListQuotationsQuerySchema.parse(req.query);
-            const rows = await this.quotationService.list(page || 1, limit || 20, search, status);
+            const { page, limit, search, status, month } = ListQuotationsQuerySchema.parse(req.query);
+            const rows = await this.quotationService.list(page || 1, limit || 20, search, status, month);
             return ApiResponse.success(res, rows);
         } catch (error) {
             next(error);

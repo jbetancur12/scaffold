@@ -242,13 +242,15 @@ export class ProductionEntryPdfService {
                 });
             }
             const group = grouped.get(opId)!;
-            const productLabel = (entry.variant as any).product?.name
-                ? `${(entry.variant as any).product.name} - ${(entry.variant as any).name}`
-                : (entry.variant as any).name || 'Sin nombre';
+            const v = entry.variant;
+            const productName = (v as { product?: { name?: string } }).product?.name;
+            const productLabel = productName
+                ? `${productName} - ${v.name}`
+                : v.name || 'Sin nombre';
             const entryData = {
                 date: this.formatDate(entry.entryDate),
                 product: productLabel,
-                sku: (entry.variant as any).sku || '',
+                sku: (v as { sku?: string }).sku || '',
                 quantity: Number(entry.quantity || 0),
             };
             group.entries.push(entryData);

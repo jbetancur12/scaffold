@@ -163,7 +163,7 @@ export default function ProductionEntryFormPage() {
                                     <div key={item.id} className={`flex items-center gap-3 p-3 border rounded-md ${isComplete ? 'border-green-200 bg-green-50/50' : 'border-slate-200'}`}>
                                         <div className="flex-1 min-w-0">
                                             <div className={`text-sm truncate ${isComplete ? 'font-medium text-green-700 line-through' : 'font-medium text-slate-900'}`}>
-                                                {(item.variant as any)?.product?.name ?? ''} {(item.variant as any)?.name ?? ''}
+                                                {item.variant?.product?.name ?? ''} {item.variant?.name ?? ''}
                                             </div>
                                             <div className="text-xs text-slate-500">
                                                 {isComplete

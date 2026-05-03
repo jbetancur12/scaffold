@@ -572,9 +572,15 @@ export class QuotationService {
             .slice(0, filters?.limit || 5);
     }
 
-    async list(page = 1, limit = 20, search?: string, status?: QuotationStatus) {
+    async list(page = 1, limit = 20, search?: string, status?: QuotationStatus, month?: string) {
         const query: Record<string, unknown> = { deletedAt: null };
         if (status) query.status = status;
+        if (month) {
+            const [year, mon] = month.split('-').map(Number);
+            const from = new Date(year, mon - 1, 1);
+            const to = new Date(year, mon, 1);
+            query.quotationDate = { $gte: from, $lt: to };
+        }
         if (search) {
             query.$or = [
                 { code: { $ilike: `%${search}%` } },

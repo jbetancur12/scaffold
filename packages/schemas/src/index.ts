@@ -1504,6 +1504,7 @@ export const ListQuotationsQuerySchema = z.object({
     limit: z.coerce.number().int().positive().optional(),
     search: z.string().optional(),
     status: z.nativeEnum(QuotationStatus).optional(),
+    month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
 });
 
 export const QuotationAnalyticsQuerySchema = z.object({

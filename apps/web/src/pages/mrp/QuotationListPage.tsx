@@ -87,6 +87,7 @@ export default function QuotationListPage() {
             const res = await mrpApi.listQuotations(page, limit, {
                 search: searchQuery || undefined,
                 status: statusFilter !== 'ALL' ? (statusFilter as QuotationStatus) : undefined,
+                month: analyticsMonth,
             });
             setRows(res.data);
         } catch (error) {
@@ -99,7 +100,7 @@ export default function QuotationListPage() {
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, statusFilter]);
+    }, [page, statusFilter, analyticsMonth]);
 
     const filteredOrders = rows.filter((order) => {
         const query = searchQuery.toLowerCase();

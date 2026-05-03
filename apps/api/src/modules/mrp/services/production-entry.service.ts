@@ -69,16 +69,14 @@ export class ProductionEntryService {
                 );
             }
 
-            const entry = this.repo.create({
+            const entry = Object.assign(new ProductionEntry(), {
                 entryDate: data.entryDate,
                 operator,
                 productionOrderItem: orderItem,
                 variant: orderItem.variant,
                 quantity: item.quantity,
                 notes: data.notes,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            } as any);
+            });
             entries.push(entry);
 
             orderItem.producedQuantity = Number(orderItem.producedQuantity) + Number(item.quantity);
@@ -133,13 +131,13 @@ export class ProductionEntryService {
         const byDateByOperator = new Map<string, Map<string, number>>();
         const productNameToSku = new Map<string, Set<string>>();
         let grandTotal = 0;
-        let totalEntries = entries.length;
+        const totalEntries = entries.length;
 
         for (const entry of entries) {
             const opId = entry.operator.id;
             const opName = entry.operator.name;
             const opCode = entry.operator.code;
-            const variant = entry.variant as any;
+            const variant = entry.variant;
             const productName = variant.product?.name || 'Sin nombre';
             const sku = variant.sku || '';
             const qty = Number(entry.quantity || 0);
