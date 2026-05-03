@@ -580,6 +580,7 @@ export interface QuotationItem {
     customDescription?: string;
     customSku?: string;
     noteText?: string;
+    itemNotes?: string;
     sortOrder?: number;
     quantity: number;
     approvedQuantity: number;
@@ -2348,6 +2349,7 @@ export interface CreateQuotationItemPayload {
     customDescription?: string;
     customSku?: string;
     noteText?: string;
+    itemNotes?: string;
     quantity: number;
     approvedQuantity?: number;
     unitPrice: number;

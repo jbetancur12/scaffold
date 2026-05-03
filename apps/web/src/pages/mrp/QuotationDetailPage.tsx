@@ -350,6 +350,9 @@ export default function QuotationDetailPage() {
                                                             ? `${it.product?.name || 'Producto'}${it.variant ? ` - ${it.variant.name}` : ''}`
                                                             : it.customDescription || 'Ítem libre'}
                                                     </div>
+                                                    {it.itemNotes && (
+                                                        <p className="text-xs text-slate-500 mt-1 whitespace-pre-line">{it.itemNotes}</p>
+                                                    )}
                                                 </td>
                                                 <td className="px-6 py-4 text-right font-medium text-slate-600">
                                                     {it.quantity}

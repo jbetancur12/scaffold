@@ -87,6 +87,8 @@ html(lang="es")
           tr
             td
               div(style="font-weight: 500; color: #0f172a; font-size: 12px;")= item.label
+              if item.itemNotes
+                div(style="font-size: 10px; color: #475569; margin-top: 2px; font-style: italic;")= item.itemNotes
               if item.meta
                 div.muted(style="margin-top: 2px;")= item.meta
             td.right= item.quantity
@@ -477,6 +479,7 @@ export class QuotationPdfService {
                 label: item.isCatalogItem
                     ? `${item.product?.name || 'Producto'}${item.variant ? ` - ${item.variant.name}` : ''}`
                     : item.customDescription || 'Ítem libre',
+                itemNotes: item.itemNotes || '',
                 meta: (() => {
                     const discountPercent = Number(item.discountPercent || 0);
                     const finalUnitPrice = Number(item.unitPrice || 0);

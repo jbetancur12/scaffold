@@ -29,6 +29,9 @@ export class QuotationItem extends BaseEntity {
     customSku?: string;
 
     @Property({ nullable: true, type: 'text' })
+    itemNotes?: string;
+
+    @Property({ nullable: true, type: 'text' })
     noteText?: string;
 
     @Property({ default: 0 })

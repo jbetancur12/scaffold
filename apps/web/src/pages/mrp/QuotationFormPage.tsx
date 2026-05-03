@@ -25,6 +25,7 @@ type ItemForm = {
     customDescription?: string;
     customSku?: string;
     noteText?: string;
+    itemNotes?: string;
     quantity: number;
     approvedQuantity: number;
     unitPrice: number;
@@ -57,6 +58,7 @@ const createItem = (): ItemForm => ({
     customDescription: '',
     customSku: '',
     noteText: '',
+    itemNotes: '',
     quantity: 1,
     approvedQuantity: 1,
     unitPrice: 0,
@@ -73,6 +75,7 @@ const createNoteItem = (): ItemForm => ({
     customDescription: '',
     customSku: '',
     noteText: '',
+    itemNotes: '',
     quantity: 0,
     approvedQuantity: 0,
     unitPrice: 0,
@@ -481,6 +484,7 @@ export default function QuotationFormPage() {
                             customDescription: it.customDescription || '',
                             customSku: it.customSku || '',
                             noteText: '',
+                            itemNotes: it.itemNotes || '',
                             quantity: Number(it.quantity || 0),
                             approvedQuantity: Number(it.approvedQuantity ?? it.quantity ?? 0),
                             unitPrice: Number.isFinite(listUnitPrice) ? Number(listUnitPrice.toFixed(4)) : 0,
@@ -881,6 +885,7 @@ export default function QuotationFormPage() {
                             unitPrice: Number(it.unitPrice),
                             discountPercent: Number(it.discountPercent),
                             taxRate: Number(it.taxRate),
+                            itemNotes: it.itemNotes?.trim() || undefined,
                         };
                     }
                     return {
@@ -893,6 +898,7 @@ export default function QuotationFormPage() {
                         unitPrice: Number(it.unitPrice),
                         discountPercent: Number(it.discountPercent),
                         taxRate: Number(it.taxRate),
+                        itemNotes: it.itemNotes?.trim() || undefined,
                     };
                 }),
             };
@@ -1652,6 +1658,17 @@ export default function QuotationFormPage() {
                                                 Neto unitario: {unitNetPrice.toLocaleString('es-CO', { style: 'currency', currency: 'COP' })}
                                             </div>
                                         )}
+
+                                        <div className="mt-3">
+                                            <Label className="text-[11px] font-semibold text-slate-500 mb-1 block">Notas del ítem (opcional)</Label>
+                                            <Textarea
+                                                value={it.itemNotes || ''}
+                                                onChange={(e) => patchItem(idx, { itemNotes: e.target.value })}
+                                                placeholder="Ej: Color azul, tamaño personalizado, incluye grabado..."
+                                                rows={2}
+                                                className="border-slate-300 resize-y bg-white"
+                                            />
+                                        </div>
                                     </div>
                                 );
                             })}

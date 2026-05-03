@@ -18,6 +18,7 @@ type QuotationInputItem = {
     customDescription?: string;
     customSku?: string;
     noteText?: string;
+    itemNotes?: string;
     quantity: number;
     approvedQuantity?: number;
     unitPrice: number;
@@ -256,6 +257,7 @@ export class QuotationService {
         item.variant = variant;
         item.customDescription = row.customDescription;
         item.customSku = row.customSku;
+        item.itemNotes = row.itemNotes;
         item.noteText = undefined;
         item.sortOrder = index;
         item.quantity = quantity;

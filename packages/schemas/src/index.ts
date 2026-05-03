@@ -1461,6 +1461,7 @@ const QuotationCatalogItemSchema = z.object({
     discountPercent: z.number().min(0).max(100).optional(),
     taxRate: z.number().min(0).max(100).optional(),
     approved: z.boolean().optional(),
+    itemNotes: z.string().optional(),
 });
 
 const QuotationCustomItemSchema = z.object({
@@ -1468,6 +1469,7 @@ const QuotationCustomItemSchema = z.object({
     isCatalogItem: z.literal(false),
     customDescription: z.string().min(2),
     customSku: z.string().optional(),
+    itemNotes: z.string().optional(),
     quantity: z.number().positive(),
     approvedQuantity: z.number().min(0).optional(),
     unitPrice: z.number().min(0),
