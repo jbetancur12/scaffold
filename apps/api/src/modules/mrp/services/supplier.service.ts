@@ -195,7 +195,7 @@ export class SupplierService {
     async listSuppliers(page = 1, limit = 10, search?: string): Promise<{ suppliers: Supplier[]; total: number }> {
         const where: Record<string, unknown> = {};
         if (search) {
-            where['name'] = { $like: `%${search}%` };
+            where['name'] = { $ilike: `%${search}%` };
         }
         const [suppliers, total] = await this.supplierRepo.findAndCount(
             where,
