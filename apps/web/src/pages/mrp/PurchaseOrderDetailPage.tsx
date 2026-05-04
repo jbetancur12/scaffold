@@ -58,8 +58,8 @@ const prettifyOrderNotes = (notes: string) => {
     const markers = [
         'Tipo de compra:', 'Lugar de entrega:', 'Forma de pago:', 'Moneda:',
         'Aprobador:', 'Requisitos de calidad:', 'Descuento:', 'Retención',
-        'Otros cargos:', 'Total neto estimado:', 'Requisicion origen:',
-        'Requisición origen:', 'OP origen:',
+        'Ret. Fuente:', 'Ret. IVA:', 'Otros cargos:', 'Total neto estimado:',
+        'Requisicion origen:', 'Requisición origen:', 'OP origen:',
     ];
     for (const marker of markers) {
         const rx = new RegExp(`\\s(${marker.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')})`, 'g');
@@ -717,6 +717,26 @@ export default function PurchaseOrderDetailPage() {
                                         </td>
                                         <td className="px-6 py-2 text-right text-sm font-semibold text-red-600">
                                             - {formatCurrency(order.withholdingAmount)}
+                                        </td>
+                                    </tr>
+                                ) : null}
+                                {order.retentionSourceAmount ? (
+                                    <tr>
+                                        <td colSpan={3} className="px-6 py-2 text-right text-sm font-medium text-slate-500">
+                                            Ret. Fuente
+                                        </td>
+                                        <td className="px-6 py-2 text-right text-sm font-semibold text-red-600">
+                                            - {formatCurrency(order.retentionSourceAmount)}
+                                        </td>
+                                    </tr>
+                                ) : null}
+                                {order.retentionIvaAmount ? (
+                                    <tr>
+                                        <td colSpan={3} className="px-6 py-2 text-right text-sm font-medium text-slate-500">
+                                            Ret. IVA
+                                        </td>
+                                        <td className="px-6 py-2 text-right text-sm font-semibold text-red-600">
+                                            - {formatCurrency(order.retentionIvaAmount)}
                                         </td>
                                     </tr>
                                 ) : null}

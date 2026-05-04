@@ -33,4 +33,10 @@ export class Supplier extends BaseEntity implements ISupplier {
 
     @Property({ nullable: true, type: 'text' })
     notes?: string;
+
+    @Property({ default: false })
+    retentionAtSource: boolean = false;
+
+    @Property({ default: false })
+    retentionIva: boolean = false;
 }

@@ -375,6 +375,8 @@ export interface Supplier {
     bankDetails?: string;
     paymentConditions?: string;
     notes?: string;
+    retentionAtSource: boolean;
+    retentionIva: boolean;
     createdAt: string | Date;
     updatedAt: string | Date;
 }
@@ -491,6 +493,8 @@ export interface PurchaseOrder {
     documentControlDate?: string | Date;
     withholdingRate?: number;
     withholdingAmount?: number;
+    retentionSourceAmount?: number;
+    retentionIvaAmount?: number;
     discountAmount?: number;
     otherChargesAmount?: number;
     netTotalAmount?: number;
@@ -2327,6 +2331,8 @@ export interface OperationalConfig {
         active: boolean;
         baseUvtLimit?: number;
     }>;
+    purchaseRetentionSourceRate?: number;
+    purchaseRetentionIvaRate?: number;
     shippingOrderCoverageThreshold?: number;
     shippingCoverageLimitFull?: number;
     shippingCoverageLimitShared?: number;

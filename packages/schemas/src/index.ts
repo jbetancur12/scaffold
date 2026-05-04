@@ -75,15 +75,17 @@ export const UpdateUserSchema = z.object({
 // MRP Schemas
 
 export const SupplierSchema = z.object({
-    name: z.string().min(1, 'El nombre es obligatorio'),
-    contactName: z.string().optional(),
+    name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
     email: z.string().email('Email inválido').optional().or(z.literal('')),
+    contactName: z.string().optional(),
     phone: z.string().optional(),
     address: z.string().optional(),
     city: z.string().optional(),
     department: z.string().optional(),
     bankDetails: z.string().optional(),
     paymentConditions: z.string().optional(),
+    retentionAtSource: z.boolean().optional(),
+    retentionIva: z.boolean().optional(),
     notes: z.string().optional(),
 });
 
@@ -387,6 +389,8 @@ export const CreatePurchaseOrderSchema = z.object({
     discountAmount: z.number().min(0).optional(),
     withholdingRate: z.number().min(0).max(100).optional(),
     withholdingAmount: z.number().min(0).optional(),
+    retentionSourceAmount: z.number().min(0).optional(),
+    retentionIvaAmount: z.number().min(0).optional(),
     otherChargesAmount: z.number().min(0).optional(),
     netTotalAmount: z.number().min(0).optional(),
     warehouseId: z.string().uuid().optional(),

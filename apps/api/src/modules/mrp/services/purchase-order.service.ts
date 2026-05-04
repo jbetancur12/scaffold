@@ -140,9 +140,17 @@ export class PurchaseOrderService {
         return { totalAmount, taxTotal, subtotalBase };
     }
 
-    private applyPurchaseOrderTotals(purchaseOrder: PurchaseOrder, data: CreatePurchaseOrderDto, totals: { totalAmount: number; taxTotal: number; subtotalBase: number }) {
+    private applyPurchaseOrderTotals(
+        purchaseOrder: PurchaseOrder,
+        data: CreatePurchaseOrderDto,
+        totals: { totalAmount: number; taxTotal: number; subtotalBase: number },
+        supplier: Supplier,
+        config: OperationalConfig
+    ) {
         const discountAmount = Number(data.discountAmount || 0);
         const otherChargesAmount = Number(data.otherChargesAmount || 0);
+
+        // Retención en la fuente (withholding)
         const withholdingRate = Number(data.withholdingRate || 0);
         const taxableBase = Math.max(0, totals.subtotalBase - discountAmount);
         const withholdingAmount = Number(
@@ -150,11 +158,26 @@ export class PurchaseOrderService {
                 ? data.withholdingAmount
                 : taxableBase * (withholdingRate / 100)
         );
+
+        // Retención en la fuente (source retention) - based on supplier flag and config rate
+        let retentionSourceAmount = 0;
+        if (supplier.retentionAtSource && config.purchaseRetentionSourceRate) {
+            // Apply to subtotal (before tax)
+            retentionSourceAmount = taxableBase * (Number(config.purchaseRetentionSourceRate) / 100);
+        }
+
+        // Retención IVA - based on supplier flag and config rate, applied to tax amount only
+        let retentionIvaAmount = 0;
+        if (supplier.retentionIva && config.purchaseRetentionIvaRate) {
+            retentionIvaAmount = totals.taxTotal * (Number(config.purchaseRetentionIvaRate) / 100);
+        }
+
         const grossTotal = Math.max(0, totals.totalAmount - discountAmount + otherChargesAmount);
+        const totalRetentions = withholdingAmount + retentionSourceAmount + retentionIvaAmount;
         const netTotalAmount = Number(
             data.netTotalAmount !== undefined
                 ? data.netTotalAmount
-                : Math.max(0, grossTotal - withholdingAmount)
+                : Math.max(0, grossTotal - totalRetentions)
         );
 
         purchaseOrder.subtotalBase = totals.subtotalBase;
@@ -164,6 +187,8 @@ export class PurchaseOrderService {
         purchaseOrder.otherChargesAmount = otherChargesAmount;
         purchaseOrder.withholdingRate = withholdingRate;
         purchaseOrder.withholdingAmount = withholdingAmount;
+        purchaseOrder.retentionSourceAmount = retentionSourceAmount;
+        purchaseOrder.retentionIvaAmount = retentionIvaAmount;
         purchaseOrder.netTotalAmount = netTotalAmount;
     }
 
@@ -221,7 +246,7 @@ export class PurchaseOrderService {
             purchaseOrder.code = `${prefix}-${String(nextNumber).padStart(4, '0')}`;
 
             const totals = await this.buildPurchaseOrderItems(tx, purchaseOrder, data);
-            this.applyPurchaseOrderTotals(purchaseOrder, data, totals);
+            this.applyPurchaseOrderTotals(purchaseOrder, data, totals, supplier, config);
 
             await tx.persistAndFlush(purchaseOrder);
             await this.logAudit(tx, purchaseOrder.id, 'created', {
@@ -268,7 +293,10 @@ export class PurchaseOrderService {
 
             purchaseOrder.items.removeAll();
             const totals = await this.buildPurchaseOrderItems(tx, purchaseOrder, data);
-            this.applyPurchaseOrderTotals(purchaseOrder, data, totals);
+
+            // Fetch operational config for retention calculations
+            const [config] = await tx.find(OperationalConfig, {}, { orderBy: { createdAt: 'DESC' }, limit: 1 });
+            this.applyPurchaseOrderTotals(purchaseOrder, data, totals, purchaseOrder.supplier, config!);
 
             await tx.persistAndFlush(purchaseOrder);
             const after = this.buildAuditSnapshot(purchaseOrder);

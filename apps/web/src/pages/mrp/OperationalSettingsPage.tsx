@@ -171,6 +171,8 @@ export default function OperationalSettingsPage() {
                 purchasePaymentMethods: methods,
                 purchaseWithholdingRules: rules,
                 uvtValue: config.uvtValue,
+                purchaseRetentionSourceRate: config.purchaseRetentionSourceRate || undefined,
+                purchaseRetentionIvaRate: config.purchaseRetentionIvaRate || undefined,
             };
             const updated = await saveOperationalConfig(payload);
             setConfig(updated);
@@ -744,6 +746,58 @@ export default function OperationalSettingsPage() {
                                     <div className="rounded-md bg-slate-100 p-3 mt-4 text-xs text-slate-600">
                                         <p><strong>Claves sugeridas:</strong> "compra" (recomendado 2.5%, base 27 UVT) y "servicio" (recomendado 4%, base 4 UVT).</p>
                                         <p className="mt-1">Si la opción "Automático" está activa, la retención se calculará sola en cada Orden de Compra si el Subtotal supera la base.</p>
+                                    </div>
+                                </div>
+
+                                <hr className="border-slate-100" />
+
+                                {/* Retention Rates */}
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label className="text-base font-semibold text-slate-800">Retenciones Adicionales</Label>
+                                        <p className="text-sm text-muted-foreground">Porcentajes aplicables si el proveedor tiene activada la retención correspondiente.</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="purchaseRetentionSourceRate" className="text-sm font-medium text-slate-700">
+                                                Retención en la Fuente (%)
+                                            </Label>
+                                            <div className="relative">
+                                                <Input
+                                                    id="purchaseRetentionSourceRate"
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.1"
+                                                    value={config.purchaseRetentionSourceRate || ''}
+                                                    onChange={(e) => setConfig({ ...config, purchaseRetentionSourceRate: Number(e.target.value) || undefined })}
+                                                    className="bg-slate-50 border-slate-200 focus:bg-white pr-10"
+                                                    placeholder="Ej: 2.5"
+                                                />
+                                                <span className="absolute right-3 top-2 text-slate-400 text-sm">%</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500">Aplicado al Subtotal (antes de IVA). Requiere check en proveedor.</p>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="purchaseRetentionIvaRate" className="text-sm font-medium text-slate-700">
+                                                Retención IVA (%)
+                                            </Label>
+                                            <div className="relative">
+                                                <Input
+                                                    id="purchaseRetentionIvaRate"
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.1"
+                                                    value={config.purchaseRetentionIvaRate || ''}
+                                                    onChange={(e) => setConfig({ ...config, purchaseRetentionIvaRate: Number(e.target.value) || undefined })}
+                                                    className="bg-slate-50 border-slate-200 focus:bg-white pr-10"
+                                                    placeholder="Ej: 15"
+                                                />
+                                                <span className="absolute right-3 top-2 text-slate-400 text-sm">%</span>
+                                            </div>
+                                            <p className="text-xs text-slate-500">Aplicado al valor del IVA (no al subtotal). Requiere check en proveedor.</p>
+                                        </div>
                                     </div>
                                 </div>
                             </CardContent>

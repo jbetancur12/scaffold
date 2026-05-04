@@ -28,6 +28,8 @@ export default function SupplierFormPage() {
         department: '',
         bankDetails: '',
         paymentConditions: '',
+        retentionAtSource: false,
+        retentionIva: false,
         notes: '',
     });
     const { data: supplier, loading: loadingSupplier, error: supplierError } = useSupplierQuery(isEditing ? id : undefined);
@@ -45,6 +47,8 @@ export default function SupplierFormPage() {
             department: supplier.department || '',
             bankDetails: supplier.bankDetails || '',
             paymentConditions: supplier.paymentConditions || '',
+            retentionAtSource: supplier.retentionAtSource || false,
+            retentionIva: supplier.retentionIva || false,
             notes: supplier.notes || '',
         });
     }, [supplier]);
@@ -255,6 +259,31 @@ export default function SupplierFormPage() {
                                 onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, bankDetails: e.target.value })}
                                 className="min-h-[120px] bg-slate-50 border-slate-200 focus:bg-white transition-colors resize-y"
                             />
+                        </div>
+
+                        {/* Retention Checkboxes */}
+                        <div className="md:col-span-2 space-y-3 pt-4 border-t border-slate-100">
+                            <Label className="text-slate-700 font-medium">Retenciones Aplicables</Label>
+                            <div className="flex flex-col gap-3">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.retentionAtSource || false}
+                                        onChange={(e) => setFormData({ ...formData, retentionAtSource: e.target.checked })}
+                                        className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                                    />
+                                    <span className="text-sm text-slate-700">Retención en la Fuente</span>
+                                </label>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.retentionIva || false}
+                                        onChange={(e) => setFormData({ ...formData, retentionIva: e.target.checked })}
+                                        className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                                    />
+                                    <span className="text-sm text-slate-700">Retención IVA</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -429,8 +429,19 @@ export default function PurchaseOrderFormPage() {
     const thresholdAmount = baseUvtLimit * uvtValue;
 
     const withholdingAmount = taxableBase >= thresholdAmount ? taxableBase * (withholdingRate / 100) : 0;
+
+    // Retención en la fuente (source retention) - based on supplier
+    const supplierForRetention = suppliers?.find(s => s.id === formData.supplierId);
+    const retentionSourceRate = supplierForRetention?.retentionAtSource ? Number(operationalConfig?.purchaseRetentionSourceRate || 0) : 0;
+    const retentionSourceAmount = retentionSourceRate > 0 ? taxableBase * (retentionSourceRate / 100) : 0;
+
+    // Retención IVA - based on supplier
+    const retentionIvaRate = supplierForRetention?.retentionIva ? Number(operationalConfig?.purchaseRetentionIvaRate || 0) : 0;
+    const retentionIvaAmount = retentionIvaRate > 0 ? totals.tax * (retentionIvaRate / 100) : 0;
+
     const grossTotal = Math.max(0, totals.total - discountAmount + otherChargesAmount);
-    const netTotal = Math.max(0, grossTotal - withholdingAmount);
+    const totalRetentions = withholdingAmount + retentionSourceAmount + retentionIvaAmount;
+    const netTotal = Math.max(0, grossTotal - totalRetentions);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -470,6 +481,8 @@ export default function PurchaseOrderFormPage() {
                 discountAmount,
                 withholdingRate,
                 withholdingAmount,
+                retentionSourceAmount,
+                retentionIvaAmount,
                 otherChargesAmount,
                 netTotalAmount: netTotal,
                 expectedDeliveryDate: formData.expectedDeliveryDate || undefined,
@@ -1442,7 +1455,7 @@ export default function PurchaseOrderFormPage() {
                                 <span className="text-slate-800 font-semibold">{formatCurrency(totals.tax)}</span>
                             </div>
 
-                            {(discountAmount > 0 || withholdingAmount > 0) && (
+                            {(discountAmount > 0 || withholdingAmount > 0 || retentionSourceAmount > 0 || retentionIvaAmount > 0) && (
                                 <div className="pt-2 border-t border-slate-50/50 space-y-2">
                                     {discountAmount > 0 && (
                                         <div className="flex justify-between items-center text-sm">
@@ -1454,6 +1467,18 @@ export default function PurchaseOrderFormPage() {
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-rose-600 font-medium tracking-tight">Retención ({withholdingRate}%):</span>
                                             <span className="text-rose-700 font-semibold">- {formatCurrency(withholdingAmount)}</span>
+                                        </div>
+                                    )}
+                                    {retentionSourceAmount > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-rose-600 font-medium">Ret. Fuente:</span>
+                                            <span className="text-rose-700 font-semibold">- {formatCurrency(retentionSourceAmount)}</span>
+                                        </div>
+                                    )}
+                                    {retentionIvaAmount > 0 && (
+                                        <div className="flex justify-between items-center text-sm">
+                                            <span className="text-rose-600 font-medium">Ret. IVA:</span>
+                                            <span className="text-rose-700 font-semibold">- {formatCurrency(retentionIvaAmount)}</span>
                                         </div>
                                     )}
                                 </div>
