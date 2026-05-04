@@ -104,8 +104,5 @@ export class OperationalConfig extends BaseEntity implements IOperationalConfig 
     purchaseWithholdingRules: Array<{ key: string; label: string; rate: number; active: boolean; baseUvtLimit?: number }> = [];
 
     @Property({ type: 'decimal', precision: 5, scale: 2, nullable: true })
-    purchaseRetentionSourceRate?: number;
-
-    @Property({ type: 'decimal', precision: 5, scale: 2, nullable: true })
     purchaseRetentionIvaRate?: number;
 }

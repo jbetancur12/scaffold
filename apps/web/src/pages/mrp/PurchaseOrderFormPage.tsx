@@ -430,17 +430,13 @@ export default function PurchaseOrderFormPage() {
 
     const withholdingAmount = taxableBase >= thresholdAmount ? taxableBase * (withholdingRate / 100) : 0;
 
-    // Retención en la fuente (source retention) - based on supplier
-    const supplierForRetention = suppliers?.find(s => s.id === formData.supplierId);
-    const retentionSourceRate = supplierForRetention?.retentionAtSource ? Number(operationalConfig?.purchaseRetentionSourceRate || 0) : 0;
-    const retentionSourceAmount = retentionSourceRate > 0 ? taxableBase * (retentionSourceRate / 100) : 0;
-
-    // Retención IVA - based on supplier
-    const retentionIvaRate = supplierForRetention?.retentionIva ? Number(operationalConfig?.purchaseRetentionIvaRate || 0) : 0;
+    // Retención IVA - based on supplier checkbox and config rate
+    const selectedSupplierForRetention = suppliers.find(s => s.id === formData.supplierId);
+    const retentionIvaRate = selectedSupplierForRetention?.retentionIva ? Number(operationalConfig?.purchaseRetentionIvaRate || 0) : 0;
     const retentionIvaAmount = retentionIvaRate > 0 ? totals.tax * (retentionIvaRate / 100) : 0;
 
     const grossTotal = Math.max(0, totals.total - discountAmount + otherChargesAmount);
-    const totalRetentions = withholdingAmount + retentionSourceAmount + retentionIvaAmount;
+    const totalRetentions = withholdingAmount + retentionIvaAmount;
     const netTotal = Math.max(0, grossTotal - totalRetentions);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -481,7 +477,6 @@ export default function PurchaseOrderFormPage() {
                 discountAmount,
                 withholdingRate,
                 withholdingAmount,
-                retentionSourceAmount,
                 retentionIvaAmount,
                 otherChargesAmount,
                 netTotalAmount: netTotal,
@@ -617,7 +612,7 @@ export default function PurchaseOrderFormPage() {
             setActiveCatalogComboboxIdx(null);
         }
     };
-    const selectedSupplier = getSupplierById(formData.supplierId);
+    const selectedSupplierDetails = getSupplierById(formData.supplierId);
 
     const formatReferenceCode = (prefix: 'REQ' | 'OP', id?: string) => {
         if (!id) return 'N/A';
@@ -738,7 +733,7 @@ export default function PurchaseOrderFormPage() {
                                     </Button>
                                     {formData.supplierId ? (
                                         <span className="text-xs text-slate-500">
-                                            Seleccionado: {selectedSupplier?.name || 'N/A'}
+                                            Seleccionado: {selectedSupplierDetails?.name || 'N/A'}
                                         </span>
                                     ) : (
                                         <span className="text-xs text-slate-500">Sin proveedor seleccionado</span>
@@ -760,18 +755,18 @@ export default function PurchaseOrderFormPage() {
                             </div>
                         </div>
 
-                        {selectedSupplier ? (
+                        {selectedSupplierDetails ? (
                             <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4 shadow-sm animate-in fade-in duration-300">
                                 <div className="text-sm font-semibold text-indigo-900 mb-3 flex items-center justify-between">
                                     <span>Ficha rápida del proveedor</span>
                                     <span className="text-xs font-normal text-indigo-600 px-2 py-0.5 bg-indigo-100 rounded-full">Activo</span>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-slate-600">
-                                    <div className="flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Contacto</span> <span className="text-slate-900">{selectedSupplier.contactName || 'N/A'}</span></div>
-                                    <div className="flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Email</span> <span className="text-slate-900 truncate" title={selectedSupplier.email}>{selectedSupplier.email || 'N/A'}</span></div>
-                                    <div className="flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Teléfono</span> <span className="text-slate-900">{selectedSupplier.phone || 'N/A'}</span></div>
-                                    <div className="flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Ciudad</span> <span className="text-slate-900">{selectedSupplier.city || 'N/A'}</span></div>
-                                    <div className="md:col-span-2 flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Dirección</span> <span className="text-slate-900 truncate" title={selectedSupplier.address}>{selectedSupplier.address || 'N/A'}</span></div>
+                                    <div className="flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Contacto</span> <span className="text-slate-900">{selectedSupplierDetails?.contactName || 'N/A'}</span></div>
+                                    <div className="flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Email</span> <span className="text-slate-900 truncate" title={selectedSupplierDetails?.email}>{selectedSupplierDetails?.email || 'N/A'}</span></div>
+                                    <div className="flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Teléfono</span> <span className="text-slate-900">{selectedSupplierDetails?.phone || 'N/A'}</span></div>
+                                    <div className="flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Ciudad</span> <span className="text-slate-900">{selectedSupplierDetails?.city || 'N/A'}</span></div>
+                                    <div className="md:col-span-2 flex flex-col"><span className="text-xs font-medium text-slate-500 uppercase">Dirección</span> <span className="text-slate-900 truncate" title={selectedSupplierDetails?.address}>{selectedSupplierDetails?.address || 'N/A'}</span></div>
                                 </div>
                             </div>
                         ) : null}
@@ -1455,7 +1450,7 @@ export default function PurchaseOrderFormPage() {
                                 <span className="text-slate-800 font-semibold">{formatCurrency(totals.tax)}</span>
                             </div>
 
-                            {(discountAmount > 0 || withholdingAmount > 0 || retentionSourceAmount > 0 || retentionIvaAmount > 0) && (
+                            {(discountAmount > 0 || withholdingAmount > 0 || retentionIvaAmount > 0) && (
                                 <div className="pt-2 border-t border-slate-50/50 space-y-2">
                                     {discountAmount > 0 && (
                                         <div className="flex justify-between items-center text-sm">
@@ -1467,12 +1462,6 @@ export default function PurchaseOrderFormPage() {
                                         <div className="flex justify-between items-center text-sm">
                                             <span className="text-rose-600 font-medium tracking-tight">Retención ({withholdingRate}%):</span>
                                             <span className="text-rose-700 font-semibold">- {formatCurrency(withholdingAmount)}</span>
-                                        </div>
-                                    )}
-                                    {retentionSourceAmount > 0 && (
-                                        <div className="flex justify-between items-center text-sm">
-                                            <span className="text-rose-600 font-medium">Ret. Fuente:</span>
-                                            <span className="text-rose-700 font-semibold">- {formatCurrency(retentionSourceAmount)}</span>
                                         </div>
                                     )}
                                     {retentionIvaAmount > 0 && (

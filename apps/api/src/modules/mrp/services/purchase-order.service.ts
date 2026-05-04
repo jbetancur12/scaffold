@@ -150,7 +150,7 @@ export class PurchaseOrderService {
         const discountAmount = Number(data.discountAmount || 0);
         const otherChargesAmount = Number(data.otherChargesAmount || 0);
 
-        // Retención en la fuente (withholding)
+        // Retención en la fuente (withholding) - already handled by purchaseWithholdingRules
         const withholdingRate = Number(data.withholdingRate || 0);
         const taxableBase = Math.max(0, totals.subtotalBase - discountAmount);
         const withholdingAmount = Number(
@@ -159,13 +159,6 @@ export class PurchaseOrderService {
                 : taxableBase * (withholdingRate / 100)
         );
 
-        // Retención en la fuente (source retention) - based on supplier flag and config rate
-        let retentionSourceAmount = 0;
-        if (supplier.retentionAtSource && config.purchaseRetentionSourceRate) {
-            // Apply to subtotal (before tax)
-            retentionSourceAmount = taxableBase * (Number(config.purchaseRetentionSourceRate) / 100);
-        }
-
         // Retención IVA - based on supplier flag and config rate, applied to tax amount only
         let retentionIvaAmount = 0;
         if (supplier.retentionIva && config.purchaseRetentionIvaRate) {
@@ -173,7 +166,7 @@ export class PurchaseOrderService {
         }
 
         const grossTotal = Math.max(0, totals.totalAmount - discountAmount + otherChargesAmount);
-        const totalRetentions = withholdingAmount + retentionSourceAmount + retentionIvaAmount;
+        const totalRetentions = withholdingAmount + retentionIvaAmount;
         const netTotalAmount = Number(
             data.netTotalAmount !== undefined
                 ? data.netTotalAmount
@@ -187,7 +180,6 @@ export class PurchaseOrderService {
         purchaseOrder.otherChargesAmount = otherChargesAmount;
         purchaseOrder.withholdingRate = withholdingRate;
         purchaseOrder.withholdingAmount = withholdingAmount;
-        purchaseOrder.retentionSourceAmount = retentionSourceAmount;
         purchaseOrder.retentionIvaAmount = retentionIvaAmount;
         purchaseOrder.netTotalAmount = netTotalAmount;
     }

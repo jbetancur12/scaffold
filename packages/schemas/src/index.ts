@@ -389,7 +389,6 @@ export const CreatePurchaseOrderSchema = z.object({
     discountAmount: z.number().min(0).optional(),
     withholdingRate: z.number().min(0).max(100).optional(),
     withholdingAmount: z.number().min(0).optional(),
-    retentionSourceAmount: z.number().min(0).optional(),
     retentionIvaAmount: z.number().min(0).optional(),
     otherChargesAmount: z.number().min(0).optional(),
     netTotalAmount: z.number().min(0).optional(),

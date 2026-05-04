@@ -493,7 +493,6 @@ export interface PurchaseOrder {
     documentControlDate?: string | Date;
     withholdingRate?: number;
     withholdingAmount?: number;
-    retentionSourceAmount?: number;
     retentionIvaAmount?: number;
     discountAmount?: number;
     otherChargesAmount?: number;
@@ -2331,7 +2330,6 @@ export interface OperationalConfig {
         active: boolean;
         baseUvtLimit?: number;
     }>;
-    purchaseRetentionSourceRate?: number;
     purchaseRetentionIvaRate?: number;
     shippingOrderCoverageThreshold?: number;
     shippingCoverageLimitFull?: number;

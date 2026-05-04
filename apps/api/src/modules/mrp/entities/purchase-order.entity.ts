@@ -58,9 +58,6 @@ export class PurchaseOrder {
     withholdingAmount: number = 0;
 
     @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-    retentionSourceAmount: number = 0;
-
-    @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })
     retentionIvaAmount: number = 0;
 
     @Property({ type: 'decimal', precision: 10, scale: 2, default: 0 })

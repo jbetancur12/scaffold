@@ -58,7 +58,7 @@ const prettifyOrderNotes = (notes: string) => {
     const markers = [
         'Tipo de compra:', 'Lugar de entrega:', 'Forma de pago:', 'Moneda:',
         'Aprobador:', 'Requisitos de calidad:', 'Descuento:', 'Retención',
-        'Ret. Fuente:', 'Ret. IVA:', 'Otros cargos:', 'Total neto estimado:',
+        'Ret. IVA:', 'Otros cargos:', 'Total neto estimado:',
         'Requisicion origen:', 'Requisición origen:', 'OP origen:',
     ];
     for (const marker of markers) {
@@ -717,16 +717,6 @@ export default function PurchaseOrderDetailPage() {
                                         </td>
                                         <td className="px-6 py-2 text-right text-sm font-semibold text-red-600">
                                             - {formatCurrency(order.withholdingAmount)}
-                                        </td>
-                                    </tr>
-                                ) : null}
-                                {order.retentionSourceAmount ? (
-                                    <tr>
-                                        <td colSpan={3} className="px-6 py-2 text-right text-sm font-medium text-slate-500">
-                                            Ret. Fuente
-                                        </td>
-                                        <td className="px-6 py-2 text-right text-sm font-semibold text-red-600">
-                                            - {formatCurrency(order.retentionSourceAmount)}
                                         </td>
                                     </tr>
                                 ) : null}
