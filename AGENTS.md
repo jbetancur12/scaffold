@@ -50,6 +50,17 @@ npm run seed               # Seeds dev database
 npm run db:reset           # Drops volumes and recreates (destructive)
 ```
 
+**Production migrations:** The `migration:prod` script runs `node dist/apps/api/src/scripts/run-migration.js`.
+The production deploy script (`deploy.sh`) runs migrations automatically via:
+```bash
+docker compose -f $COMPOSE_FILE exec -T api npm run migration:prod --workspace=api
+```
+If migrations fail in production, manually run:
+```bash
+docker exec mrp-app-api-1 npm run migration:prod --workspace=api
+```
+The migration snapshot file `apps/api/src/migrations/.snapshot-scaffold_db.json` can cause false "No migrations pending" — if columns are missing in prod, force-reapply by deleting the migration row from `mikro_orm_migrations` table and re-running.
+
 ### PDF generation
 PDF services use Playwright + Pug. Requires one-time setup:
 ```bash
@@ -68,6 +79,7 @@ npm run pdf:setup --workspace=api   # Installs playwright, pug, chromium
 - `allowGlobalContext: true` in dev, false in production
 - Uses `RequestContext.create(orm.em, next)` per-request DI pattern
 - `repo.create()` requires all non-nullable fields including `createdAt`/`updatedAt` (BaseEntity has defaults but TS types don't infer them)
+- **PostgreSQL ILIKE**: Use `$ilike` (not `$like`) for case-insensitive search in MikroORM queries
 
 ### API response pattern
 All controllers use `ApiResponse.success(res, data, message, statusCode)` or throw `AppError(message, statusCode)`. Errors caught by `errorHandler` middleware (must be last).
@@ -79,6 +91,8 @@ All controllers use `ApiResponse.success(res, data, message, statusCode)` or thr
 - Toast hook: `const { toast } = useToast()` from `@/components/ui/use-toast`
 - `mrpApi.getProducts()` returns `{ products: Product[], total }`, NOT `{ data: [...] }`
 - `mrpApi.getProductionOrders()` returns `{ orders: ProductionOrder[], total }`
+- **Pagination pattern**: API endpoints accept `?page=N&limit=M&search=text`, hooks return `{ ..., page, limit, totalPages }`
+- **Debounced search**: Use `setTimeout` + `clearTimeout` in `useEffect` with 500ms delay
 
 ### Zod schemas
 - `CreateProductionEntrySchema` uses `z.number().int()` — quantities must be integers
@@ -100,8 +114,34 @@ All controllers use `ApiResponse.success(res, data, message, statusCode)` or thr
 
 JWT secret and other config in `.env` at monorepo root.
 
+**Production:**
+- Prod DB name is `mrp_db` (not `scaffold_db` — check `.env` in prod)
+- Deploy script: `~/mrp-app/deploy.sh` (runs `docker compose -f docker-compose.prod.yml`)
+- Containers: `mrp-app-api-1`, `mrp-app-web-1`, `mrp-app-postgres-1`, `mrp-app-redis-1`
+- To check prod logs: `docker logs mrp-app-api-1 --tail 100`
+- **Migration path issue**: Prod builds create nested `dist/apps/api/dist/...` paths. The `migration:prod` script must use the correct path to `run-migration.js`.
+
 ## Testing
 No test framework currently configured. `npm run test` runs workspaces with `--if-present` (no-op).
 
 ## Git
 No pre-commit hooks, no CI workflows in repo. Push directly.
+
+## Deploy FAQ
+
+**Q: API returns 500 with "column does not exist"**
+A: Production is missing DB columns. The migration ran but columns weren't created. Fix:
+```bash
+docker exec mrp-app-postgres-1 psql -U postgres -d mrp_db -c "ALTER TABLE <table> ADD COLUMN IF NOT EXISTS <col> <type>;"
+docker exec mrp-app-api-1 npm run migration:prod --workspace=api
+```
+
+**Q: Supplier list search/pagination not working**
+A: Ensure the `useSuppliersQuery` hook passes `search` in the query key. Check `mrpQueryKeys.suppliersList` includes search param. The API `listSuppliers` service method must accept `search?: string` and use `$ilike` operator.
+
+**Q: How to check if migrations actually applied in prod**
+A:
+```bash
+docker exec mrp-app-postgres-1 psql -U postgres -d mrp_db -c "SELECT * FROM mikro_orm_migrations ORDER BY id DESC LIMIT 10;"
+docker exec mrp-app-postgres-1 psql -U postgres -d mrp_db -c "\d <table_name>"
+```
