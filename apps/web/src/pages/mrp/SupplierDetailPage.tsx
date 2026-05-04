@@ -119,6 +119,24 @@ export default function SupplierDetailPage() {
                                         {supplier.paymentConditions || 'No registradas'}
                                     </p>
                                 </div>
+                                <div>
+                                    <span className="text-sm text-slate-500 block mb-2">Retenciones Activas</span>
+                                    <div className="flex flex-wrap gap-2">
+                                        {supplier.retentionAtSource ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium">
+                                                Retención en la Fuente
+                                            </span>
+                                        ) : null}
+                                        {supplier.retentionIva ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded-md text-xs font-medium">
+                                                Retención IVA
+                                            </span>
+                                        ) : null}
+                                        {!supplier.retentionAtSource && !supplier.retentionIva ? (
+                                            <span className="text-xs text-slate-400">Ninguna retención activa</span>
+                                        ) : null}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
