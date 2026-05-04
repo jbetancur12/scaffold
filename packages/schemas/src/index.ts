@@ -1391,6 +1391,7 @@ export const OperationalConfigSchema = z.object({
     shippingCoverageLimitFull: z.number().min(0, 'El tope de cobertura total debe ser mayor o igual a 0').nullish(),
     shippingCoverageLimitShared: z.number().min(0, 'El tope de cobertura compartida debe ser mayor o igual a 0').nullish(),
     uvtValue: z.number().min(0, 'El valor del UVT debe ser mayor o igual a 0').nullish(),
+    purchaseRetentionIvaRate: z.number().min(0).max(100).nullish(),
     quotationTermsTemplate: QuotationTermsTemplateSchema.nullish(),
     allowQuotationBelowMargin: z.boolean().optional(),
     purchaseWithholdingRules: z.array(

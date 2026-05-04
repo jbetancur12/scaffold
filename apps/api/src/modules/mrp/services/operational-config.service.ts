@@ -193,6 +193,9 @@ export class OperationalConfigService {
                 active: rule.active ?? true,
             }));
         }
+        if (data.purchaseRetentionIvaRate !== undefined) {
+            config.purchaseRetentionIvaRate = data.purchaseRetentionIvaRate;
+        }
         if (data.quotationTermsTemplate !== undefined) {
             config.quotationTermsTemplate = data.quotationTermsTemplate || this.getDefaultQuotationTermsTemplate();
         }
