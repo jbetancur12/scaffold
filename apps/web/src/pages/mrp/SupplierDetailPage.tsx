@@ -100,6 +100,7 @@ export default function SupplierDetailPage() {
                             </div>
                         </div>
 
+                        {/* Datos Financieros - NOW WITH RETENTIONS */}
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
                             <h3 className="font-semibold text-lg border-b pb-2 mb-4 flex items-center gap-2">
                                 <CreditCard className="h-4 w-4 text-slate-400" />
