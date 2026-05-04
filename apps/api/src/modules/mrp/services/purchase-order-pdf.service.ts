@@ -106,6 +106,10 @@ html(lang="es")
       tr
         td.label Retención
         td.right= withholdingAmount
+      if retentionIvaAmount && retentionIvaAmount !== '$ 0'
+        tr
+          td.label Ret. IVA
+          td.right= retentionIvaAmount
       tr
         td.label Otros cargos
         td.right= otherChargesAmount
@@ -336,6 +340,7 @@ export class PurchaseOrderPdfService {
       taxTotal: this.formatCurrency(Number(order.taxTotal || 0)),
       discountAmount: this.formatCurrency(Number(order.discountAmount || 0)),
       withholdingAmount: this.formatCurrency(Number(order.withholdingAmount || 0)),
+      retentionIvaAmount: this.formatCurrency(Number(order.retentionIvaAmount || 0)),
       otherChargesAmount: this.formatCurrency(Number(order.otherChargesAmount || 0)),
       netTotalAmount: this.formatCurrency(Number(order.netTotalAmount || order.totalAmount || 0)),
       logoDataUrl,
