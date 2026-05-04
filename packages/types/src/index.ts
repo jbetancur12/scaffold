@@ -2467,3 +2467,48 @@ export interface ProductThreadProcessPayload {
     ratio?: number;
     sortOrder?: number;
 }
+
+// Production Forecast Types
+export type ForecastGroupBy = 'product' | 'variant' | 'customer' | 'variant-customer';
+
+export interface SalesVelocityPoint {
+    month: string;
+    quantity: number;
+}
+
+export interface ForecastInsight {
+    key: string;
+    label: string;
+    productId?: string;
+    productName?: string;
+    variantId?: string;
+    variantName?: string;
+    variantSku?: string;
+    customerId?: string;
+    customerName?: string;
+    currentStock: number;
+    monthlyVelocity: number;
+    velocityTrend: SalesVelocityPoint[];
+    suggestedProduction: number;
+    productionMinutesPerUnit: number;
+    estimatedProductionTimeHours: number;
+    stockCoverDays: number;
+    reorderPoint: number;
+    urgency: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface ProductionForecastResult {
+    period: {
+        from: string | Date;
+        to: string | Date;
+        monthsAnalyzed: number;
+    };
+    groupBy: ForecastGroupBy;
+    insights: ForecastInsight[];
+    summary: {
+        totalSuggestedProduction: number;
+        totalEstimatedHours: number;
+        criticalItems: number;
+        lowStockItems: number;
+    };
+}

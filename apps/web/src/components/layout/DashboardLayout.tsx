@@ -26,6 +26,7 @@ import {
     Layers,
     BarChart3,
     ClipboardList,
+    TrendingUp,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
@@ -95,6 +96,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: Factory, label: 'Órdenes de Producción', path: '/mrp/production-orders', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Factory, label: 'Simulador Producción', path: '/mrp/production-orders/simulator', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: BarChart3, label: 'Analíticas Producción', path: '/mrp/production-analytics', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: TrendingUp, label: 'Pronóstico Producción', path: '/mrp/production-forecast', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Users, label: 'Operadores', path: '/mrp/operators', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: ClipboardList, label: 'Registros de Producción', path: '/mrp/production-entries', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Inventario', path: '/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
@@ -114,7 +116,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         },
         {
             label: 'Operación',
-            items: ['/mrp/sales-orders', '/mrp/quotations', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/production-orders/simulator', '/mrp/production-analytics', '/mrp/operators', '/mrp/production-entries', '/mrp/inventory', '/mrp/warehouses', '/mrp/thread-calculator'],
+            items: ['/mrp/sales-orders', '/mrp/quotations', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/production-orders/simulator', '/mrp/production-analytics', '/mrp/production-forecast', '/mrp/operators', '/mrp/production-entries', '/mrp/inventory', '/mrp/warehouses', '/mrp/thread-calculator'],
         },
         {
             label: 'Parámetros',

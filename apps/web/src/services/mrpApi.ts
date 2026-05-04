@@ -17,6 +17,8 @@ import {
     FinishedGoodsLotInventory,
     OperationalConfig,
     Warehouse,
+    ForecastGroupBy,
+    ProductionForecastResult,
     NonConformity,
     CapaAction,
     AuditEvent,
@@ -1003,6 +1005,17 @@ export const mrpApi = {
     exportProductionAnalyticsCsv: async (filters: ProductionAnalyticsFilters & { groupBy?: ProductionAnalyticsDetailGroupBy }): Promise<Blob> => {
         const response = await api.get('/mrp/analytics/production/export.csv', { params: filters, responseType: 'blob' });
         return response.data as Blob;
+    },
+    getProductionForecast: async (filters?: {
+        months?: number;
+        from?: string;
+        to?: string;
+        groupBy?: ForecastGroupBy;
+        minStockDays?: number;
+        safetyStockDays?: number;
+    }): Promise<ProductionForecastResult> => {
+        const response = await api.get('/mrp/analytics/production/forecast', { params: filters });
+        return response.data;
     },
 
     // Quality / INVIMA

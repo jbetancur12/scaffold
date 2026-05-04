@@ -52,6 +52,8 @@ export const mrpQueryKeys = {
         `mrp.production-analytics.top-customers.${month || ''}.${from || ''}.${to || ''}.${status || ''}.${limit || ''}`,
     productionAnalyticsDetail: (month?: string, from?: string, to?: string, status?: string, groupBy?: string) =>
         `mrp.production-analytics.detail.${month || ''}.${from || ''}.${to || ''}.${status || ''}.${groupBy || ''}`,
+    productionForecast: (from?: string, to?: string, groupBy?: string) =>
+        `mrp.production-forecast.${from || ''}.${to || ''}.${groupBy || ''}`,
     operationalConfig: 'mrp.operational-config',
     qualityNonConformities: 'mrp.quality.non-conformities',
     qualityCapas: 'mrp.quality.capa-actions',

@@ -23,6 +23,7 @@ import { ThreadProcessService } from './services/thread-process.service';
 import { QuotationService } from './services/quotation.service';
 import { QuotationPdfService } from './services/quotation-pdf.service';
 import { ProductionAnalyticsService } from './services/production-analytics.service';
+import { ProductionForecastService } from './services/production-forecast.service';
 import { CustomerShippingLabelPdfService } from './services/customer-shipping-label-pdf.service';
 import { ProductCatalogPdfService } from './services/product-catalog-pdf.service';
 import { PriceListConfigService } from './services/price-list-config.service';
@@ -2883,6 +2884,25 @@ export class MrpController {
         try {
             const { from, to, operatorId } = ProductionEntryPdfQuerySchema.parse(req.query);
             const result = await this.productionEntryService.getKpis(from, to, operatorId);
+            return ApiResponse.success(res, result);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getProductionForecast(req: Request, res: Response, next: NextFunction) {
+        try {
+            const em = RequestContext.getEntityManager()!;
+            const forecastService = new ProductionForecastService(em);
+            const input = {
+                months: req.query.months ? Number(req.query.months) : undefined,
+                from: req.query.from as string | undefined,
+                to: req.query.to as string | undefined,
+                groupBy: req.query.groupBy as 'product' | 'variant' | 'customer' | undefined,
+                minStockDays: req.query.minStockDays ? Number(req.query.minStockDays) : undefined,
+                safetyStockDays: req.query.safetyStockDays ? Number(req.query.safetyStockDays) : undefined,
+            };
+            const result = await forecastService.getForecast(input);
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);

@@ -45,6 +45,7 @@ const ThreadCalculatorPage = lazy(() => import('@/pages/mrp/ThreadCalculatorPage
 const WarehouseListPage = lazy(() => import('@/pages/mrp/WarehouseListPage'));
 const WarehouseFormPage = lazy(() => import('@/pages/mrp/WarehouseFormPage'));
 const ProductionAnalyticsPage = lazy(() => import('@/pages/mrp/ProductionAnalyticsPage'));
+const ProductionForecastPage = lazy(() => import('@/pages/mrp/ProductionForecastPage'));
 const OperatorListPage = lazy(() => import('@/pages/mrp/OperatorListPage'));
 const OperatorFormPage = lazy(() => import('@/pages/mrp/OperatorFormPage'));
 const ProductionEntryListPage = lazy(() => import('@/pages/mrp/ProductionEntryListPage'));
@@ -180,6 +181,7 @@ export default function App() {
                             <Route path="/mrp/production-orders/:id" element={<ProductionOrderDetailPage />} />
                             <Route path="/mrp/production-orders/:id/edit" element={<ProductionOrderFormPage />} />
                             <Route path="/mrp/production-analytics" element={<ProductionAnalyticsPage />} />
+                            <Route path="/mrp/production-forecast" element={<ProductionForecastPage />} />
 
                             <Route path="/mrp/purchase-orders" element={<PurchaseOrderListPage />} />
                             <Route path="/mrp/purchase-orders/new" element={<PurchaseOrderFormPage />} />
