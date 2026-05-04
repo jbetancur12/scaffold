@@ -4,6 +4,8 @@ import {
     ForecastInsight,
     ProductionForecastResult,
     SalesVelocityPoint,
+    CustomerForecastInsight,
+    CustomerVariantForecast,
 } from '@scaffold/types';
 import { SalesOrderItem } from '../entities/sales-order-item.entity';
 import { InventoryItem } from '../entities/inventory-item.entity';
@@ -99,6 +101,21 @@ export class ProductionForecastService {
             months: string[];
         }>();
 
+        // For customer grouping with nested variants
+        const customerVariantMap = new Map<string, {
+            customerId: string;
+            customerName: string;
+            variants: Map<string, {
+                variantId: string;
+                variantName: string;
+                variantSku: string;
+                productName: string;
+                quantities: number[];
+                months: string[];
+                productionMinutesPerUnit: number;
+            }>;
+        }>();
+
         for (const item of salesItems) {
             const monthKey = toMonthKey(new Date(item.salesOrder.orderDate));
             const variant = item.variant;
@@ -151,6 +168,35 @@ export class ProductionForecastService {
             const monthMap = monthlyData.get(key) || new Map<string, number>();
             monthMap.set(monthKey, (monthMap.get(monthKey) || 0) + Number(item.quantity || 0));
             monthlyData.set(key, monthMap);
+
+            // Build customer-variant mapping for nested view
+            if (groupBy === 'customer' && customer?.id) {
+                const customerKey = customer.id;
+                const customerData = customerVariantMap.get(customerKey) || {
+                    customerId: customerKey,
+                    customerName: customer.name || 'Sin nombre',
+                    variants: new Map<string, any>(),
+                };
+
+                if (!customerVariantMap.has(customerKey)) {
+                    customerVariantMap.set(customerKey, customerData);
+                }
+
+                const variantKey = variant?.id || `variant:none:${product.id}`;
+                const variantData = customerData.variants.get(variantKey) || {
+                    variantId: variant?.id || variantKey,
+                    variantName: variant?.name || 'Sin variante',
+                    variantSku: variant?.sku || 'N/A',
+                    productName: product.name,
+                    quantities: [],
+                    months: [],
+                    productionMinutesPerUnit: variant?.productionMinutes ? Number(variant.productionMinutes) : 0,
+                };
+
+                variantData.quantities.push(Number(item.quantity || 0));
+                variantData.months.push(monthKey);
+                customerData.variants.set(variantKey, variantData);
+            }
         }
 
         const variantIds = new Set<string>();
@@ -174,6 +220,7 @@ export class ProductionForecastService {
         }
 
         const insights: ForecastInsight[] = [];
+        const customerInsights: CustomerForecastInsight[] = [];
         let totalSuggestedProduction = 0;
         let totalEstimatedHours = 0;
         let criticalItems = 0;
@@ -241,6 +288,61 @@ export class ProductionForecastService {
             totalEstimatedHours += estimatedProductionTimeHours;
         }
 
+        // Build customer insights with nested variants
+        if (groupBy === 'customer') {
+            for (const [customerId, customerData] of customerVariantMap) {
+                let customerSuggestedProduction = 0;
+                let customerEstimatedHours = 0;
+                let customerCriticalItems = 0;
+                const variants: CustomerVariantForecast[] = [];
+
+                for (const variantData of customerData.variants.values()) {
+                    const totalQuantity = variantData.quantities.reduce((sum, q: number) => sum + q, 0);
+                    const monthlyVelocity = monthsAnalyzed > 0 ? totalQuantity / monthsAnalyzed : 0;
+                    const dailyVelocity = monthlyVelocity / 30;
+                    const currentStock = stockByVariant.get(variantData.variantId) || 0;
+                    const stockCoverDays = dailyVelocity > 0 ? currentStock / dailyVelocity : 999;
+                    const reorderPoint = (dailyVelocity * minStockDays) + (dailyVelocity * safetyStockDays);
+                    const suggestedProduction = Math.max(0, Math.ceil(reorderPoint - currentStock));
+                    const estimatedHours = (suggestedProduction * variantData.productionMinutesPerUnit) / 60;
+
+                    let urgency: 'low' | 'medium' | 'high' | 'critical' = 'low';
+                    if (stockCoverDays <= 0 || stockCoverDays <= safetyStockDays) {
+                        urgency = stockCoverDays <= 0 ? 'critical' : 'high';
+                        customerCriticalItems++;
+                    } else if (stockCoverDays <= minStockDays) {
+                        urgency = 'medium';
+                    }
+
+                    variants.push({
+                        variantId: variantData.variantId,
+                        variantName: variantData.variantName,
+                        variantSku: variantData.variantSku,
+                        productName: variantData.productName,
+                        currentStock,
+                        monthlyVelocity: Math.round(monthlyVelocity * 100) / 100,
+                        stockCoverDays: Math.round(stockCoverDays * 10) / 10,
+                        suggestedProduction,
+                        estimatedProductionTimeHours: Math.round(estimatedHours * 100) / 100,
+                        urgency,
+                    });
+
+                    customerSuggestedProduction += suggestedProduction;
+                    customerEstimatedHours += estimatedHours;
+                }
+
+                customerInsights.push({
+                    key: customerId,
+                    customerId,
+                    customerName: customerData.customerName,
+                    totalSuggestedProduction: customerSuggestedProduction,
+                    totalEstimatedHours: Math.round(customerEstimatedHours * 100) / 100,
+                    criticalItems: customerCriticalItems,
+                    variants,
+                });
+            }
+        }
+
         insights.sort((a, b) => {
             const urgencyOrder = { critical: 0, high: 1, medium: 2, low: 3 };
             if (urgencyOrder[a.urgency] !== urgencyOrder[b.urgency]) {
@@ -257,6 +359,7 @@ export class ProductionForecastService {
             },
             groupBy,
             insights,
+            customerInsights: customerInsights.length > 0 ? customerInsights : undefined,
             summary: {
                 totalSuggestedProduction,
                 totalEstimatedHours: Math.round(totalEstimatedHours * 100) / 100,

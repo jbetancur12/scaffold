@@ -2497,6 +2497,29 @@ export interface ForecastInsight {
     urgency: 'low' | 'medium' | 'high' | 'critical';
 }
 
+export interface CustomerVariantForecast {
+    variantId: string;
+    variantName: string;
+    variantSku: string;
+    productName: string;
+    currentStock: number;
+    monthlyVelocity: number;
+    stockCoverDays: number;
+    suggestedProduction: number;
+    estimatedProductionTimeHours: number;
+    urgency: 'low' | 'medium' | 'high' | 'critical';
+}
+
+export interface CustomerForecastInsight {
+    key: string;
+    customerId: string;
+    customerName: string;
+    totalSuggestedProduction: number;
+    totalEstimatedHours: number;
+    criticalItems: number;
+    variants: CustomerVariantForecast[];
+}
+
 export interface ProductionForecastResult {
     period: {
         from: string | Date;
@@ -2505,6 +2528,7 @@ export interface ProductionForecastResult {
     };
     groupBy: ForecastGroupBy;
     insights: ForecastInsight[];
+    customerInsights?: CustomerForecastInsight[];
     summary: {
         totalSuggestedProduction: number;
         totalEstimatedHours: number;

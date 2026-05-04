@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { ForecastGroupBy } from '@scaffold/types';
+import { ForecastGroupBy, CustomerForecastInsight, CustomerVariantForecast } from '@scaffold/types';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, Loader2, TrendingUp, AlertTriangle, Package, Clock } from 'lucide-react';
+import { BarChart3, Loader2, TrendingUp, AlertTriangle, Package, Clock, ChevronDown, ChevronRight } from 'lucide-react';
 import { useProductionForecastQuery } from '@/hooks/mrp/useProductionForecast';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
 
@@ -21,6 +21,7 @@ export default function ProductionForecastPage() {
     const [months, setMonths] = useState(6);
     const [minStockDays, setMinStockDays] = useState(15);
     const [safetyStockDays, setSafetyStockDays] = useState(7);
+    const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
 
     const { data: forecast, loading, error } = useProductionForecastQuery({
         months,
@@ -40,6 +41,65 @@ export default function ProductionForecastPage() {
         };
         const config = variants[urgency] || variants.low;
         return <Badge className={config.className}>{config.label}</Badge>;
+    };
+
+    const toggleCustomer = (customerId: string) => {
+        const newExpanded = new Set(expandedCustomers);
+        if (newExpanded.has(customerId)) {
+            newExpanded.delete(customerId);
+        } else {
+            newExpanded.add(customerId);
+        }
+        setExpandedCustomers(newExpanded);
+    };
+
+    const renderVariantRow = (variant: CustomerVariantForecast, index: number) => (
+        <TableRow key={variant.variantId || index} className="bg-slate-50/50">
+            <TableCell className="pl-8">
+                <div>
+                    <p className="font-medium text-sm">{variant.variantName}</p>
+                    <p className="text-xs text-slate-500">{variant.variantSku} • {variant.productName}</p>
+                </div>
+            </TableCell>
+            <TableCell className="text-right text-sm">{variant.currentStock}</TableCell>
+            <TableCell className="text-right text-sm">{variant.monthlyVelocity.toFixed(1)}</TableCell>
+            <TableCell className="text-right text-sm">
+                <span className={variant.stockCoverDays <= 7 ? 'text-red-600 font-bold' : ''}>
+                    {variant.stockCoverDays.toFixed(1)}
+                </span>
+            </TableCell>
+            <TableCell className="text-right text-sm font-bold text-blue-600">{variant.suggestedProduction}</TableCell>
+            <TableCell className="text-right text-sm">{variant.estimatedProductionTimeHours.toFixed(1)}</TableCell>
+            <TableCell className="text-center">{urgencyBadge(variant.urgency)}</TableCell>
+        </TableRow>
+    );
+
+    const renderCustomerRow = (customer: CustomerForecastInsight) => {
+        const isExpanded = expandedCustomers.has(customer.customerId);
+        return (
+            <>
+                <TableRow 
+                    key={customer.customerId} 
+                    className="hover:bg-slate-50/80 cursor-pointer"
+                    onClick={() => toggleCustomer(customer.customerId)}
+                >
+                    <TableCell>
+                        <div className="flex items-center gap-2">
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            <div>
+                                <p className="font-medium">{customer.customerName}</p>
+                                <p className="text-sm text-slate-500">{customer.variants.length} variantes • {customer.totalSuggestedProduction} unidades sugeridas</p>
+                            </div>
+                        </div>
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-blue-600">{customer.totalSuggestedProduction}</TableCell>
+                    <TableCell className="text-right">{customer.totalEstimatedHours.toFixed(1)} hrs</TableCell>
+                    <TableCell className="text-right">{customer.criticalItems} críticas</TableCell>
+                    <TableCell colSpan={3} />
+                </TableRow>
+                {isExpanded && customer.variants.map((variant, idx) => renderVariantRow(variant, idx))}
+            </>
+        );
     };
 
     return (
@@ -174,31 +234,34 @@ export default function ProductionForecastPage() {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            forecast.insights.map((item) => (
-                                <TableRow key={item.key} className="hover:bg-slate-50/80">
-                                    <TableCell>
-                                        <div>
-                                            <p className="font-medium">{item.label}</p>
-                                            {item.variantSku && (
-                                                <p className="text-sm text-slate-500">{item.variantSku}</p>
-                                            )}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">{item.currentStock}</TableCell>
-                                    <TableCell className="text-right">{item.monthlyVelocity.toFixed(1)}</TableCell>
-                                    <TableCell className="text-right">
-                                        <span className={item.stockCoverDays <= 7 ? 'text-red-600 font-bold' : ''}>
-                                            {item.stockCoverDays.toFixed(1)}
-                                        </span>
-                                    </TableCell>
-                                    <TableCell className="text-right font-bold text-blue-600">
-                                        {item.suggestedProduction}
-                                    </TableCell>
-                                    <TableCell className="text-right">{item.estimatedProductionTimeHours.toFixed(1)}</TableCell>
-                                    <TableCell className="text-center">{urgencyBadge(item.urgency)}</TableCell>
-                                </TableRow>
-                            ))
-                        )}
+                            groupBy === 'customer' && forecast.customerInsights ? (
+                                forecast.customerInsights.map((customer) => renderCustomerRow(customer))
+                            ) : (
+                                forecast.insights.map((item) => (
+                                    <TableRow key={item.key} className="hover:bg-slate-50/80">
+                                        <TableCell>
+                                            <div>
+                                                <p className="font-medium">{item.label}</p>
+                                                {item.variantSku && (
+                                                    <p className="text-sm text-slate-500">{item.variantSku}</p>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">{item.currentStock}</TableCell>
+                                        <TableCell className="text-right">{item.monthlyVelocity.toFixed(1)}</TableCell>
+                                        <TableCell className="text-right">
+                                            <span className={item.stockCoverDays <= 7 ? 'text-red-600 font-bold' : ''}>
+                                                {item.stockCoverDays.toFixed(1)}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="text-right font-bold text-blue-600">
+                                            {item.suggestedProduction}
+                                        </TableCell>
+                                        <TableCell className="text-right">{item.estimatedProductionTimeHours.toFixed(1)}</TableCell>
+                                        <TableCell className="text-center">{urgencyBadge(item.urgency)}</TableCell>
+                                    </TableRow>
+                                ))
+                        ))}
                     </TableBody>
                 </Table>
             </Card>
