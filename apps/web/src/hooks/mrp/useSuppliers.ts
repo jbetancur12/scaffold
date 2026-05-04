@@ -9,7 +9,7 @@ export const useSuppliersQuery = (page = 1, limit = 10, search?: string) => {
         return mrpApi.getSuppliers(page, limit, search);
     }, [page, limit, search]);
 
-    const result = useMrpQuery(fetchSuppliers, true, mrpQueryKeys.suppliersList(page, limit));
+    const result = useMrpQuery(fetchSuppliers, true, mrpQueryKeys.suppliersList(page, limit, search));
 
     return {
         ...result,
