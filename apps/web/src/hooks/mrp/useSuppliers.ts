@@ -4,12 +4,19 @@ import { mrpApi } from '@/services/mrpApi';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 import { invalidateMrpQueriesByPrefix, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
-export const useSuppliersQuery = (page = 1, limit = 10) => {
+export const useSuppliersQuery = (page = 1, limit = 10, search?: string) => {
     const fetchSuppliers = useCallback(async (): Promise<{ suppliers: Supplier[]; total: number }> => {
-        return mrpApi.getSuppliers(page, limit);
-    }, [page, limit]);
+        return mrpApi.getSuppliers(page, limit, search);
+    }, [page, limit, search]);
 
-    return useMrpQuery(fetchSuppliers, true, mrpQueryKeys.suppliersList(page, limit));
+    const result = useMrpQuery(fetchSuppliers, true, mrpQueryKeys.suppliersList(page, limit));
+
+    return {
+        ...result,
+        page,
+        limit,
+        totalPages: result.data?.total ? Math.ceil(result.data.total / limit) : 1,
+    };
 };
 
 export const useSupplierQuery = (id?: string) => {

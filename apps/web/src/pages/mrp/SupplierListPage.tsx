@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Table,
@@ -8,7 +8,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Truck, Plus, Edit2, Building2, User, Phone, ArrowUpRight, Download, Upload } from 'lucide-react';
+import { Truck, Plus, Edit2, Building2, User, Phone, ArrowUpRight, Download, Upload, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSuppliersQuery } from '@/hooks/mrp/useSuppliers';
 import { useMrpQueryErrorToast } from '@/hooks/mrp/useMrpQueryErrorToast';
@@ -28,8 +28,19 @@ export default function SupplierListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
 
-    const { data: suppliersResponse, loading, error } = useSuppliersQuery();
+    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 500);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const { data: suppliersResponse, loading, error } = useSuppliersQuery(page, 10, debouncedSearch);
     const suppliers = suppliersResponse?.suppliers ?? [];
+    const total = suppliersResponse?.total ?? 0;
+    const totalPages = total > 0 ? Math.ceil(total / 10) : 1;
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [importCsvText, setImportCsvText] = useState('');
     const [importFileName, setImportFileName] = useState('');
@@ -241,10 +252,20 @@ export default function SupplierListPage() {
 
             {/* Main Content Area */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-                {/* Search Header - Optional for now if no query params exist, but good for structure */}
+                {/* Search Header */}
                 <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50">
-                    <div className="text-sm text-slate-500 font-medium w-full text-right sm:text-left">
-                        {totalSuppliers > 0 ? `Mostrando ${totalSuppliers} proveedores registrados` : ''}
+                    <div className="relative w-full sm:w-auto">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                            type="text"
+                            placeholder="Buscar proveedor..."
+                            value={search}
+                            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                            className="w-full sm:w-64 pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                        />
+                    </div>
+                    <div className="text-sm text-slate-500 font-medium">
+                        {total > 0 ? `Mostrando ${(page - 1) * 10 + 1}-${Math.min(page * 10, total)} de ${total} proveedores` : 'No hay proveedores'}
                     </div>
                 </div>
 
@@ -359,6 +380,56 @@ export default function SupplierListPage() {
                         </TableBody>
                     </Table>
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+                        <div className="text-sm text-slate-500">
+                            Página {page} de {totalPages}
+                        </div>
+                        <div className="flex gap-1">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(p => Math.max(1, p - 1))}
+                                disabled={page <= 1}
+                            >
+                                Anterior
+                            </Button>
+                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                let pageNum;
+                                if (totalPages <= 5) {
+                                    pageNum = i + 1;
+                                } else if (page <= 3) {
+                                    pageNum = i + 1;
+                                } else if (page >= totalPages - 2) {
+                                    pageNum = totalPages - 4 + i;
+                                } else {
+                                    pageNum = page - 2 + i;
+                                }
+                                return (
+                                    <Button
+                                        key={pageNum}
+                                        variant={pageNum === page ? "default" : "outline"}
+                                        size="sm"
+                                        onClick={() => setPage(pageNum)}
+                                        className={pageNum === page ? "bg-violet-600 hover:bg-violet-700" : ""}
+                                    >
+                                        {pageNum}
+                                    </Button>
+                                );
+                            })}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                                disabled={page >= totalPages}
+                            >
+                                Siguiente
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <Dialog open={importPreviewOpen} onOpenChange={setImportPreviewOpen}>

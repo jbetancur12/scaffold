@@ -648,7 +648,8 @@ export class MrpController {
     async listSuppliers(req: Request, res: Response, next: NextFunction) {
         try {
             const { page, limit } = PaginationQuerySchema.parse(req.query);
-            const result = await this.supplierService.listSuppliers(page || 1, limit || 10);
+            const search = req.query.search as string | undefined;
+            const result = await this.supplierService.listSuppliers(page || 1, limit || 10, search);
             return ApiResponse.success(res, result);
         } catch (error) {
             next(error);

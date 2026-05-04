@@ -715,8 +715,10 @@ export const mrpApi = {
     },
 
     // Suppliers
-    getSuppliers: async (page = 1, limit = 10) => {
-        const response = await api.get<{ suppliers: Supplier[], total: number }>(`/mrp/suppliers?page=${page}&limit=${limit}`);
+    getSuppliers: async (page = 1, limit = 10, search?: string) => {
+        const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+        if (search) params.append('search', search);
+        const response = await api.get<{ suppliers: Supplier[], total: number }>(`/mrp/suppliers?${params.toString()}`);
         return response.data;
     },
     exportSuppliersCsv: async (): Promise<Blob> => {
