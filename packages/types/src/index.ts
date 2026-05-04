@@ -377,6 +377,9 @@ export interface Supplier {
     notes?: string;
     retentionAtSource: boolean;
     retentionIva: boolean;
+    rutFileName?: string;
+    rutFileMime?: string;
+    rutFilePath?: string;
     createdAt: string | Date;
     updatedAt: string | Date;
 }

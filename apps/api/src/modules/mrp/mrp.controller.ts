@@ -38,6 +38,7 @@ import {
     ProductGroupSchema,
     UpdateProductSchema,
     UploadProductImageSchema,
+    UploadRutFileSchema,
     UpdateProductGroupSchema,
     ProductionOrderSchema,
     RawMaterialSchema,
@@ -705,6 +706,41 @@ export class MrpController {
             const { id, materialId } = req.params;
             await this.supplierService.removeSupplierMaterial(id, materialId);
             return ApiResponse.success(res, null, 'Material desvinculado del proveedor');
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async uploadSupplierRut(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = UploadRutFileSchema.parse(req.body);
+            const actor = this.resolveActor(req);
+            const supplier = await this.supplierService.uploadRutFile(id, payload, actor);
+            return ApiResponse.success(res, supplier, 'Archivo RUT cargado', 200);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async downloadSupplierRut(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const file = await this.supplierService.readRutFile(id);
+            res.setHeader('Content-Type', file.mimeType);
+            res.setHeader('Content-Disposition', `inline; filename="${file.fileName}"`);
+            return res.send(file.buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteSupplierRut(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const actor = this.resolveActor(req);
+            const supplier = await this.supplierService.deleteRutFile(id, actor);
+            return ApiResponse.success(res, supplier, 'Archivo RUT eliminado');
         } catch (error) {
             next(error);
         }

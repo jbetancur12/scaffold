@@ -1453,17 +1453,6 @@
           "nullable": true,
           "mappedType": "json"
         },
-        "purchase_retention_source_rate": {
-          "name": "purchase_retention_source_rate",
-          "type": "numeric(5,2)",
-          "unsigned": false,
-          "autoincrement": false,
-          "primary": false,
-          "nullable": true,
-          "precision": 5,
-          "scale": 2,
-          "mappedType": "decimal"
-        },
         "purchase_retention_iva_rate": {
           "name": "purchase_retention_iva_rate",
           "type": "numeric(5,2)",
@@ -7458,6 +7447,36 @@
           "nullable": false,
           "default": "false",
           "mappedType": "boolean"
+        },
+        "rut_file_name": {
+          "name": "rut_file_name",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "rut_file_mime": {
+          "name": "rut_file_mime",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
+        },
+        "rut_file_path": {
+          "name": "rut_file_path",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "length": 255,
+          "mappedType": "string"
         }
       },
       "name": "supplier",
@@ -8671,6 +8690,18 @@
         },
         "withholding_amount": {
           "name": "withholding_amount",
+          "type": "numeric(10,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "precision": 10,
+          "scale": 2,
+          "default": "0",
+          "mappedType": "decimal"
+        },
+        "retention_iva_amount": {
+          "name": "retention_iva_amount",
           "type": "numeric(10,2)",
           "unsigned": false,
           "autoincrement": false,

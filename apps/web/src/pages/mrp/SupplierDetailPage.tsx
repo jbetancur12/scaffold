@@ -1,17 +1,84 @@
 import { useNavigate, useParams } from 'react-router-dom';
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, Edit2, Factory, MapPin, Phone, Mail, Building, CreditCard, FileText } from 'lucide-react';
 import { SupplierMaterialsTab } from './components/SupplierMaterialsTab';
 import { useSupplierQuery } from '@/hooks/mrp/useSuppliers';
 import { useMrpQueryErrorRedirect } from '@/hooks/mrp/useMrpQueryErrorRedirect';
+import { useToast } from '@/components/ui/use-toast';
+import { mrpApi } from '@/services/mrpApi';
+import { getErrorMessage } from '@/lib/api-error';
+import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
+import { invalidateMrpQuery } from '@/hooks/useMrpQuery';
 
 export default function SupplierDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const { data: supplier, loading, error } = useSupplierQuery(id);
+    const { toast } = useToast();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useMrpQueryErrorRedirect(error, 'No se pudo cargar la información del proveedor', '/mrp/suppliers');
+
+    const handleRutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            toast({ title: 'Error', description: 'El archivo debe ser PDF o imagen (JPEG, PNG, WebP)', variant: 'destructive' });
+            return;
+        }
+
+        if (file.size > 10 * 1024 * 1024) {
+            toast({ title: 'Error', description: 'El archivo no debe superar 10 MB', variant: 'destructive' });
+            return;
+        }
+
+        try {
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            const base64Data = base64.split(',')[1] || base64;
+            await mrpApi.uploadSupplierRut(id!, { fileName: file.name, mimeType: file.type, base64Data });
+            invalidateMrpQuery(mrpQueryKeys.supplier(id!));
+            toast({ title: 'Éxito', description: 'Archivo RUT cargado correctamente' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo cargar el archivo'), variant: 'destructive' });
+        } finally {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleDownloadRut = async () => {
+        try {
+            const blob = await mrpApi.downloadSupplierRut(id!);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = supplier?.rutFileName || 'RUT';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo descargar el archivo'), variant: 'destructive' });
+        }
+    };
+
+    const handleDeleteRut = async () => {
+        if (!confirm('¿Está seguro de eliminar el archivo RUT?')) return;
+        try {
+            await mrpApi.deleteSupplierRut(id!);
+            invalidateMrpQuery(mrpQueryKeys.supplier(id!));
+            toast({ title: 'Éxito', description: 'Archivo RUT eliminado correctamente' });
+        } catch (err) {
+            toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo eliminar el archivo'), variant: 'destructive' });
+        }
+    };
 
     if (loading) {
         return (
@@ -140,6 +207,54 @@ export default function SupplierDetailPage() {
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* RUT File */}
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <h3 className="font-semibold text-lg border-b pb-2 mb-4 flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-slate-400" />
+                            Documento RUT
+                        </h3>
+                        {supplier.rutFilePath ? (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between bg-slate-50 p-3 rounded-md border border-slate-100">
+                                    <div className="flex items-center gap-2">
+                                        <FileText className="h-4 w-4 text-slate-500" />
+                                        <span className="text-sm font-medium">{supplier.rutFileName || 'RUT'}</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleDownloadRut()}
+                                        >
+                                            Descargar
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleDeleteRut()}
+                                        >
+                                            Eliminar
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-4">
+                                <p className="text-sm text-slate-500 mb-3">No hay un archivo RUT cargado</p>
+                                <Button onClick={() => fileInputRef.current?.click()}>
+                                    Subir RUT
+                                </Button>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                    className="hidden"
+                                    onChange={handleRutUpload}
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Notes */}

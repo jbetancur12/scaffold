@@ -768,6 +768,18 @@ export const mrpApi = {
         const response = await api.post<SupplierMaterial>(`/mrp/suppliers/${id}/materials`, data);
         return response.data;
     },
+    uploadSupplierRut: async (id: string, data: { fileName: string; mimeType: string; base64Data: string }): Promise<Supplier> => {
+        const response = await api.post(`/mrp/suppliers/${id}/rut`, data);
+        return response.data;
+    },
+    downloadSupplierRut: async (id: string): Promise<Blob> => {
+        const response = await api.get(`/mrp/suppliers/${id}/rut`, { responseType: 'blob' });
+        return response.data as unknown as Blob;
+    },
+    deleteSupplierRut: async (id: string): Promise<Supplier> => {
+        const response = await api.delete(`/mrp/suppliers/${id}/rut`);
+        return response.data;
+    },
 
     // Raw Materials
     getRawMaterials: async (page = 1, limit = 10, search = '') => {

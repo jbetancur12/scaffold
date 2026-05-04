@@ -39,4 +39,13 @@ export class Supplier extends BaseEntity implements ISupplier {
 
     @Property({ default: false })
     retentionIva: boolean = false;
+
+    @Property({ nullable: true })
+    rutFileName?: string;
+
+    @Property({ nullable: true })
+    rutFileMime?: string;
+
+    @Property({ nullable: true })
+    rutFilePath?: string;
 }

@@ -6,16 +6,19 @@ import { SupplierSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { AppError } from '../../../shared/utils/response';
 import { QualityAuditEvent } from '../entities/quality-audit-event.entity';
+import { ObjectStorageService } from '../../../shared/services/object-storage.service';
 
 export class SupplierService {
     private readonly em: EntityManager;
     private readonly supplierRepo: EntityRepository<Supplier>;
     private readonly auditRepo: EntityRepository<QualityAuditEvent>;
+    private readonly storageService: ObjectStorageService;
 
     constructor(em: EntityManager) {
         this.em = em;
         this.supplierRepo = em.getRepository(Supplier);
         this.auditRepo = em.getRepository(QualityAuditEvent);
+        this.storageService = new ObjectStorageService();
     }
 
     private readonly supplierImportHeaders = [
@@ -428,5 +431,87 @@ export class SupplierService {
         if (link) {
             await this.em.removeAndFlush(link);
         }
+    }
+
+    private decodeBase64Data(base64Data: string): Buffer {
+        const match = /^data:([^;]+);base64,(.+)$/.exec(base64Data);
+        if (!match) {
+            return Buffer.from(base64Data, 'base64');
+        }
+        return Buffer.from(match[2], 'base64');
+    }
+
+    async uploadRutFile(
+        supplierId: string,
+        payload: { base64Data: string; fileName: string; mimeType: string },
+        actor?: string
+    ): Promise<Supplier> {
+        const supplier = await this.supplierRepo.findOneOrFail({ id: supplierId });
+
+        const buffer = this.decodeBase64Data(payload.base64Data);
+        const maxBytes = 10 * 1024 * 1024; // 10 MB
+        if (buffer.length === 0 || buffer.length > maxBytes) {
+            throw new AppError('El archivo RUT debe tener entre 1 byte y 10 MB', 400);
+        }
+
+        const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+        if (!allowedMimes.includes(payload.mimeType.toLowerCase())) {
+            throw new AppError('El archivo RUT debe ser PDF o imagen (JPEG, PNG, WebP)', 400);
+        }
+
+        // Delete previous RUT file if exists
+        if (supplier.rutFilePath) {
+            await this.storageService.deleteObject(supplier.rutFilePath);
+        }
+
+        const folderPrefix = `suppliers/${supplier.id}/rut`;
+        const persisted = await this.storageService.saveObject({
+            fileName: payload.fileName,
+            mimeType: payload.mimeType,
+            buffer,
+            folderPrefix,
+        });
+
+        supplier.rutFileName = payload.fileName;
+        supplier.rutFileMime = payload.mimeType;
+        supplier.rutFilePath = persisted.storagePath;
+
+        await this.em.persistAndFlush(supplier);
+        await this.logAudit(supplier.id, 'rut_uploaded', {
+            fileName: supplier.rutFileName,
+        }, actor);
+
+        return supplier;
+    }
+
+    async readRutFile(supplierId: string): Promise<{ fileName: string; mimeType: string; buffer: Buffer }> {
+        const supplier = await this.supplierRepo.findOneOrFail({ id: supplierId });
+        if (!supplier.rutFilePath) {
+            throw new AppError('El proveedor no tiene un archivo RUT cargado', 404);
+        }
+
+        const buffer = await this.storageService.readObject(supplier.rutFilePath);
+        return {
+            fileName: supplier.rutFileName || 'rut',
+            mimeType: supplier.rutFileMime || 'application/octet-stream',
+            buffer,
+        };
+    }
+
+    async deleteRutFile(supplierId: string, actor?: string): Promise<Supplier> {
+        const supplier = await this.supplierRepo.findOneOrFail({ id: supplierId });
+
+        if (supplier.rutFilePath) {
+            await this.storageService.deleteObject(supplier.rutFilePath);
+        }
+
+        supplier.rutFileName = undefined;
+        supplier.rutFileMime = undefined;
+        supplier.rutFilePath = undefined;
+
+        await this.em.persistAndFlush(supplier);
+        await this.logAudit(supplier.id, 'rut_deleted', {}, actor);
+
+        return supplier;
     }
 }

@@ -282,6 +282,13 @@ export const UploadProductImageSchema = z.object({
     actor: z.string().optional(),
 });
 
+export const UploadRutFileSchema = z.object({
+    fileName: z.string().min(1),
+    mimeType: z.string().min(3),
+    base64Data: z.string().min(8),
+    actor: z.string().optional(),
+});
+
 export const ProductVariantSchema = z.object({
     productId: z.string().uuid(),
     name: z.string().min(1, 'El nombre es obligatorio'),
