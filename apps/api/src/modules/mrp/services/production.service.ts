@@ -1300,7 +1300,7 @@ export class ProductionService {
         });
     }
 
-    async updateStatus(id: string, status: ProductionOrderStatus, warehouseId?: string, actor?: string): Promise<ProductionOrder> {
+    async updateStatus(id: string, status: ProductionOrderStatus, warehouseId?: string, actor?: string, materialConsumption?: { rawMaterialId: string; actualQty: number }[]): Promise<ProductionOrder> {
         return this.em.transactional(async (tx) => {
             const productionOrderRepo = tx.getRepository(ProductionOrder);
             const inventoryRepo = tx.getRepository(InventoryItem);
@@ -1317,18 +1317,10 @@ export class ProductionService {
 
             order.status = status;
 
-            // If status is changed to COMPLETED, update finished goods inventory
+            // If status is changed to IN_PROGRESS, only validate documents and critical changes
             if (status === ProductionOrderStatus.IN_PROGRESS) {
                 await this.assertProcessDocument(DocumentProcess.PRODUCCION);
                 await this.assertNoBlockingCriticalChanges(order.id);
-                const requirements = await this.calculateMaterialRequirements(order.id);
-                const missingMaterials = requirements.filter((req) => Number(req.available) < Number(req.required));
-                if (missingMaterials.length > 0) {
-                    throw new AppError(
-                        `No hay stock liberado suficiente. Revisa cuarentena para: ${missingMaterials.map((m) => m.material.name).join(', ')}`,
-                        400
-                    );
-                }
             }
 
             // If status is changed to COMPLETED, update finished goods inventory
@@ -1442,6 +1434,21 @@ export class ProductionService {
                                 materialName: bomItem.rawMaterial.name,
                                 specificationId: bomItem.rawMaterialSpecification?.id,
                             });
+                        }
+                    }
+                }
+
+                // Override with actual consumption if provided
+                if (materialConsumption && materialConsumption.length > 0) {
+                    const consumptionMap = new Map<string, number>();
+                    for (const item of materialConsumption) {
+                        consumptionMap.set(item.rawMaterialId, Number(item.actualQty));
+                    }
+                    for (const [materialId, requirement] of materialRequirements.entries()) {
+                        const actualQty = consumptionMap.get(materialId);
+                        if (actualQty !== undefined) {
+                            requirement.required = actualQty;
+                            requirement.remnantRecoverable = 0; // No remnant calculation for actual consumption
                         }
                     }
                 }

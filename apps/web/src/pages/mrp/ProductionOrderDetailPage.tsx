@@ -20,6 +20,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2, Factory, FileText, Package, Layers, AlertTriangle, TrendingDown, Boxes, Save, ChevronDown, ChevronUp, ExternalLink, Receipt } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -70,6 +79,7 @@ export default function ProductionOrderDetailPage() {
     // Warehouse selection for completion
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+    const [materialConsumption, setMaterialConsumption] = useState<{ rawMaterialId: string; actualQty: number; theoreticalQty: number; name: string }[]>([]);
     const [showItemsToProduce, setShowItemsToProduce] = useState(true);
     const [newBatchVariantId, setNewBatchVariantId] = useState<string>('');
     const [newBatchQty, setNewBatchQty] = useState<number>(1);
@@ -175,7 +185,7 @@ export default function ProductionOrderDetailPage() {
         if (!order) return;
 
         if (newStatus === ProductionOrderStatus.COMPLETED) {
-            setIsCompleteDialogOpen(true);
+            await handleOpenCompleteDialog();
             return;
         }
 
@@ -199,6 +209,10 @@ export default function ProductionOrderDetailPage() {
                 orderId: order.id,
                 status: ProductionOrderStatus.COMPLETED,
                 warehouseId: selectedWarehouseId || undefined,
+                materialConsumption: materialConsumption.map(m => ({
+                    rawMaterialId: m.rawMaterialId,
+                    actualQty: m.actualQty
+                }))
             });
             toast({ title: "Orden completada", description: "El producto terminado ha sido agregado al inventario." });
             setIsCompleteDialogOpen(false);
@@ -207,6 +221,28 @@ export default function ProductionOrderDetailPage() {
             toast({
                 title: "Error",
                 description: getErrorMessage(error, 'No se pudo completar la orden'),
+                variant: "destructive"
+            });
+        }
+    };
+
+    const handleOpenCompleteDialog = async () => {
+        if (!order) return;
+        try {
+            const requirements = await mrpApi.calculateMaterialRequirements(order.id);
+            setMaterialConsumption(
+                requirements.map(req => ({
+                    rawMaterialId: req.material.id,
+                    actualQty: Number(req.required),
+                    theoreticalQty: Number(req.required),
+                    name: req.material.name
+                }))
+            );
+            setIsCompleteDialogOpen(true);
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: getErrorMessage(error, 'No se pudieron cargar los requerimientos'),
                 variant: "destructive"
             });
         }
@@ -2408,10 +2444,48 @@ export default function ProductionOrderDetailPage() {
                         <DialogHeader>
                             <DialogTitle>Finalizar Orden de Producción</DialogTitle>
                         </DialogHeader>
-                        <div className="grid gap-4 py-4">
+                        <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
                             <p className="text-sm text-slate-500">
                                 ¿Estás seguro de finalizar esta orden? Los productos terminados se agregarán al inventario.
                             </p>
+                            {materialConsumption.length > 0 && (
+                                <div className="space-y-2">
+                                    <p className="text-sm font-medium">Consumo de Materia Prima</p>
+                                    <p className="text-xs text-slate-500">
+                                        Ajusta el consumo real. Por defecto se usan los cálculos teóricos.
+                                    </p>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Material</TableHead>
+                                                <TableHead>Teórico</TableHead>
+                                                <TableHead>Real</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {materialConsumption.map((item, idx) => (
+                                                <TableRow key={item.rawMaterialId}>
+                                                    <TableCell className="font-medium">{item.name}</TableCell>
+                                                    <TableCell>{item.theoreticalQty.toFixed(4)}</TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            type="number"
+                                                            value={item.actualQty}
+                                                            onChange={(e) => {
+                                                                const newVal = parseFloat(e.target.value) || 0;
+                                                                setMaterialConsumption(prev =>
+                                                                    prev.map((m, i) => i === idx ? { ...m, actualQty: newVal } : m)
+                                                                );
+                                                            }}
+                                                            className="w-28"
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
                             <div className="grid gap-2">
                                 <Label htmlFor="warehouse">Almacén de Destino</Label>
                                 <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>

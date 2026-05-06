@@ -51,10 +51,10 @@ export const useProductionBatchesQuery = (orderId?: string) => {
 
 export const useUpdateProductionOrderStatusMutation = () => {
     return useMrpMutation<
-        { orderId: string; status: string; warehouseId?: string },
+        { orderId: string; status: string; warehouseId?: string; materialConsumption?: { rawMaterialId: string; actualQty: number }[] },
         ProductionOrder
     >(
-        async ({ orderId, status, warehouseId }) => mrpApi.updateProductionOrderStatus(orderId, status, warehouseId),
+        async ({ orderId, status, warehouseId, materialConsumption }) => mrpApi.updateProductionOrderStatus(orderId, status, warehouseId, materialConsumption),
         {
             onSuccess: async (order, input) => {
                 invalidateMrpQuery(mrpQueryKeys.productionOrder(order.id));

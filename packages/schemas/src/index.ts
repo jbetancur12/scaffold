@@ -634,9 +634,15 @@ export const AddSupplierMaterialSchema = z.object({
     price: z.number().min(0).optional(),
 });
 
+export const MaterialConsumptionItemSchema = z.object({
+    rawMaterialId: z.string().uuid(),
+    actualQty: z.number().positive(),
+});
+
 export const UpdateProductionOrderStatusSchema = z.object({
     status: z.nativeEnum(ProductionOrderStatus),
     warehouseId: z.string().uuid().optional(),
+    materialConsumption: z.array(MaterialConsumptionItemSchema).optional(),
 });
 
 export const UpsertProductionMaterialAllocationSchema = z.object({

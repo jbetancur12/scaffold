@@ -947,9 +947,9 @@ export class MrpController {
     async updateProductionOrderStatus(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
-            const { status, warehouseId } = UpdateProductionOrderStatusSchema.parse(req.body);
+            const { status, warehouseId, materialConsumption } = UpdateProductionOrderStatusSchema.parse(req.body);
             const actor = this.resolveActor(req);
-            const order = await this.productionService.updateStatus(id, status, warehouseId, actor);
+            const order = await this.productionService.updateStatus(id, status, warehouseId, actor, materialConsumption);
             return ApiResponse.success(res, order, 'Estado de orden actualizado');
         } catch (error) {
             next(error);

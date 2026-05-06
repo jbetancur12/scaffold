@@ -872,6 +872,10 @@ export const mrpApi = {
         const response = await api.post<MaterialRequirement[]>('/mrp/production-orders/simulate-requirements', payload);
         return response.data;
     },
+    calculateMaterialRequirements: async (orderId: string): Promise<MaterialRequirement[]> => {
+        const response = await api.get<MaterialRequirement[]>(`/mrp/production-orders/${orderId}/requirements`);
+        return response.data;
+    },
     calculateThreadConsumption: async (payload: CalculateThreadConsumptionPayload): Promise<ThreadConsumptionResult> => {
         const response = await api.post<ThreadConsumptionResult>('/mrp/thread-consumption/calculate', payload);
         return response.data;
@@ -907,8 +911,8 @@ export const mrpApi = {
             newLotBalance: number;
         };
     },
-    updateProductionOrderStatus: async (id: string, status: string, warehouseId?: string): Promise<ProductionOrder> => {
-        const response = await api.patch(`/mrp/production-orders/${id}/status`, { status, warehouseId });
+    updateProductionOrderStatus: async (id: string, status: string, warehouseId?: string, materialConsumption?: { rawMaterialId: string; actualQty: number }[]): Promise<ProductionOrder> => {
+        const response = await api.patch(`/mrp/production-orders/${id}/status`, { status, warehouseId, materialConsumption });
         return response.data;
     },
     listProductionBatches: async (orderId: string): Promise<ProductionBatch[]> => {
