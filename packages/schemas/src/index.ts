@@ -645,6 +645,21 @@ export const UpdateProductionOrderStatusSchema = z.object({
     materialConsumption: z.array(MaterialConsumptionItemSchema).optional(),
 });
 
+export const QuickCompleteProductionOrderSchema = z.object({
+    variantId: z.string().uuid().optional(),
+    partialQuantity: z.number().positive().optional(),
+    warehouseId: z.string().uuid().optional(),
+    materialConsumption: z.array(MaterialConsumptionItemSchema).optional(),
+}).superRefine((payload, ctx) => {
+    if (payload.partialQuantity !== undefined && !payload.variantId) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['variantId'],
+            message: 'La variante es obligatoria para un parcial rapido',
+        });
+    }
+});
+
 export const UpsertProductionMaterialAllocationSchema = z.object({
     rawMaterialId: z.string().uuid(),
     lotId: z.string().uuid().optional(),
@@ -1662,6 +1677,7 @@ type DateInputValue<T> = T extends Date
 
 // MRP/Quality API input contracts (schema-driven)
 export type CreateProductionBatchPayload = DateInputValue<z.input<typeof CreateProductionBatchSchema>>;
+export type QuickCompleteProductionOrderPayload = DateInputValue<z.input<typeof QuickCompleteProductionOrderSchema>>;
 export type UpsertProductionBatchPackagingFormPayload = DateInputValue<z.input<typeof UpsertProductionBatchPackagingFormSchema>>;
 export type UpsertProductionMaterialAllocationPayload = DateInputValue<z.input<typeof UpsertProductionMaterialAllocationSchema>>;
 export type ReturnProductionMaterialPayload = DateInputValue<z.input<typeof ReturnProductionMaterialSchema>>;

@@ -868,9 +868,6 @@ export class QualityPostmarketService {
                     { productionBatch: batchId, warehouse: { type: WarehouseType.FINISHED_GOODS } },
                     { populate: ['warehouse'], orderBy: { quantity: 'DESC' } }
                 );
-                if (rows.length === 0) {
-                    continue;
-                }
                 let remaining = Number(qty);
                 const totalAvailable = rows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
                 if (totalAvailable < remaining) {

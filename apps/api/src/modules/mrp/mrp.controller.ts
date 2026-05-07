@@ -62,6 +62,7 @@ import {
     ListRawMaterialsQuerySchema,
     AddSupplierMaterialSchema,
     UpdateProductionOrderStatusSchema,
+    QuickCompleteProductionOrderSchema,
     InventoryQuerySchema,
     InventoryKardexQuerySchema,
     FinishedGoodsLotInventoryQuerySchema,
@@ -956,6 +957,18 @@ export class MrpController {
         }
     }
 
+    async quickCompleteProductionOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const payload = QuickCompleteProductionOrderSchema.parse(req.body ?? {});
+            const actor = this.resolveActor(req);
+            const order = await this.productionService.quickComplete(id, payload, actor);
+            return ApiResponse.success(res, order, payload.partialQuantity ? 'Parcial enviado a bodega' : 'Orden finalizada rapido');
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async calculateMaterialRequirements(req: Request, res: Response, next: NextFunction) {
         try {
             const { id } = req.params;
@@ -1707,7 +1720,7 @@ export class MrpController {
             const payload = CustomerShippingLabelSchema.parse(req.body);
             const file = await this.customerShippingLabelPdfService.generateLabel(payload);
             res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename=\"${file.fileName}\"`);
+            res.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
             return res.send(file.buffer);
         } catch (error) {
             next(error);

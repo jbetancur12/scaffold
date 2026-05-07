@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { ProductionBatch, ProductionBatchUnit, ProductionOrder, UpsertProductionBatchFinishedInspectionFormPayload, UpsertProductionBatchPackagingFormPayload } from '@scaffold/types';
 import { MaterialRequirement, mrpApi } from '@/services/mrpApi';
-import { CreateProductionOrderDto, ReturnProductionMaterialPayload, SimulateProductionRequirementsPayload, UpsertProductionMaterialAllocationPayload } from '@scaffold/schemas';
+import { CreateProductionOrderDto, QuickCompleteProductionOrderPayload, ReturnProductionMaterialPayload, SimulateProductionRequirementsPayload, UpsertProductionMaterialAllocationPayload } from '@scaffold/schemas';
 import { mrpQueryKeys } from '@/hooks/mrpQueryKeys';
 import { invalidateMrpQueriesByPrefix, invalidateMrpQuery, useMrpMutation, useMrpQuery } from '@/hooks/useMrpQuery';
 
@@ -64,6 +64,26 @@ export const useUpdateProductionOrderStatusMutation = () => {
                 if (input.status === 'completed') {
                     invalidateMrpQueriesByPrefix(mrpQueryKeys.rawMaterials);
                 }
+            },
+        }
+    );
+};
+
+export const useQuickCompleteProductionOrderMutation = () => {
+    return useMrpMutation<
+        { orderId: string; payload: QuickCompleteProductionOrderPayload },
+        ProductionOrder
+    >(
+        async ({ orderId, payload }) => mrpApi.quickCompleteProductionOrder(orderId, payload),
+        {
+            onSuccess: async (order, input) => {
+                invalidateMrpQuery(mrpQueryKeys.productionOrder(order.id));
+                invalidateMrpQuery(mrpQueryKeys.productionRequirements(input.orderId));
+                invalidateMrpQuery(mrpQueryKeys.productionBatches(input.orderId));
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.productionOrders);
+                invalidateMrpQueriesByPrefix(mrpQueryKeys.rawMaterials);
+                invalidateMrpQueriesByPrefix('mrp.inventory');
+                invalidateMrpQueriesByPrefix('mrp.inventory-fg-lots');
             },
         }
     );

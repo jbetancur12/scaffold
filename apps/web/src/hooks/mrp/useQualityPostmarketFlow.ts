@@ -8,7 +8,7 @@ import {
     TechnovigilanceSeverity,
     TechnovigilanceStatus,
     TechnovigilanceReportChannel,
-    ProductionBatch,
+    FinishedGoodsLotInventory,
 } from '@scaffold/types';
 import { useToast } from '@/components/ui/use-toast';
 import { getErrorMessage } from '@/lib/api-error';
@@ -87,7 +87,7 @@ export const useQualityPostmarketFlow = () => {
         items: [{ productionBatchId: '', productionBatchUnitId: '', quantity: 1 }],
     });
     const [batchLookupQuery, setBatchLookupQuery] = useState('');
-    const [batchLookupResults, setBatchLookupResults] = useState<ProductionBatch[]>([]);
+    const [batchLookupResults, setBatchLookupResults] = useState<FinishedGoodsLotInventory[]>([]);
     const [loadingBatchLookup, setLoadingBatchLookup] = useState(false);
 
     const technovigilanceCases = technovigilanceData ?? [];
@@ -291,10 +291,14 @@ export const useQualityPostmarketFlow = () => {
         }
         try {
             setLoadingBatchLookup(true);
-            const rows = await mrpApi.lookupProductionBatches({ search, limit: 10 });
-            setBatchLookupResults(rows);
-            if (rows.length === 0) {
-                toast({ title: 'Sin resultados', description: 'No se encontraron lotes con ese criterio.' });
+            const result = await mrpApi.getFinishedGoodsLotInventory({
+                search,
+                limit: 10,
+                positiveOnly: true,
+            });
+            setBatchLookupResults(result.items);
+            if (result.items.length === 0) {
+                toast({ title: 'Sin resultados', description: 'No hay lotes con saldo disponible para ese criterio.' });
             }
         } catch (err) {
             toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo buscar lotes'), variant: 'destructive' });
@@ -303,8 +307,9 @@ export const useQualityPostmarketFlow = () => {
         }
     };
 
-    const applyBatchToShipmentItem = (index: number, batchId: string) => {
-        updateShipmentItem(index, 'productionBatchId', batchId);
+    const applyBatchToShipmentItem = (index: number, lotInventory: FinishedGoodsLotInventory) => {
+        updateShipmentItem(index, 'productionBatchId', lotInventory.productionBatchId);
+        updateShipmentItem(index, 'quantity', Math.min(1, Number(lotInventory.quantity || 0)));
     };
 
     const quickShowRecallAffectedCustomers = async (recallCaseId: string) => {

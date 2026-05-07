@@ -279,28 +279,21 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
                                 </div>
                                 {model.batchLookupResults.length > 0 && (
                                     <div className="space-y-2">
-                                        {model.batchLookupResults.map((batch) => (
-                                            <div key={batch.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
-                                                <span className="font-semibold text-slate-800">{batch.code}</span>
+                                        {model.batchLookupResults.map((lot) => (
+                                            <div key={lot.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs">
+                                                <span className="font-semibold text-slate-800">{lot.productionBatch?.code || lot.productionBatchId}</span>
                                                 <span className="text-slate-400">·</span>
                                                 <span className="text-slate-600">
-                                                    {(batch.variant?.product?.name || 'Producto')} {batch.variant?.name ? `— ${batch.variant?.name}` : ''}
+                                                    {(lot.productionBatch?.variant?.product?.name || 'Producto')} {lot.productionBatch?.variant?.name ? `— ${lot.productionBatch.variant.name}` : ''}
                                                 </span>
-                                                {batch.productionOrder?.code && (
-                                                    <>
-                                                        <span className="text-slate-400">·</span>
-                                                        <span className="text-slate-500">OP {batch.productionOrder.code}</span>
-                                                    </>
-                                                )}
+                                                <span className="font-semibold text-emerald-700">Disponible {Number(lot.quantity || 0)}</span>
                                                 <span className="text-slate-400">·</span>
-                                                <span className="text-slate-500">QC {batch.qcStatus}</span>
-                                                <span className="text-slate-400">·</span>
-                                                <span className="text-slate-500">Empaque {batch.packagingStatus}</span>
+                                                <span className="text-slate-500">{lot.warehouse?.name || 'Bodega PT'}</span>
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant="outline"
-                                                    onClick={() => model.applyBatchToShipmentItem(targetItemIndex, batch.id)}
+                                                    onClick={() => model.applyBatchToShipmentItem(targetItemIndex, lot)}
                                                     className="ml-auto rounded-xl h-7 text-xs border-slate-200"
                                                 >
                                                     Usar en ítem {targetItemIndex + 1}
@@ -320,12 +313,29 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
                                         <Plus className="mr-1 h-3.5 w-3.5" />Ítem
                                     </Button>
                                 </div>
-                                {model.shipmentForm.items.map((item, index) => (
-                                    <div key={`shipment-item-${index}`} className="grid grid-cols-1 md:grid-cols-4 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                                        <Input placeholder="UUID lote" value={item.productionBatchId}
-                                            onChange={(e) => model.updateShipmentItem(index, 'productionBatchId', e.target.value)}
-                                            className="h-9 rounded-xl border-slate-200 focus-visible:ring-violet-500 font-mono text-xs" />
-                                        <Input placeholder="UUID serial (opcional)" value={item.productionBatchUnitId}
+                                {model.shipmentForm.items.map((item, index) => {
+                                    const selectedLot = model.batchLookupResults.find((lot) => lot.productionBatchId === item.productionBatchId);
+                                    return (
+                                    <div key={`shipment-item-${index}`} className="grid grid-cols-1 md:grid-cols-5 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                                        <div className="md:col-span-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs min-h-9">
+                                            {selectedLot ? (
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <span className="font-semibold text-slate-900">{selectedLot.productionBatch?.code || selectedLot.productionBatchId}</span>
+                                                    <span className="text-slate-400">·</span>
+                                                    <span className="text-slate-600">
+                                                        {selectedLot.productionBatch?.variant?.product?.name || 'Producto'}
+                                                        {selectedLot.productionBatch?.variant?.name ? ` — ${selectedLot.productionBatch.variant.name}` : ''}
+                                                    </span>
+                                                    <span className="text-slate-400">·</span>
+                                                    <span className="font-semibold text-emerald-700">Disp. {Number(selectedLot.quantity || 0)}</span>
+                                                </div>
+                                            ) : item.productionBatchId ? (
+                                                <span className="font-mono text-slate-500">{item.productionBatchId}</span>
+                                            ) : (
+                                                <span className="text-slate-400">Selecciona un lote desde Buscar lote</span>
+                                            )}
+                                        </div>
+                                        <Input placeholder="Serial opcional" value={item.productionBatchUnitId}
                                             onChange={(e) => model.updateShipmentItem(index, 'productionBatchUnitId', e.target.value)}
                                             className="h-9 rounded-xl border-slate-200 focus-visible:ring-violet-500 font-mono text-xs" />
                                         <Input type="number" min={0.0001} step={0.0001} placeholder="Cantidad"
@@ -339,7 +349,8 @@ export function QualityShipmentTab({ model }: { model: QualityComplianceModel })
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             <div className="flex justify-end gap-2">

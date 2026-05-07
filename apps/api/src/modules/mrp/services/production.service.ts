@@ -2,6 +2,7 @@ import { EntityManager, EntityRepository } from '@mikro-orm/core';
 import {
     ChangeControlStatus,
     ChangeImpactLevel,
+    DocumentApprovalMethod,
     DocumentCategory,
     DocumentProcess,
     DocumentStatus,
@@ -12,6 +13,8 @@ import {
     ProductionOrderStatus,
     SalesOrderStatus,
     BatchReleaseStatus,
+    RegulatoryCodingStandard,
+    RegulatoryDeviceType,
     RegulatoryLabelScopeType,
     RegulatoryLabelStatus,
     WarehouseType,
@@ -41,7 +44,7 @@ import { SalesOrder } from '../entities/sales-order.entity';
 import { BOMItem } from '../entities/bom-item.entity';
 import { RawMaterialSpecification } from '../entities/raw-material-specification.entity';
 import { DocumentControlService } from './document-control.service';
-import { ProductionOrderSchema, ProductionOrderItemCreateSchema, ReturnProductionMaterialSchema, SimulateProductionRequirementsSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
+import { ProductionOrderSchema, ProductionOrderItemCreateSchema, QuickCompleteProductionOrderSchema, ReturnProductionMaterialSchema, SimulateProductionRequirementsSchema, UpsertProductionMaterialAllocationSchema } from '@scaffold/schemas';
 import { z } from 'zod';
 import { AppError } from '../../../shared/utils/response';
 
@@ -85,12 +88,13 @@ export class ProductionService {
         return `V${markerNumber}`;
     }
 
-    private async generateAutoBatchCode(order: ProductionOrder, variantId: string) {
+    private async generateAutoBatchCode(order: ProductionOrder, variantId: string, em?: EntityManager) {
         const dateToken = this.formatBatchDateToken();
         const variantMarker = this.getVariantMarker(order, variantId);
         const prefix = `${dateToken}-${variantMarker}-`;
 
-        const existing = await this.batchRepo.find(
+        const repo = em ? em.getRepository(ProductionBatch) : this.batchRepo;
+        const existing = await repo.find(
             { code: { $ilike: `${prefix}%` } },
             { orderBy: { createdAt: 'DESC' } }
         );
@@ -500,7 +504,8 @@ export class ProductionService {
         actor?: string
     ): Promise<ProductionOrder> {
         // Ensure dates are properly instantiated as Date objects and handle potential string inputs
-        const orderData = { ...data };
+        const productionOrderData = data as z.infer<typeof ProductionOrderSchema> & { salesOrderId?: string };
+        const orderData = { ...productionOrderData };
         if (!orderData.code?.trim()) {
             orderData.code = await this.generateNextOrderCode();
         }
@@ -528,8 +533,8 @@ export class ProductionService {
 
         const order = this.productionOrderRepo.create(orderData as unknown as ProductionOrder);
 
-        if ((data as any).salesOrderId) {
-            order.salesOrder = this.em.getReference(SalesOrder, (data as any).salesOrderId);
+        if (productionOrderData.salesOrderId) {
+            order.salesOrder = this.em.getReference(SalesOrder, productionOrderData.salesOrderId);
         }
 
         for (const itemData of itemsData) {
@@ -1300,11 +1305,310 @@ export class ProductionService {
         });
     }
 
+    private async resolveFinishedGoodsWarehouse(tx: EntityManager, warehouseId?: string) {
+        const warehouseRepo = tx.getRepository(Warehouse);
+        let warehouse: Warehouse | null = null;
+        if (warehouseId) {
+            warehouse = await warehouseRepo.findOne({ id: warehouseId });
+            if (!warehouse) throw new AppError('La bodega de destino no existe', 404);
+            if (warehouse.type !== WarehouseType.FINISHED_GOODS) {
+                throw new AppError('La bodega seleccionada debe ser de producto terminado', 400);
+            }
+        }
+        if (!warehouse) warehouse = await warehouseRepo.findOne({ type: WarehouseType.FINISHED_GOODS });
+        if (!warehouse) {
+            warehouse = warehouseRepo.create({
+                name: 'Bodega de Producto Terminado',
+                location: 'Default',
+                type: WarehouseType.FINISHED_GOODS,
+            } as Warehouse);
+            tx.persist(warehouse);
+        }
+        return warehouse;
+    }
+
+    private async createQuickReadyBatch(tx: EntityManager, order: ProductionOrder, item: ProductionOrderItem, quantity: number, actor?: string) {
+        const batchRepo = tx.getRepository(ProductionBatch);
+        const releaseRepo = tx.getRepository(BatchRelease);
+        const code = await this.generateAutoBatchCode(order, item.variant.id, tx);
+        if (await batchRepo.findOne({ code })) {
+            throw new AppError('No se pudo generar un lote unico para el completado rapido', 409);
+        }
+
+        const now = new Date();
+        const batch = batchRepo.create({
+            productionOrder: order,
+            variant: item.variant,
+            code,
+            plannedQty: quantity,
+            producedQty: quantity,
+            notes: 'Lote generado por completado rapido',
+            qcStatus: ProductionBatchQcStatus.PASSED,
+            finishedInspectionStatus: ProductionBatchFinishedInspectionStatus.PASSED,
+            packagingStatus: ProductionBatchPackagingStatus.PACKED,
+            status: ProductionBatchStatus.READY,
+            finishedInspectionFormCompleted: true,
+            finishedInspectionFormFilledBy: actor || 'sistema-web',
+            finishedInspectionFormFilledAt: now,
+            finishedInspectionFormData: {
+                inspectorName: actor || 'sistema-web',
+                verifierName: actor || 'sistema-web',
+                quantityInspected: quantity,
+                quantityApproved: quantity,
+                quantityRejected: 0,
+                sizeCheck: true,
+                stitchingCheck: true,
+                visualCheck: true,
+                labelingCheck: true,
+                productMatchesOrder: true,
+                observations: 'Autoaprobado por completado rapido',
+            },
+            packagingFormCompleted: true,
+            packagingFormFilledBy: actor || 'sistema-web',
+            packagingFormFilledAt: now,
+            packagingFormData: {
+                operatorName: actor || 'sistema-web',
+                verifierName: actor || 'sistema-web',
+                quantityToPack: quantity,
+                quantityPacked: quantity,
+                lotLabel: code,
+                hasTechnicalSheet: true,
+                hasLabels: true,
+                hasPackagingMaterial: true,
+                hasTools: true,
+                inventoryRecorded: true,
+                observations: 'Autoempacado por completado rapido',
+            },
+        } as unknown as ProductionBatch);
+
+        const release = releaseRepo.create({
+            productionBatch: batch,
+            status: BatchReleaseStatus.LIBERADO_QA,
+            qcApproved: true,
+            labelingValidated: true,
+            documentsCurrent: true,
+            evidencesComplete: true,
+            checklistNotes: 'Liberacion automatica por completado rapido',
+            signedBy: actor || 'sistema-web',
+            approvalMethod: DocumentApprovalMethod.FIRMA_DIGITAL,
+            approvalSignature: 'quick-complete',
+            signedAt: now,
+            reviewedBy: actor || 'sistema-web',
+        } as unknown as BatchRelease);
+
+        tx.persist([batch, release]);
+        await this.ensureQuickRegulatoryLotLabel(tx, batch, actor);
+        await this.logAudit('production_batch', batch.id, 'quick_ready_created', {
+            orderId: order.id,
+            code: batch.code,
+            quantity,
+        }, actor);
+        return batch;
+    }
+
+    private async markBatchQuickReady(tx: EntityManager, batch: ProductionBatch, actor?: string) {
+        const releaseRepo = tx.getRepository(BatchRelease);
+        const quantity = Number(batch.producedQty || batch.plannedQty || 0);
+        const now = new Date();
+        batch.producedQty = quantity;
+        batch.qcStatus = ProductionBatchQcStatus.PASSED;
+        batch.finishedInspectionStatus = ProductionBatchFinishedInspectionStatus.PASSED;
+        batch.packagingStatus = ProductionBatchPackagingStatus.PACKED;
+        batch.status = ProductionBatchStatus.READY;
+        batch.finishedInspectionFormCompleted = true;
+        batch.finishedInspectionFormFilledBy = batch.finishedInspectionFormFilledBy || actor || 'sistema-web';
+        batch.finishedInspectionFormFilledAt = batch.finishedInspectionFormFilledAt || now;
+        batch.finishedInspectionFormData = batch.finishedInspectionFormData || {
+            inspectorName: actor || 'sistema-web',
+            verifierName: actor || 'sistema-web',
+            quantityInspected: quantity,
+            quantityApproved: quantity,
+            quantityRejected: 0,
+            sizeCheck: true,
+            stitchingCheck: true,
+            visualCheck: true,
+            labelingCheck: true,
+            productMatchesOrder: true,
+            observations: 'Autoaprobado por finalizacion rapida',
+        };
+        batch.packagingFormCompleted = true;
+        batch.packagingFormFilledBy = batch.packagingFormFilledBy || actor || 'sistema-web';
+        batch.packagingFormFilledAt = batch.packagingFormFilledAt || now;
+        batch.packagingFormData = batch.packagingFormData || {
+            operatorName: actor || 'sistema-web',
+            verifierName: actor || 'sistema-web',
+            quantityToPack: quantity,
+            quantityPacked: quantity,
+            lotLabel: batch.code,
+            hasTechnicalSheet: true,
+            hasLabels: true,
+            hasPackagingMaterial: true,
+            hasTools: true,
+            inventoryRecorded: true,
+            observations: 'Autoempacado por finalizacion rapida',
+        };
+
+        let release = await releaseRepo.findOne({ productionBatch: batch.id });
+        if (!release) release = releaseRepo.create({ productionBatch: batch } as unknown as BatchRelease);
+        release.status = BatchReleaseStatus.LIBERADO_QA;
+        release.qcApproved = true;
+        release.labelingValidated = true;
+        release.documentsCurrent = true;
+        release.evidencesComplete = true;
+        release.checklistNotes = release.checklistNotes || 'Liberacion automatica por finalizacion rapida';
+        release.rejectedReason = undefined;
+        release.signedBy = release.signedBy || actor || 'sistema-web';
+        release.approvalMethod = release.approvalMethod || DocumentApprovalMethod.FIRMA_DIGITAL;
+        release.approvalSignature = release.approvalSignature || 'quick-complete';
+        release.signedAt = release.signedAt || now;
+        release.reviewedBy = release.reviewedBy || actor || 'sistema-web';
+        tx.persist([batch, release]);
+        await this.ensureQuickRegulatoryLotLabel(tx, batch, actor);
+    }
+
+    private async ensureQuickRegulatoryLotLabel(tx: EntityManager, batch: ProductionBatch, actor?: string) {
+        const labelRepo = tx.getRepository(RegulatoryLabel);
+        const product = batch.variant.product;
+        const registration = product?.invimaRegistration;
+        let label = await labelRepo.findOne({
+            productionBatch: batch.id,
+            scopeType: RegulatoryLabelScopeType.LOTE,
+            productionBatchUnit: null,
+        });
+        if (!label) {
+            label = labelRepo.create({
+                productionBatch: batch,
+                productionBatchUnit: null,
+                scopeType: RegulatoryLabelScopeType.LOTE,
+                createdBy: actor || 'sistema-web',
+            } as unknown as RegulatoryLabel);
+        }
+
+        label.status = RegulatoryLabelStatus.VALIDADA;
+        label.deviceType = RegulatoryDeviceType.CLASE_I;
+        label.codingStandard = RegulatoryCodingStandard.INTERNO;
+        label.productName = product?.name || batch.variant.name || batch.variant.sku || 'Producto';
+        label.manufacturerName = registration?.manufacturerName || registration?.holderName || 'Fabricante no definido';
+        label.invimaRegistration = registration?.code || 'NO_REQUIERE_INVIMA';
+        label.lotCode = batch.code;
+        label.serialCode = undefined;
+        label.manufactureDate = new Date();
+        label.expirationDate = undefined;
+        label.gtin = undefined;
+        label.udiDi = undefined;
+        label.udiPi = undefined;
+        label.internalCode = batch.code;
+        label.codingValue = batch.code;
+        label.validationErrors = [];
+        tx.persist(label);
+    }
+
+    private async incrementFinishedGoodsInventory(tx: EntityManager, batch: ProductionBatch, warehouse: Warehouse, quantity: number) {
+        const lotInventoryRepo = tx.getRepository(FinishedGoodsLotInventory);
+        const inventoryRepo = tx.getRepository(InventoryItem);
+        let lotInventory = await lotInventoryRepo.findOne({ productionBatch: batch.id, warehouse: warehouse.id });
+        if (lotInventory) {
+            lotInventory.quantity = Number(lotInventory.quantity || 0) + Number(quantity);
+        } else {
+            lotInventory = lotInventoryRepo.create({ productionBatch: batch, warehouse, quantity } as unknown as FinishedGoodsLotInventory);
+        }
+        tx.persist(lotInventory);
+
+        let inventoryItem = await inventoryRepo.findOne({ variant: batch.variant.id, warehouse: warehouse.id });
+        if (inventoryItem) {
+            inventoryItem.quantity = Number(inventoryItem.quantity || 0) + Number(quantity);
+            inventoryItem.lastUpdated = new Date();
+        } else {
+            inventoryItem = inventoryRepo.create({
+                variant: batch.variant,
+                warehouse,
+                quantity,
+                lastUpdated: new Date(),
+            } as unknown as InventoryItem);
+        }
+        tx.persist(inventoryItem);
+    }
+
+    async quickComplete(id: string, payload: z.infer<typeof QuickCompleteProductionOrderSchema>, actor?: string): Promise<ProductionOrder> {
+        if (payload.partialQuantity !== undefined) {
+            return this.em.transactional(async (tx) => {
+                const orderRepo = tx.getRepository(ProductionOrder);
+                const order = await orderRepo.findOneOrFail(
+                    { id },
+                    { populate: ['items', 'items.variant', 'items.variant.product', 'items.variant.product.invimaRegistration', 'salesOrder'] }
+                );
+                if (order.status !== ProductionOrderStatus.IN_PROGRESS) {
+                    throw new AppError('El parcial rapido solo aplica a OP en progreso', 400);
+                }
+                const item = order.items.getItems().find((row) => row.variant.id === payload.variantId);
+                if (!item) throw new AppError('La variante no pertenece a la orden', 400);
+
+                const quantity = Number(payload.partialQuantity || 0);
+                const pending = Number(item.quantity || 0) - Number(item.producedQuantity || 0);
+                if (quantity <= 0) throw new AppError('La cantidad parcial debe ser mayor a 0', 400);
+                if (quantity > pending) throw new AppError(`La cantidad parcial supera lo pendiente (${pending})`, 400);
+
+                const warehouse = await this.resolveFinishedGoodsWarehouse(tx, payload.warehouseId);
+                const batch = await this.createQuickReadyBatch(tx, order, item, quantity, actor);
+                await this.incrementFinishedGoodsInventory(tx, batch, warehouse, quantity);
+                item.producedQuantity = Number(item.producedQuantity || 0) + quantity;
+                tx.persist(item);
+                if (order.salesOrder) await this.syncSalesOrderStatus(order.salesOrder.id, tx);
+                await tx.flush();
+                await this.logAudit('production_order', order.id, 'quick_partial_completed', {
+                    variantId: item.variant.id,
+                    quantity,
+                    batchCode: batch.code,
+                    warehouseId: warehouse.id,
+                }, actor);
+                return orderRepo.findOneOrFail({ id }, { populate: ['items', 'items.variant', 'items.variant.product', 'batches', 'batches.variant', 'salesOrder'] });
+            });
+        }
+
+        await this.em.transactional(async (tx) => {
+            const orderRepo = tx.getRepository(ProductionOrder);
+            const order = await orderRepo.findOneOrFail(
+                { id },
+                { populate: ['items', 'items.variant', 'items.variant.product', 'items.variant.product.invimaRegistration', 'batches', 'batches.variant', 'batches.variant.product', 'batches.variant.product.invimaRegistration', 'batches.units', 'salesOrder'] }
+            );
+            if (order.status !== ProductionOrderStatus.IN_PROGRESS) {
+                throw new AppError('La finalizacion rapida solo aplica a OP en progreso', 400);
+            }
+            await this.assertNoBlockingCriticalChanges(order.id);
+
+            for (const item of order.items.getItems()) {
+                const target = Number(item.quantity || 0);
+                const related = order.batches.getItems().filter((batch) => batch.variant.id === item.variant.id);
+                const existingQty = related.reduce((sum, batch) => {
+                    const units = batch.units.getItems();
+                    if (units.length > 0) return sum + units.filter((unit) => !unit.rejected && unit.packaged).length;
+                    return sum + Number(batch.producedQty || batch.plannedQty || 0);
+                }, 0);
+                if (existingQty > target) {
+                    throw new AppError(`Los lotes existentes para ${item.variant.name || item.variant.sku} superan la cantidad de la OP`, 400);
+                }
+                if (existingQty < target) {
+                    const pending = Number((target - existingQty).toFixed(4));
+                    const batch = await this.createQuickReadyBatch(tx, order, item, pending, actor);
+                    order.batches.add(batch);
+                    related.push(batch);
+                }
+                for (const batch of related) {
+                    await this.markBatchQuickReady(tx, batch, actor);
+                }
+                item.producedQuantity = target;
+                tx.persist(item);
+            }
+            await tx.flush();
+        });
+
+        return this.updateStatus(id, ProductionOrderStatus.COMPLETED, payload.warehouseId, actor, payload.materialConsumption);
+    }
+
     async updateStatus(id: string, status: ProductionOrderStatus, warehouseId?: string, actor?: string, materialConsumption?: { rawMaterialId: string; actualQty: number }[]): Promise<ProductionOrder> {
         return this.em.transactional(async (tx) => {
             const productionOrderRepo = tx.getRepository(ProductionOrder);
             const inventoryRepo = tx.getRepository(InventoryItem);
-            const warehouseRepo = tx.getRepository(Warehouse);
             const order = await productionOrderRepo.findOneOrFail(
                 { id },
                 { populate: ['items', 'items.variant', 'items.variant.bomItems', 'items.variant.bomItems.rawMaterial', 'items.variant.bomItems.rawMaterialSpecification', 'batches', 'batches.units', 'salesOrder'] }
@@ -1667,44 +1971,34 @@ export class ProductionService {
                     }
                 }
 
-                // Get or create warehouse for finished goods
-                let warehouse: Warehouse | null = null;
-                if (warehouseId) {
-                    warehouse = await warehouseRepo.findOne({ id: warehouseId });
-                }
-
-                if (!warehouse) {
-                    warehouse = await warehouseRepo.findOne({ type: WarehouseType.FINISHED_GOODS });
-                }
-
-                if (!warehouse) {
-                    warehouse = warehouseRepo.create({
-                        name: 'Bodega de Producto Terminado',
-                        location: 'Default',
-                        type: WarehouseType.FINISHED_GOODS
-                    } as Warehouse);
-                    tx.persist(warehouse);
-                }
+                const warehouse = await this.resolveFinishedGoodsWarehouse(tx, warehouseId);
 
                 const lotInventoryRepo = tx.getRepository(FinishedGoodsLotInventory);
+                const stockedByVariant = new Map<string, number>();
                 for (const batch of batches) {
                     const completedQty = batchCompletedQuantities.get(batch.id) || 0;
                     const dispatchedQty = dispatchedByBatch.get(batch.id) || 0;
                     const netQty = Math.max(0, Number(completedQty) - Number(dispatchedQty));
                     if (netQty <= 0) continue;
 
+                    const existingLotInventories = await lotInventoryRepo.find({ productionBatch: batch.id });
+                    const alreadyStocked = existingLotInventories.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+                    stockedByVariant.set(batch.variant.id, Number(stockedByVariant.get(batch.variant.id) || 0) + alreadyStocked);
+
                     let lotInventory = await lotInventoryRepo.findOne({
                         productionBatch: batch.id,
                         warehouse
                     });
+                    const deltaQty = Math.max(0, Number(netQty) - Number(alreadyStocked));
+                    if (deltaQty <= 0) continue;
                     if (lotInventory) {
-                        lotInventory.quantity = Number(lotInventory.quantity) + Number(netQty);
+                        lotInventory.quantity = Number(lotInventory.quantity || 0) + deltaQty;
                     } else {
                         lotInventory = lotInventoryRepo.create({
                             productionBatch: batch,
                             warehouse,
-                            quantity: netQty
-                        } as any);
+                            quantity: deltaQty
+                        } as unknown as FinishedGoodsLotInventory);
                     }
                     tx.persist(lotInventory);
                 }
@@ -1712,7 +2006,8 @@ export class ProductionService {
                 for (const item of order.items) {
                     const completedQty = variantQuantities.get(item.variant.id) ?? item.quantity;
                     const dispatchedQty = dispatchedByVariant.get(item.variant.id) || 0;
-                    const netQty = Math.max(0, Number(completedQty) - Number(dispatchedQty));
+                    const alreadyStocked = stockedByVariant.get(item.variant.id) || 0;
+                    const netQty = Math.max(0, Number(completedQty) - Number(dispatchedQty) - Number(alreadyStocked));
                     if (netQty <= 0) {
                         continue;
                     }

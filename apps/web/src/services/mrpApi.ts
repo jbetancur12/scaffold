@@ -171,6 +171,7 @@ import type {
     ConvertQuotationPayload,
     UpsertProductionMaterialAllocationPayload,
     ReturnProductionMaterialPayload,
+    QuickCompleteProductionOrderPayload,
     ProductCsvImportPayload,
     SupplierCsvImportPayload,
     CustomerCsvImportPayload,
@@ -915,6 +916,10 @@ export const mrpApi = {
         const response = await api.patch(`/mrp/production-orders/${id}/status`, { status, warehouseId, materialConsumption });
         return response.data;
     },
+    quickCompleteProductionOrder: async (id: string, payload: QuickCompleteProductionOrderPayload): Promise<ProductionOrder> => {
+        const response = await api.post(`/mrp/production-orders/${id}/quick-complete`, payload);
+        return response.data;
+    },
     listProductionBatches: async (orderId: string): Promise<ProductionBatch[]> => {
         const response = await api.get<ProductionBatch[]>(`/mrp/production-orders/${orderId}/batches`);
         return response.data;
@@ -1121,7 +1126,7 @@ export const mrpApi = {
     },
     createEquipmentCalibration: async (
         equipmentId: string,
-        data: Record<string, any> & { result?: EquipmentCalibrationResult }
+        data: Record<string, unknown> & { result?: EquipmentCalibrationResult }
     ): Promise<EquipmentCalibration> => {
         const response = await api.post<EquipmentCalibration>(`/mrp/quality/equipment/${equipmentId}/calibrations`, data);
         return response.data;

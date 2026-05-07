@@ -85,6 +85,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.get('/production-orders', (req, res, next) => mrpController.listProductionOrders(req, res, next));
     router.get('/production-orders/:id', (req, res, next) => mrpController.getProductionOrder(req, res, next));
     router.patch('/production-orders/:id/status', (req, res, next) => mrpController.updateProductionOrderStatus(req, res, next));
+    router.post('/production-orders/:id/quick-complete', (req, res, next) => mrpController.quickCompleteProductionOrder(req, res, next));
     router.patch('/production-orders/:id/link-sales-order', (req, res, next) => mrpController.linkProductionToSalesOrder(req, res, next));
     router.post('/production-orders', (req, res, next) => mrpController.createProductionOrder(req, res, next));
     router.post('/production-orders/simulate-requirements', (req, res, next) => mrpController.simulateMaterialRequirements(req, res, next));

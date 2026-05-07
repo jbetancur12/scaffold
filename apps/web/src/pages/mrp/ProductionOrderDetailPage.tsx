@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2, Factory, FileText, Package, Layers, AlertTriangle, TrendingDown, Boxes, Save, ChevronDown, ChevronUp, ExternalLink, Receipt } from 'lucide-react';
+import { ArrowLeft, Printer, Play, CheckCircle, Truck, Loader2, Factory, FileText, Package, Layers, AlertTriangle, TrendingDown, Boxes, Save, ChevronDown, ChevronUp, ExternalLink, Receipt, Send, Zap } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { ProductionRequirementsTable } from '@/components/mrp/ProductionRequirementsTable';
 import {
@@ -60,6 +60,7 @@ import {
     useProductionBatchesQuery,
     useProductionOrderQuery,
     useProductionRequirementsQuery,
+    useQuickCompleteProductionOrderMutation,
     useReturnProductionMaterialMutation,
     useUpdateProductionBatchPackagingMutation,
     useUpdateProductionBatchQcMutation,
@@ -79,6 +80,10 @@ export default function ProductionOrderDetailPage() {
     // Warehouse selection for completion
     const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
     const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+    const [isQuickTotalDialogOpen, setIsQuickTotalDialogOpen] = useState(false);
+    const [isQuickPartialDialogOpen, setIsQuickPartialDialogOpen] = useState(false);
+    const [quickPartialVariantId, setQuickPartialVariantId] = useState<string>('');
+    const [quickPartialQuantity, setQuickPartialQuantity] = useState<string>('');
     const [materialConsumption, setMaterialConsumption] = useState<{ rawMaterialId: string; actualQty: number; theoreticalQty: number; name: string }[]>([]);
     const [showItemsToProduce, setShowItemsToProduce] = useState(true);
     const [newBatchVariantId, setNewBatchVariantId] = useState<string>('');
@@ -156,15 +161,16 @@ export default function ProductionOrderDetailPage() {
     const { data: batchesData, error: batchesError, execute: reloadBatches } = useProductionBatchesQuery(id);
     const { data: warehousesData, error: warehousesError } = useWarehousesQuery();
     const { data: operationalConfig } = useOperationalConfigQuery();
-    const requirements = requirementsData ?? [];
-    const batches = batchesData ?? [];
-    const warehouses = warehousesData ?? [];
+    const requirements = useMemo(() => requirementsData ?? [], [requirementsData]);
+    const batches = useMemo(() => batchesData ?? [], [batchesData]);
+    const warehouses = useMemo(() => warehousesData ?? [], [warehousesData]);
     const isSerialMode = operationalConfig?.operationMode === 'serial';
     const defaultPackagingDocCode = operationalConfig?.defaultPackagingControlledDocumentCode || undefined;
     const defaultFinishedInspectionDocCode = operationalConfig?.defaultFinishedInspectionControlledDocumentCode || undefined;
     const defaultLabelingDocCode = operationalConfig?.defaultLabelingControlledDocumentCode || undefined;
     const defaultBatchReleaseDocCode = operationalConfig?.defaultBatchReleaseControlledDocumentCode || undefined;
     const { execute: updateOrderStatus, loading: submitting } = useUpdateProductionOrderStatusMutation();
+    const { execute: quickCompleteOrder, loading: quickCompleting } = useQuickCompleteProductionOrderMutation();
     const { execute: createBatch, loading: creatingBatch } = useCreateProductionBatchMutation();
     const { execute: addBatchUnits } = useAddProductionBatchUnitsMutation();
     const { execute: updateBatchQc } = useUpdateProductionBatchQcMutation();
@@ -244,6 +250,96 @@ export default function ProductionOrderDetailPage() {
                 title: "Error",
                 description: getErrorMessage(error, 'No se pudieron cargar los requerimientos'),
                 variant: "destructive"
+            });
+        }
+    };
+
+    const handleOpenQuickTotalDialog = async () => {
+        if (!order) return;
+        try {
+            const requirements = await mrpApi.calculateMaterialRequirements(order.id);
+            setMaterialConsumption(
+                requirements.map(req => ({
+                    rawMaterialId: req.material.id,
+                    actualQty: Number(req.required),
+                    theoreticalQty: Number(req.required),
+                    name: req.material.name
+                }))
+            );
+            setIsQuickTotalDialogOpen(true);
+        } catch (error) {
+            toast({
+                title: "Error",
+                description: getErrorMessage(error, 'No se pudieron cargar los requerimientos'),
+                variant: "destructive"
+            });
+        }
+    };
+
+    const handleOpenQuickPartialDialog = () => {
+        const firstPending = order?.items?.find(item => Number(item.quantity || 0) - Number(item.producedQuantity || 0) > 0);
+        setQuickPartialVariantId(firstPending?.variantId || firstPending?.variant?.id || '');
+        setQuickPartialQuantity('');
+        setIsQuickPartialDialogOpen(true);
+    };
+
+    const handleQuickPartial = async () => {
+        if (!order) return;
+        const quantity = Number(quickPartialQuantity);
+        if (!quickPartialVariantId || !Number.isFinite(quantity) || quantity <= 0) {
+            toast({
+                title: 'Datos incompletos',
+                description: 'Selecciona una variante y una cantidad mayor a cero.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        try {
+            await quickCompleteOrder({
+                orderId: order.id,
+                payload: {
+                    variantId: quickPartialVariantId,
+                    partialQuantity: quantity,
+                    warehouseId: selectedWarehouseId || undefined,
+                },
+            });
+            toast({ title: 'Parcial enviado', description: 'El lote fue generado y enviado a bodega.' });
+            setIsQuickPartialDialogOpen(false);
+            setQuickPartialQuantity('');
+            await reloadOrder({ force: true });
+            await reloadBatches({ force: true });
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo enviar el parcial a bodega'),
+                variant: 'destructive',
+            });
+        }
+    };
+
+    const handleQuickTotal = async () => {
+        if (!order) return;
+        try {
+            await quickCompleteOrder({
+                orderId: order.id,
+                payload: {
+                    warehouseId: selectedWarehouseId || undefined,
+                    materialConsumption: materialConsumption.map(m => ({
+                        rawMaterialId: m.rawMaterialId,
+                        actualQty: m.actualQty
+                    })),
+                },
+            });
+            toast({ title: 'Orden finalizada rápido', description: 'La OP fue cerrada y el inventario quedó actualizado.' });
+            setIsQuickTotalDialogOpen(false);
+            await reloadOrder({ force: true });
+            await reloadBatches({ force: true });
+        } catch (error) {
+            toast({
+                title: 'Error',
+                description: getErrorMessage(error, 'No se pudo finalizar rápido la orden'),
+                variant: 'destructive',
             });
         }
     };
@@ -967,6 +1063,11 @@ export default function ProductionOrderDetailPage() {
         return <div className="p-8 text-slate-500 italic">Orden no encontrada</div>;
     }
 
+    const quickPartialItems = order.items ?? [];
+    const quickPartialSelectedItem = quickPartialItems.find((item) => (item.variantId || item.variant?.id) === quickPartialVariantId);
+    const quickPartialPending = quickPartialSelectedItem
+        ? Math.max(0, Number(quickPartialSelectedItem.quantity || 0) - Number(quickPartialSelectedItem.producedQuantity || 0))
+        : 0;
     const lotExecutionEnabled = order.status === ProductionOrderStatus.IN_PROGRESS;
     const lotExecutionDisabledReason = 'Debes planificar e iniciar la orden para ejecutar QC y empaque.';
     const activeLotBatch = lotCenterBatchId ? batches.find((b) => b.id === lotCenterBatchId) : undefined;
@@ -1156,10 +1257,20 @@ export default function ProductionOrderDetailPage() {
                                         </Button>
                                     )}
                                     {order.status === ProductionOrderStatus.IN_PROGRESS && (
-                                        <Button onClick={() => handleStatusChange(ProductionOrderStatus.COMPLETED)} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium h-10 px-5">
-                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                            Finalizar
-                                        </Button>
+                                        <>
+                                            <Button onClick={handleOpenQuickPartialDialog} variant="outline" className="border-sky-200 text-sky-700 hover:bg-sky-50 rounded-xl font-medium h-10 px-4">
+                                                <Send className="mr-2 h-4 w-4" />
+                                                Parcial rápido
+                                            </Button>
+                                            <Button onClick={handleOpenQuickTotalDialog} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium h-10 px-4">
+                                                <Zap className="mr-2 h-4 w-4" />
+                                                Finalizar rápido
+                                            </Button>
+                                            <Button onClick={() => handleStatusChange(ProductionOrderStatus.COMPLETED)} variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 rounded-xl font-medium h-10 px-4">
+                                                <CheckCircle className="mr-2 h-4 w-4" />
+                                                Finalizar
+                                            </Button>
+                                        </>
                                     )}
                                     <Button variant="outline" size="icon" className="rounded-xl border-slate-200 h-10 w-10">
                                         <Printer className="h-4 w-4" />
@@ -1284,7 +1395,7 @@ export default function ProductionOrderDetailPage() {
                                 {!lotExecutionEnabled ? (
                                     <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                                         <AlertTriangle className="h-4 w-4 shrink-0" />
-                                        QC y empaque se habilitan cuando la orden esté en "En Progreso".
+                                        QC y empaque se habilitan cuando la orden esté en &quot;En Progreso&quot;.
                                     </div>
                                 ) : null}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
@@ -2433,6 +2544,164 @@ export default function ProductionOrderDetailPage() {
                                         <Save className="mr-2 h-4 w-4" />
                                         Guardar FOR
                                     </>
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={isQuickPartialDialogOpen} onOpenChange={setIsQuickPartialDialogOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Parcial rápido a bodega</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="quick-partial-variant">Variante</Label>
+                                <Select value={quickPartialVariantId} onValueChange={(value) => {
+                                    setQuickPartialVariantId(value);
+                                    setQuickPartialQuantity('');
+                                }}>
+                                    <SelectTrigger id="quick-partial-variant">
+                                        <SelectValue placeholder="Seleccionar variante" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {quickPartialItems.map((item) => {
+                                            const variantId = item.variantId || item.variant?.id || '';
+                                            const pending = Math.max(0, Number(item.quantity || 0) - Number(item.producedQuantity || 0));
+                                            return (
+                                                <SelectItem key={item.id} value={variantId} disabled={pending <= 0}>
+                                                    {item.variant?.product?.name || 'Producto'} / {item.variant?.name || item.variant?.sku || 'Variante'} · Pendiente {pending}
+                                                </SelectItem>
+                                            );
+                                        })}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="quick-partial-qty">Cantidad a enviar</Label>
+                                <Input
+                                    id="quick-partial-qty"
+                                    type="number"
+                                    min="0"
+                                    max={quickPartialPending || undefined}
+                                    value={quickPartialQuantity}
+                                    onChange={(e) => setQuickPartialQuantity(e.target.value)}
+                                    placeholder={quickPartialPending ? `Máximo ${quickPartialPending}` : 'Sin pendiente'}
+                                />
+                                <p className="text-xs text-slate-400">
+                                    Se generará un lote automáticamente y la OP seguirá en progreso.
+                                </p>
+                            </div>
+                            <div className="grid gap-2">
+                                <Label htmlFor="quick-partial-warehouse">Almacén de destino</Label>
+                                <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
+                                    <SelectTrigger id="quick-partial-warehouse">
+                                        <SelectValue placeholder="Seleccionar almacén (opcional)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {warehouses.map((w) => (
+                                            <SelectItem key={w.id} value={w.id}>
+                                                {w.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsQuickPartialDialogOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleQuickPartial} disabled={quickCompleting || quickPartialPending <= 0}>
+                                {quickCompleting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Enviando...
+                                    </>
+                                ) : (
+                                    'Enviar a bodega'
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={isQuickTotalDialogOpen} onOpenChange={setIsQuickTotalDialogOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Finalizar rápido</DialogTitle>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
+                            <p className="text-sm text-slate-500">
+                                Se generarán automáticamente los lotes pendientes, se enviará el producto terminado a bodega y se cerrará la OP.
+                            </p>
+                            {materialConsumption.length > 0 && (
+                                <div className="space-y-2">
+                                    <p className="text-sm font-medium">Consumo de Materia Prima</p>
+                                    <p className="text-xs text-slate-500">
+                                        Ajusta el consumo real. Por defecto se usan los cálculos teóricos.
+                                    </p>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Material</TableHead>
+                                                <TableHead>Teórico</TableHead>
+                                                <TableHead>Real</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {materialConsumption.map((item, idx) => (
+                                                <TableRow key={item.rawMaterialId}>
+                                                    <TableCell className="font-medium">{item.name}</TableCell>
+                                                    <TableCell>{item.theoreticalQty.toFixed(4)}</TableCell>
+                                                    <TableCell>
+                                                        <Input
+                                                            type="number"
+                                                            value={item.actualQty}
+                                                            onChange={(e) => {
+                                                                const newVal = parseFloat(e.target.value) || 0;
+                                                                setMaterialConsumption(prev =>
+                                                                    prev.map((m, i) => i === idx ? { ...m, actualQty: newVal } : m)
+                                                                );
+                                                            }}
+                                                            className="w-28"
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                            <div className="grid gap-2">
+                                <Label htmlFor="quick-total-warehouse">Almacén de destino</Label>
+                                <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>
+                                    <SelectTrigger id="quick-total-warehouse">
+                                        <SelectValue placeholder="Seleccionar almacén (opcional)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {warehouses.map((w) => (
+                                            <SelectItem key={w.id} value={w.id}>
+                                                {w.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsQuickTotalDialogOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleQuickTotal} disabled={quickCompleting}>
+                                {quickCompleting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Finalizando...
+                                    </>
+                                ) : (
+                                    'Finalizar rápido'
                                 )}
                             </Button>
                         </DialogFooter>

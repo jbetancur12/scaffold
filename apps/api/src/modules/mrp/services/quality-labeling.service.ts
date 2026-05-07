@@ -245,17 +245,25 @@ export class QualityLabelingService {
     }
 
     async validateDispatchReadiness(productionBatchId: string, actor?: string): Promise<DispatchValidationResult> {
-        const batch = await this.em.findOneOrFail(ProductionBatch, { id: productionBatchId }, { populate: ['units'] });
-        const labels = await this.regulatoryLabelRepo.find({ productionBatch: productionBatchId }, { populate: ['productionBatchUnit'] });
+        const batch = await this.em.findOneOrFail(
+            ProductionBatch,
+            { id: productionBatchId },
+            { populate: ['units', 'variant', 'variant.product', 'variant.product.invimaRegistration'] }
+        );
+        let labels = await this.regulatoryLabelRepo.find({ productionBatch: productionBatchId }, { populate: ['productionBatchUnit'] });
         const configs = await this.operationalConfigRepo.findAll({ limit: 1, orderBy: { createdAt: 'DESC' } });
         const mode = configs[0]?.operationMode === 'serial' ? 'serial' : 'lote';
         const errors: string[] = [];
 
-        const lotLabel = labels.find((label) =>
+        let lotLabel = labels.find((label) =>
             label.scopeType === RegulatoryLabelScopeType.LOTE &&
             !label.productionBatchUnit &&
             label.status === RegulatoryLabelStatus.VALIDADA
         );
+        if (!lotLabel && String(batch.notes || '').includes('completado rapido')) {
+            lotLabel = await this.createQuickCompleteLotLabel(batch, actor);
+            labels = await this.regulatoryLabelRepo.find({ productionBatch: productionBatchId }, { populate: ['productionBatchUnit'] });
+        }
         if (!lotLabel) {
             errors.push('Falta etiqueta regulatoria de lote en estado validada');
         }
@@ -301,6 +309,43 @@ export class QualityLabelingService {
         });
 
         return result;
+    }
+
+    private async createQuickCompleteLotLabel(batch: ProductionBatch, actor?: string) {
+        const product = batch.variant.product;
+        const registration = product?.invimaRegistration;
+        let label = await this.regulatoryLabelRepo.findOne({
+            productionBatch: batch.id,
+            scopeType: RegulatoryLabelScopeType.LOTE,
+            productionBatchUnit: null,
+        });
+        if (!label) {
+            label = this.regulatoryLabelRepo.create({
+                productionBatch: batch,
+                productionBatchUnit: null,
+                scopeType: RegulatoryLabelScopeType.LOTE,
+                createdBy: actor || 'sistema-web',
+            } as unknown as RegulatoryLabel);
+        }
+
+        label.status = RegulatoryLabelStatus.VALIDADA;
+        label.deviceType = RegulatoryDeviceType.CLASE_I;
+        label.codingStandard = RegulatoryCodingStandard.INTERNO;
+        label.productName = product?.name || batch.variant.name || batch.variant.sku || 'Producto';
+        label.manufacturerName = registration?.manufacturerName || registration?.holderName || 'Fabricante no definido';
+        label.invimaRegistration = registration?.code || 'NO_REQUIERE_INVIMA';
+        label.lotCode = batch.code;
+        label.serialCode = undefined;
+        label.manufactureDate = new Date();
+        label.expirationDate = undefined;
+        label.gtin = undefined;
+        label.udiDi = undefined;
+        label.udiPi = undefined;
+        label.internalCode = batch.code;
+        label.codingValue = batch.code;
+        label.validationErrors = [];
+        await this.em.persistAndFlush(label);
+        return label;
     }
 
     private validateRegulatoryLabel(payload: {
