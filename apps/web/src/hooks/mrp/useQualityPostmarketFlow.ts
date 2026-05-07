@@ -88,6 +88,7 @@ export const useQualityPostmarketFlow = () => {
     });
     const [batchLookupQuery, setBatchLookupQuery] = useState('');
     const [batchLookupResults, setBatchLookupResults] = useState<FinishedGoodsLotInventory[]>([]);
+    const [selectedLotByBatchId, setSelectedLotByBatchId] = useState<Record<string, FinishedGoodsLotInventory>>({});
     const [loadingBatchLookup, setLoadingBatchLookup] = useState(false);
 
     const technovigilanceCases = technovigilanceData ?? [];
@@ -254,6 +255,7 @@ export const useQualityPostmarketFlow = () => {
             });
             setBatchLookupQuery('');
             setBatchLookupResults([]);
+            setSelectedLotByBatchId({});
             toast({ title: 'Despacho registrado', description: 'Trazabilidad bidireccional actualizada.' });
         } catch (err) {
             toast({ title: 'Error', description: getErrorMessage(err, 'No se pudo registrar el despacho'), variant: 'destructive' });
@@ -308,6 +310,10 @@ export const useQualityPostmarketFlow = () => {
     };
 
     const applyBatchToShipmentItem = (index: number, lotInventory: FinishedGoodsLotInventory) => {
+        setSelectedLotByBatchId((prev) => ({
+            ...prev,
+            [lotInventory.productionBatchId]: lotInventory,
+        }));
         updateShipmentItem(index, 'productionBatchId', lotInventory.productionBatchId);
         updateShipmentItem(index, 'quantity', Math.min(1, Number(lotInventory.quantity || 0)));
     };
@@ -419,6 +425,7 @@ export const useQualityPostmarketFlow = () => {
         shipmentForm,
         batchLookupQuery,
         batchLookupResults,
+        selectedLotByBatchId,
         setTechnoForm,
         setRecallForm,
         setCustomerForm,
