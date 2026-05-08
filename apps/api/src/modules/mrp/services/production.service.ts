@@ -1804,7 +1804,10 @@ export class ProductionService {
                             if (!row.rawMaterialSpecification) return true;
                             return row.rawMaterialSpecification.id === requirement.specificationId;
                         });
-                        const available = rows.reduce((sum, row) => sum + Number(row.quantityAvailable), 0);
+                        const availableFromLots = rows.reduce((sum, row) => sum + Number(row.quantityAvailable), 0);
+                        const invRows = await inventoryRepo.find({ rawMaterial: materialId, warehouse: { type: { $ne: WarehouseType.QUARANTINE } } });
+                        const realAvailable = invRows.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+                        const available = Math.min(availableFromLots, realAvailable);
                         if (available < pending) {
                             throw new AppError(
                                 `Stock insuficiente para consumir ${requirement.materialName}. Requerido: ${pending.toFixed(4)}, disponible: ${available.toFixed(4)}`,
@@ -1955,10 +1958,8 @@ export class ProductionService {
                             throw new AppError(`No existe inventario agregado para material ${materialId} en bodega ${warehouseRowId}`, 400);
                         }
                         const currentQty = Number(inventoryRow.quantity);
-                        if (currentQty < consumedQty) {
-                            throw new AppError(`Inconsistencia de inventario para material ${materialId} en bodega ${warehouseRowId}`, 400);
-                        }
-                        inventoryRow.quantity = currentQty - consumedQty;
+                        const actualDeduction = Math.min(currentQty, consumedQty);
+                        inventoryRow.quantity = Number((currentQty - actualDeduction).toFixed(4));
                         tx.persist(inventoryRow);
                     }
 
