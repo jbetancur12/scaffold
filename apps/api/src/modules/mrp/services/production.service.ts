@@ -2063,8 +2063,48 @@ export class ProductionService {
                 quantityAvailable: { $gt: 0 },
                 warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
             },
-            { populate: ['warehouse', 'rawMaterialSpecification'] }
+            { populate: ['rawMaterial', 'warehouse', 'rawMaterialSpecification'] }
         );
+
+        const invByKey = new Map<string, number>();
+        for (const inv of inventories) {
+            if (!inv.rawMaterial || !inv.warehouse) continue;
+            const specId = inv.rawMaterialSpecification?.id || '';
+            const key = `${inv.rawMaterial.id}::${inv.warehouse.id}::${specId}`;
+            invByKey.set(key, (invByKey.get(key) || 0) + Number(inv.quantity || 0));
+        }
+
+        const lotTotalByKey = new Map<string, { total: number; lots: RawMaterialLot[] }>();
+        for (const lot of existingLots) {
+            const matId = lot.rawMaterial?.id;
+            if (!matId) continue;
+            const whId = lot.warehouse?.id;
+            if (!whId) continue;
+            const specId = lot.rawMaterialSpecification?.id || '';
+            const key = `${matId}::${whId}::${specId}`;
+            if (!lotTotalByKey.has(key)) lotTotalByKey.set(key, { total: 0, lots: [] });
+            const entry = lotTotalByKey.get(key)!;
+            entry.total += Number(lot.quantityAvailable || 0);
+            entry.lots.push(lot);
+        }
+
+        for (const [key, entry] of lotTotalByKey.entries()) {
+            const invQty = invByKey.get(key) || 0;
+            if (entry.total > invQty) {
+                const excess = entry.total - invQty;
+                let remainingExcess = excess;
+                const sortedLots = entry.lots.sort((a, b) => Number(b.quantityAvailable) - Number(a.quantityAvailable));
+                for (const lot of sortedLots) {
+                    if (remainingExcess <= 0) break;
+                    const currentQty = Number(lot.quantityAvailable || 0);
+                    if (currentQty <= 0) continue;
+                    const reduce = Math.min(currentQty, remainingExcess);
+                    lot.quantityAvailable = currentQty - reduce;
+                    remainingExcess -= reduce;
+                    manager.persist(lot);
+                }
+            }
+        }
 
         const coveredByExisting = new Map<string, number>();
         for (const lot of existingLots) {
