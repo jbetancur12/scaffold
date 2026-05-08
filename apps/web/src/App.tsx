@@ -50,6 +50,7 @@ const OperatorListPage = lazy(() => import('@/pages/mrp/OperatorListPage'));
 const OperatorFormPage = lazy(() => import('@/pages/mrp/OperatorFormPage'));
 const ProductionEntryListPage = lazy(() => import('@/pages/mrp/ProductionEntryListPage'));
 const ProductionEntryFormPage = lazy(() => import('@/pages/mrp/ProductionEntryFormPage'));
+const DispatchPage = lazy(() => import('@/pages/mrp/DispatchPage'));
 
 const QualityNcPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityNcPage })));
 const QualityCapaPage = lazy(() => import('@/pages/quality/QualitySectionPages').then((m) => ({ default: m.QualityCapaPage })));
@@ -195,6 +196,7 @@ export default function App() {
                             <Route path="/mrp/sales-orders/new" element={<SalesOrderFormPage />} />
                             <Route path="/mrp/sales-orders/:id/edit" element={<SalesOrderFormPage />} />
                             <Route path="/mrp/sales-orders/:id" element={<SalesOrderDetailPage />} />
+                            <Route path="/mrp/dispatch" element={<DispatchPage />} />
                             <Route path="/mrp/quotations" element={<QuotationListPage />} />
                             <Route path="/mrp/quotations/new" element={<QuotationFormPage />} />
                             <Route path="/mrp/quotations/:id/edit" element={<QuotationFormPage />} />

@@ -1046,6 +1046,26 @@ export const ListShipmentsQuerySchema = z.object({
     commercialDocument: z.string().optional(),
 });
 
+export const DispatchItemLotAllocationSchema = z.object({
+    lotId: z.string().uuid(),
+    quantity: z.number().positive(),
+});
+
+export const PendingDispatchItemSchema = z.object({
+    salesOrderItemId: z.string().uuid(),
+    quantity: z.number().positive(),
+    lotAllocations: z.array(DispatchItemLotAllocationSchema).optional(),
+});
+
+export const CreateDispatchFromSalesOrderSchema = z.object({
+    customerId: z.string().uuid(),
+    commercialDocument: z.string().min(3),
+    shippedAt: z.coerce.date().optional(),
+    dispatchedBy: z.string().optional(),
+    notes: z.string().optional(),
+    items: z.array(PendingDispatchItemSchema).min(1),
+});
+
 export const CreateDmrTemplateSchema = z.object({
     productId: z.string().uuid().optional(),
     process: z.nativeEnum(DocumentProcess),

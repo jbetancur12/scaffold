@@ -526,6 +526,7 @@ export interface SalesOrderItem {
     taxRate: number;
     taxAmount: number;
     subtotal: number;
+    dispatchedQuantity: number;
 }
 
 export interface CancellationSettlementItem {
@@ -1542,6 +1543,8 @@ export interface ShipmentItem {
     productionBatch?: Pick<ProductionBatch, 'id' | 'code'>;
     productionBatchUnitId?: string;
     productionBatchUnit?: Pick<ProductionBatchUnit, 'id' | 'serialCode'>;
+    salesOrderItemId?: string;
+    salesOrderItem?: Pick<SalesOrderItem, 'id' | 'dispatchedQuantity'>;
     quantity: number;
     createdAt: string | Date;
     updatedAt: string | Date;
@@ -1558,6 +1561,49 @@ export interface Shipment {
     items: ShipmentItem[];
     createdAt: string | Date;
     updatedAt: string | Date;
+}
+
+export interface AvailableLot {
+    lotId: string;
+    lotCode: string;
+    warehouseId: string;
+    warehouseName: string;
+    quantity: number;
+}
+
+export interface PendingDispatchItem {
+    salesOrderId: string;
+    salesOrderCode: string;
+    salesOrderItemId: string;
+    productId: string;
+    productName: string;
+    productSku: string;
+    variantId?: string;
+    variantName?: string;
+    variantSku?: string;
+    orderedQuantity: number;
+    dispatchedQuantity: number;
+    pendingQuantity: number;
+    availableStock: number;
+    availableLots: AvailableLot[];
+}
+
+export interface DispatchItemLotAllocation {
+    lotId: string;
+    quantity: number;
+}
+
+export interface CreateDispatchFromSalesOrderPayload {
+    customerId: string;
+    commercialDocument: string;
+    shippedAt?: string | Date;
+    dispatchedBy?: string;
+    notes?: string;
+    items: Array<{
+        salesOrderItemId: string;
+        quantity: number;
+        lotAllocations?: DispatchItemLotAllocation[];
+    }>;
 }
 
 export interface RecallAffectedCustomer {

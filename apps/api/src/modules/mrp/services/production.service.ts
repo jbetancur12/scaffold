@@ -2056,6 +2056,26 @@ export class ProductionService {
             { populate: ['rawMaterial', 'warehouse', 'rawMaterialSpecification'] }
         );
 
+        const existingLots = await lotRepo.find(
+            {
+                rawMaterial: { $in: materialIds },
+                quantityAvailable: { $gt: 0 },
+                warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
+            },
+            { populate: ['warehouse', 'rawMaterialSpecification'] }
+        );
+
+        const coveredByExisting = new Map<string, number>();
+        for (const lot of existingLots) {
+            const matId = lot.rawMaterial?.id;
+            if (!matId) continue;
+            const whId = lot.warehouse?.id;
+            if (!whId) continue;
+            const specId = lot.rawMaterialSpecification?.id || '';
+            const key = `${matId}::${whId}::${specId}`;
+            coveredByExisting.set(key, (coveredByExisting.get(key) || 0) + Number(lot.quantityAvailable || 0));
+        }
+
         const toPersist: RawMaterialLot[] = [];
         for (const inv of inventories) {
             if (!inv.rawMaterial || !inv.warehouse) continue;
@@ -2066,18 +2086,28 @@ export class ProductionService {
                 supplierLotCode: code,
             });
             if (exists) continue;
+
+            const specId = inv.rawMaterialSpecification?.id || '';
+            const key = `${inv.rawMaterial.id}::${inv.warehouse.id}::${specId}`;
+            const alreadyCovered = coveredByExisting.get(key) || 0;
+            const invQty = Number(inv.quantity);
+            const remaining = Math.max(0, invQty - alreadyCovered);
+
+            if (remaining <= 0) continue;
+
             const lot = lotRepo.create({
                 rawMaterial: inv.rawMaterial,
                 rawMaterialSpecification: inv.rawMaterialSpecification,
                 warehouse: inv.warehouse,
                 supplierLotCode: code,
-                quantityInitial: Number(inv.quantity),
-                quantityAvailable: Number(inv.quantity),
+                quantityInitial: remaining,
+                quantityAvailable: remaining,
                 unitCost: Number(inv.rawMaterial.averageCost || inv.rawMaterial.lastPurchasePrice || 0),
                 receivedAt: inv.lastUpdated || inv.createdAt,
                 notes: 'Lote legacy generado automáticamente para trazabilidad PEPS.',
             } as unknown as RawMaterialLot);
             toPersist.push(lot);
+            coveredByExisting.set(key, alreadyCovered + remaining);
         }
         if (toPersist.length > 0) {
             await manager.persistAndFlush(toPersist);

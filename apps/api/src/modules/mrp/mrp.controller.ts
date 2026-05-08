@@ -20,6 +20,7 @@ import { QualityLabelingPdfService } from './services/quality-labeling-pdf.servi
 import { QualityBatchReleasePdfService } from './services/quality-batch-release-pdf.service';
 import { ThreadConsumptionService } from './services/thread-consumption.service';
 import { ThreadProcessService } from './services/thread-process.service';
+import { DispatchService } from './services/dispatch.service';
 import { QuotationService } from './services/quotation.service';
 import { QuotationPdfService } from './services/quotation-pdf.service';
 import { ProductionAnalyticsService } from './services/production-analytics.service';
@@ -180,6 +181,7 @@ import {
     CreateProductionEntrySchema,
     ListProductionEntriesQuerySchema,
     ProductionEntryPdfQuerySchema,
+    CreateDispatchFromSalesOrderSchema,
 } from '@scaffold/schemas';
 import { ProductionOrderStatus } from '@scaffold/types';
 import { ApiResponse, AppError } from '../../shared/utils/response';
@@ -230,6 +232,7 @@ export class MrpController {
     private get threadConsumptionService() { return new ThreadConsumptionService(); }
     private get threadProcessService() { return new ThreadProcessService(this.em); }
     private get productionAnalyticsService() { return new ProductionAnalyticsService(this.em); }
+    private get dispatchService() { return new DispatchService(this.em); }
 
     private parseProductionStatusFilter(raw?: string): ProductionOrderStatus[] | undefined {
         if (!raw) return undefined;
@@ -1829,6 +1832,27 @@ export class MrpController {
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', `attachment; filename="${pdf.fileName}"`);
             return res.send(pdf.buffer);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getPendingDispatchItems(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { customerId } = req.params;
+            const items = await this.dispatchService.getPendingDispatchItems(customerId);
+            return ApiResponse.success(res, items);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createDispatchFromSalesOrder(req: Request, res: Response, next: NextFunction) {
+        try {
+            const payload = CreateDispatchFromSalesOrderSchema.parse(req.body);
+            const actor = this.resolveActor(req) || payload.dispatchedBy || 'sistema-web';
+            const result = await this.dispatchService.createDispatchFromSalesOrder(payload, actor);
+            return ApiResponse.success(res, result, 'Despacho creado exitosamente', 201);
         } catch (error) {
             next(error);
         }

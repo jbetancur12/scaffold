@@ -235,6 +235,10 @@ export const createMrpRoutes = (orm: MikroORM) => {
     router.post('/sales-orders/:id/cancel-with-settlement', (req, res, next) => mrpController.cancelSalesOrderWithSettlement(req, res, next));
     router.get('/sales-orders/:id/pdf', (req, res, next) => mrpController.downloadSalesOrderPdf(req, res, next));
 
+    // Dispatch from Sales Orders
+    router.get('/dispatch/pending/:customerId', (req, res, next) => mrpController.getPendingDispatchItems(req, res, next));
+    router.post('/dispatch/from-sales-order', (req, res, next) => mrpController.createDispatchFromSalesOrder(req, res, next));
+
     // Quotations
     router.post('/quotations', (req, res, next) => mrpController.createQuotation(req, res, next));
     router.get('/quotations', (req, res, next) => mrpController.listQuotations(req, res, next));

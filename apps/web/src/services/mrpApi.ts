@@ -72,6 +72,8 @@ import {
     InvimaRegistrationStatus,
     Customer,
     Shipment,
+    PendingDispatchItem,
+    CreateDispatchFromSalesOrderPayload,
     RecallAffectedCustomer,
     DmrTemplate,
     BatchDhrExpedient,
@@ -1577,5 +1579,15 @@ export const mrpApi = {
     // Supplier Materials
     removeSupplierMaterial: async (id: string, materialId: string): Promise<void> => {
         await api.delete(`/mrp/suppliers/${id}/materials/${materialId}`);
+    },
+
+    // Dispatch from Sales Orders
+    getPendingDispatchItems: async (customerId: string): Promise<PendingDispatchItem[]> => {
+        const response = await api.get<PendingDispatchItem[]>(`/mrp/dispatch/pending/${customerId}`);
+        return response.data;
+    },
+    createDispatchFromSalesOrder: async (payload: CreateDispatchFromSalesOrderPayload): Promise<Shipment> => {
+        const response = await api.post<Shipment>('/mrp/dispatch/from-sales-order', payload);
+        return response.data;
     },
 };

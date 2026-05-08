@@ -6977,6 +6977,18 @@
           "precision": 12,
           "scale": 2,
           "mappedType": "decimal"
+        },
+        "dispatched_quantity": {
+          "name": "dispatched_quantity",
+          "type": "numeric(12,2)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "precision": 12,
+          "scale": 2,
+          "default": "0",
+          "mappedType": "decimal"
         }
       },
       "name": "sales_order_item",
@@ -7224,6 +7236,15 @@
           "nullable": true,
           "mappedType": "uuid"
         },
+        "sales_order_item_id": {
+          "name": "sales_order_item_id",
+          "type": "uuid",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "mappedType": "uuid"
+        },
         "quantity": {
           "name": "quantity",
           "type": "int",
@@ -7284,6 +7305,19 @@
             "id"
           ],
           "referencedTableName": "public.production_batch_unit",
+          "deleteRule": "set null",
+          "updateRule": "cascade"
+        },
+        "shipment_item_sales_order_item_id_foreign": {
+          "constraintName": "shipment_item_sales_order_item_id_foreign",
+          "columnNames": [
+            "sales_order_item_id"
+          ],
+          "localTableName": "public.shipment_item",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "referencedTableName": "public.sales_order_item",
           "deleteRule": "set null",
           "updateRule": "cascade"
         }

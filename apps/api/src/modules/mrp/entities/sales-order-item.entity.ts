@@ -44,4 +44,7 @@ export class SalesOrderItem extends BaseEntity {
 
     @Property({ type: 'decimal', precision: 12, scale: 2 })
     subtotal!: number;
+
+    @Property({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+    dispatchedQuantity: number = 0;
 }

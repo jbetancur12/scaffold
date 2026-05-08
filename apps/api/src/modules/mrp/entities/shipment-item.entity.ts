@@ -2,6 +2,7 @@ import { Entity, ManyToOne, Property } from '@mikro-orm/core';
 import { BaseEntity } from '../../../shared/entities/base.entity';
 import { ProductionBatch } from './production-batch.entity';
 import { ProductionBatchUnit } from './production-batch-unit.entity';
+import { SalesOrderItem } from './sales-order-item.entity';
 import { Shipment } from './shipment.entity';
 
 @Entity()
@@ -28,6 +29,14 @@ export class ShipmentItem extends BaseEntity {
     @Property({ persist: false })
     get productionBatchUnitId() {
         return this.productionBatchUnit?.id;
+    }
+
+    @ManyToOne(() => SalesOrderItem, { nullable: true })
+    salesOrderItem?: SalesOrderItem;
+
+    @Property({ persist: false })
+    get salesOrderItemId() {
+        return this.salesOrderItem?.id;
     }
 
     @Property()

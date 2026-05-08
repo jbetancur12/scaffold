@@ -27,6 +27,7 @@ import {
     BarChart3,
     ClipboardList,
     TrendingUp,
+    Truck,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
@@ -99,6 +100,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { icon: TrendingUp, label: 'Pronóstico Producción', path: '/mrp/production-forecast', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Users, label: 'Operadores', path: '/mrp/operators', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: ClipboardList, label: 'Registros de Producción', path: '/mrp/production-entries', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
+        { icon: Truck, label: 'Despachos', path: '/mrp/dispatch', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Inventario', path: '/mrp/inventory', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Warehouse, label: 'Almacenes', path: '/mrp/warehouses', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
         { icon: Scissors, label: 'Calculadora de Hilo', path: '/mrp/thread-calculator', roles: [UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN] },
@@ -116,7 +118,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         },
         {
             label: 'Operación',
-            items: ['/mrp/sales-orders', '/mrp/quotations', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/production-orders/simulator', '/mrp/production-analytics', '/mrp/production-forecast', '/mrp/operators', '/mrp/production-entries', '/mrp/inventory', '/mrp/warehouses', '/mrp/thread-calculator'],
+            items: ['/mrp/sales-orders', '/mrp/quotations', '/mrp/purchase-requisitions', '/mrp/purchase-orders', '/mrp/production-orders', '/mrp/production-orders/simulator', '/mrp/production-analytics', '/mrp/production-forecast', '/mrp/operators', '/mrp/production-entries', '/mrp/dispatch', '/mrp/inventory', '/mrp/warehouses', '/mrp/thread-calculator'],
         },
         {
             label: 'Parámetros',
