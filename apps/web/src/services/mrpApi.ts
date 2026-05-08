@@ -1586,6 +1586,10 @@ export const mrpApi = {
         const response = await api.get<PendingDispatchItem[]>(`/mrp/dispatch/pending/${customerId}`);
         return response.data;
     },
+    getCustomersWithPendingDispatch: async (): Promise<Customer[]> => {
+        const response = await api.get<Customer[]>('/mrp/dispatch/customers-with-pending');
+        return response.data;
+    },
     createDispatchFromSalesOrder: async (payload: CreateDispatchFromSalesOrderPayload): Promise<Shipment> => {
         const response = await api.post<Shipment>('/mrp/dispatch/from-sales-order', payload);
         return response.data;

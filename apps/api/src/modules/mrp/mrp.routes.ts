@@ -237,6 +237,7 @@ export const createMrpRoutes = (orm: MikroORM) => {
 
     // Dispatch from Sales Orders
     router.get('/dispatch/pending/:customerId', (req, res, next) => mrpController.getPendingDispatchItems(req, res, next));
+    router.get('/dispatch/customers-with-pending', (req, res, next) => mrpController.getCustomersWithPendingDispatch(req, res, next));
     router.post('/dispatch/from-sales-order', (req, res, next) => mrpController.createDispatchFromSalesOrder(req, res, next));
 
     // Quotations

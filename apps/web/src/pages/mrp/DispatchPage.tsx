@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, Fragment } from 'react';
+import { useState, useMemo, useCallback, useEffect, Fragment } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,8 +28,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Truck, Search, ChevronDown, ChevronRight, Package } from 'lucide-react';
 import { mrpApi } from '@/services/mrpApi';
-import { PendingDispatchItem } from '@scaffold/types';
-import { useCustomersQuery } from '@/hooks/mrp/useCustomers';
+import { Customer, PendingDispatchItem } from '@scaffold/types';
 import { getErrorMessage } from '@/lib/api-error';
 import { useMrpMutation } from '@/hooks/useMrpQuery';
 
@@ -46,6 +45,9 @@ export default function DispatchPage() {
     const [commercialDocument, setCommercialDocument] = useState('');
     const [confirmOpen, setConfirmOpen] = useState(false);
 
+    const [customers, setCustomers] = useState<Customer[]>([]);
+    const [loadingCustomers, setLoadingCustomers] = useState(true);
+
     const toggleRow = (id: string) => {
         setExpandedRows((prev) => {
             const next = new Set(prev);
@@ -54,8 +56,12 @@ export default function DispatchPage() {
             return next;
         });
     };
-    const { data: customersData, loading: loadingCustomers } = useCustomersQuery(customerSearch || undefined);
-    const customers = customersData ?? [];
+
+    useEffect(() => {
+        mrpApi.getCustomersWithPendingDispatch().then(setCustomers).catch(() => {
+            // Silently fail, customer list will be empty
+        }).finally(() => setLoadingCustomers(false));
+    }, []);
 
     const { execute: createDispatch, loading: submitting } = useMrpMutation(
         async (payload: Parameters<typeof mrpApi.createDispatchFromSalesOrder>[0]) => {

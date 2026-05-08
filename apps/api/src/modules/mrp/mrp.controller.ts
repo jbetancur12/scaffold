@@ -1847,6 +1847,15 @@ export class MrpController {
         }
     }
 
+    async getCustomersWithPendingDispatch(req: Request, res: Response, next: NextFunction) {
+        try {
+            const customers = await this.dispatchService.getCustomersWithPendingDispatch();
+            return ApiResponse.success(res, customers);
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async createDispatchFromSalesOrder(req: Request, res: Response, next: NextFunction) {
         try {
             const payload = CreateDispatchFromSalesOrderSchema.parse(req.body);

@@ -98,6 +98,35 @@ export class DispatchService {
         return result;
     }
 
+    async getCustomersWithPendingDispatch(): Promise<Customer[]> {
+        const salesOrderItemRepo = this.em.getRepository(SalesOrderItem);
+        const salesOrderRepo = this.em.getRepository(SalesOrder);
+
+        const ordersWithPending = await salesOrderRepo.find(
+            {
+                status: { $nin: [SalesOrderStatus.CANCELLED, SalesOrderStatus.SHIPPED] },
+            },
+            { populate: ['customer'] }
+        );
+
+        const customerMap = new Map<string, Customer>();
+        for (const order of ordersWithPending) {
+            if (!order.customer) continue;
+            const items = await salesOrderItemRepo.find(
+                { salesOrder: order.id },
+                { populate: ['salesOrder'] }
+            );
+            const hasPending = items.some(
+                (item) => Number(item.quantity) > Number(item.dispatchedQuantity)
+            );
+            if (hasPending && !customerMap.has(order.customer.id)) {
+                customerMap.set(order.customer.id, order.customer);
+            }
+        }
+
+        return Array.from(customerMap.values());
+    }
+
     async createDispatchFromSalesOrder(payload: CreateDispatchFromSalesOrderPayload, _actor?: string) {
         const itemIds = payload.items.map((i) => i.salesOrderItemId);
         if (itemIds.length === 0) {
