@@ -29,6 +29,7 @@ import {
     TrendingUp,
     Truck,
 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { UserRole } from '@scaffold/types';
 import { cn } from '@/lib/utils';
@@ -73,6 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const { toast } = useToast();
     const location = useLocation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [sidebarSearch, setSidebarSearch] = useState('');
     const [isMrpOpen, setIsMrpOpen] = useState(true);
     const [isQualityOpen, setIsQualityOpen] = useState(true);
     const [isPostmarketOpen, setIsPostmarketOpen] = useState(true);
@@ -151,202 +153,283 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
     };
 
-    const renderNavItems = (onItemClick?: () => void) => (
-        <>
-            <SidebarItem
-                icon={LayoutDashboard}
-                label="Resumen"
-                active={location.pathname === '/'}
-                onClick={() => {
-                    navigate('/');
-                    onItemClick?.();
-                }}
-            />
+    const renderNavItems = (onItemClick?: () => void) => {
+        const searchQuery = sidebarSearch.trim().toLowerCase();
 
-            {/* MRP Group */}
-            <div className="space-y-1.5">
-                <button
-                    onClick={() => setIsMrpOpen(!isMrpOpen)}
-                    className={cn(
-                        "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group select-none",
-                        isMrpActive ? "bg-slate-100/80" : "hover:bg-slate-50"
-                    )}
-                >
-                    <div className="flex items-center gap-3">
-                        <div className={cn(
-                            "flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm border",
-                            isMrpActive ? "bg-primary text-white border-primary/20" : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300 group-hover:text-slate-700"
-                        )}>
-                            <Boxes className="h-4 w-4" />
+        if (searchQuery) {
+            const qualityItems = qualitySections.map((s) => ({
+                icon: s.domain === 'quality' ? ShieldCheck : Megaphone,
+                label: s.label,
+                path: s.path,
+                group: s.domain === 'quality' ? 'Calidad e INVIMA' : 'Postmercado',
+            }));
+
+            const allItems = [
+                ...filteredMrpItems.map((i) => ({ ...i, group: 'Módulo MRP' })),
+                ...qualityItems,
+            ];
+
+            if (user?.role === UserRole.SUPERADMIN) {
+                allItems.push({ icon: Users, label: 'Usuarios', path: '/users', group: 'Administración', roles: [UserRole.SUPERADMIN] } as typeof allItems[0]);
+            }
+
+            const filtered = allItems.filter((item) =>
+                item.label.toLowerCase().includes(searchQuery)
+            );
+
+            if (filtered.length === 0) {
+                return <p className="text-xs text-slate-400 text-center py-4">Sin resultados</p>;
+            }
+
+            const grouped = new Map<string, typeof filtered>();
+            filtered.forEach((item) => {
+                const group = grouped.get(item.group) || [];
+                group.push(item);
+                grouped.set(item.group, group);
+            });
+
+            return (
+                <>
+                    <SidebarItem
+                        icon={LayoutDashboard}
+                        label="Resumen"
+                        active={location.pathname === '/'}
+                        onClick={() => {
+                            navigate('/');
+                            onItemClick?.();
+                        }}
+                    />
+                    {Array.from(grouped.entries()).map(([groupLabel, items]) => (
+                        <div key={groupLabel} className="space-y-1 pt-2">
+                            <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">{groupLabel}</div>
+                            {items.map((item) => (
+                                <SidebarItem
+                                    key={item.path}
+                                    icon={item.icon}
+                                    label={item.label}
+                                    active={location.pathname === item.path}
+                                    isChild={true}
+                                    onClick={() => {
+                                        navigate(item.path);
+                                        onItemClick?.();
+                                    }}
+                                />
+                            ))}
                         </div>
-                        <span className={cn(
-                            "text-sm font-semibold tracking-tight",
-                            isMrpActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
-                        )}>Módulo MRP</span>
-                    </div>
-                    {isMrpOpen ? <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200" />}
-                </button>
+                    ))}
+                </>
+            );
+        }
 
-                {isMrpOpen && (
-                    <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300 ease-out fill-mode-both pb-2">
-                        {mrpCategories.map((category) => {
-                            const categoryItems = filteredMrpItems.filter((item) => category.items.includes(item.path));
-                            if (categoryItems.length === 0) return null;
-                            return (
-                                <div key={category.label} className="space-y-1 pt-1">
-                                    <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">{category.label}</div>
-                                    {categoryItems.map((item) => (
-                                        <SidebarItem
-                                            key={item.path}
-                                            icon={item.icon}
-                                            label={item.label}
-                                            active={location.pathname === item.path}
-                                            isChild={true}
-                                            onClick={() => {
-                                                navigate(item.path);
-                                                onItemClick?.();
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* Quality Group */}
-            <div className="space-y-1.5">
-                <button
-                    onClick={() => setIsQualityOpen(!isQualityOpen)}
-                    className={cn(
-                        "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group select-none",
-                        isQualityActive ? "bg-slate-100/80" : "hover:bg-slate-50"
-                    )}
-                >
-                    <div className="flex items-center gap-3">
-                        <div className={cn(
-                            "flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm border",
-                            isQualityActive ? "bg-emerald-600 text-white border-emerald-600/20" : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300 group-hover:text-slate-700"
-                        )}>
-                            <ShieldCheck className="h-4 w-4" />
-                        </div>
-                        <span className={cn(
-                            "text-sm font-semibold tracking-tight",
-                            isQualityActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
-                        )}>Calidad e INVIMA</span>
-                    </div>
-                    {isQualityOpen ? <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200" />}
-                </button>
-
-                {isQualityOpen && (
-                    <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300 ease-out fill-mode-both pb-2">
-                        {qualitySectionCategoryOrder.map((categoryKey) => {
-                            const categoryItems = qualitySections.filter((item) => item.domain === 'quality' && item.category === categoryKey);
-                            if (categoryItems.length === 0) return null;
-                            return (
-                                <div key={categoryKey} className="space-y-1 pt-1">
-                                    <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">
-                                        {qualitySectionCategoryLabels[categoryKey]}
-                                    </div>
-                                    {categoryItems.map((item) => (
-                                        <SidebarItem
-                                            key={item.path}
-                                            icon={ShieldCheck}
-                                            label={item.label}
-                                            active={location.pathname === item.path}
-                                            isChild={true}
-                                            onClick={() => {
-                                                navigate(item.path);
-                                                onItemClick?.();
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* Postmarket Group */}
-            <div className="space-y-1.5">
-                <button
-                    onClick={() => setIsPostmarketOpen(!isPostmarketOpen)}
-                    className={cn(
-                        "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group select-none",
-                        isPostmarketActive ? "bg-slate-100/80" : "hover:bg-slate-50"
-                    )}
-                >
-                    <div className="flex items-center gap-3">
-                        <div className={cn(
-                            "flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm border",
-                            isPostmarketActive ? "bg-blue-600 text-white border-blue-600/20" : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300 group-hover:text-slate-700"
-                        )}>
-                            <Megaphone className="h-4 w-4" />
-                        </div>
-                        <span className={cn(
-                            "text-sm font-semibold tracking-tight",
-                            isPostmarketActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
-                        )}>Postmercado</span>
-                    </div>
-                    {isPostmarketOpen ? <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200" />}
-                </button>
-
-                {isPostmarketOpen && (
-                    <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300 ease-out fill-mode-both pb-2">
-                        {qualitySectionCategoryOrder.map((categoryKey) => {
-                            const categoryItems = qualitySections.filter((item) => item.domain === 'postmarket' && item.category === categoryKey);
-                            if (categoryItems.length === 0) return null;
-                            return (
-                                <div key={`post-${categoryKey}`} className="space-y-1 pt-1">
-                                    <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">
-                                        {qualitySectionCategoryLabels[categoryKey]}
-                                    </div>
-                                    {categoryItems.map((item) => (
-                                        <SidebarItem
-                                            key={item.path}
-                                            icon={Megaphone}
-                                            label={item.label}
-                                            active={location.pathname === item.path}
-                                            isChild={true}
-                                            onClick={() => {
-                                                navigate(item.path);
-                                                onItemClick?.();
-                                            }}
-                                        />
-                                    ))}
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {user?.role === UserRole.SUPERADMIN && (
+        return (
+            <>
                 <SidebarItem
-                    icon={Users}
-                    label="Usuarios"
-                    active={location.pathname === '/users'}
+                    icon={LayoutDashboard}
+                    label="Resumen"
+                    active={location.pathname === '/'}
                     onClick={() => {
-                        navigate('/users');
+                        navigate('/');
                         onItemClick?.();
                     }}
                 />
-            )}
-        </>
-    );
+
+                {/* MRP Group */}
+                <div className="space-y-1.5">
+                    <button
+                        onClick={() => setIsMrpOpen(!isMrpOpen)}
+                        className={cn(
+                            "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group select-none",
+                            isMrpActive ? "bg-slate-100/80" : "hover:bg-slate-50"
+                        )}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={cn(
+                                "flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm border",
+                                isMrpActive ? "bg-primary text-white border-primary/20" : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300 group-hover:text-slate-700"
+                            )}>
+                                <Boxes className="h-4 w-4" />
+                            </div>
+                            <span className={cn(
+                                "text-sm font-semibold tracking-tight",
+                                isMrpActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
+                            )}>Módulo MRP</span>
+                        </div>
+                        {isMrpOpen ? <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200" />}
+                    </button>
+
+                    {isMrpOpen && (
+                        <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300 ease-out fill-mode-both pb-2">
+                            {mrpCategories.map((category) => {
+                                const categoryItems = filteredMrpItems.filter((item) => category.items.includes(item.path));
+                                if (categoryItems.length === 0) return null;
+                                return (
+                                    <div key={category.label} className="space-y-1 pt-1">
+                                        <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">{category.label}</div>
+                                        {categoryItems.map((item) => (
+                                            <SidebarItem
+                                                key={item.path}
+                                                icon={item.icon}
+                                                label={item.label}
+                                                active={location.pathname === item.path}
+                                                isChild={true}
+                                                onClick={() => {
+                                                    navigate(item.path);
+                                                    onItemClick?.();
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Quality Group */}
+                <div className="space-y-1.5">
+                    <button
+                        onClick={() => setIsQualityOpen(!isQualityOpen)}
+                        className={cn(
+                            "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group select-none",
+                            isQualityActive ? "bg-slate-100/80" : "hover:bg-slate-50"
+                        )}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={cn(
+                                "flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm border",
+                                isQualityActive ? "bg-emerald-600 text-white border-emerald-600/20" : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300 group-hover:text-slate-700"
+                            )}>
+                                <ShieldCheck className="h-4 w-4" />
+                            </div>
+                            <span className={cn(
+                                "text-sm font-semibold tracking-tight",
+                                isQualityActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
+                            )}>Calidad e INVIMA</span>
+                        </div>
+                        {isQualityOpen ? <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200" />}
+                    </button>
+
+                    {isQualityOpen && (
+                        <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300 ease-out fill-mode-both pb-2">
+                            {qualitySectionCategoryOrder.map((categoryKey) => {
+                                const categoryItems = qualitySections.filter((item) => item.domain === 'quality' && item.category === categoryKey);
+                                if (categoryItems.length === 0) return null;
+                                return (
+                                    <div key={categoryKey} className="space-y-1 pt-1">
+                                        <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">
+                                            {qualitySectionCategoryLabels[categoryKey]}
+                                        </div>
+                                        {categoryItems.map((item) => (
+                                            <SidebarItem
+                                                key={item.path}
+                                                icon={ShieldCheck}
+                                                label={item.label}
+                                                active={location.pathname === item.path}
+                                                isChild={true}
+                                                onClick={() => {
+                                                    navigate(item.path);
+                                                    onItemClick?.();
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Postmarket Group */}
+                <div className="space-y-1.5">
+                    <button
+                        onClick={() => setIsPostmarketOpen(!isPostmarketOpen)}
+                        className={cn(
+                            "w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group select-none",
+                            isPostmarketActive ? "bg-slate-100/80" : "hover:bg-slate-50"
+                        )}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={cn(
+                                "flex items-center justify-center w-7 h-7 rounded-md transition-colors shadow-sm border",
+                                isPostmarketActive ? "bg-blue-600 text-white border-blue-600/20" : "bg-white text-slate-500 border-slate-200 group-hover:border-slate-300 group-hover:text-slate-700"
+                            )}>
+                                <Megaphone className="h-4 w-4" />
+                            </div>
+                            <span className={cn(
+                                "text-sm font-semibold tracking-tight",
+                                isPostmarketActive ? "text-slate-900" : "text-slate-700 group-hover:text-slate-900"
+                            )}>Postmercado</span>
+                        </div>
+                        {isPostmarketOpen ? <ChevronDown className="h-4 w-4 text-slate-400 transition-transform duration-200" /> : <ChevronRight className="h-4 w-4 text-slate-400 transition-transform duration-200" />}
+                    </button>
+
+                    {isPostmarketOpen && (
+                        <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-300 ease-out fill-mode-both pb-2">
+                            {qualitySectionCategoryOrder.map((categoryKey) => {
+                                const categoryItems = qualitySections.filter((item) => item.domain === 'postmarket' && item.category === categoryKey);
+                                if (categoryItems.length === 0) return null;
+                                return (
+                                    <div key={`post-${categoryKey}`} className="space-y-1 pt-1">
+                                        <div className="pl-[2.75rem] pr-2 text-[11px] font-bold uppercase tracking-wider text-slate-400/80 mb-1">
+                                            {qualitySectionCategoryLabels[categoryKey]}
+                                        </div>
+                                        {categoryItems.map((item) => (
+                                            <SidebarItem
+                                                key={item.path}
+                                                icon={Megaphone}
+                                                label={item.label}
+                                                active={location.pathname === item.path}
+                                                isChild={true}
+                                                onClick={() => {
+                                                    navigate(item.path);
+                                                    onItemClick?.();
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+
+                {user?.role === UserRole.SUPERADMIN && (
+                    <SidebarItem
+                        icon={Users}
+                        label="Usuarios"
+                        active={location.pathname === '/users'}
+                        onClick={() => {
+                            navigate('/users');
+                            onItemClick?.();
+                        }}
+                    />
+                )}
+            </>
+        );
+    };
 
     return (
         <div className="min-h-screen bg-slate-50 flex">
             {/* Desktop Sidebar */}
             <aside className="hidden lg:flex flex-col w-[280px] bg-white border-r border-slate-200/60 p-4 sticky top-0 h-screen shadow-sm z-40">
-                <div className="flex items-center gap-3 mb-6 px-3 py-2">
+                <div className="flex items-center gap-3 mb-4 px-3 py-2">
                     <img
                         src={logo}
                         alt="Colortópedicas"
                         className="h-[52px] w-auto object-contain"
                     />
+                </div>
+
+                <div className="px-3 mb-3">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                        <Input
+                            placeholder="Buscar en menú..."
+                            className="pl-8 h-9 text-sm bg-slate-50 border-slate-200"
+                            value={sidebarSearch}
+                            onChange={(e) => setSidebarSearch(e.target.value)}
+                        />
+                    </div>
                 </div>
 
                 <nav className="flex-1 space-y-2 overflow-y-auto pr-2 custom-scrollbar">
@@ -400,7 +483,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </Button>
                 </div>
 
-                <nav className="space-y-2 overflow-y-auto h-[calc(100vh-200px)]">
+                <div className="px-3 mb-3">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                        <Input
+                            placeholder="Buscar en menú..."
+                            className="pl-8 h-9 text-sm bg-slate-50 border-slate-200"
+                            value={sidebarSearch}
+                            onChange={(e) => setSidebarSearch(e.target.value)}
+                        />
+                    </div>
+                </div>
+
+                <nav className="space-y-2 overflow-y-auto h-[calc(100vh-260px)]">
                     {renderNavItems(() => setIsMobileMenuOpen(false))}
                 </nav>
             </aside>
