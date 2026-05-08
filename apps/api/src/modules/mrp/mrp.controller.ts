@@ -1847,7 +1847,7 @@ export class MrpController {
         }
     }
 
-    async getCustomersWithPendingDispatch(req: Request, res: Response, next: NextFunction) {
+    async getCustomersWithPendingDispatch(_req: Request, res: Response, next: NextFunction) {
         try {
             const customers = await this.dispatchService.getCustomersWithPendingDispatch();
             return ApiResponse.success(res, customers);
