@@ -55,9 +55,11 @@ const statusConfig: Record<ProductionOrderStatus, { label: string; classes: stri
 export default function ProductionOrderListPage() {
     const navigate = useNavigate();
     const { toast } = useToast();
+    const [page, setPage] = useState(1);
+    const limit = 10;
     const [showPackagingSettings, setShowPackagingSettings] = useState(false);
 
-    const { data: ordersResponse, loading, error } = useProductionOrdersQuery();
+    const { data: ordersResponse, loading, error } = useProductionOrdersQuery(page, limit);
     const { data: operationalConfig } = useOperationalConfigQuery();
     const { execute: saveOperationalConfig, loading: savingConfig } = useSaveOperationalConfigMutation();
     const { data: packagingDocs } = useControlledDocumentsQuery({
@@ -69,6 +71,8 @@ export default function ProductionOrderListPage() {
     const [selectedLabelingDocCode, setSelectedLabelingDocCode] = useState<string>('');
     const [selectedBatchReleaseDocCode, setSelectedBatchReleaseDocCode] = useState<string>('');
     const orders = ordersResponse?.orders ?? [];
+    const total = ordersResponse?.total ?? 0;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
 
     useMrpQueryErrorToast(error, 'No se pudieron cargar las órdenes de producción');
 
@@ -80,11 +84,11 @@ export default function ProductionOrderListPage() {
     const currentOperationMode: 'lote' | 'serial' = 'lote';
 
     const kpi = useMemo(() => ({
-        total: orders.length,
+        total,
         planned: orders.filter(o => o.status === ProductionOrderStatus.PLANNED).length,
         inProgress: orders.filter(o => o.status === ProductionOrderStatus.IN_PROGRESS).length,
         completed: orders.filter(o => o.status === ProductionOrderStatus.COMPLETED).length,
-    }), [orders]);
+    }), [total, orders]);
 
     const handleSavePackagingConfig = async () => {
         if (!operationalConfig) return;
@@ -336,62 +340,106 @@ export default function ProductionOrderListPage() {
                             </Button>
                         </div>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="bg-slate-50/80 border-b border-slate-100 hover:bg-slate-50/80">
-                                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5 pl-6">Código</TableHead>
-                                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5">Estado</TableHead>
-                                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5">Fecha Inicio</TableHead>
-                                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5">Fecha Fin</TableHead>
-                                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5 pr-6 text-right">Acciones</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {orders.map((order) => {
-                                    const cfg = statusConfig[order.status] ?? statusConfig[ProductionOrderStatus.DRAFT];
-                                    return (
-                                        <TableRow
-                                            key={order.id}
-                                            className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors cursor-pointer"
-                                            onClick={() => navigate(`/mrp/production-orders/${order.id}`)}
-                                        >
-                                            <TableCell className="pl-6 py-4">
-                                                <span className="font-bold text-slate-900 font-mono tracking-tight">
-                                                    {order.code}
-                                                </span>
-                                            </TableCell>
-                                            <TableCell className="py-4">
-                                                <Badge variant="outline" className={`inline-flex items-center font-semibold ring-1 ring-inset ${cfg.classes}`}>
-                                                    {cfg.icon}
-                                                    {cfg.label}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="py-4 text-sm text-slate-600">
-                                                {order.startDate ? format(new Date(order.startDate), 'dd/MM/yyyy') : (
-                                                    <span className="text-slate-400 italic">—</span>
+                        <>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-slate-50/80 border-b border-slate-100 hover:bg-slate-50/80">
+                                        <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5 pl-6">Código</TableHead>
+                                        <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5">Estado</TableHead>
+                                        <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5">Fecha Inicio</TableHead>
+                                        <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5">Fecha Fin</TableHead>
+                                        <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider py-3.5 pr-6 text-right">Acciones</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {orders.map((order) => {
+                                        const cfg = statusConfig[order.status] ?? statusConfig[ProductionOrderStatus.DRAFT];
+                                        return (
+                                            <TableRow
+                                                key={order.id}
+                                                className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors cursor-pointer"
+                                                onClick={() => navigate(`/mrp/production-orders/${order.id}`)}
+                                            >
+                                                <TableCell className="pl-6 py-4">
+                                                    <span className="font-bold text-slate-900 font-mono tracking-tight">
+                                                        {order.code}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell className="py-4">
+                                                    <Badge variant="outline" className={`inline-flex items-center font-semibold ring-1 ring-inset ${cfg.classes}`}>
+                                                        {cfg.icon}
+                                                        {cfg.label}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="py-4 text-sm text-slate-600">
+                                                    {order.startDate ? format(new Date(order.startDate), 'dd/MM/yyyy') : (
+                                                        <span className="text-slate-400 italic">—</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="py-4 text-sm text-slate-600">
+                                                    {order.endDate ? format(new Date(order.endDate), 'dd/MM/yyyy') : (
+                                                        <span className="text-slate-400 italic">—</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="py-4 pr-6 text-right">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={(e) => { e.stopPropagation(); navigate(`/mrp/production-orders/${order.id}`); }}
+                                                        className="rounded-lg text-slate-500 hover:text-violet-700 hover:bg-violet-50 h-8 px-3"
+                                                    >
+                                                        <Eye className="h-4 w-4 mr-1.5" />
+                                                        Ver
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
+                                <span className="text-sm text-slate-500">
+                                    {total} orden(es) — Página {page} de {totalPages}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={page <= 1}
+                                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                        className="rounded-lg h-8 px-3"
+                                    >
+                                        Anterior
+                                    </Button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                                        .map((p, idx, arr) => (
+                                            <span key={p} className="flex items-center">
+                                                {idx > 0 && arr[idx - 1] !== p - 1 && (
+                                                    <span className="text-slate-300 px-1 text-sm">...</span>
                                                 )}
-                                            </TableCell>
-                                            <TableCell className="py-4 text-sm text-slate-600">
-                                                {order.endDate ? format(new Date(order.endDate), 'dd/MM/yyyy') : (
-                                                    <span className="text-slate-400 italic">—</span>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="py-4 pr-6 text-right">
                                                 <Button
-                                                    variant="ghost"
+                                                    variant={p === page ? 'default' : 'outline'}
                                                     size="sm"
-                                                    onClick={(e) => { e.stopPropagation(); navigate(`/mrp/production-orders/${order.id}`); }}
-                                                    className="rounded-lg text-slate-500 hover:text-violet-700 hover:bg-violet-50 h-8 px-3"
+                                                    onClick={() => setPage(p)}
+                                                    className={`rounded-lg h-8 w-8 min-w-0 p-0 ${p === page ? 'bg-violet-600 hover:bg-violet-700' : ''}`}
                                                 >
-                                                    <Eye className="h-4 w-4 mr-1.5" />
-                                                    Ver
+                                                    {p}
                                                 </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
+                                            </span>
+                                        ))}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={page >= totalPages}
+                                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                                        className="rounded-lg h-8 px-3"
+                                    >
+                                        Siguiente
+                                    </Button>
+                                </div>
+                            </div>
+                        </>
                     )}
                 </div>
             </div>
