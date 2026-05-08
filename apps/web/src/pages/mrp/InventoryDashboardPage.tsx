@@ -58,6 +58,7 @@ export default function InventoryDashboardPage() {
     const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
     const [selectedFilterWarehouseId, setSelectedFilterWarehouseId] = useState<string>('all');
     const [selectedMaterialId, setSelectedMaterialId] = useState('');
+    const [selectedSpecId, setSelectedSpecId] = useState('');
     const [manualQuantity, setManualQuantity] = useState('');
     const [manualCost, setManualCost] = useState('');
     const [kardexMaterialId, setKardexMaterialId] = useState<string>('all');
@@ -100,6 +101,11 @@ export default function InventoryDashboardPage() {
 
     useMrpQueryErrorToast(rawMaterialsError, 'No se pudo cargar información auxiliar');
     useMrpQueryErrorToast(warehousesError, 'No se pudo cargar información auxiliar');
+
+    const materialSpecs = useMemo(() => {
+        const mat = rawMaterials.find(m => m.id === selectedMaterialId);
+        return mat?.specifications ?? [];
+    }, [rawMaterials, selectedMaterialId]);
 
     const inventoryDisplay = useMemo<InventoryDisplayItem[]>(() => {
         if (groupMode === 'detailed') {
@@ -174,6 +180,7 @@ export default function InventoryDashboardPage() {
                 quantity: Number(manualQuantity),
                 unitCost: Number(manualCost),
                 warehouseId: selectedWarehouseId || undefined,
+                rawMaterialSpecificationId: selectedSpecId || undefined,
             });
 
             toast({
@@ -183,6 +190,7 @@ export default function InventoryDashboardPage() {
 
             setIsManualAddOpen(false);
             setSelectedMaterialId('');
+            setSelectedSpecId('');
             setManualQuantity('');
             setManualCost('');
             await refetchInventory({ force: true });
@@ -263,7 +271,7 @@ export default function InventoryDashboardPage() {
                             <div className="grid gap-4 py-4">
                                 <div className="grid gap-2">
                                     <Label htmlFor="material">Materia Prima</Label>
-                                    <Select value={selectedMaterialId} onValueChange={setSelectedMaterialId}>
+                                    <Select value={selectedMaterialId} onValueChange={(val) => { setSelectedMaterialId(val); setSelectedSpecId(''); }}>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Seleccionar materia prima" />
                                         </SelectTrigger>
@@ -276,6 +284,24 @@ export default function InventoryDashboardPage() {
                                         </SelectContent>
                                     </Select>
                                 </div>
+                                {materialSpecs.length > 0 && (
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="specification">Especificación</Label>
+                                        <Select value={selectedSpecId} onValueChange={setSelectedSpecId}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Genérica (sin especificación)" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="">Genérica (sin especificación)</SelectItem>
+                                                {materialSpecs.map((spec) => (
+                                                    <SelectItem key={spec.id} value={spec.id}>
+                                                        {spec.name}{spec.sku ? ` (${spec.sku})` : ''}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
                                 <div className="grid gap-2">
                                     <Label htmlFor="warehouse">Almacén</Label>
                                     <Select value={selectedWarehouseId} onValueChange={setSelectedWarehouseId}>

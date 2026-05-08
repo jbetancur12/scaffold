@@ -14,7 +14,7 @@ export const useInventoryQuery = (page = 1, limit = 100, warehouseId?: string) =
 
 export const useManualStockMutation = () => {
     return useMrpMutation<
-        { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string },
+        { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string; rawMaterialSpecificationId?: string },
         InventoryItem
     >(
         async (payload) => mrpApi.addManualStock(payload)

@@ -2,6 +2,7 @@ import { EntityManager, EntityRepository, FilterQuery } from '@mikro-orm/core';
 import { InventoryItem } from '../entities/inventory-item.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { RawMaterial } from '../entities/raw-material.entity';
+import { RawMaterialSpecification } from '../entities/raw-material-specification.entity';
 import { RawMaterialLot } from '../entities/raw-material-lot.entity';
 import { RawMaterialKardex } from '../entities/raw-material-kardex.entity';
 import { FinishedGoodsLotInventory } from '../entities/finished-goods-lot-inventory.entity';
@@ -155,7 +156,7 @@ export class InventoryService {
         return { items, total };
     }
 
-    async addManualStock(data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }, actor?: string): Promise<InventoryItem> {
+    async addManualStock(data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string; rawMaterialSpecificationId?: string }, actor?: string): Promise<InventoryItem> {
         // 1. Get or create warehouse
         let warehouse: Warehouse | null = null;
         if (data.warehouseId) {
@@ -175,14 +176,20 @@ export class InventoryService {
             await this.em.persist(warehouse);
         }
 
-        // 2. Get Raw Material
+        // 2. Get Raw Material & optional specification
         const rawMaterialRepo = this.em.getRepository(RawMaterial);
         const rawMaterial = await rawMaterialRepo.findOneOrFail({ id: data.rawMaterialId });
+
+        let specification: RawMaterialSpecification | null = null;
+        if (data.rawMaterialSpecificationId) {
+            const specRepo = this.em.getRepository(RawMaterialSpecification);
+            specification = await specRepo.findOneOrFail({ id: data.rawMaterialSpecificationId });
+        }
 
         // 3. Get or Create Inventory Item
         let inventory = await this.inventoryRepo.findOne({
             rawMaterial: { id: data.rawMaterialId },
-            rawMaterialSpecification: null,
+            rawMaterialSpecification: specification?.id ?? null,
             warehouse: { id: warehouse.id },
         });
 
@@ -190,7 +197,7 @@ export class InventoryService {
             inventory = this.inventoryRepo.create({
                 warehouse,
                 rawMaterial,
-                rawMaterialSpecification: undefined,
+                rawMaterialSpecification: specification ?? undefined,
                 quantity: 0,
             } as InventoryItem);
         }
@@ -215,7 +222,7 @@ export class InventoryService {
         const supplierLotCode = `MANUAL-${Date.now().toString(36).toUpperCase()}`;
         const lot = this.rawMaterialLotRepo.create({
             rawMaterial,
-            rawMaterialSpecification: undefined,
+            rawMaterialSpecification: specification ?? undefined,
             warehouse,
             supplierLotCode,
             quantityInitial: addedQty,
@@ -227,7 +234,7 @@ export class InventoryService {
 
         const kardex = this.rawMaterialKardexRepo.create({
             rawMaterial,
-            rawMaterialSpecification: undefined,
+            rawMaterialSpecification: specification ?? undefined,
             warehouse,
             lot,
             movementType: 'ENTRADA_AJUSTE_MANUAL',

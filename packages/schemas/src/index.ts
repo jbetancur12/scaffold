@@ -464,6 +464,7 @@ export const ManualStockSchema = z.object({
     quantity: z.number().min(0.01),
     unitCost: z.number().min(0),
     warehouseId: z.string().uuid().optional(),
+    rawMaterialSpecificationId: z.string().uuid().optional(),
 });
 
 export const CreateProductionOrderSchema = z.object({

@@ -1507,7 +1507,7 @@ export const mrpApi = {
         const response = await api.get<{ items: FinishedGoodsLotInventory[], total: number }>(`/mrp/inventory/finished-goods-lots`, { params });
         return response.data;
     },
-    addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string }): Promise<InventoryItem> => {
+    addManualStock: async (data: { rawMaterialId: string; quantity: number; unitCost: number; warehouseId?: string; rawMaterialSpecificationId?: string }): Promise<InventoryItem> => {
         const response = await api.post<InventoryItem>('/mrp/inventory/manual-add', data);
         return response.data;
     },

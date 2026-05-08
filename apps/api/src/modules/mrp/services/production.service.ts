@@ -1801,7 +1801,8 @@ export class ProductionService {
                         let pending = Number(requirement.required);
                         const rows = (lotsByMaterial.get(materialId) || []).filter((row) => {
                             if (!requirement.specificationId) return true;
-                            return row.rawMaterialSpecification?.id === requirement.specificationId;
+                            if (!row.rawMaterialSpecification) return true;
+                            return row.rawMaterialSpecification.id === requirement.specificationId;
                         });
                         const available = rows.reduce((sum, row) => sum + Number(row.quantityAvailable), 0);
                         if (available < pending) {
@@ -2052,7 +2053,7 @@ export class ProductionService {
                 quantity: { $gt: 0 },
                 warehouse: { type: { $ne: WarehouseType.QUARANTINE } },
             },
-            { populate: ['rawMaterial', 'warehouse'] }
+            { populate: ['rawMaterial', 'warehouse', 'rawMaterialSpecification'] }
         );
 
         const toPersist: RawMaterialLot[] = [];
@@ -2067,6 +2068,7 @@ export class ProductionService {
             if (exists) continue;
             const lot = lotRepo.create({
                 rawMaterial: inv.rawMaterial,
+                rawMaterialSpecification: inv.rawMaterialSpecification,
                 warehouse: inv.warehouse,
                 supplierLotCode: code,
                 quantityInitial: Number(inv.quantity),
