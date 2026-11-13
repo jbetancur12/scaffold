@@ -3,7 +3,7 @@
 ## Quick Start
 
 ```bash
-npm run db:up          # Start postgres (5433), redis (6379), minio (9010/9001)
+npm run db:up          # Start postgres (5434), redis (6381), minio (9010/9011)
 npm run dev            # Starts all 4 watchers: types, schemas, api (tsx), web (vite)
 npm run build          # Build packages first, then apps (order matters)
 ```
@@ -108,9 +108,9 @@ All controllers use `ApiResponse.success(res, data, message, statusCode)` or thr
 
 | Service | Dev Port | Creds |
 |---|---|---|
-| PostgreSQL | 5433 | postgres/postgres, db: scaffold_db |
-| Redis | 6379 | no auth |
-| MinIO | 9010 (API), 9001 (console) | minioadmin/minioadmin, bucket: mrp-quality-documents |
+| PostgreSQL | 5434 | postgres/postgres, db: scaffold_db |
+| Redis | 6381 | no auth |
+| MinIO | 9010 (API), 9011 (console) | minioadmin/minioadmin, bucket: mrp-quality-documents |
 
 JWT secret and other config in `.env` at monorepo root.
 

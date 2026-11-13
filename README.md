@@ -13,13 +13,13 @@ Monorepo Full-stack con React, Express, MikroORM y PostgreSQL. Incluye módulos 
 ### Instalación
 ```bash
 npm install
-npm run db:up          # Levanta postgres (5433), redis (6379), minio (9010/9001)
+npm run db:up          # Levanta postgres (5434), redis (6381), minio (9010/9011)
 npm run dev            # Inicia 4 watchers: types, schemas, api (tsx), web (vite)
 ```
 
 - **API**: http://localhost:5050
 - **Web**: http://localhost:3000
-- **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
+- **MinIO Console**: http://localhost:9011 (minioadmin/minioadmin)
 
 ## Estructura del Proyecto
 
@@ -103,9 +103,9 @@ docker exec mrp-app-api-1 npm run migration:prod --workspace=api
 
 | Servicio | Puerto Dev | Credenciales |
 |---|---|---|
-| PostgreSQL | 5433 | postgres/postgres, db: scaffold_db |
-| Redis | 6379 | sin auth |
-| MinIO | 9010 (API), 9001 (consola) | minioadmin/minioadmin, bucket: mrp-quality-documents |
+| PostgreSQL | 5434 | postgres/postgres, db: scaffold_db |
+| Redis | 6381 | sin auth |
+| MinIO | 9010 (API), 9011 (consola) | minioadmin/minioadmin, bucket: mrp-quality-documents |
 
 **Producción**: La BD se llama `mrp_db` (no `scaffold_db`). Despliegue vía `~/mrp-app/deploy.sh`.
 

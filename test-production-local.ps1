@@ -25,12 +25,12 @@ NODE_ENV=production
 DB_USER=postgres
 DB_PASSWORD=postgres
 DB_NAME=scaffold_db
-DB_PORT=5433
+DB_PORT=5434
 
 #===========================================
 # REDIS
 #===========================================
-REDIS_PORT=6379
+REDIS_PORT=6381
 
 #===========================================
 # API

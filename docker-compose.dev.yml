@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: scaffold_db
     ports:
-      - "5433:5432"
+      - "${POSTGRES_DEV_PORT:-5434}:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +22,7 @@ services:
     image: redis:7-alpine
     restart: always
     ports:
-      - "6379:6379"
+      - "${REDIS_DEV_PORT:-6381}:6379"
     volumes:
       - redis_dev_data:/data
     healthcheck:
